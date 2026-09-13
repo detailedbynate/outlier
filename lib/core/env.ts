@@ -44,7 +44,9 @@ export type ServerEnv = z.infer<typeof serverEnvSchema>;
 
 /** Parse an environment record. Exported separately so it can be tested without process.env. */
 export function parseEnv(source: Record<string, string | undefined>): ServerEnv {
-  const result = serverEnvSchema.safeParse(source);
+  // Blank values (e.g. an empty variable in a hosting dashboard) mean "unset" so defaults apply.
+  const cleaned = Object.fromEntries(Object.entries(source).filter(([, value]) => value !== undefined && value.trim() !== ""));
+  const result = serverEnvSchema.safeParse(cleaned);
   if (!result.success) {
     const issues = result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
     throw new ConfigError(`Invalid environment configuration: ${issues}`);

@@ -11,6 +11,14 @@ describe("parseEnv", () => {
     expect(env.LOG_LEVEL).toBe("info");
   });
 
+  it("uses defaults for blank values of every type", () => {
+    const env = parseEnv({ LOG_LEVEL: "", YOUTUBE_API_BASE_URL: "", STORAGE_BUDGET_MB: " ", JOB_WORKER_CONCURRENCY: "" });
+    expect(env.LOG_LEVEL).toBe("info");
+    expect(env.YOUTUBE_API_BASE_URL).toBe("https://www.googleapis.com/youtube/v3");
+    expect(env.STORAGE_BUDGET_MB).toBe(250);
+    expect(env.JOB_WORKER_CONCURRENCY).toBe(2);
+  });
+
   it("coerces numbers", () => {
     expect(parseEnv({ JOB_WORKER_CONCURRENCY: "8" }).JOB_WORKER_CONCURRENCY).toBe(8);
   });
