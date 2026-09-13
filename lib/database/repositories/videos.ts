@@ -4,12 +4,17 @@ import type { TablesInsert, VideoFeedRow, VideoFormat, VideoPerformanceRow, Vide
 import type { YouTubeVideo } from "@/types/youtube";
 import { MAX_DESCRIPTION_CHARS, truncateText } from "./channels";
 
-export function videoToRow(video: YouTubeVideo, channelUuid: string, syncedAt: Date): TablesInsert<"videos"> {
+export function videoToRow(
+  video: YouTubeVideo,
+  channelUuid: string,
+  syncedAt: Date,
+  options: { storeDescription?: boolean } = {},
+): TablesInsert<"videos"> {
   return {
     youtube_video_id: video.id,
     channel_id: channelUuid,
     title: video.title,
-    description: truncateText(video.description, MAX_DESCRIPTION_CHARS),
+    description: options.storeDescription === false ? null : truncateText(video.description, MAX_DESCRIPTION_CHARS),
     published_at: video.publishedAt,
     duration_seconds: video.durationSeconds,
     format: video.format,

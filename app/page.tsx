@@ -14,7 +14,7 @@ export default async function DashboardPage() {
   const { storage, repositories } = getServices();
   const [status, channelCount, videoCount, topVideos] = await Promise.all([
     storage.getStatus(),
-    repositories.channels.count(),
+    repositories.channels.count({ tracked: true }),
     repositories.videos.count(),
     repositories.videos.feed({ orderBy: "outlier_score", limit: 6, publishedAfter: daysAgo(30) }),
   ]);

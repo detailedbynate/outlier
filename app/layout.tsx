@@ -1,43 +1,55 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { SidebarNav } from "@/components/sidebar-nav";
 import { getCurrentUser } from "@/lib/auth/session";
 import { signOut } from "./login/actions";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Outlier",
-  description: "YouTube intelligence: viral videos, channel tracking, and analysis",
+  description: "YouTube intelligence: viral videos, channel research, and analysis",
 };
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const current = await getCurrentUser();
+
+  if (!current?.approved) {
+    return (
+      <html lang="en">
+        <body>
+          <div className="shell">
+            <header className="topbar">
+              <Link href="/" className="brand">
+                Outlier
+              </Link>
+            </header>
+            {children}
+          </div>
+        </body>
+      </html>
+    );
+  }
+
   return (
     <html lang="en">
       <body>
-        <div className="shell">
-          <header className="topbar">
+        <div className="app">
+          <aside className="sidebar">
             <Link href="/" className="brand">
               Outlier
             </Link>
-            {current?.approved ? (
-              <nav className="nav">
-                <Link href="/">Dashboard</Link>
-                <Link href="/viral">Viral videos</Link>
-                <Link href="/channels">Channels</Link>
-                <Link href="/analyze">Analyze video</Link>
-              </nav>
-            ) : null}
-            {current ? (
-              <form action={signOut} className="account">
-                <span className="muted">{current.email}</span>
-                <button type="submit" className="button-ghost">
-                  Sign out
-                </button>
-              </form>
-            ) : null}
-          </header>
-          {children}
+            <SidebarNav />
+            <form action={signOut} className="sidebar-account">
+              <span className="muted" title={current.email}>
+                {current.email}
+              </span>
+              <button type="submit" className="button-ghost">
+                Sign out
+              </button>
+            </form>
+          </aside>
+          <main className="main">{children}</main>
         </div>
       </body>
     </html>

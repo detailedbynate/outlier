@@ -40,6 +40,10 @@ const serverEnvSchema = z.object({
   SNAPSHOT_DAILY_RETENTION_DAYS: z.coerce.number().int().min(1).default(30),
   SNAPSHOT_RETENTION_DAYS: z.coerce.number().int().min(2).default(365),
 
+  /** Research discovery searches per UTC day, all users combined (100 YouTube quota units each). */
+  DISCOVERY_DAILY_LIMIT: z.coerce.number().int().min(0).max(90).default(10),
+  DISCOVERY_MAX_CHANNELS: z.coerce.number().int().min(1).max(50).default(25),
+
   ANTHROPIC_API_KEY: optionalString,
   OPENAI_API_KEY: optionalString,
 });

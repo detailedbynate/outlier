@@ -14,6 +14,9 @@ export interface SyncChannelResult {
   snapshotCreated: boolean;
 }
 
+/** Uploads sampled for channels found by research tools — enough for Shorts stats, light on storage. */
+export const LIGHT_SYNC_VIDEOS = 20;
+
 export interface ChannelServiceOptions {
   /** When set, ingestion refuses to write once the database is over budget. */
   storage?: Pick<StorageBudgetService, "assertCapacity">;
@@ -100,7 +103,15 @@ export class ChannelService {
    */
   async syncChannelVideos(
     youtubeChannelId: string,
-    options: { maxPages?: number; pageToken?: string; filter?: ChannelVideoFilter } = {},
+    options: {
+      maxPages?: number;
+      pageToken?: string;
+      filter?: ChannelVideoFilter;
+      /** Uploads per page (1-50). */
+      maxResults?: number;
+      /** Discovered channels skip video descriptions to save storage. */
+      storeDescriptions?: boolean;
+    } = {},
     now: Date = new Date(),
   ): Promise<SyncChannelVideosResult> {
     await this.options.storage?.assertCapacity();
@@ -116,14 +127,14 @@ export class ChannelService {
     do {
       const page = await this.youtube.getChannelVideos(youtubeChannelId, {
         filter: options.filter ?? "all",
-        maxResults: 50,
+        maxResults: options.maxResults ?? 50,
         pageToken,
       });
       pagesFetched += 1;
       nextPageToken = page.nextPageToken;
       pageToken = page.nextPageToken ?? undefined;
 
-      const rows = await this.videos.upsertMany(page.items.map((v) => videoToRow(v, channel.id, now)));
+      const rows = await this.videos.upsertMany(page.items.map((v) => videoToRow(v, channel.id, now, { storeDescription: options.storeDescriptions })));
       // Old videos rarely change meaningfully; snapshotting only recent ones keeps history small.
       const snapshotCutoff = now.getTime() - this.snapshotVideoMaxAgeMs;
       await this.videos.insertSnapshots(
@@ -143,10 +154,27 @@ export class ChannelService {
     return { channelId: youtubeChannelId, videosSynced, pagesFetched, nextPageToken };
   }
 
-  /** Full refresh used by tracking and the daily sync: channel stats + latest page of uploads + metrics. */
-  async refreshChannel(identifier: string, now: Date = new Date()): Promise<SyncChannelResult & { videosSynced: number }> {
+  /**
+   * Full refresh: channel stats + latest uploads + metrics.
+   * `light` is for channels found by research tools: fewer uploads, no descriptions.
+   * `track` marks the channel for daily refreshes.
+   */
+  async refreshChannel(
+    identifier: string,
+    options: { light?: boolean; track?: boolean } = {},
+    now: Date = new Date(),
+  ): Promise<SyncChannelResult & { videosSynced: number }> {
     const synced = await this.syncChannel(identifier, now);
-    const { videosSynced } = await this.syncChannelVideos(synced.channel.youtube_channel_id, { maxPages: 1 }, now);
+    if (options.track && !synced.channel.tracked) {
+      await this.channels.setTracked(synced.channel.id, true);
+      synced.channel = { ...synced.channel, tracked: true };
+    }
+    const light = options.light && !synced.channel.tracked;
+    const { videosSynced } = await this.syncChannelVideos(
+      synced.channel.youtube_channel_id,
+      { maxPages: 1, maxResults: light ? LIGHT_SYNC_VIDEOS : 50, storeDescriptions: !light },
+      now,
+    );
     return { ...synced, videosSynced };
   }
 

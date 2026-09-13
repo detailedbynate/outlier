@@ -152,9 +152,40 @@ export class YouTubeService {
 
     const ids = items.items.map((i) => i.videoId);
     const hints: VideoFormatHints =
-      filter === "shorts" ? { knownShortIds: new Set(ids) } : filter === "long_form" ? { knownLongFormIds: new Set(ids) } : {};
+      filter === "shorts"
+        ? { knownShortIds: new Set(ids) }
+        : filter === "long_form"
+          ? { knownLongFormIds: new Set(ids) }
+          : await this.uploadFormatHints(channelId, items.items);
     const videos = await this.getVideos(ids, hints);
     return { ...items, items: videos };
+  }
+
+  /**
+   * Classify mixed uploads using the channel's Shorts playlist (1 extra unit):
+   * listed videos are Shorts; unlisted uploads are long-form when the Shorts page
+   * covers their publish date. Anything older falls back to the duration heuristic.
+   */
+  private async uploadFormatHints(channelId: string, uploads: YouTubePlaylistItem[]): Promise<VideoFormatHints> {
+    let shorts: Page<YouTubePlaylistItem>;
+    try {
+      shorts = await this.getPlaylistItems(channelPlaylistId(channelId, "shorts"), { maxResults: 50 });
+    } catch (error) {
+      // No Shorts playlist means the channel has no Shorts; other errors just lose the hint.
+      if (isAppError(error) && error.code === "NOT_FOUND") shorts = { items: [], nextPageToken: null, prevPageToken: null, totalResults: 0 };
+      else return {};
+    }
+
+    const knownShortIds = new Set(shorts.items.map((i) => i.videoId));
+    const complete = shorts.nextPageToken === null;
+    const oldestListedShort = Math.min(...shorts.items.map((i) => Date.parse(i.videoPublishedAt ?? i.addedAt ?? "")).filter(Number.isFinite));
+    const knownLongFormIds = new Set(
+      uploads
+        .filter((u) => !knownShortIds.has(u.videoId))
+        .filter((u) => complete || Date.parse(u.videoPublishedAt ?? "") >= oldestListedShort)
+        .map((u) => u.videoId),
+    );
+    return { knownShortIds, knownLongFormIds };
   }
 
   async getChannelShorts(channelId: string, options: PageOptions = {}): Promise<Page<YouTubeVideo>> {

@@ -16,16 +16,18 @@ import { getYouTubeService } from "@/lib/youtube";
 import { ChannelService } from "./channel-service";
 import { DiscoveryService } from "./discovery-service";
 import { JobService } from "./job-service";
+import { ResearchService } from "./research-service";
 import { StorageBudgetService } from "./storage-budget-service";
 import { VideoService } from "./video-service";
 
-export { ChannelService, DiscoveryService, JobService, StorageBudgetService, VideoService };
+export { ChannelService, DiscoveryService, JobService, ResearchService, StorageBudgetService, VideoService };
 
 export interface Services {
   channels: ChannelService;
   videos: VideoService;
   discovery: DiscoveryService;
   jobs: JobService;
+  research: ResearchService;
   storage: StorageBudgetService;
   jobRegistry: JobRegistry;
   scheduler: JobScheduler;
@@ -113,6 +115,10 @@ export function getServices(): Services {
     videos,
     discovery: new DiscoveryService(youtube),
     jobs: new JobService(queue, repositories.jobs),
+    research: new ResearchService(
+      { youtube, channels: repositories.channels, usage: repositories.usage, storage, enqueue },
+      { discoveryDailyLimit: config.DISCOVERY_DAILY_LIMIT, discoveryMaxChannels: config.DISCOVERY_MAX_CHANNELS },
+    ),
     storage,
     jobRegistry,
     scheduler,

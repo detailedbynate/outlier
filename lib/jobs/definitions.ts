@@ -37,11 +37,16 @@ export const channelSyncVideosPayload = z.object({
 
 export const channelRefreshPayload = z.object({
   channelId: z.string().regex(CHANNEL_ID_PATTERN, "Expected a YouTube channel id (UC...)"),
+  /** Discovered channels: fewer uploads, no descriptions. Ignored for tracked channels. */
+  light: z.boolean().default(false),
 });
 
 export const videoAnalyzePayload = z.object({ video: z.string().trim().min(1).max(500) });
 
 const emptyPayload = z.object({}).default({});
+
+/** Channels found by research tools refresh weekly instead of daily. */
+const DISCOVERED_REFRESH_DAYS = 7;
 
 /** Return a "skipped" result instead of failing when storage is full — retrying won't help until data is pruned. */
 async function skipIfOverBudget<T>(run: () => Promise<T>): Promise<T | { skipped: "storage_budget"; message: string }> {
@@ -82,9 +87,9 @@ export function createJobRegistry(deps: JobDependencies): JobRegistry {
         type: "channel.refresh",
         description: "Refresh a tracked channel: stats snapshot, latest uploads, performance metrics.",
         payloadSchema: channelRefreshPayload,
-        handler: ({ channelId }) =>
+        handler: ({ channelId, light }) =>
           skipIfOverBudget(async () => {
-            const { channel, videosSynced } = await deps.channels.refreshChannel(channelId);
+            const { channel, videosSynced } = await deps.channels.refreshChannel(channelId, { light });
             return { youtubeChannelId: channel.youtube_channel_id, videosSynced };
           }),
       }),
@@ -101,13 +106,14 @@ export function createJobRegistry(deps: JobDependencies): JobRegistry {
             return { skipped: "storage_budget", usedBytes: status.usedBytes, budgetBytes: status.budgetBytes };
           }
           // Slightly shorter than the interval so a channel synced at 09:05 yesterday is due at 09:00 today.
-          const staleBefore = new Date(Date.now() - deps.config.syncIntervalHours * 0.9 * 3_600_000);
-          const channels = await deps.channelRepository.listStale(staleBefore, deps.config.syncMaxChannelsPerRun);
+          const trackedBefore = new Date(Date.now() - deps.config.syncIntervalHours * 0.9 * 3_600_000);
+          const discoveredBefore = new Date(Date.now() - DISCOVERED_REFRESH_DAYS * 86_400_000);
+          const channels = await deps.channelRepository.listDueForRefresh(trackedBefore, discoveredBefore, deps.config.syncMaxChannelsPerRun);
           const day = new Date().toISOString().slice(0, 10);
           for (const channel of channels) {
             await deps.enqueue(
               "channel.refresh",
-              { channelId: channel.youtube_channel_id },
+              { channelId: channel.youtube_channel_id, light: !channel.tracked },
               { idempotencyKey: `channel.refresh:${channel.youtube_channel_id}:${day}`, priority: -10 },
             );
           }

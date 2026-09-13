@@ -93,6 +93,36 @@ describe("YouTubeService", () => {
     expect(calls.map((c) => c.endpoint)).toEqual(["playlistItems", "videos"]);
   });
 
+  it("classifies mixed uploads using the Shorts playlist instead of duration", async () => {
+    const item = (videoId: string, publishedAt: string) => ({
+      id: `pi-${videoId}`,
+      snippet: { playlistId: "x" },
+      contentDetails: { videoId, videoPublishedAt: publishedAt },
+    });
+    const { client } = createFakeYouTube([
+      {
+        endpoint: "playlistItems",
+        match: (p) => p.get("playlistId") === "UU_x5XG1OV2P6uZZ5FSM9Ttw",
+        body: listBody([item("short000000", "2026-09-10T00:00:00Z"), item("twomin00000", "2026-09-09T00:00:00Z")]),
+      },
+      {
+        endpoint: "playlistItems",
+        match: (p) => p.get("playlistId") === "UUSH_x5XG1OV2P6uZZ5FSM9Ttw",
+        body: listBody([item("short000000", "2026-09-10T00:00:00Z")]),
+      },
+      {
+        endpoint: "videos",
+        // A 4-minute Short and a 2-minute regular video: duration alone gets both wrong.
+        body: listBody([rawVideo("short000000", { duration: "PT3M50S" }), rawVideo("twomin00000", { duration: "PT2M" })]),
+      },
+    ]);
+    const page = await new YouTubeService(client).getChannelVideos(CHANNEL_ID);
+    expect(page.items.map((v) => [v.id, v.format, v.formatSource])).toEqual([
+      ["short000000", "short", "shorts_playlist"],
+      ["twomin00000", "long_form", "shorts_playlist"],
+    ]);
+  });
+
   it("returns an empty page when a channel has no Shorts playlist", async () => {
     const { client } = createFakeYouTube([
       { endpoint: "playlistItems", status: 404, body: { error: { code: 404, message: "not found", errors: [{ reason: "playlistNotFound" }] } } },

@@ -75,6 +75,8 @@ export type ChannelRow = Timestamps & {
   keywords: string[];
   niche_id: string | null;
   last_synced_at: string | null;
+  /** Tracked channels refresh daily; channels found by research tools refresh weekly. */
+  tracked: boolean;
 };
 
 export type ChannelSnapshotRow = {
@@ -231,6 +233,30 @@ export type VideoFeedRow = {
   computed_at: string | null;
 };
 
+export type ShortsChannelRow = {
+  channel_id: string;
+  youtube_channel_id: string;
+  title: string;
+  handle: string | null;
+  thumbnail_url: string | null;
+  country: string | null;
+  channel_created_at: string | null;
+  subscriber_count: number | null;
+  hidden_subscriber_count: boolean;
+  view_count: number;
+  video_count: number;
+  tracked: boolean;
+  last_synced_at: string | null;
+  videos_sampled: number;
+  shorts_sampled: number;
+  shorts_share: number;
+  avg_short_views: number | null;
+  median_short_views: number | null;
+  top_short_views: number | null;
+  last_short_at: string | null;
+  shorts_last_30d: number;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -257,6 +283,10 @@ export type Database = {
       };
       video_feed: {
         Row: VideoFeedRow;
+        Relationships: [];
+      };
+      shorts_channels: {
+        Row: ShortsChannelRow;
         Relationships: [];
       };
     };

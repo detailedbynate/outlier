@@ -19,7 +19,7 @@ export async function trackChannel(_prev: TrackChannelState, formData: FormData)
 
   let youtubeChannelId: string;
   try {
-    const { channel } = await getServices().channels.refreshChannel(identifier);
+    const { channel } = await getServices().channels.refreshChannel(identifier, { track: true });
     youtubeChannelId = channel.youtube_channel_id;
   } catch (error) {
     logger.warn("track channel failed", { identifier, error });

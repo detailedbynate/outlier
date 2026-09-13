@@ -9,13 +9,13 @@ export const dynamic = "force-dynamic";
 
 export default async function ChannelsPage() {
   await requireApprovedUser();
-  const channels = await getServices().repositories.channels.list({ limit: 200 });
+  const channels = await getServices().repositories.channels.list({ limit: 200, tracked: true });
 
   return (
     <div className="stack">
       <div>
-        <h1>Channels</h1>
-        <p className="subtitle">Tracked channels are refreshed automatically once a day while the worker runs.</p>
+        <h1>Tracked Channels</h1>
+        <p className="subtitle">Channels you track are refreshed every day.</p>
       </div>
 
       <section className="card">

@@ -173,6 +173,55 @@ describe("supabase migrations", () => {
     expect(left.rows[0]!.n).toBe(2);
   });
 
+  it("lists channels whose recent uploads are mostly Shorts, with stats", async () => {
+    const insertChannel = async (ytId: string, title: string) =>
+      (
+        await db.query<{ id: string }>(
+          `insert into public.channels (youtube_channel_id, title, subscriber_count) values ($1, $2, 1000) returning id`,
+          [ytId, title],
+        )
+      ).rows[0]!.id;
+    const insertVideos = async (channelId: string, prefix: string, formats: string[], views: number[]) => {
+      for (const [i, format] of formats.entries()) {
+        await db.query(
+          `insert into public.videos (youtube_video_id, channel_id, title, published_at, format, view_count)
+           values ($1, $2, 'v', now() - make_interval(days => $3), $4::public.video_format, $5)`,
+          [`${prefix}${String(i).padStart(11 - prefix.length, "0")}`, channelId, i + 1, format, views[i]],
+        );
+      }
+    };
+
+    const shortsChannel = await insertChannel("UCssssssssssssssssssssss", "Shorts Maker");
+    await insertVideos(shortsChannel, "sh", ["short", "short", "short", "short", "long_form"], [100, 200, 300, 400, 5000]);
+    const longChannel = await insertChannel("UCllllllllllllllllllllll", "Long Form Only");
+    await insertVideos(longChannel, "lf", ["long_form", "long_form", "short", "short", "short"], [1, 1, 1, 1, 1].map((x) => x * 10));
+    // 3 Shorts of 5 uploads is exactly 60%; a third long-form upload drops it below the threshold.
+    await db.query(
+      `insert into public.videos (youtube_video_id, channel_id, title, published_at, format) values ('lfextra0001', $1, 'v', now(), 'long_form')`,
+      [longChannel],
+    );
+
+    const { rows } = await db.query<{
+      title: string;
+      shorts_sampled: number;
+      shorts_share: string;
+      avg_short_views: string;
+      median_short_views: string;
+    }>(`select title, shorts_sampled::int, shorts_share, avg_short_views, median_short_views from public.shorts_channels order by title`);
+    expect(rows.map((r) => r.title)).toEqual(["Shorts Maker"]);
+    expect(rows[0]).toMatchObject({ shorts_sampled: 4 });
+    expect(Number(rows[0]!.shorts_share)).toBe(0.8);
+    expect(Number(rows[0]!.avg_short_views)).toBe(250);
+    expect(Number(rows[0]!.median_short_views)).toBe(250);
+  });
+
+  it("defaults new channels to untracked", async () => {
+    const { rows } = await db.query<{ tracked: boolean }>(
+      `insert into public.channels (youtube_channel_id, title) values ('UCnnnnnnnnnnnnnnnnnnnnnn', 'New') returning tracked`,
+    );
+    expect(rows[0]!.tracked).toBe(false);
+  });
+
   it("computes credit balances from the ledger and validates sign by source", async () => {
     const { rows } = await db.query<{ id: string }>(`select id from public.workspaces limit 1`);
     const ws = rows[0]!.id;
