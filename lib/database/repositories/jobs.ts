@@ -25,6 +25,15 @@ export class JobRepository {
     );
   }
 
+  /** Most recently created job of a type (any status) — used by the scheduler. */
+  async findLatestByType(type: string): Promise<JobRow | null> {
+    const rows = unwrap(
+      await this.db.from("jobs").select("*").eq("type", type).order("created_at", { ascending: false }).limit(1),
+      "jobs.findLatestByType",
+    );
+    return rows[0] ?? null;
+  }
+
   async claim(workerId: string, batchSize: number, types?: string[]): Promise<JobRow[]> {
     return unwrap(
       await this.db.rpc("claim_jobs", { worker_id: workerId, batch_size: batchSize, job_types: types ?? null }),

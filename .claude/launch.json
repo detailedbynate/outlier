@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "outlier",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--use-system-ca", "node_modules/next/dist/bin/next", "dev", "-p", "3000"],
+      "env": { "NODE_OPTIONS": "--use-system-ca" },
+      "port": 3000
+    }
+  ]
+}

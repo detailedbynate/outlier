@@ -5,12 +5,20 @@ import { channelToRow, type ChannelRepository } from "@/lib/database/repositorie
 import { videoToRow, type VideoRepository } from "@/lib/database/repositories/videos";
 import { CHANNEL_ID_PATTERN } from "@/lib/youtube/parse";
 import type { PageOptions, YouTubeService } from "@/lib/youtube/service";
+import type { StorageBudgetService } from "./storage-budget-service";
 import type { ChannelRow, VideoFormat } from "@/types/database";
 import type { ChannelVideoFilter, Page, YouTubeChannel, YouTubePlaylist, YouTubeVideo } from "@/types/youtube";
 
 export interface SyncChannelResult {
   channel: ChannelRow;
   snapshotCreated: boolean;
+}
+
+export interface ChannelServiceOptions {
+  /** When set, ingestion refuses to write once the database is over budget. */
+  storage?: Pick<StorageBudgetService, "assertCapacity">;
+  /** Only videos newer than this get stat snapshots. */
+  snapshotVideoMaxAgeDays?: number;
 }
 
 export interface SyncChannelVideosResult {
@@ -27,13 +35,17 @@ export interface SyncChannelVideosResult {
 export class ChannelService {
   private readonly log: Logger;
 
+  private readonly snapshotVideoMaxAgeMs: number;
+
   constructor(
     private readonly youtube: YouTubeService,
     private readonly channels: ChannelRepository,
     private readonly videos: VideoRepository,
+    private readonly options: ChannelServiceOptions = {},
     logger?: Logger,
   ) {
     this.log = logger ?? createLogger({ module: "services.channel" });
+    this.snapshotVideoMaxAgeMs = (options.snapshotVideoMaxAgeDays ?? 90) * 86_400_000;
   }
 
   // Live reads (YouTube only, nothing persisted) -------------------------------
@@ -63,6 +75,7 @@ export class ChannelService {
 
   /** Fetch a channel from YouTube, upsert it, and append a statistics snapshot. */
   async syncChannel(identifier: string, now: Date = new Date()): Promise<SyncChannelResult> {
+    await this.options.storage?.assertCapacity();
     const remote = await this.youtube.getChannel(identifier);
     const [channel] = await this.channels.upsertMany([channelToRow(remote, now)]);
     if (!channel) throw new AppError("INTERNAL_ERROR", "Channel upsert returned no row", { expose: false });
@@ -90,6 +103,7 @@ export class ChannelService {
     options: { maxPages?: number; pageToken?: string; filter?: ChannelVideoFilter } = {},
     now: Date = new Date(),
   ): Promise<SyncChannelVideosResult> {
+    await this.options.storage?.assertCapacity();
     const channel =
       (await this.channels.findByYouTubeId(youtubeChannelId)) ?? (await this.syncChannel(youtubeChannelId, now)).channel;
 
@@ -110,8 +124,10 @@ export class ChannelService {
       pageToken = page.nextPageToken ?? undefined;
 
       const rows = await this.videos.upsertMany(page.items.map((v) => videoToRow(v, channel.id, now)));
+      // Old videos rarely change meaningfully; snapshotting only recent ones keeps history small.
+      const snapshotCutoff = now.getTime() - this.snapshotVideoMaxAgeMs;
       await this.videos.insertSnapshots(
-        rows.map((row) => ({
+        rows.filter((row) => Date.parse(row.published_at) >= snapshotCutoff).map((row) => ({
           video_id: row.id,
           captured_at: now.toISOString(),
           view_count: row.view_count,
@@ -125,6 +141,13 @@ export class ChannelService {
     await this.refreshPerformance(channel.id, now);
     this.log.info("channel videos synced", { channelId: youtubeChannelId, videosSynced, pagesFetched });
     return { channelId: youtubeChannelId, videosSynced, pagesFetched, nextPageToken };
+  }
+
+  /** Full refresh used by tracking and the daily sync: channel stats + latest page of uploads + metrics. */
+  async refreshChannel(identifier: string, now: Date = new Date()): Promise<SyncChannelResult & { videosSynced: number }> {
+    const synced = await this.syncChannel(identifier, now);
+    const { videosSynced } = await this.syncChannelVideos(synced.channel.youtube_channel_id, { maxPages: 1 }, now);
+    return { ...synced, videosSynced };
   }
 
   /** Recompute video_performance for a channel's recent videos, per format. */

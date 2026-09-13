@@ -1,14 +1,22 @@
 import type { DatabaseClient } from "@/lib/database/client";
-import { unwrap, unwrapMaybe } from "@/lib/database/errors";
+import { assertOk, unwrap, unwrapMaybe } from "@/lib/database/errors";
 import type { ChannelRow, ChannelSnapshotRow, TablesInsert } from "@/types/database";
 import type { YouTubeChannel } from "@/types/youtube";
+
+/** Long descriptions are the biggest per-row cost; the first part carries the useful keywords. */
+export const MAX_DESCRIPTION_CHARS = 1000;
+
+export function truncateText(value: string | null | undefined, max: number): string | null {
+  if (!value) return null;
+  return value.length > max ? value.slice(0, max) : value;
+}
 
 export function channelToRow(channel: YouTubeChannel, syncedAt: Date): TablesInsert<"channels"> {
   return {
     youtube_channel_id: channel.id,
     handle: channel.handle,
     title: channel.title,
-    description: channel.description || null,
+    description: truncateText(channel.description, MAX_DESCRIPTION_CHARS),
     custom_url: channel.customUrl,
     country: channel.country?.toUpperCase() ?? null,
     default_language: channel.defaultLanguage,
@@ -65,6 +73,24 @@ export class ChannelRepository {
     let query = this.db.from("channel_snapshots").select("*").eq("channel_id", channelId).order("captured_at");
     if (since) query = query.gte("captured_at", since.toISOString());
     return unwrap(await query, "channel_snapshots.list");
+  }
+
+  async list(options: { limit: number; offset?: number }): Promise<ChannelRow[]> {
+    const offset = options.offset ?? 0;
+    return unwrap(
+      await this.db
+        .from("channels")
+        .select("*")
+        .order("subscriber_count", { ascending: false, nullsFirst: false })
+        .range(offset, offset + options.limit - 1),
+      "channels.list",
+    );
+  }
+
+  async count(): Promise<number> {
+    const result = await this.db.from("channels").select("id", { count: "exact", head: true });
+    assertOk(result, "channels.count");
+    return result.count ?? 0;
   }
 
   /** Channels whose data is oldest (never-synced first) — feed for scheduled refresh jobs. */

@@ -24,6 +24,18 @@ const serverEnvSchema = z.object({
   JOB_WORKER_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(2_000),
   JOB_WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(32).default(2),
 
+  /** Supabase plan's database size limit (free tier: 500 MB). */
+  SUPABASE_PLAN_LIMIT_MB: z.coerce.number().positive().default(500),
+  /** Ingestion stops once the database reaches this size. Keep well under the plan limit. */
+  STORAGE_BUDGET_MB: z.coerce.number().positive().default(250),
+
+  SYNC_INTERVAL_HOURS: z.coerce.number().positive().max(168).default(24),
+  SYNC_MAX_CHANNELS_PER_RUN: z.coerce.number().int().min(1).max(500).default(50),
+  /** Only videos newer than this get daily stat snapshots (older videos still get their totals refreshed). */
+  SNAPSHOT_VIDEO_MAX_AGE_DAYS: z.coerce.number().int().min(1).max(3650).default(90),
+  SNAPSHOT_DAILY_RETENTION_DAYS: z.coerce.number().int().min(1).default(30),
+  SNAPSHOT_RETENTION_DAYS: z.coerce.number().int().min(2).default(365),
+
   ANTHROPIC_API_KEY: optionalString,
   OPENAI_API_KEY: optionalString,
 });

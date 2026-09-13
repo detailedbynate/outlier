@@ -121,6 +121,58 @@ describe("supabase migrations", () => {
     ).rejects.toThrow(/jobs_idempotency_active_key/);
   });
 
+  it("reports database size and exposes the video feed", async () => {
+    const size = await db.query<{ bytes: string | number }>(`select public.database_size_bytes() as bytes`);
+    expect(Number(size.rows[0]!.bytes)).toBeGreaterThan(0);
+
+    const { rows } = await db.query<{ id: string }>(
+      `insert into public.channels (youtube_channel_id, title, subscriber_count) values ('UCffffffffffffffffffffff', 'Feed', 10) returning id`,
+    );
+    const video = await db.query<{ id: string }>(
+      `insert into public.videos (youtube_video_id, channel_id, title, published_at, view_count)
+       values ('feedvideo01', $1, 'Feed video', now(), 500) returning id`,
+      [rows[0]!.id],
+    );
+    await db.query(`insert into public.video_performance (video_id, views_per_day, outlier_score) values ($1, 100, 4.5)`, [
+      video.rows[0]!.id,
+    ]);
+    const feed = await db.query<{ channel_title: string; outlier_score: string }>(
+      `select channel_title, outlier_score from public.video_feed where youtube_video_id = 'feedvideo01'`,
+    );
+    expect(feed.rows[0]!.channel_title).toBe("Feed");
+    expect(Number(feed.rows[0]!.outlier_score)).toBe(4.5);
+  });
+
+  it("prunes snapshots to one per day recently, one per week later, none past retention", async () => {
+    const { rows } = await db.query<{ id: string }>(
+      `insert into public.channels (youtube_channel_id, title) values ('UCpppppppppppppppppppppp', 'Prune') returning id`,
+    );
+    const channelId = rows[0]!.id;
+    // Today: 3 snapshots (keep 1). 60 days ago: 3 in the same week (keep 1). 400 days ago: 1 (delete).
+    await db.query(
+      `insert into public.channel_snapshots (channel_id, captured_at, view_count, video_count)
+       select $1, ts, 1, 1 from unnest(array[
+         date_trunc('day', now()) + interval '1 hour',
+         date_trunc('day', now()) + interval '2 hours',
+         date_trunc('day', now()) + interval '3 hours',
+         date_trunc('week', now() - interval '60 days') + interval '1 day',
+         date_trunc('week', now() - interval '60 days') + interval '2 days',
+         date_trunc('week', now() - interval '60 days') + interval '3 days',
+         now() - interval '400 days'
+       ]::timestamptz[]) as ts`,
+      [channelId],
+    );
+    const result = await db.query<{ channel_snapshots_deleted: string | number }>(
+      `select * from public.prune_snapshots(30, 365)`,
+    );
+    expect(Number(result.rows[0]!.channel_snapshots_deleted)).toBe(5);
+    const left = await db.query<{ n: number }>(
+      `select count(*)::int as n from public.channel_snapshots where channel_id = $1`,
+      [channelId],
+    );
+    expect(left.rows[0]!.n).toBe(2);
+  });
+
   it("computes credit balances from the ledger and validates sign by source", async () => {
     const { rows } = await db.query<{ id: string }>(`select id from public.workspaces limit 1`);
     const ws = rows[0]!.id;

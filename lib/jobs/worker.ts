@@ -6,6 +6,7 @@ import type { JobRepository } from "@/lib/database/repositories/jobs";
 import type { JobRow } from "@/types/database";
 import { retryDelayMs } from "./backoff";
 import type { JobRegistry } from "./registry";
+import type { JobScheduler } from "./scheduler";
 
 export interface JobWorkerOptions {
   concurrency?: number;
@@ -14,6 +15,9 @@ export interface JobWorkerOptions {
   staleLockTimeout?: string;
   workerId?: string;
   logger?: Logger;
+  /** Recurring jobs (daily sync, pruning), checked every `scheduleCheckMs`. */
+  scheduler?: Pick<JobScheduler, "tick">;
+  scheduleCheckMs?: number;
 }
 
 /**
@@ -29,6 +33,9 @@ export class JobWorker {
   private readonly abort = new AbortController();
   private readonly active = new Set<Promise<void>>();
   private lastStaleCheck = 0;
+  private lastScheduleCheck = 0;
+  private readonly scheduler?: Pick<JobScheduler, "tick">;
+  private readonly scheduleCheckMs: number;
 
   constructor(
     private readonly repository: JobRepository,
@@ -40,6 +47,8 @@ export class JobWorker {
     this.pollIntervalMs = options.pollIntervalMs ?? 2_000;
     this.staleLockTimeout = options.staleLockTimeout ?? "15 minutes";
     this.log = options.logger ?? createLogger({ module: "jobs.worker", workerId: this.workerId });
+    this.scheduler = options.scheduler;
+    this.scheduleCheckMs = options.scheduleCheckMs ?? 5 * 60_000;
   }
 
   async start(): Promise<void> {
@@ -47,6 +56,7 @@ export class JobWorker {
     while (!this.abort.signal.aborted) {
       try {
         await this.maybeRequeueStale();
+        await this.maybeRunScheduler();
         const processed = await this.tick();
         if (processed === 0) await this.sleep(this.pollIntervalMs);
       } catch (error) {
@@ -105,6 +115,12 @@ export class JobWorker {
         log.error("could not record job failure", { error: serializeError(markError) });
       }
     }
+  }
+
+  private async maybeRunScheduler(): Promise<void> {
+    if (!this.scheduler || Date.now() - this.lastScheduleCheck < this.scheduleCheckMs) return;
+    this.lastScheduleCheck = Date.now();
+    await this.scheduler.tick();
   }
 
   private async maybeRequeueStale(): Promise<void> {

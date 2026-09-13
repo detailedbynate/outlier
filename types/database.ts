@@ -206,6 +206,31 @@ export type CreditRow = {
   created_at: string;
 };
 
+export type VideoFeedRow = {
+  video_id: string;
+  youtube_video_id: string;
+  title: string;
+  thumbnail_url: string | null;
+  published_at: string;
+  format: VideoFormat;
+  duration_seconds: number | null;
+  view_count: number;
+  like_count: number | null;
+  comment_count: number | null;
+  channel_id: string;
+  youtube_channel_id: string;
+  channel_title: string;
+  channel_thumbnail_url: string | null;
+  subscriber_count: number | null;
+  views_per_day: number | null;
+  engagement_rate: number | null;
+  outlier_score: number | null;
+  channel_median_views: number | null;
+  views_delta_24h: number | null;
+  views_delta_7d: number | null;
+  computed_at: string | null;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -230,6 +255,10 @@ export type Database = {
         Row: { workspace_id: string; balance: number };
         Relationships: [];
       };
+      video_feed: {
+        Row: VideoFeedRow;
+        Relationships: [];
+      };
     };
     Functions: {
       claim_jobs: {
@@ -243,6 +272,14 @@ export type Database = {
       is_workspace_member: {
         Args: { target_workspace: string };
         Returns: boolean;
+      };
+      database_size_bytes: {
+        Args: Record<string, never>;
+        Returns: number;
+      };
+      prune_snapshots: {
+        Args: { daily_days?: number; max_days?: number };
+        Returns: { channel_snapshots_deleted: number; video_snapshots_deleted: number }[];
       };
     };
     Enums: {

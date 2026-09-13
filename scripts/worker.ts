@@ -26,6 +26,7 @@ async function main(): Promise<void> {
   const worker = new JobWorker(services.repositories.jobs, services.jobRegistry, {
     concurrency: config.JOB_WORKER_CONCURRENCY,
     pollIntervalMs: config.JOB_WORKER_POLL_INTERVAL_MS,
+    scheduler: services.scheduler,
   });
 
   const shutdown = (signal: string) => {

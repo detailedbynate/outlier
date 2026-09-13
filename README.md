@@ -25,11 +25,38 @@ supabase db reset                 # applies supabase/migrations
 
 Hosted project: `supabase link --project-ref <ref>`, then `supabase db push`.
 
-### Background worker
+### UI
+
+`npm run dev` and open http://localhost:3000:
+
+- **Dashboard**: counts, storage meter, track a channel, top outliers (last 30 days)
+- **Viral videos**: outlier feed with date/format/sort filters
+- **Channels**: tracked channels, plus a page per channel with a subscriber chart, outliers, and uploads
+- **Analyze video**: score any video against its channel
+
+The UI has no login yet, so tracking channels from the UI is disabled when `NODE_ENV=production`.
+
+If Node can't verify Supabase's TLS certificate (a corporate proxy or antivirus that intercepts HTTPS), start with `NODE_OPTIONS=--use-system-ca`.
+
+### Background worker & auto-sync
 
 ```bash
 npm run worker                    # polls Postgres for jobs; Ctrl+C to stop
 ```
+
+While running, the worker schedules:
+
+- `catalog.refresh` every `SYNC_INTERVAL_HOURS` (24): refreshes up to `SYNC_MAX_CHANNELS_PER_RUN` (50) of the stalest tracked channels
+- `maintenance.prune_snapshots` daily: keeps daily snapshots for 30 days, then weekly, and deletes them after 365 days
+
+### Storage budget
+
+To stay well inside Supabase's free 500 MB, ingestion stops once the database reaches `STORAGE_BUDGET_MB` (default **250 MB**). Reads keep working and the dashboard shows usage. Growth is kept small by:
+
+- snapshotting only videos newer than `SNAPSHOT_VIDEO_MAX_AGE_DAYS` (90)
+- capping stored descriptions at 1,000 characters
+- syncing only the latest 50 uploads per channel on each refresh
+- pruning snapshot history
 
 ### Checks
 

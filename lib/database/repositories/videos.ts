@@ -1,14 +1,15 @@
 import type { DatabaseClient } from "@/lib/database/client";
-import { unwrap, unwrapMaybe } from "@/lib/database/errors";
-import type { TablesInsert, VideoFormat, VideoPerformanceRow, VideoRow, VideoSnapshotRow } from "@/types/database";
+import { assertOk, unwrap, unwrapMaybe } from "@/lib/database/errors";
+import type { TablesInsert, VideoFeedRow, VideoFormat, VideoPerformanceRow, VideoRow, VideoSnapshotRow } from "@/types/database";
 import type { YouTubeVideo } from "@/types/youtube";
+import { MAX_DESCRIPTION_CHARS, truncateText } from "./channels";
 
 export function videoToRow(video: YouTubeVideo, channelUuid: string, syncedAt: Date): TablesInsert<"videos"> {
   return {
     youtube_video_id: video.id,
     channel_id: channelUuid,
     title: video.title,
-    description: video.description || null,
+    description: truncateText(video.description, MAX_DESCRIPTION_CHARS),
     published_at: video.publishedAt,
     duration_seconds: video.durationSeconds,
     format: video.format,
@@ -73,6 +74,30 @@ export class VideoRepository {
         .order("published_at", { ascending: false })
         .limit(limit),
       "videos.recentVideos",
+    );
+  }
+
+  async count(): Promise<number> {
+    const result = await this.db.from("videos").select("id", { count: "exact", head: true });
+    assertOk(result, "videos.count");
+    return result.count ?? 0;
+  }
+
+  /** Discovery feed: videos with performance metrics, filtered and ranked. */
+  async feed(options: {
+    orderBy: "outlier_score" | "views_per_day" | "published_at" | "view_count";
+    limit: number;
+    publishedAfter?: Date;
+    format?: VideoFormat;
+    youtubeChannelId?: string;
+  }): Promise<VideoFeedRow[]> {
+    let query = this.db.from("video_feed").select("*");
+    if (options.publishedAfter) query = query.gte("published_at", options.publishedAfter.toISOString());
+    if (options.format) query = query.eq("format", options.format);
+    if (options.youtubeChannelId) query = query.eq("youtube_channel_id", options.youtubeChannelId);
+    return unwrap(
+      await query.order(options.orderBy, { ascending: false, nullsFirst: false }).limit(options.limit),
+      "video_feed.list",
     );
   }
 
