@@ -2,12 +2,14 @@
 import { StatTile } from "@/components/stat-tile";
 import { isAppError } from "@/lib/core/errors";
 import { formatCompact, formatDuration, formatMultiplier, formatNumber, formatPercent, timeAgo } from "@/lib/format";
+import { requireApprovedUser } from "@/lib/auth/session";
 import { getServices } from "@/lib/services";
 import type { VideoAnalysis } from "@/lib/services/video-service";
 
 export const dynamic = "force-dynamic";
 
 export default async function AnalyzePage({ searchParams }: { searchParams: Promise<{ v?: string }> }) {
+  await requireApprovedUser();
   const { v } = await searchParams;
   const input = v?.trim() ?? "";
 

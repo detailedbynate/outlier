@@ -3,7 +3,7 @@ import { z } from "zod";
 import { AppError, serializeError, toAppError, ValidationError } from "@/lib/core/errors";
 import { createLogger, type Logger } from "@/lib/core/logger";
 import type { ApiErrorBody, ApiMeta, ApiSuccess } from "@/types/api";
-import { authenticateRequest, type ApiPrincipal } from "./auth";
+import { authenticateCron, authenticateRequest, type ApiPrincipal } from "./auth";
 
 const log = createLogger({ module: "api" });
 
@@ -24,8 +24,8 @@ export interface HandlerContext<P, Q, B> {
 }
 
 export interface HandlerConfig<P extends z.ZodType, Q extends z.ZodType, B extends z.ZodType> {
-  /** "api_key" (default) requires API v1 credentials; "public" skips auth (health checks). */
-  auth?: "api_key" | "public";
+  /** "api_key" (default) requires API v1 credentials; "cron" requires CRON_SECRET; "public" skips auth (health checks). */
+  auth?: "api_key" | "cron" | "public";
   params?: P;
   query?: Q;
   body?: B;
@@ -82,7 +82,9 @@ export function apiHandler<
     const startedAt = Date.now();
 
     try {
-      const principal = config.auth === "public" ? null : authenticateRequest(request);
+      let principal: ApiPrincipal | null = null;
+      if (config.auth === "cron") authenticateCron(request);
+      else if (config.auth !== "public") principal = authenticateRequest(request);
       const params = parseWith(config.params, await context.params, "path parameters");
       const query = parseWith(config.query, Object.fromEntries(url.searchParams), "query parameters");
 

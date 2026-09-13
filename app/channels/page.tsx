@@ -2,11 +2,13 @@
 import Link from "next/link";
 import { TrackChannelForm } from "@/components/track-channel-form";
 import { formatCompact, formatNumber, timeAgo } from "@/lib/format";
+import { requireApprovedUser } from "@/lib/auth/session";
 import { getServices } from "@/lib/services";
 
 export const dynamic = "force-dynamic";
 
 export default async function ChannelsPage() {
+  await requireApprovedUser();
   const channels = await getServices().repositories.channels.list({ limit: 200 });
 
   return (

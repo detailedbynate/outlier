@@ -34,7 +34,11 @@ Hosted project: `supabase link --project-ref <ref>`, then `supabase db push`.
 - **Channels**: tracked channels, plus a page per channel with a subscriber chart, outliers, and uploads
 - **Analyze video**: score any video against its channel
 
-The UI has no login yet, so tracking channels from the UI is disabled when `NODE_ENV=production`.
+**Login:** accounts are invite-only. Create them in Supabase → Authentication → Users → Add user (auto-confirm), and turn off "Allow new users to sign up". `ALLOWED_EMAILS` (comma-separated) can restrict access further. Every page and server action checks the session (`requireApprovedUser`), and `proxy.ts` redirects signed-out visitors to `/login`.
+
+### Auto-sync on Vercel (free)
+
+`.github/workflows/sync.yml` calls `POST /api/cron/tick` every hour. Each call enqueues due recurring jobs, recovers stuck ones, and runs queued jobs for up to ~40s. Set the repository secrets `APP_URL` and `CRON_SECRET`, and set `CRON_SECRET` in Vercel.
 
 If Node can't verify Supabase's TLS certificate (a corporate proxy or antivirus that intercepts HTTPS), start with `NODE_OPTIONS=--use-system-ca`.
 

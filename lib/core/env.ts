@@ -20,6 +20,10 @@ const serverEnvSchema = z.object({
   YOUTUBE_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(2),
 
   INTERNAL_API_KEY: optionalString,
+  /** Bearer secret for /api/cron/* (called by GitHub Actions). */
+  CRON_SECRET: optionalString,
+  /** Comma-separated emails allowed to use the app. Blank = any signed-in user. */
+  ALLOWED_EMAILS: optionalString,
 
   JOB_WORKER_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(2_000),
   JOB_WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(32).default(2),

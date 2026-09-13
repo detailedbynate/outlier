@@ -4,11 +4,13 @@ import { StorageMeter } from "@/components/storage-meter";
 import { TrackChannelForm } from "@/components/track-channel-form";
 import { VideoCard } from "@/components/video-card";
 import { daysAgo, formatNumber } from "@/lib/format";
+import { requireApprovedUser } from "@/lib/auth/session";
 import { getServices } from "@/lib/services";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
+  await requireApprovedUser();
   const { storage, repositories } = getServices();
   const [status, channelCount, videoCount, topVideos] = await Promise.all([
     storage.getStatus(),

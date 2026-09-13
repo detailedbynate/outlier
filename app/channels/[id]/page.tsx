@@ -5,12 +5,14 @@ import { LineChart } from "@/components/line-chart";
 import { StatTile } from "@/components/stat-tile";
 import { VideoCard } from "@/components/video-card";
 import { daysAgo, formatCompact, formatNumber, timeAgo } from "@/lib/format";
+import { requireApprovedUser } from "@/lib/auth/session";
 import { getServices } from "@/lib/services";
 import { CHANNEL_ID_PATTERN } from "@/lib/youtube/parse";
 
 export const dynamic = "force-dynamic";
 
 export default async function ChannelPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireApprovedUser();
   const { id } = await params;
   if (!CHANNEL_ID_PATTERN.test(id)) notFound();
 

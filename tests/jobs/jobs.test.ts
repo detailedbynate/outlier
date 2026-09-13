@@ -131,6 +131,24 @@ describe("JobWorker.run", () => {
   });
 });
 
+describe("JobWorker.drain", () => {
+  it("runs jobs until the queue is empty", async () => {
+    const repo = fakeRepository();
+    repo.claim.mockResolvedValueOnce([job({ id: "a" })]).mockResolvedValueOnce([job({ id: "b" })]).mockResolvedValue([]);
+    const worker = new JobWorker(repo as unknown as JobRepository, registryWith(async () => null), { workerId: "w1", logger: silent });
+    expect(await worker.drain({ deadline: Date.now() + 10_000, maxJobs: 10 })).toEqual({ processed: 2, stoppedBy: "empty" });
+    expect(repo.markSucceeded).toHaveBeenCalledTimes(2);
+  });
+
+  it("stops at maxJobs and at the deadline", async () => {
+    const repo = fakeRepository();
+    repo.claim.mockResolvedValue([job()]);
+    const worker = new JobWorker(repo as unknown as JobRepository, registryWith(async () => null), { workerId: "w1", logger: silent });
+    expect(await worker.drain({ deadline: Date.now() + 10_000, maxJobs: 3 })).toEqual({ processed: 3, stoppedBy: "max_jobs" });
+    expect(await worker.drain({ deadline: Date.now() - 1, maxJobs: 3 })).toEqual({ processed: 0, stoppedBy: "deadline" });
+  });
+});
+
 describe("retryDelayMs", () => {
   it("grows exponentially with jitter and caps at one hour", () => {
     const mid = () => 0.5;

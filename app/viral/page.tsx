@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { VideoCard } from "@/components/video-card";
 import { daysAgo } from "@/lib/format";
+import { requireApprovedUser } from "@/lib/auth/session";
 import { getServices } from "@/lib/services";
 import type { VideoFormat } from "@/types/database";
 
@@ -32,6 +33,7 @@ function pick<T extends readonly { key: string }[]>(options: T, value: unknown, 
 }
 
 export default async function ViralPage({ searchParams }: { searchParams: SearchParams }) {
+  await requireApprovedUser();
   const params = await searchParams;
   const range = pick(RANGES, params.range, "30");
   const format = pick(FORMATS, params.format, "all");

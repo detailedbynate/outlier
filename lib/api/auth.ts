@@ -25,6 +25,14 @@ export function extractBearerToken(request: Request): string | null {
   return request.headers.get("x-api-key");
 }
 
+/** Scheduled callers (GitHub Actions) authenticate with CRON_SECRET. Refuses everything when it isn't configured. */
+export function authenticateCron(request: Request): void {
+  const { CRON_SECRET } = env();
+  if (!CRON_SECRET) throw new AppError("CONFIG_ERROR", "CRON_SECRET is not configured", { expose: false });
+  const token = extractBearerToken(request);
+  if (!token || !safeEqual(token, CRON_SECRET)) throw new UnauthorizedError("Invalid or missing cron secret");
+}
+
 export function authenticateRequest(request: Request): ApiPrincipal {
   const { INTERNAL_API_KEY, NODE_ENV } = env();
 

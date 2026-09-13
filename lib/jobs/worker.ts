@@ -87,6 +87,23 @@ export class JobWorker {
     return jobs.length;
   }
 
+  /**
+   * Run jobs one at a time until the queue is empty, `maxJobs` is reached, or
+   * the deadline passes. For serverless callers (the cron endpoint), where a
+   * long-lived polling loop isn't possible.
+   */
+  async drain(options: { deadline: number; maxJobs: number }): Promise<{ processed: number; stoppedBy: "empty" | "deadline" | "max_jobs" }> {
+    let processed = 0;
+    while (processed < options.maxJobs) {
+      if (Date.now() >= options.deadline) return { processed, stoppedBy: "deadline" };
+      const [job] = await this.repository.claim(this.workerId, 1, this.registry.types());
+      if (!job) return { processed, stoppedBy: "empty" };
+      await this.run(job);
+      processed += 1;
+    }
+    return { processed, stoppedBy: "max_jobs" };
+  }
+
   /** Execute one claimed job and record the outcome. Never throws. */
   async run(job: JobRow): Promise<void> {
     const log = this.log.child({ jobId: job.id, jobType: job.type, attempt: job.attempts });
