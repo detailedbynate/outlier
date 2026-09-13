@@ -1,0 +1,41 @@
+import { timingSafeEqual } from "node:crypto";
+import { env } from "@/lib/core/env";
+import { AppError, UnauthorizedError } from "@/lib/core/errors";
+
+/**
+ * Who is calling the API. Today only the internal key exists; per-workspace
+ * API keys (hashed in the database) and Supabase user sessions will add
+ * `workspaceId` / `userId` so services can scope data and meter usage.
+ */
+export interface ApiPrincipal {
+  kind: "internal" | "anonymous_dev";
+  workspaceId: string | null;
+  userId: string | null;
+}
+
+function safeEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  return bufA.length === bufB.length && timingSafeEqual(bufA, bufB);
+}
+
+export function extractBearerToken(request: Request): string | null {
+  const header = request.headers.get("authorization");
+  if (header?.toLowerCase().startsWith("bearer ")) return header.slice(7).trim() || null;
+  return request.headers.get("x-api-key");
+}
+
+export function authenticateRequest(request: Request): ApiPrincipal {
+  const { INTERNAL_API_KEY, NODE_ENV } = env();
+
+  if (!INTERNAL_API_KEY) {
+    if (NODE_ENV === "production") {
+      throw new AppError("CONFIG_ERROR", "INTERNAL_API_KEY must be set in production", { expose: false });
+    }
+    return { kind: "anonymous_dev", workspaceId: null, userId: null };
+  }
+
+  const token = extractBearerToken(request);
+  if (!token || !safeEqual(token, INTERNAL_API_KEY)) throw new UnauthorizedError("Invalid or missing API key");
+  return { kind: "internal", workspaceId: null, userId: null };
+}
