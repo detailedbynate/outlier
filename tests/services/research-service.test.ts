@@ -78,6 +78,6 @@ describe("ResearchService.discoverShortsChannels", () => {
 
 describe("escapeLike", () => {
   it("escapes wildcards and filter separators", () => {
-    expect(escapeLike("100%_real,(ok)")).toBe("100\\%\\_real  ok ");
+    expect(escapeLike('100%_real,(ok)*"')).toBe("100\\%\\_real  ok   ");
   });
 });

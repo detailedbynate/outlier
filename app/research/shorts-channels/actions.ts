@@ -7,6 +7,18 @@ import { logger } from "@/lib/core/logger";
 import { JobWorker } from "@/lib/jobs/worker";
 import { getServices } from "@/lib/services";
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Bookmark: tracked channels refresh daily and show in Tracked Channels. No YouTube quota is used here. */
+export async function setChannelTracked(formData: FormData): Promise<void> {
+  await requireApprovedUser();
+  const channelId = String(formData.get("channelId") ?? "");
+  if (!UUID_PATTERN.test(channelId)) return;
+  await getServices().repositories.channels.setTracked(channelId, formData.get("tracked") === "true");
+  revalidatePath("/research/shorts-channels");
+  revalidatePath("/channels");
+}
+
 export interface DiscoverState {
   message: string | null;
   error: string | null;

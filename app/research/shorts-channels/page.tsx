@@ -1,200 +1,224 @@
-/* eslint-disable @next/next/no-img-element -- YouTube avatars are already CDN-optimized */
 import Link from "next/link";
+import { Dropdown } from "@/components/dropdown";
+import { ChevronDownIcon, SearchIcon, SlidersIcon, SortIcon, VideoIcon, VideoOffIcon } from "@/components/icons";
 import { requireApprovedUser } from "@/lib/auth/session";
-import type { ShortsChannelFilters } from "@/lib/database/repositories/channels";
-import { daysAgo, formatCompact, formatPercent, timeAgo } from "@/lib/format";
 import { getServices } from "@/lib/services";
+import { ChannelCard } from "./channel-card";
 import { DiscoverForm } from "./discover-form";
+import {
+  ACTIVITY,
+  AVG_VIEWS,
+  activeQuickFilter,
+  buildHref,
+  CHANNEL_AGE,
+  clearedAdvanced,
+  countAdvanced,
+  COUNTRIES,
+  label,
+  MAX_LIMIT,
+  PAGE_SIZE,
+  parseState,
+  QUICK_FILTERS,
+  SHORTS_SHARE,
+  SORTS,
+  SUBSCRIBERS,
+  toFilters,
+} from "./filters";
 
 export const dynamic = "force-dynamic";
 // Discovery ingests channels inside the server action.
 export const maxDuration = 60;
 
-type Option = { key: string; label: string };
-
-const SUBSCRIBERS: (Option & { min?: number; max?: number })[] = [
-  { key: "any", label: "Any" },
-  { key: "u10k", label: "Under 10K", max: 10_000 },
-  { key: "10k-100k", label: "10K–100K", min: 10_000, max: 100_000 },
-  { key: "100k-1m", label: "100K–1M", min: 100_000, max: 1_000_000 },
-  { key: "1m", label: "1M+", min: 1_000_000 },
-];
-
-const AVG_VIEWS: (Option & { min?: number })[] = [
-  { key: "any", label: "Any" },
-  { key: "10k", label: "10K+", min: 10_000 },
-  { key: "100k", label: "100K+", min: 100_000 },
-  { key: "1m", label: "1M+", min: 1_000_000 },
-];
-
-const CHANNEL_AGE: (Option & { days?: number })[] = [
-  { key: "any", label: "Any" },
-  { key: "90d", label: "Under 3 months", days: 90 },
-  { key: "6m", label: "Under 6 months", days: 182 },
-  { key: "1y", label: "Under 1 year", days: 365 },
-];
-
-const ACTIVITY: (Option & { days?: number })[] = [
-  { key: "any", label: "Any" },
-  { key: "7d", label: "Posted in last 7 days", days: 7 },
-  { key: "30d", label: "Posted in last 30 days", days: 30 },
-];
-
-const SORTS: (Option & { column: ShortsChannelFilters["orderBy"] })[] = [
-  { key: "views", label: "Avg Short views", column: "avg_short_views" },
-  { key: "subs", label: "Subscribers", column: "subscriber_count" },
-  { key: "momentum", label: "Shorts last 30 days", column: "shorts_last_30d" },
-  { key: "newest", label: "Newest channels", column: "channel_created_at" },
-  { key: "recent", label: "Recently active", column: "last_short_at" },
-];
-
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
-
-function pick<T extends Option>(options: T[], value: unknown): T {
-  return options.find((o) => o.key === value) ?? options[0]!;
-}
 
 export default async function ShortsChannelsPage({ searchParams }: { searchParams: SearchParams }) {
   await requireApprovedUser();
-  const params = await searchParams;
-  const text = typeof params.q === "string" ? params.q.trim().slice(0, 100) : "";
-  const subs = pick(SUBSCRIBERS, params.subs);
-  const views = pick(AVG_VIEWS, params.views);
-  const age = pick(CHANNEL_AGE, params.age);
-  const activity = pick(ACTIVITY, params.active);
-  const sort = pick(SORTS, params.sort);
+  const state = parseState(await searchParams);
+  const showVideos = state.videos !== "hide";
 
   const { research } = getServices();
-  const [channels, searchesLeft] = await Promise.all([
-    research.searchShortsChannels({
-      text: text || undefined,
-      minSubscribers: subs.min,
-      maxSubscribers: subs.max,
-      minAvgViews: views.min,
-      createdAfter: age.days ? daysAgo(age.days) : undefined,
-      activeSince: activity.days ? daysAgo(activity.days) : undefined,
-      orderBy: sort.column,
-      limit: 100,
-    }),
+  const [{ channels, terms }, popular, searchesLeft] = await Promise.all([
+    research.browseShortsChannels(state.q, toFilters(state), showVideos ? 8 : 0),
+    research.popularKeywords(10),
     research.discoverySearchesLeftToday(),
   ]);
 
-  const current = { q: text, subs: subs.key, views: views.key, age: age.key, active: activity.key, sort: sort.key };
-  const href = (overrides: Partial<typeof current>) => {
-    const next = new URLSearchParams();
-    for (const [key, value] of Object.entries({ ...current, ...overrides })) {
-      if (value && value !== "any" && !(key === "sort" && value === "views")) next.set(key, value);
-    }
-    const qs = next.toString();
-    return `/research/shorts-channels${qs ? `?${qs}` : ""}`;
-  };
+  const advancedCount = countAdvanced(state);
+  const quick = activeQuickFilter(state);
+  const canLoadMore = channels.length === Number(state.limit) && Number(state.limit) < MAX_LIMIT;
+  const discoverKeyword = terms[0] ?? "";
 
-  const chips = (label: string, options: Option[], selected: string, param: keyof typeof current) => (
-    <div className="filter-row">
-      <span className="filter-label">{label}</span>
-      <div className="chips">
+  const select = (name: string, options: { key: string; label: string }[], value: string) => (
+    <label className="field">
+      <span>{
+        { subs: "Subscribers", views: "Average views", age: "Channel age", active: "Last upload", share: "Shorts share", country: "Country" }[name]
+      }</span>
+      <select name={name} defaultValue={value}>
         {options.map((o) => (
-          <Link key={o.key} href={href({ [param]: o.key })} className="chip" aria-current={o.key === selected}>
+          <option key={o.key} value={o.key}>
             {o.label}
-          </Link>
+          </option>
         ))}
-      </div>
-    </div>
+      </select>
+    </label>
   );
 
   return (
-    <div className="stack">
-      <div>
-        <h1>Shorts Channels</h1>
-        <p className="subtitle">Find channels that mainly post Shorts, and see how many views their Shorts typically get.</p>
+    <div className="research-page">
+      <form method="get" action="/research/shorts-channels" className="search-hero" role="search">
+        <SearchIcon size={18} className="search-hero-icon" />
+        <label htmlFor="q" className="sr-only">
+          Search channels by niche
+        </label>
+        <input
+          id="q"
+          name="q"
+          type="search"
+          defaultValue={state.q}
+          placeholder={'Search "recipe, cooking, food" to find food channels'}
+          autoComplete="off"
+        />
+        {Object.entries(state).map(([key, value]) =>
+          key === "q" || key === "limit" || value === "any" || (key === "sort" && value === "views") || (key === "videos" && value === "show") ? null : (
+            <input key={key} type="hidden" name={key} value={value} />
+          ),
+        )}
+      </form>
+
+      <div className="popular-row">
+        <span className="muted">Popular this week:</span>
+        {popular.map((keyword) => (
+          <Link key={keyword} href={buildHref(state, { q: keyword, limit: String(PAGE_SIZE) })} className="keyword-chip">
+            {keyword}
+          </Link>
+        ))}
       </div>
 
-      <section className="card">
-        <h2>Discover new channels</h2>
-        <p className="stat-note" style={{ margin: "-6px 0 12px" }}>
-          Pulls channels behind the most-viewed Shorts for a niche from the last 90 days.
-        </p>
-        <DiscoverForm searchesLeft={searchesLeft} />
-      </section>
+      <div className="toolbar">
+        <div className="toolbar-group">
+          <Dropdown
+            label={
+              <>
+                <span>{quick ? quick.label : "Quick Filters"}</span>
+                <ChevronDownIcon size={16} />
+              </>
+            }
+          >
+            {QUICK_FILTERS.map((preset) => (
+              <Link
+                key={preset.key}
+                href={buildHref(state, { ...clearedAdvanced(), sort: "views", ...preset.params, limit: String(PAGE_SIZE) })}
+                className="dropdown-item"
+                aria-current={quick?.key === preset.key}
+              >
+                <span>{preset.label}</span>
+                <span className="dropdown-item-note">{preset.description}</span>
+              </Link>
+            ))}
+            {quick ? (
+              <Link href={buildHref(state, { ...clearedAdvanced(), sort: "views" })} className="dropdown-item dropdown-item-muted">
+                Clear quick filter
+              </Link>
+            ) : null}
+          </Dropdown>
 
-      <section className="card filter-bar">
-        <form method="get" className="form" action="/research/shorts-channels">
-          {Object.entries(current).map(([key, value]) =>
-            key === "q" || value === "any" ? null : <input key={key} type="hidden" name={key} value={value} />,
-          )}
-          <label htmlFor="q" className="sr-only">
-            Search by channel name
-          </label>
-          <input id="q" name="q" type="text" defaultValue={text} placeholder="Search saved Shorts channels by name" />
-          <button type="submit">Search</button>
-        </form>
-        {chips("Subscribers", SUBSCRIBERS, subs.key, "subs")}
-        {chips("Avg views", AVG_VIEWS, views.key, "views")}
-        {chips("Channel age", CHANNEL_AGE, age.key, "age")}
-        {chips("Activity", ACTIVITY, activity.key, "active")}
-        {chips("Sort by", SORTS, sort.key, "sort")}
-      </section>
-
-      <section className="card">
-        <div className="spread" style={{ marginBottom: 8 }}>
-          <h2 style={{ margin: 0 }}>
-            {channels.length === 100 ? "Top 100" : channels.length} {channels.length === 1 ? "channel" : "channels"}
-          </h2>
-          <span className="stat-note">Stats from each channel&apos;s latest uploads</span>
+          <Dropdown
+            label={
+              <>
+                <SortIcon size={15} />
+                <span>
+                  Sorted by: <strong>{label(SORTS, state.sort)}</strong>
+                </span>
+                <ChevronDownIcon size={16} />
+              </>
+            }
+          >
+            {SORTS.map((sort) => (
+              <Link key={sort.key} href={buildHref(state, { sort: sort.key })} className="dropdown-item" aria-current={sort.key === state.sort}>
+                {sort.label}
+              </Link>
+            ))}
+          </Dropdown>
         </div>
-        {channels.length === 0 ? (
-          <div className="empty">
-            No Shorts channels match. Try a different filter, or discover a niche above.
-          </div>
-        ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Channel</th>
-                  <th className="num">Subscribers</th>
-                  <th className="num">Avg Short views</th>
-                  <th className="num">Median</th>
-                  <th className="num">Top Short</th>
-                  <th className="num">Shorts / 30d</th>
-                  <th className="num">Shorts share</th>
-                  <th className="num">Channel age</th>
-                  <th className="num">Last Short</th>
-                </tr>
-              </thead>
-              <tbody>
-                {channels.map((c) => (
-                  <tr key={c.channel_id}>
-                    <td>
-                      <Link href={`/channels/${c.youtube_channel_id}`} className="row" style={{ gap: 10, flexWrap: "nowrap" }}>
-                        {c.thumbnail_url ? <img className="avatar" src={c.thumbnail_url} alt="" loading="lazy" /> : null}
-                        <span style={{ minWidth: 0 }}>
-                          <strong className="clamp">{c.title}</strong>
-                          <span className="muted" style={{ fontSize: 12 }}>
-                            {c.handle ?? ""}
-                            {c.country ? ` · ${c.country}` : ""}
-                            {c.tracked ? " · Tracked" : ""}
-                          </span>
-                        </span>
-                      </Link>
-                    </td>
-                    <td className="num">{c.hidden_subscriber_count ? "Hidden" : formatCompact(c.subscriber_count)}</td>
-                    <td className="num">
-                      <strong>{formatCompact(c.avg_short_views)}</strong>
-                    </td>
-                    <td className="num">{formatCompact(c.median_short_views)}</td>
-                    <td className="num">{formatCompact(c.top_short_views)}</td>
-                    <td className="num">{c.shorts_last_30d}</td>
-                    <td className="num">{formatPercent(c.shorts_share, 0)}</td>
-                    <td className="num muted">{c.channel_created_at ? timeAgo(c.channel_created_at).replace(" ago", "") : "—"}</td>
-                    <td className="num muted">{timeAgo(c.last_short_at)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+
+        <div className="toolbar-group">
+          <Dropdown
+            align="end"
+            label={
+              <>
+                <SlidersIcon size={15} />
+                <span>Advanced Filters</span>
+                {advancedCount > 0 ? <span className="count-badge">{advancedCount}</span> : null}
+              </>
+            }
+          >
+            <form method="get" action="/research/shorts-channels" className="advanced-form">
+              {state.q ? <input type="hidden" name="q" value={state.q} /> : null}
+              {state.sort !== "views" ? <input type="hidden" name="sort" value={state.sort} /> : null}
+              {state.videos === "hide" ? <input type="hidden" name="videos" value="hide" /> : null}
+              {select("subs", SUBSCRIBERS, state.subs)}
+              {select("views", AVG_VIEWS, state.views)}
+              {select("age", CHANNEL_AGE, state.age)}
+              {select("active", ACTIVITY, state.active)}
+              {select("share", SHORTS_SHARE, state.share)}
+              {select("country", COUNTRIES, state.country)}
+              <label className="checkbox-field">
+                <input type="checkbox" name="tracked" value="yes" defaultChecked={state.tracked === "yes"} />
+                <span>Only my tracked channels</span>
+              </label>
+              <div className="advanced-actions">
+                <Link href={buildHref(state, clearedAdvanced())} className="button-ghost">
+                  Reset
+                </Link>
+                <button type="submit">Apply filters</button>
+              </div>
+            </form>
+          </Dropdown>
+
+          <Link href={buildHref(state, { videos: showVideos ? "hide" : "show" })} className="toolbar-button">
+            {showVideos ? <VideoOffIcon size={15} /> : <VideoIcon size={15} />}
+            <span>{showVideos ? "Hide Videos" : "Show Videos"}</span>
+          </Link>
+        </div>
+      </div>
+
+      <div className="results-meta">
+        <span>
+          {channels.length === 0
+            ? "No channels found"
+            : `${canLoadMore ? `Top ${channels.length}` : channels.length} ${channels.length === 1 ? "channel" : "channels"}`}
+          {terms.length > 0 ? ` matching ${terms.map((t) => `“${t}”`).join(", ")}` : ""}
+        </span>
+        {advancedCount > 0 || state.q ? (
+          <Link href="/research/shorts-channels" className="muted">
+            Clear all
+          </Link>
+        ) : null}
+      </div>
+
+      {channels.length === 0 ? (
+        <div className="card empty">
+          {terms.length > 0
+            ? "No saved Shorts channels match yet. Discover some from YouTube below."
+            : "No Shorts channels match these filters."}
+        </div>
+      ) : (
+        <div className="channel-list">
+          {channels.map((channel) => (
+            <ChannelCard key={channel.channel_id} channel={channel} showVideos={showVideos} />
+          ))}
+        </div>
+      )}
+
+      {canLoadMore ? (
+        <div className="load-more">
+          <Link href={buildHref(state, { limit: String(Number(state.limit) + PAGE_SIZE) })} className="toolbar-button" scroll={false}>
+            Show more channels
+          </Link>
+        </div>
+      ) : null}
+
+      <DiscoverForm keyword={discoverKeyword} searchesLeft={searchesLeft} />
     </div>
   );
 }

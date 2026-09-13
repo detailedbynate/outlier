@@ -33,6 +33,8 @@ export function videoToRow(
   };
 }
 
+export type VideoPreview = Pick<VideoRow, "channel_id" | "youtube_video_id" | "title" | "thumbnail_url" | "view_count" | "published_at">;
+
 export class VideoRepository {
   constructor(private readonly db: DatabaseClient) {}
 
@@ -80,6 +82,30 @@ export class VideoRepository {
         .limit(limit),
       "videos.recentVideos",
     );
+  }
+
+  /** Latest Shorts for each channel (for card previews), newest first. Batched to stay under row limits. */
+  async latestShortsByChannel(channelIds: string[], perChannel: number): Promise<Map<string, VideoPreview[]>> {
+    const byChannel = new Map<string, VideoPreview[]>();
+    for (let i = 0; i < channelIds.length; i += 10) {
+      const batch = channelIds.slice(i, i + 10);
+      const rows = unwrap(
+        await this.db
+          .from("videos")
+          .select("channel_id, youtube_video_id, title, thumbnail_url, view_count, published_at")
+          .in("channel_id", batch)
+          .eq("format", "short")
+          .order("published_at", { ascending: false })
+          .limit(batch.length * 50),
+        "videos.latestShortsByChannel",
+      );
+      for (const row of rows) {
+        const list = byChannel.get(row.channel_id) ?? [];
+        if (list.length < perChannel) list.push(row);
+        byChannel.set(row.channel_id, list);
+      }
+    }
+    return byChannel;
   }
 
   async count(): Promise<number> {

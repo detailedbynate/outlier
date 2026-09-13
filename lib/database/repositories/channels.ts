@@ -129,33 +129,66 @@ export class ChannelRepository {
     return new Set(rows.map((r) => r.youtube_channel_id));
   }
 
+  /**
+   * Channel ids matching any keyword in the channel's title/description or its
+   * stored video titles. Terms are OR'd; each term is a case-insensitive substring.
+   */
+  async findChannelIdsByKeywords(terms: string[], limit = 300): Promise<string[]> {
+    const ids = new Set<string>();
+    for (const term of terms) {
+      const pattern = `*${escapeLike(term)}*`;
+      const [byChannel, byVideo] = await Promise.all([
+        this.db.from("channels").select("id").or(`title.ilike."${pattern}",description.ilike."${pattern}"`).limit(limit),
+        this.db.from("videos").select("channel_id").ilike("title", `%${escapeLike(term)}%`).limit(limit),
+      ]);
+      for (const row of unwrap(byChannel, "channels.keywordSearch")) ids.add(row.id);
+      for (const row of unwrap(byVideo, "videos.keywordSearch")) ids.add(row.channel_id);
+    }
+    return [...ids].slice(0, limit);
+  }
+
   async searchShortsChannels(filters: ShortsChannelFilters): Promise<ShortsChannelRow[]> {
+    if (filters.channelIds && filters.channelIds.length === 0) return [];
     let query = this.db.from("shorts_channels").select("*");
-    if (filters.text) query = query.ilike("title", `%${escapeLike(filters.text)}%`);
+    if (filters.channelIds) query = query.in("channel_id", filters.channelIds);
     if (filters.minSubscribers !== undefined) query = query.gte("subscriber_count", filters.minSubscribers);
     if (filters.maxSubscribers !== undefined) query = query.lt("subscriber_count", filters.maxSubscribers);
     if (filters.minAvgViews !== undefined) query = query.gte("avg_short_views", filters.minAvgViews);
+    if (filters.minShortsShare !== undefined) query = query.gte("shorts_share", filters.minShortsShare);
     if (filters.createdAfter) query = query.gte("channel_created_at", filters.createdAfter.toISOString());
     if (filters.activeSince) query = query.gte("last_short_at", filters.activeSince.toISOString());
+    if (filters.country) query = query.eq("country", filters.country);
+    if (filters.tracked !== undefined) query = query.eq("tracked", filters.tracked);
     return unwrap(
       await query.order(filters.orderBy, { ascending: false, nullsFirst: false }).limit(filters.limit),
       "shorts_channels.search",
     );
   }
+
+  async setTrackedMany(ids: string[], tracked: boolean): Promise<void> {
+    if (ids.length === 0) return;
+    assertOk(await this.db.from("channels").update({ tracked }).in("id", ids), "channels.setTrackedMany");
+  }
 }
 
 export interface ShortsChannelFilters {
-  text?: string;
+  /** Restrict to these channel UUIDs (e.g. keyword search results). */
+  channelIds?: string[];
   minSubscribers?: number;
   maxSubscribers?: number;
   minAvgViews?: number;
+  /** 0-1 share of recent uploads that are Shorts. */
+  minShortsShare?: number;
   createdAfter?: Date;
   activeSince?: Date;
+  /** ISO 3166 alpha-2. */
+  country?: string;
+  tracked?: boolean;
   orderBy: "avg_short_views" | "subscriber_count" | "channel_created_at" | "last_short_at" | "shorts_last_30d";
   limit: number;
 }
 
-/** Escape LIKE wildcards and PostgREST filter separators in user input. */
+/** Escape LIKE wildcards and strip PostgREST filter separators from user input. */
 export function escapeLike(value: string): string {
-  return value.replace(/[\\%_]/g, (ch) => `\\${ch}`).replace(/[,()]/g, " ");
+  return value.replace(/[\\%_]/g, (ch) => `\\${ch}`).replace(/[*,()"]/g, " ");
 }

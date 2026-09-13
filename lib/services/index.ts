@@ -116,7 +116,7 @@ export function getServices(): Services {
     discovery: new DiscoveryService(youtube),
     jobs: new JobService(queue, repositories.jobs),
     research: new ResearchService(
-      { youtube, channels: repositories.channels, usage: repositories.usage, storage, enqueue },
+      { youtube, channels: repositories.channels, videos: repositories.videos, usage: repositories.usage, storage, enqueue },
       { discoveryDailyLimit: config.DISCOVERY_DAILY_LIMIT, discoveryMaxChannels: config.DISCOVERY_MAX_CHANNELS },
     ),
     storage,
