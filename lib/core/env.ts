@@ -28,6 +28,8 @@ const serverEnvSchema = z.object({
   ADMIN_EMAILS: optionalString,
   /** Public site URL for invite links, e.g. https://outlier.vercel.app. Falls back to the request origin. */
   SITE_URL: optionalString.pipe(z.url().optional()),
+  /** Discord invite link shown on the landing page (e.g. https://discord.gg/abc123). */
+  DISCORD_INVITE_URL: optionalString.pipe(z.url().optional()),
 
   JOB_WORKER_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(2_000),
   JOB_WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(32).default(2),
