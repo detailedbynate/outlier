@@ -1,6 +1,7 @@
 import "server-only";
 import { AppError } from "@/lib/core/errors";
 import type { DatabaseClient } from "@/lib/database/client";
+import type { AccountProvisioner } from "@/lib/services/account-service";
 import type { InviteSender } from "@/lib/services/waitlist-service";
 
 const ALREADY_REGISTERED = /already (been )?registered|already exists/i;
@@ -45,5 +46,39 @@ export class SupabaseInviteSender implements InviteSender {
     url.searchParams.set("token_hash", result.data.properties.hashed_token);
     url.searchParams.set("type", type);
     return url.toString();
+  }
+}
+
+/** Creates accounts for /admin/accounts: an invite email, or a one-time link to send yourself. */
+export class SupabaseAccountProvisioner implements AccountProvisioner {
+  private readonly invites: SupabaseInviteSender;
+
+  constructor(
+    private readonly admin: DatabaseClient,
+    private readonly userIdByEmail: (email: string) => Promise<string | null>,
+  ) {
+    this.invites = new SupabaseInviteSender(admin);
+  }
+
+  async provision(email: string, redirectTo: string, delivery: "email" | "link"): Promise<{ userId: string; link: string | null; existed: boolean }> {
+    const existingId = await this.userIdByEmail(email);
+    if (delivery === "link") {
+      const link = await this.invites.createSignInLink(email, redirectTo);
+      const userId = existingId ?? (await this.userIdByEmail(email));
+      if (!userId) throw new AppError("UPSTREAM_ERROR", "The account was created but couldn't be found yet. Try again in a moment.", { expose: true });
+      return { userId, link, existed: existingId !== null };
+    }
+    if (existingId) {
+      // Already has an account: just apply the settings; they can sign in as usual.
+      return { userId: existingId, link: null, existed: true };
+    }
+    const { data, error } = await this.admin.auth.admin.inviteUserByEmail(email, { redirectTo });
+    if (error || !data.user) {
+      if (error && (error.status === 429 || /rate limit/i.test(error.message))) {
+        throw new AppError("RATE_LIMITED", "The email limit was hit. Choose \"Copy sign-in link\" instead, or finish the Resend SMTP setup.");
+      }
+      throw new AppError("UPSTREAM_ERROR", `Invite failed: ${error?.message ?? "no user returned"}`, { cause: error, expose: true });
+    }
+    return { userId: data.user.id, link: null, existed: false };
   }
 }

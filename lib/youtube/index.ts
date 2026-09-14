@@ -14,6 +14,13 @@ export * from "./parse";
 
 let service: YouTubeService | undefined;
 let quota: QuotaManager | undefined;
+type UserLimitsResolver = (userId: string) => Promise<{ dailyUnits?: number | null; tier?: string } | null>;
+let userLimits: UserLimitsResolver | undefined;
+
+/** Per-user YouTube limits (set by the services composition root from account settings). */
+export function setQuotaUserLimits(resolver: UserLimitsResolver): void {
+  userLimits = resolver;
+}
 
 export function quotaConfigFromEnv(config = env()): QuotaConfig {
   return {
@@ -30,7 +37,9 @@ export function quotaConfigFromEnv(config = env()): QuotaConfig {
 
 /** Shared quota manager (reads and records usage in Postgres). */
 export function getQuotaManager(): QuotaManager {
-  quota ??= new QuotaManager(new YouTubeQuotaRepository(getAdminDatabase()), quotaConfigFromEnv());
+  quota ??= new QuotaManager(new YouTubeQuotaRepository(getAdminDatabase()), quotaConfigFromEnv(), undefined, (userId) =>
+    userLimits ? userLimits(userId) : Promise.resolve(null),
+  );
   return quota;
 }
 

@@ -38,3 +38,12 @@ describe("CreditsService", () => {
     );
   });
 });
+
+describe("CreditsService per-user limits", () => {
+  it("uses an account's daily credit override when set", async () => {
+    const usage = { creditsSpentSince: vi.fn(async () => 40), hasEventSince: vi.fn(async () => false), record: vi.fn(async () => ({}) as never) };
+    const service = new CreditsService(usage, 100, async (userId) => (userId === "vip" ? 500 : null));
+    expect((await service.status("vip", NOW)).limit).toBe(500);
+    expect((await service.status("regular", NOW)).remaining).toBe(60);
+  });
+});

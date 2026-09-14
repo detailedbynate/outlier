@@ -4647,3 +4647,53 @@ body:has(.onboarding-root) .ambient {
   font-weight: 500;
 }
 
+
+/* Admin accounts */
+.account-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
+  gap: 10px 12px;
+  align-items: end;
+}
+
+.account-note {
+  grid-column: span 2;
+}
+
+.account-actions {
+  display: flex;
+  align-items: end;
+}
+
+.account-status {
+  grid-column: 1 / -1;
+}
+
+.account-edit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.account-edit input[type="number"] {
+  width: 96px;
+}
+
+.account-edit input[name="note"] {
+  width: 160px;
+}
+
+.accounts-table tr.is-disabled td {
+  opacity: 0.55;
+}
+
+.role-owner {
+  color: var(--accent-text);
+}
+
+@media (max-width: 600px) {
+  .account-note {
+    grid-column: auto;
+  }
+}

@@ -33,15 +33,18 @@ export class CreditsService {
   constructor(
     private readonly usage: Pick<UsageRepository, "creditsSpentSince" | "record" | "hasEventSince">,
     private readonly dailyCredits: number,
+    /** Per-user override (null = default). */
+    private readonly limitFor?: (userId: string) => Promise<number | null>,
   ) {}
 
   async status(userId: string, now: Date = new Date()): Promise<CreditStatus> {
     const dayStart = startOfUtcDay(now);
-    const used = await this.usage.creditsSpentSince(userId, dayStart);
+    const [used, override] = await Promise.all([this.usage.creditsSpentSince(userId, dayStart), this.limitFor?.(userId) ?? null]);
+    const limit = override ?? this.dailyCredits;
     return {
       used,
-      limit: this.dailyCredits,
-      remaining: Math.max(this.dailyCredits - used, 0),
+      limit,
+      remaining: Math.max(limit - used, 0),
       resetsAt: new Date(dayStart.getTime() + 86_400_000).toISOString(),
     };
   }

@@ -103,6 +103,8 @@ export class QuotaManager {
     private readonly store: QuotaStore,
     private readonly config: QuotaConfig,
     logger?: Logger,
+    /** Per-user overrides: `dailyUnits` undefined = tier default, null = no per-user cap. */
+    private readonly userLimits?: (userId: string) => Promise<{ dailyUnits?: number | null; tier?: string } | null>,
   ) {
     this.log = logger ?? createLogger({ module: "youtube.quota" });
     if (config.userReserveUnits + config.safetyBufferUnits >= config.dailyUnits) {
@@ -122,8 +124,10 @@ export class QuotaManager {
 
   /** Reserve units for one request or throw QuotaUnavailableError. */
   async acquire(request: QuotaRequest, context: QuotaContext, now: Date = new Date()): Promise<void> {
-    const limits = this.limits(context.tier);
     const userKey = context.lane === "user" && context.userId ? context.userId : "";
+    const override = userKey ? await this.userOverride(userKey) : null;
+    const limits = this.limits(override?.tier ?? context.tier);
+    const perUser = override?.dailyUnits === undefined ? limits.perUser : override.dailyUnits;
     let allowed: boolean;
     try {
       allowed = await this.store.consume({
@@ -134,7 +138,7 @@ export class QuotaManager {
         units: request.units,
         totalLimit: limits.total,
         laneLimit: context.lane === "background" ? limits.background : limits.user,
-        userLimit: userKey ? limits.perUser : null,
+        userLimit: userKey ? perUser : null,
       });
     } catch (error) {
       // If the ledger itself is unreachable, fail open (YouTube still enforces the hard limit) and alert.
@@ -175,9 +179,20 @@ export class QuotaManager {
 
   /** Units a user has left today (for UI hints). */
   async remainingForUser(userId: string, tier = "default", now: Date = new Date()): Promise<number> {
-    const rows = await this.store.usage(quotaDay(now));
+    const [rows, override] = await Promise.all([this.store.usage(quotaDay(now)), this.userOverride(userId)]);
     const used = rows.filter((r) => r.lane === "user" && r.userKey === userId).reduce((acc, r) => acc + r.units, 0);
-    return Math.max(this.limits(tier).perUser - used, 0);
+    const perUser = override?.dailyUnits === undefined ? this.limits(override?.tier ?? tier).perUser : override.dailyUnits;
+    return perUser === null ? Number.POSITIVE_INFINITY : Math.max(perUser - used, 0);
+  }
+
+  private async userOverride(userId: string): Promise<{ dailyUnits?: number | null; tier?: string } | null> {
+    if (!this.userLimits) return null;
+    try {
+      return await this.userLimits(userId);
+    } catch (error) {
+      this.log.warn("user quota limits unavailable", { error });
+      return null;
+    }
   }
 
   private async denialReason(context: QuotaContext, userKey: string, units: number, now: Date): Promise<"daily" | "lane" | "user"> {

@@ -40,6 +40,8 @@ const serverEnvSchema = z.object({
   CRON_SECRET: optionalString,
   /** Comma-separated emails allowed to use the app. Blank = any signed-in user. People invited from the waitlist are always allowed. */
   ALLOWED_EMAILS: optionalString,
+  /** Comma-separated owner/founder emails: unlimited, can manage admins and every account. */
+  OWNER_EMAILS: z.string().default("nathanchintu@icloud.com"),
   /** Comma-separated emails that can manage the waitlist at /admin/waitlist. */
   ADMIN_EMAILS: optionalString,
   /** Public site URL for invite links, e.g. https://outlier.vercel.app. Falls back to the request origin. */

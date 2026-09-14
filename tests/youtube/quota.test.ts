@@ -69,6 +69,15 @@ describe("QuotaManager", () => {
     expect(await manager.remainingForUser("u1", "default", NOW)).toBe(50);
   });
 
+  it("applies per-account unit overrides, with no cap for unlimited accounts", async () => {
+    const limits = async (userId: string) => (userId === "owner" ? { dailyUnits: null } : userId === "small" ? { dailyUnits: 50 } : null);
+    const manager = new QuotaManager(memoryStore(), CONFIG, createLogger(), limits);
+    const ctx = (userId: string) => ({ lane: "user" as const, operation: "page", userId });
+    await expect(manager.acquire({ endpoint: "search", units: 100 }, ctx("small"), NOW)).rejects.toBeInstanceOf(QuotaUnavailableError);
+    for (let i = 0; i < 5; i++) await manager.acquire({ endpoint: "search", units: 100 }, ctx("owner"), NOW);
+    expect(await manager.remainingForUser("owner", "default", NOW)).toBe(Number.POSITIVE_INFINITY);
+  });
+
   it("summarizes usage by lane and operation", async () => {
     const manager = new QuotaManager(memoryStore(), CONFIG, createLogger());
     await manager.acquire({ endpoint: "videos", units: 1 }, { lane: "background", operation: "job:monitor.videos" }, NOW);

@@ -267,6 +267,24 @@ export type UserPreferencesRow = Timestamps & {
   onboarding_completed_at: string | null;
 };
 
+export type AccountRole = "owner" | "admin" | "member";
+
+export type AccountSettingsRow = {
+  user_id: string;
+  email: string;
+  role: AccountRole;
+  /** null = app default (DAILY_CREDITS). */
+  daily_credits: number | null;
+  /** null = tier default (YOUTUBE_USER_DAILY_UNITS). */
+  youtube_daily_units: number | null;
+  quota_tier: string;
+  disabled: boolean;
+  note: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type RateLimitRow = {
   key: string;
   window_start: string;
@@ -401,6 +419,7 @@ export type Database = {
         "pick_date" | "niche" | "youtube_channel_id" | "channel_title" | "youtube_video_id" | "video_title"
       >;
       trending_pick_stats: TableDef<TrendingPickStatRow, "pick_id" | "views">;
+      account_settings: TableDef<AccountSettingsRow, "user_id" | "email">;
       youtube_quota_usage: {
         Row: YouTubeQuotaUsageRow;
         Insert: Pick<YouTubeQuotaUsageRow, "day" | "lane" | "operation"> & Partial<YouTubeQuotaUsageRow>;

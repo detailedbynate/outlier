@@ -30,6 +30,9 @@ export interface CurrentUser {
   email: string;
   approved: boolean;
   isAdmin: boolean;
+  /** Founder/owner: unlimited, manages admins. */
+  isOwner: boolean;
+  role: "owner" | "admin" | "member" | null;
   /** Finished first-run onboarding (only checked for approved users). */
   onboardingCompleted: boolean;
 }
@@ -41,12 +44,17 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   if (error || !data.user) return null;
   const email = data.user.email ?? "";
   const config = env();
-  const isAdmin = email !== "" && parseAllowedEmails(config.ADMIN_EMAILS).has(email.toLowerCase());
-  let approved = isAdmin || isEmailAllowed(email, parseAllowedEmails(config.ALLOWED_EMAILS));
+  const services = getServices();
+  const account = await services.accounts.forUser(data.user.id, email || null);
+  const role = account?.role ?? null;
+  const isOwner = role === "owner" || services.accounts.isOwnerEmail(email);
+  const isAdmin = isOwner || role === "admin" || (email !== "" && parseAllowedEmails(config.ADMIN_EMAILS).has(email.toLowerCase()));
+  // Accounts created at /admin/accounts are approved; disabled accounts never are.
+  let approved = !account?.disabled && (isAdmin || account !== null || isEmailAllowed(email, parseAllowedEmails(config.ALLOWED_EMAILS)));
   // With an allowlist in place, people invited from the waitlist still get in.
-  if (!approved && email) approved = await getServices().waitlist.isInvited(email);
-  const onboardingCompleted = approved ? await getServices().onboarding.isCompleted(data.user.id) : false;
-  return { user: data.user, email, approved, isAdmin, onboardingCompleted };
+  if (!approved && !account?.disabled && email) approved = await services.waitlist.isInvited(email);
+  const onboardingCompleted = approved ? await services.onboarding.isCompleted(data.user.id) : false;
+  return { user: data.user, email, approved, isAdmin: isAdmin && !account?.disabled, isOwner, role: isOwner ? "owner" : isAdmin ? "admin" : role, onboardingCompleted };
 });
 
 /**

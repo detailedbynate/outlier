@@ -38,7 +38,10 @@ function isActive(pathname: string, href: string): boolean {
 
 const ADMIN_SECTION: { title: string; items: NavItem[] } = {
   title: "Admin",
-  items: [{ href: "/admin/waitlist", label: "Waitlist", icon: UsersIcon }],
+  items: [
+    { href: "/admin/accounts", label: "Accounts", icon: UsersIcon },
+    { href: "/admin/waitlist", label: "Waitlist", icon: UsersIcon },
+  ],
 };
 
 export function SidebarNav({ isAdmin = false }: { isAdmin?: boolean }) {

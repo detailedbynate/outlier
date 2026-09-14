@@ -4,6 +4,9 @@ import { createMigratedDatabase, migrationFiles } from "../helpers/database";
 
 const EXPECTED_TABLES = [
   "users",
+  "account_settings",
+  "youtube_quota_usage",
+  "youtube_api_cache",
   "workspaces",
   "workspace_members",
   "channels",
@@ -388,6 +391,16 @@ describe("supabase migrations", () => {
     const row = (await db.query<Record<string, unknown>>(`select view_count, like_count, monitor_priority from public.videos where id = $1`, [video.id])).rows[0]!;
     expect(row).toMatchObject({ monitor_priority: 3, like_count: null });
     expect(Number(row.view_count)).toBe(5000);
+  });
+
+  it("stores account roles and limits with validation", async () => {
+    const { rows } = await db.query<{ id: string }>(`insert into auth.users (email) values ('member@example.com') returning id`);
+    const userId = rows[0]!.id;
+    await db.query(`insert into public.account_settings (user_id, email, daily_credits, youtube_daily_units) values ($1, 'member@example.com', 250, 500)`, [userId]);
+    const row = (await db.query<{ role: string; quota_tier: string; disabled: boolean }>(`select role, quota_tier, disabled from public.account_settings where user_id = $1`, [userId])).rows[0];
+    expect(row).toEqual({ role: "member", quota_tier: "default", disabled: false });
+    await expect(db.query(`update public.account_settings set role = 'superuser' where user_id = $1`, [userId])).rejects.toThrow(/account_settings_role_valid/);
+    await expect(db.query(`update public.account_settings set daily_credits = -1 where user_id = $1`, [userId])).rejects.toThrow(/account_settings_credits_valid/);
   });
 
   it("defaults new channels to untracked", async () => {
