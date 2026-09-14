@@ -6,6 +6,7 @@ import { TrackChannelForm } from "@/components/track-channel-form";
 import { formatCompact, formatNumber, timeAgo } from "@/lib/format";
 import { requireApprovedUser } from "@/lib/auth/session";
 import { getServices } from "@/lib/services";
+import { setChannelTracked } from "../research/shorts-channels/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,9 @@ export default async function ChannelsPage() {
                   <th className="num">Total views</th>
                   <th className="num">Videos</th>
                   <th className="num">Last synced</th>
+                  <th className="num">
+                    <span className="sr-only">Actions</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -53,6 +57,15 @@ export default async function ChannelsPage() {
                     <td className="num">{formatCompact(channel.view_count)}</td>
                     <td className="num">{formatNumber(channel.video_count)}</td>
                     <td className="num muted">{timeAgo(channel.last_synced_at)}</td>
+                    <td className="num">
+                      <form action={setChannelTracked}>
+                        <input type="hidden" name="channelId" value={channel.id} />
+                        <input type="hidden" name="tracked" value="false" />
+                        <button type="submit" className="button-ghost button-small" aria-label={`Remove ${channel.title} from tracked channels`}>
+                          Remove
+                        </button>
+                      </form>
+                    </td>
                   </tr>
                 ))}
               </tbody>
