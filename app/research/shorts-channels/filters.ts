@@ -47,12 +47,20 @@ export const COUNTRIES = [
 ] satisfies Option[];
 
 export const SORTS = [
-  { key: "views", label: "Avg views", column: "avg_short_views" },
-  { key: "subs", label: "Subscribers", column: "subscriber_count" },
-  { key: "momentum", label: "Most active", column: "shorts_last_30d" },
-  { key: "newest", label: "Newest channels", column: "channel_created_at" },
-  { key: "recent", label: "Latest upload", column: "last_short_at" },
-] satisfies (Option & { column: ShortsChannelFilters["orderBy"] })[];
+  { key: "views", label: "Avg views", column: "avg_short_views", group: "Channel" },
+  { key: "subs", label: "Subscribers", column: "subscriber_count", group: "Channel" },
+  { key: "momentum", label: "Most active", column: "shorts_last_30d", group: "Channel" },
+  { key: "newest", label: "Newest channels", column: "channel_created_at", group: "Channel" },
+  { key: "recent", label: "Latest upload", column: "last_short_at", group: "Channel" },
+  { key: "views24", label: "Views · last 24h", column: "views_24h", group: "Realtime" },
+  { key: "views48", label: "Views · last 48h", column: "views_48h", group: "Realtime" },
+  { key: "subs24", label: "Subs · last 24h", column: "subs_24h", group: "Realtime" },
+  { key: "subs48", label: "Subs · last 48h", column: "subs_48h", group: "Realtime" },
+] satisfies (Option & { column: ShortsChannelFilters["orderBy"]; group: "Channel" | "Realtime" })[];
+
+export function isRealtimeSort(key: string): boolean {
+  return SORTS.some((s) => s.key === key && s.group === "Realtime");
+}
 
 export const PAGE_SIZE = 30;
 export const MAX_LIMIT = 120;

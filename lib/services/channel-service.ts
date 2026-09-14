@@ -178,6 +178,36 @@ export class ChannelService {
     return { ...synced, videosSynced };
   }
 
+  /**
+   * Cheap stats-only refresh for many channels: 1 quota unit per 50 channels.
+   * Updates subscriber/view/video counts and appends snapshots (for 24h/48h
+   * growth) without re-syncing videos or touching last_synced_at.
+   */
+  async snapshotChannelStats(youtubeChannelIds: string[], now: Date = new Date()): Promise<{ updated: number; snapshots: number }> {
+    if (youtubeChannelIds.length === 0) return { updated: 0, snapshots: 0 };
+    await this.options.storage?.assertCapacity();
+    const remote = await this.youtube.getChannels(youtubeChannelIds);
+    const rows = remote.map((channel) => {
+      const { last_synced_at: _unchanged, ...row } = channelToRow(channel, now);
+      return row;
+    });
+    const saved = await this.channels.upsertMany(rows);
+    const byYoutubeId = new Map(remote.map((c) => [c.id, c]));
+    const snapshots = await this.channels.insertSnapshots(
+      saved.map((row) => {
+        const stats = byYoutubeId.get(row.youtube_channel_id)!.statistics;
+        return {
+          channel_id: row.id,
+          captured_at: now.toISOString(),
+          subscriber_count: stats.subscriberCount,
+          view_count: stats.viewCount,
+          video_count: stats.videoCount,
+        };
+      }),
+    );
+    return { updated: saved.length, snapshots: snapshots.length };
+  }
+
   /** Recompute video_performance for a channel's recent videos, per format. */
   async refreshPerformance(channelUuid: string, now: Date = new Date()): Promise<number> {
     let updated = 0;

@@ -166,6 +166,13 @@ export class ChannelRepository {
     );
   }
 
+  /** Page through YouTube channel ids in a stable order (keyset pagination on youtube_channel_id). */
+  async youtubeIdsPage(after: string | null, limit: number): Promise<string[]> {
+    let query = this.db.from("channels").select("youtube_channel_id").order("youtube_channel_id").limit(limit);
+    if (after) query = query.gt("youtube_channel_id", after);
+    return unwrap(await query, "channels.youtubeIdsPage").map((r) => r.youtube_channel_id);
+  }
+
   async setTrackedMany(ids: string[], tracked: boolean): Promise<void> {
     if (ids.length === 0) return;
     assertOk(await this.db.from("channels").update({ tracked }).in("id", ids), "channels.setTrackedMany");
@@ -187,7 +194,16 @@ export interface ShortsChannelFilters {
   /** ISO 3166 alpha-2. */
   country?: string;
   tracked?: boolean;
-  orderBy: "avg_short_views" | "subscriber_count" | "channel_created_at" | "last_short_at" | "shorts_last_30d";
+  orderBy:
+    | "avg_short_views"
+    | "subscriber_count"
+    | "channel_created_at"
+    | "last_short_at"
+    | "shorts_last_30d"
+    | "views_24h"
+    | "views_48h"
+    | "subs_24h"
+    | "subs_48h";
   limit: number;
 }
 

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Dropdown } from "@/components/dropdown";
-import { ChevronDownIcon, FlameIcon, SearchIcon, ShortsIcon, SlidersIcon, SortIcon, VideoIcon, VideoOffIcon } from "@/components/icons";
+import { ChevronDownIcon, FlameIcon, SearchIcon, ShortsIcon, SlidersIcon, SortIcon, VideoIcon, VideoOffIcon, ZapIcon } from "@/components/icons";
 import { PageHeader } from "@/components/page-header";
 import { requireApprovedUser } from "@/lib/auth/session";
 import { timeAgo } from "@/lib/format";
@@ -15,6 +15,7 @@ import {
   CHANNEL_AGE,
   clearedAdvanced,
   countAdvanced,
+  isRealtimeSort,
   COUNTRIES,
   label,
   MAX_LIMIT,
@@ -140,10 +141,18 @@ export default async function ShortsChannelsPage({ searchParams }: { searchParam
               </>
             }
           >
-            {SORTS.map((sort) => (
-              <Link key={sort.key} href={buildHref(state, { sort: sort.key })} className="dropdown-item" aria-current={sort.key === state.sort}>
-                {sort.label}
-              </Link>
+            {(["Channel", "Realtime"] as const).map((group) => (
+              <div key={group} className="dropdown-group">
+                <div className="dropdown-group-title">
+                  {group === "Realtime" ? <ZapIcon size={12} /> : null}
+                  {group === "Realtime" ? "Realtime growth" : "Channel stats"}
+                </div>
+                {SORTS.filter((sort) => sort.group === group).map((sort) => (
+                  <Link key={sort.key} href={buildHref(state, { sort: sort.key })} className="dropdown-item" aria-current={sort.key === state.sort}>
+                    {sort.label}
+                  </Link>
+                ))}
+              </div>
             ))}
           </Dropdown>
         </div>
@@ -220,6 +229,7 @@ export default async function ShortsChannelsPage({ searchParams }: { searchParam
             : `${canLoadMore ? `Top ${channels.length}` : channels.length} ${channels.length === 1 ? "channel" : "channels"}`}
           {terms.length > 0 ? ` matching ${terms.map((t) => `“${t}”`).join(", ")}` : ""}
         </span>
+        {isRealtimeSort(state.sort) ? <span className="muted">Growth since the snapshot ~24h/48h earlier · channels without history yet are listed last</span> : null}
         {advancedCount > 0 || state.q ? (
           <Link href="/research/shorts-channels" className="muted">
             Clear all
@@ -236,7 +246,7 @@ export default async function ShortsChannelsPage({ searchParams }: { searchParam
       ) : (
         <div className="channel-list">
           {channels.map((channel) => (
-            <ChannelCard key={channel.channel_id} channel={channel} showVideos={showVideos} />
+            <ChannelCard key={channel.channel_id} channel={channel} showVideos={showVideos} highlightGrowth={isRealtimeSort(state.sort)} />
           ))}
         </div>
       )}

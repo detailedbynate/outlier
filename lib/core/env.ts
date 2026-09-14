@@ -39,6 +39,10 @@ const serverEnvSchema = z.object({
   SNAPSHOT_VIDEO_MAX_AGE_DAYS: z.coerce.number().int().min(1).max(3650).default(90),
   SNAPSHOT_DAILY_RETENTION_DAYS: z.coerce.number().int().min(1).default(30),
   SNAPSHOT_RETENTION_DAYS: z.coerce.number().int().min(2).default(365),
+  /** How often every catalog channel gets a stats snapshot (powers 24h/48h growth). */
+  STATS_SNAPSHOT_INTERVAL_HOURS: z.coerce.number().positive().max(24).default(6),
+  /** Channels per stats snapshot run (1 YouTube quota unit per 50). */
+  STATS_SNAPSHOT_MAX_CHANNELS: z.coerce.number().int().min(50).max(50_000).default(5_000),
 
   /** Research discovery searches per UTC day, all users combined (100 YouTube quota units each). */
   DISCOVERY_DAILY_LIMIT: z.coerce.number().int().min(0).max(90).default(10),

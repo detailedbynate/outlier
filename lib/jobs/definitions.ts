@@ -25,6 +25,7 @@ export interface JobDependencies {
     syncMaxChannelsPerRun: number;
     snapshotDailyRetentionDays: number;
     snapshotRetentionDays: number;
+    statsSnapshotMaxChannels: number;
   };
 }
 
@@ -134,6 +135,29 @@ export function createJobRegistry(deps: JobDependencies): JobRegistry {
           if (status.level === "over_budget") return { skipped: "storage_budget" };
           return { ...(await deps.trending.computeDailyPicks()) };
         },
+      }),
+    )
+    .register(
+      defineJob({
+        type: "catalog.snapshot_stats",
+        description: "Scheduled: snapshot subscriber/view counts for every catalog channel (24h/48h growth).",
+        payloadSchema: emptyPayload,
+        maxAttempts: 2,
+        handler: (_payload, { signal }) =>
+          skipIfOverBudget(async () => {
+            let after: string | null = null;
+            let updated = 0;
+            let batches = 0;
+            while (updated < deps.config.statsSnapshotMaxChannels && !signal.aborted) {
+              const ids = await deps.channelRepository.youtubeIdsPage(after, 50);
+              if (ids.length === 0) break;
+              updated += (await deps.channels.snapshotChannelStats(ids)).updated;
+              after = ids.at(-1)!;
+              batches += 1;
+              if (ids.length < 50) break;
+            }
+            return { updated, quotaUnits: batches };
+          }),
       }),
     )
     .register(

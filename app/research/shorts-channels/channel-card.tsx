@@ -21,9 +21,12 @@ export function ChannelCard({
   channel,
   showVideos,
   badge,
+  highlightGrowth = false,
 }: {
   channel: ShortsChannelWithPreviews;
   showVideos: boolean;
+  /** Emphasize the realtime growth row (when sorting by growth). */
+  highlightGrowth?: boolean;
   /** e.g. the niche a trending pick was found in. */
   badge?: string;
 }) {
@@ -101,6 +104,23 @@ export function ChannelCard({
         </div>
       </header>
 
+      <div className={`growth-row ${highlightGrowth ? "is-highlighted" : ""}`}>
+        <span className="growth-label">
+          <ZapIcon size={13} />
+          Realtime
+        </span>
+        {channel.views_24h === null && channel.views_48h === null ? (
+          <span className="muted">Collecting data · growth appears after ~24 hours of snapshots</span>
+        ) : (
+          <>
+            <GrowthStat label="views 24h" value={channel.views_24h} />
+            <GrowthStat label="views 48h" value={channel.views_48h} />
+            <GrowthStat label="subs 24h" value={channel.hidden_subscriber_count ? null : channel.subs_24h} />
+            <GrowthStat label="subs 48h" value={channel.hidden_subscriber_count ? null : channel.subs_48h} />
+          </>
+        )}
+      </div>
+
       <div className="channel-stats-row">
         <ZapIcon size={14} className="accent-icon" />
         <span>
@@ -140,5 +160,25 @@ export function ChannelCard({
         </div>
       ) : null}
     </article>
+  );
+}
+
+function GrowthStat({ label, value }: { label: string; value: number | null }) {
+  if (value === null) {
+    return (
+      <span className="growth-stat">
+        <strong className="muted">—</strong> {label}
+      </span>
+    );
+  }
+  const direction = value > 0 ? "up" : value < 0 ? "down" : "flat";
+  return (
+    <span className="growth-stat" data-direction={direction}>
+      <strong>
+        {value > 0 ? "+" : value < 0 ? "−" : ""}
+        {formatCompact(Math.abs(value))}
+      </strong>{" "}
+      {label}
+    </span>
   );
 }

@@ -111,6 +111,7 @@ export function getServices(): Services {
       syncMaxChannelsPerRun: config.SYNC_MAX_CHANNELS_PER_RUN,
       snapshotDailyRetentionDays: config.SNAPSHOT_DAILY_RETENTION_DAYS,
       snapshotRetentionDays: config.SNAPSHOT_RETENTION_DAYS,
+      statsSnapshotMaxChannels: config.STATS_SNAPSHOT_MAX_CHANNELS,
     },
   });
   const queue = new JobQueue(repositories.jobs, jobRegistry);
@@ -118,6 +119,7 @@ export function getServices(): Services {
 
   const scheduler = new JobScheduler({ findLatestByType: (type) => repositories.jobs.findLatestByType(type), enqueue }, [
     { type: "catalog.refresh", everyHours: config.SYNC_INTERVAL_HOURS },
+    { type: "catalog.snapshot_stats", everyHours: config.STATS_SNAPSHOT_INTERVAL_HOURS },
     { type: "maintenance.prune_snapshots", everyHours: 24 },
     { type: TRENDING_JOB_TYPE, everyHours: 24 },
   ]);

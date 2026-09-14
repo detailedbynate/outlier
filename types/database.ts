@@ -255,6 +255,12 @@ export type ShortsChannelRow = {
   top_short_views: number | null;
   last_short_at: string | null;
   shorts_last_30d: number;
+  /** Growth vs. ~24h/48h ago; null until enough snapshot history exists. */
+  views_24h: number | null;
+  views_48h: number | null;
+  subs_24h: number | null;
+  subs_48h: number | null;
+  stats_captured_at: string | null;
 };
 
 export type Database = {

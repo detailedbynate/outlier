@@ -215,6 +215,37 @@ describe("supabase migrations", () => {
     expect(Number(rows[0]!.median_short_views)).toBe(250);
   });
 
+  it("computes 24h and 48h growth from snapshots, null without history", async () => {
+    const { rows } = await db.query<{ id: string }>(
+      `select channel_id as id from public.shorts_channels where youtube_channel_id = 'UCssssssssssssssssssssss'`,
+    );
+    const channelId = rows[0]!.id;
+    const growth = async () =>
+      (
+        await db.query<{ views_24h: string | null; views_48h: string | null; subs_24h: string | null; subs_48h: string | null }>(
+          `select views_24h, views_48h, subs_24h, subs_48h from public.shorts_channels where channel_id = $1`,
+          [channelId],
+        )
+      ).rows[0]!;
+
+    await db.query(
+      `insert into public.channel_snapshots (channel_id, captured_at, view_count, video_count, subscriber_count) values ($1, now(), 5000, 5, 1200)`,
+      [channelId],
+    );
+    expect(await growth()).toEqual({ views_24h: null, views_48h: null, subs_24h: null, subs_48h: null });
+
+    await db.query(
+      `insert into public.channel_snapshots (channel_id, captured_at, view_count, video_count, subscriber_count) values
+        ($1, now() - interval '49 hours', 1000, 5, 1000),
+        ($1, now() - interval '30 hours', 2500, 5, 1080),
+        ($1, now() - interval '25 hours', 3000, 5, 1100),
+        ($1, now() - interval '5 days', 10, 5, 1)`,
+      [channelId],
+    );
+    const g = await growth();
+    expect([g.views_24h, g.views_48h, g.subs_24h, g.subs_48h].map(Number)).toEqual([2000, 4000, 100, 200]);
+  });
+
   it("defaults new channels to untracked", async () => {
     const { rows } = await db.query<{ tracked: boolean }>(
       `insert into public.channels (youtube_channel_id, title) values ('UCnnnnnnnnnnnnnnnnnnnnnn', 'New') returning tracked`,

@@ -29,6 +29,7 @@
   --on-accent: #ffffff;
 
   --good: #0ca30c;
+  --good-text: #067a06;
   --warning: #e59a00;
   --critical: #d03b3b;
 
@@ -70,6 +71,7 @@
     --accent-wash: rgba(139, 92, 246, 0.14);
 
     --warning: #fab219;
+    --good-text: #3ecf3e;
 
     --glass-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.025));
     --glass-border: rgba(255, 255, 255, 0.1);
@@ -1701,4 +1703,69 @@ tr:last-child td {
   background: var(--accent-wash);
   border: 1px solid var(--accent-track);
   white-space: nowrap;
+}
+/* Realtime growth */
+.growth-row {
+  display: flex;
+  align-items: center;
+  gap: 8px 16px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  transition:
+    background 0.2s var(--ease),
+    border-color 0.2s var(--ease);
+}
+
+.growth-row.is-highlighted {
+  background: var(--accent-wash);
+  border-color: var(--accent-track);
+}
+
+.growth-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 650;
+  color: var(--text-primary);
+}
+
+.growth-label svg {
+  color: var(--warning);
+}
+
+.growth-stat strong {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Up/down is also carried by the +/− sign, never color alone. */
+.growth-stat[data-direction="up"] strong {
+  color: var(--good-text, #0ca30c);
+}
+
+.growth-stat[data-direction="down"] strong {
+  color: var(--critical);
+}
+
+.dropdown-group + .dropdown-group {
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+  padding-top: 4px;
+}
+
+.dropdown-group-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 11px 2px;
+  font-size: 10.5px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
 }
