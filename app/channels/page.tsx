@@ -1,4 +1,6 @@
 /* eslint-disable @next/next/no-img-element -- YouTube avatars are already CDN-optimized */
+import { BookmarkIcon } from "@/components/icons";
+import { PageHeader } from "@/components/page-header";
 import Link from "next/link";
 import { TrackChannelForm } from "@/components/track-channel-form";
 import { formatCompact, formatNumber, timeAgo } from "@/lib/format";
@@ -13,10 +15,7 @@ export default async function ChannelsPage() {
 
   return (
     <div className="stack">
-      <div>
-        <h1>Tracked Channels</h1>
-        <p className="subtitle">Channels you track are refreshed every day.</p>
-      </div>
+      <PageHeader icon={BookmarkIcon} title="Tracked Channels" subtitle="Channels you track are refreshed every day." />
 
       <section className="card">
         <h2>Track a channel</h2>

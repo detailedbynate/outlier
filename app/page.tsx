@@ -1,3 +1,5 @@
+import { GridIcon } from "@/components/icons";
+import { PageHeader } from "@/components/page-header";
 import Link from "next/link";
 import { StatTile } from "@/components/stat-tile";
 import { StorageMeter } from "@/components/storage-meter";
@@ -21,10 +23,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="stack">
-      <div>
-        <h1>Dashboard</h1>
-        <p className="subtitle">Track channels and spot videos that outperform their channel.</p>
-      </div>
+      <PageHeader icon={GridIcon} title="Dashboard" subtitle="Track channels and spot videos that outperform their channel." />
 
       <div className="grid grid-4">
         <StatTile label="Tracked channels" value={formatNumber(channelCount)} note="Refreshed daily by the worker" />

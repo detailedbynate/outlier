@@ -44,6 +44,9 @@ const serverEnvSchema = z.object({
   DISCOVERY_DAILY_LIMIT: z.coerce.number().int().min(0).max(90).default(10),
   DISCOVERY_MAX_CHANNELS: z.coerce.number().int().min(1).max(50).default(25),
 
+  /** Credits each user gets per UTC day. Actions that spend YouTube quota cost credits. */
+  DAILY_CREDITS: z.coerce.number().int().min(0).max(100_000).default(100),
+
   ANTHROPIC_API_KEY: optionalString,
   OPENAI_API_KEY: optionalString,
 });

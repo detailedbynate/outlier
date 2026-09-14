@@ -1,3 +1,5 @@
+import { FlameIcon } from "@/components/icons";
+import { PageHeader } from "@/components/page-header";
 import Link from "next/link";
 import { VideoCard } from "@/components/video-card";
 import { daysAgo } from "@/lib/format";
@@ -53,12 +55,7 @@ export default async function ViralPage({ searchParams }: { searchParams: Search
 
   return (
     <div className="stack">
-      <div>
-        <h1>Viral videos</h1>
-        <p className="subtitle">
-          Videos from tracked channels, ranked by how far they beat their channel&apos;s typical views.
-        </p>
-      </div>
+      <PageHeader icon={FlameIcon} title="Viral Videos" subtitle="Videos ranked by how far they beat their channel’s typical views." />
 
       <div className="row" style={{ gap: 20 }}>
         <div className="chips" aria-label="Published within">

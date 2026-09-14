@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Dropdown } from "@/components/dropdown";
-import { ChevronDownIcon, SearchIcon, SlidersIcon, SortIcon, VideoIcon, VideoOffIcon } from "@/components/icons";
+import { ChevronDownIcon, SearchIcon, ShortsIcon, SlidersIcon, SortIcon, VideoIcon, VideoOffIcon } from "@/components/icons";
+import { PageHeader } from "@/components/page-header";
 import { requireApprovedUser } from "@/lib/auth/session";
 import { getServices } from "@/lib/services";
 import { ChannelCard } from "./channel-card";
@@ -65,6 +66,7 @@ export default async function ShortsChannelsPage({ searchParams }: { searchParam
 
   return (
     <div className="research-page">
+      <PageHeader icon={ShortsIcon} title="Shorts Channels" subtitle="Find channels winning with Shorts, by niche, size, and momentum." />
       <form method="get" action="/research/shorts-channels" className="search-hero" role="search">
         <SearchIcon size={18} className="search-hero-icon" />
         <label htmlFor="q" className="sr-only">

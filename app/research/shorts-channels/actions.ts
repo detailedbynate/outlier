@@ -6,6 +6,7 @@ import { isAppError } from "@/lib/core/errors";
 import { logger } from "@/lib/core/logger";
 import { JobWorker } from "@/lib/jobs/worker";
 import { getServices } from "@/lib/services";
+import { CREDIT_COSTS } from "@/lib/services/credits-service";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -35,13 +36,16 @@ export async function discoverShortsChannels(_prev: DiscoverState, formData: For
   const services = getServices();
 
   try {
+    await services.credits.assertAvailable(user.id, "discover_channels");
     const result = await services.research.discoverShortsChannels(keyword, user.id);
+    await services.credits.charge(user.id, "discover_channels");
     let processed = 0;
     if (result.channelsQueued > 0) {
       const worker = new JobWorker(services.repositories.jobs, services.jobRegistry, { workerId: `discover:${user.id.slice(0, 8)}` });
       ({ processed } = await worker.drain({ deadline: startedAt + INLINE_WORK_MS, maxJobs: result.channelsQueued }));
     }
-    revalidatePath("/research/shorts-channels");
+    // Layout revalidation refreshes the sidebar credits meter.
+    revalidatePath("/", "layout");
 
     const remaining = Math.max(result.channelsQueued - processed, 0);
     const parts = [
@@ -50,7 +54,7 @@ export async function discoverShortsChannels(_prev: DiscoverState, formData: For
         ? "They were already up to date."
         : `Added ${processed}${remaining > 0 ? `, ${remaining} more will appear within the hour` : ""}.`,
       "Only channels that mostly post Shorts show in the list.",
-      `${result.searchesLeftToday} discovery searches left today.`,
+      `Used ${CREDIT_COSTS.discover_channels} credits.`,
     ];
     return { message: parts.join(" "), error: null };
   } catch (error) {

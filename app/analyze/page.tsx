@@ -1,23 +1,31 @@
 /* eslint-disable @next/next/no-img-element -- YouTube images are already CDN-optimized */
+import { ChartIcon } from "@/components/icons";
+import { PageHeader } from "@/components/page-header";
 import { StatTile } from "@/components/stat-tile";
 import { isAppError } from "@/lib/core/errors";
 import { formatCompact, formatDuration, formatMultiplier, formatNumber, formatPercent, timeAgo } from "@/lib/format";
 import { requireApprovedUser } from "@/lib/auth/session";
 import { getServices } from "@/lib/services";
+import { parseVideoId } from "@/lib/youtube/parse";
 import type { VideoAnalysis } from "@/lib/services/video-service";
 
 export const dynamic = "force-dynamic";
 
 export default async function AnalyzePage({ searchParams }: { searchParams: Promise<{ v?: string }> }) {
-  await requireApprovedUser();
+  const { user } = await requireApprovedUser();
   const { v } = await searchParams;
   const input = v?.trim() ?? "";
 
   let analysis: VideoAnalysis | null = null;
   let error: string | null = null;
   if (input) {
+    const { credits, videos } = getServices();
     try {
-      analysis = await getServices().videos.analyzeVideo(input);
+      const videoId = parseVideoId(input);
+      if (!(await credits.alreadyPaid(user.id, "analyze_video", videoId))) await credits.assertAvailable(user.id, "analyze_video");
+      analysis = await videos.analyzeVideo(videoId);
+      // Re-opening the same video today is free.
+      await credits.charge(user.id, "analyze_video", videoId);
     } catch (e) {
       error = isAppError(e) && e.expose ? e.message : "Could not analyze that video.";
     }
@@ -25,10 +33,7 @@ export default async function AnalyzePage({ searchParams }: { searchParams: Prom
 
   return (
     <div className="stack">
-      <div>
-        <h1>Analyze a video</h1>
-        <p className="subtitle">Paste any YouTube video or Short to see how it performs against its channel.</p>
-      </div>
+      <PageHeader icon={ChartIcon} title="Analyze Video" subtitle="Paste any YouTube video or Short to see how it performs against its channel · 2 credits" />
 
       <form className="card" method="get">
         <div className="form">

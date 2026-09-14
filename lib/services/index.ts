@@ -14,16 +14,18 @@ import type { JobRegistry } from "@/lib/jobs/registry";
 import { JobScheduler } from "@/lib/jobs/scheduler";
 import { getYouTubeService } from "@/lib/youtube";
 import { ChannelService } from "./channel-service";
+import { CreditsService } from "./credits-service";
 import { DiscoveryService } from "./discovery-service";
 import { JobService } from "./job-service";
 import { ResearchService } from "./research-service";
 import { StorageBudgetService } from "./storage-budget-service";
 import { VideoService } from "./video-service";
 
-export { ChannelService, DiscoveryService, JobService, ResearchService, StorageBudgetService, VideoService };
+export { ChannelService, CreditsService, DiscoveryService, JobService, ResearchService, StorageBudgetService, VideoService };
 
 export interface Services {
   channels: ChannelService;
+  credits: CreditsService;
   videos: VideoService;
   discovery: DiscoveryService;
   jobs: JobService;
@@ -112,6 +114,7 @@ export function getServices(): Services {
 
   services = {
     channels,
+    credits: new CreditsService(repositories.usage, config.DAILY_CREDITS),
     videos,
     discovery: new DiscoveryService(youtube),
     jobs: new JobService(queue, repositories.jobs),

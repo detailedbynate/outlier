@@ -20,7 +20,7 @@ export function DiscoverForm({ keyword, searchesLeft }: { keyword: string; searc
           <div className="stat-note">
             {disabled
               ? "Daily discovery limit reached. Resets at midnight UTC."
-              : `Adds channels behind the most-viewed Shorts from the last 90 days · ${searchesLeft} left today`}
+              : `Adds channels behind the most-viewed Shorts from the last 90 days · 10 credits`}
           </div>
         </div>
       </div>

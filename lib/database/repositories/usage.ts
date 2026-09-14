@@ -1,5 +1,5 @@
 import type { DatabaseClient } from "@/lib/database/client";
-import { unwrap } from "@/lib/database/errors";
+import { assertOk, unwrap } from "@/lib/database/errors";
 import type { TablesInsert, UsageEventRow } from "@/types/database";
 
 export class UsageRepository {
@@ -16,6 +16,31 @@ export class UsageRepository {
       "usage_events.countSince",
     );
     return rows.reduce((sum, row) => sum + row.quantity, 0);
+  }
+
+  async creditsSpentSince(userId: string, since: Date): Promise<number> {
+    const rows = unwrap(
+      await this.db
+        .from("usage_events")
+        .select("credits_cost")
+        .eq("user_id", userId)
+        .gt("credits_cost", 0)
+        .gte("occurred_at", since.toISOString()),
+      "usage_events.creditsSpentSince",
+    );
+    return rows.reduce((sum, row) => sum + row.credits_cost, 0);
+  }
+
+  async hasEventSince(userId: string, eventType: string, resourceId: string, since: Date): Promise<boolean> {
+    const result = await this.db
+      .from("usage_events")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("event_type", eventType)
+      .eq("resource_id", resourceId)
+      .gte("occurred_at", since.toISOString());
+    assertOk(result, "usage_events.hasEventSince");
+    return (result.count ?? 0) > 0;
   }
 
   /** Most frequent `resource_id` values for an event type since a point in time (e.g. popular search keywords). */

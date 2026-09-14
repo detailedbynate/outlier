@@ -117,6 +117,58 @@ export const VideoIcon = (p: P) => (
     <path d="m16 10.5 5-3v9l-5-3" />
   </Icon>
 );
+export const GridIcon = (p: P) => (
+  <Icon {...p}>
+    <rect x="3" y="3" width="7.5" height="7.5" rx="2" />
+    <rect x="13.5" y="3" width="7.5" height="7.5" rx="2" />
+    <rect x="3" y="13.5" width="7.5" height="7.5" rx="2" />
+    <rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2" />
+  </Icon>
+);
+/** Shorts-style mark: two rounded, offset lobes with a play triangle. */
+export const ShortsIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M14.4 2.9 7.9 6.4a4.1 4.1 0 0 0 .2 7.3l.9.4-1 .6a4.1 4.1 0 0 0 3.8 7.3l6.5-3.5a4.1 4.1 0 0 0-.2-7.3l-.9-.4 1-.6a4.1 4.1 0 0 0-3.8-7.3Z" />
+    <path d="m10.6 9.4 4 2.6-4 2.6z" fill="currentColor" stroke="none" />
+  </Icon>
+);
+export const FlameIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M12 22c4 0 7-2.8 7-6.8 0-3.4-2.2-5.6-3.6-7.2-.5 1.9-1.6 3-2.9 3.4.5-3.4-1-6.5-3.9-8.4.2 3.1-1.4 5-3 6.8C4.3 11.3 5 13.3 5 15.2 5 19.2 8 22 12 22Z" />
+  </Icon>
+);
+export const ChartIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M3 3v18h18" />
+    <path d="m7 15 4-4 3 3 5-6" />
+  </Icon>
+);
+export const CoinsIcon = (p: P) => (
+  <Icon {...p}>
+    <ellipse cx="9" cy="7" rx="6" ry="3" />
+    <path d="M3 7v5c0 1.7 2.7 3 6 3s6-1.3 6-3V7" />
+    <path d="M9 18c0 1.7 2.7 3 6 3s6-1.3 6-3v-5c0-1.6-2.4-2.9-5.5-3" />
+  </Icon>
+);
+export const LogOutIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H3" />
+  </Icon>
+);
+/** Brand mark: a line breaking out above its baseline — an outlier. */
+export const BrandMark = ({ size = 28 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+    <defs>
+      <linearGradient id="brand-gradient" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stopColor="#8b5cf6" />
+        <stop offset="1" stopColor="#ec4899" />
+      </linearGradient>
+    </defs>
+    <rect width="32" height="32" rx="9" fill="url(#brand-gradient)" />
+    <path d="M7 21.5h4.5l3-4 3 2.5L25 9" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+    <circle cx="25" cy="9" r="2.4" fill="#fff" />
+  </svg>
+);
 export const CompassIcon = (p: P) => (
   <Icon {...p}>
     <circle cx="12" cy="12" r="9" />
