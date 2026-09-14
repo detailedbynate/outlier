@@ -1,87 +1,75 @@
 import Link from "next/link";
-import { GridIcon } from "@/components/icons";
-import { PageHeader } from "@/components/page-header";
-import { StatTile } from "@/components/stat-tile";
-import { StorageMeter } from "@/components/storage-meter";
-import { TrackChannelForm } from "@/components/track-channel-form";
-import { VideoCard } from "@/components/video-card";
-import { daysAgo, formatNumber } from "@/lib/format";
+import { Suspense } from "react";
+import { greetingName } from "@/lib/analytics/dashboard";
+import type { CurrentUser } from "@/lib/auth/session";
+import { timeAgo } from "@/lib/format";
 import { getServices } from "@/lib/services";
+import {
+  CompetitorWatchSection,
+  NichePulseSection,
+  OverviewStats,
+  PanelSkeleton,
+  RecentActivitySection,
+  ResearchShortcuts,
+  YourChannelsSection,
+} from "./dashboard/sections";
 
-/** Signed-in home. Callers must check access first. */
-export async function DashboardView({ userId }: { userId: string }) {
-  const { storage, repositories, onboarding } = getServices();
-  const [preferences, status, channelCount, videoCount, topVideos] = await Promise.all([
-    onboarding.getPreferences(userId),
-    storage.getStatus(),
-    repositories.channels.count({ tracked: true }),
-    repositories.videos.count(),
-    repositories.videos.feed({ orderBy: "outlier_score", limit: 6, publishedAfter: daysAgo(1) }),
-  ]);
+/** Signed-in home: a daily command center. Callers must check access first. Uses stored data only (no YouTube quota). */
+export async function DashboardView({ current }: { current: CurrentUser }) {
+  const services = getServices();
+  const userId = current.user.id;
+  const [preferences, lastVisitAt] = await Promise.all([services.onboarding.getPreferences(userId), services.dashboard.registerVisit(userId)]);
+  const niches = preferences?.niches ?? [];
+  const name = greetingName(current.email, current.user.user_metadata?.full_name as string | undefined);
 
   return (
-    <div className="stack">
-      <PageHeader icon={GridIcon} title="Dashboard" subtitle="Track channels and spot videos that outperform their channel." />
+    <div className="dash">
+      <header className="dash-hero">
+        <div className="dash-hero-text">
+          <span className="dash-eyebrow">
+            <span className="dash-live" aria-hidden="true" />
+            Command center
+          </span>
+          <h1>Welcome back, {name}</h1>
+          <p>
+            {lastVisitAt ? `Here's what moved since you were last here ${timeAgo(lastVisitAt)}.` : "Here's what's moving in your space right now."}{" "}
+            <Link href="/settings/preferences" className="dash-link">
+              Tune your niches
+            </Link>
+          </p>
+        </div>
+        <Suspense fallback={<div className="dash-stats dash-stats-loading" aria-hidden="true">{[0, 1, 2, 3].map((i) => <span key={i} className="dash-stat sk-block" />)}</div>}>
+          <OverviewStats userId={userId} lastVisitAt={lastVisitAt} niches={niches.length} />
+        </Suspense>
+      </header>
 
-      <div className="grid grid-4">
-        <StatTile label="Tracked channels" value={formatNumber(channelCount)} note="Refreshed daily" />
-        <StatTile label="Videos in catalog" value={formatNumber(videoCount)} note="Latest uploads per channel" />
-        <StorageMeter status={status} />
+      <Suspense fallback={<PanelSkeleton className="dash-pulse" rows={4} />}>
+        <NichePulseSection niches={niches} lastVisitAt={lastVisitAt} />
+      </Suspense>
+
+      <div className="dash-columns">
+        <Suspense fallback={<PanelSkeleton rows={4} />}>
+          <YourChannelsSection ownChannel={preferences?.channel ?? null} />
+        </Suspense>
+        <Suspense fallback={<PanelSkeleton rows={4} />}>
+          <CompetitorWatchSection competitors={preferences?.competitors ?? []} />
+        </Suspense>
       </div>
 
-      {preferences ? (
-        <section className="card personalize-card">
-          <div className="spread" style={{ alignItems: "center" }}>
-            <div>
-              <h2 style={{ marginBottom: 4 }}>Your preferences</h2>
-              <p className="stat-note" style={{ margin: 0 }}>
-                {preferences.contentFormats.map((f) => (f === "shorts" ? "Shorts" : "Long-form")).join(" + ") || "All formats"}
-                {preferences.channel ? ` · ${preferences.channel}` : ""}
-              </p>
+      <div className="dash-columns dash-columns-bottom">
+        <section className="dash-panel dash-shortcuts-panel" style={{ "--i": 3 } as React.CSSProperties} aria-label="Research shortcuts">
+          <header className="dash-panel-head">
+            <div className="dash-panel-titles">
+              <h2>Research shortcuts</h2>
+              <p>Jump straight into a tool</p>
             </div>
-            <div className="row" style={{ gap: 8 }}>
-              <Link href="/compare" className="button-ghost">
-                Compare with competitors
-              </Link>
-              <Link href="/settings/preferences" className="button-ghost">
-                Edit preferences
-              </Link>
-            </div>
-          </div>
-          {preferences.niches.length > 0 ? (
-            <div className="chips" style={{ marginTop: 14 }}>
-              {preferences.niches.map((niche) => (
-                <Link key={niche} href={`/research/shorts-channels?q=${encodeURIComponent(niche)}`} className="chip">
-                  {niche} →
-                </Link>
-              ))}
-            </div>
-          ) : null}
+          </header>
+          <ResearchShortcuts />
         </section>
-      ) : null}
-
-      <section className="card">
-        <h2>Track a channel</h2>
-        <TrackChannelForm />
-      </section>
-
-      <section>
-        <div className="spread">
-          <h2>Top outliers · last 24 hours</h2>
-          <Link href="/viral" className="muted">
-            See all →
-          </Link>
-        </div>
-        {topVideos.length === 0 ? (
-          <div className="card empty">No breakout videos in the last 24 hours yet. New uploads from tracked channels show up here as they sync.</div>
-        ) : (
-          <div className="video-grid">
-            {topVideos.map((video) => (
-              <VideoCard key={video.video_id} video={video} />
-            ))}
-          </div>
-        )}
-      </section>
+        <Suspense fallback={<PanelSkeleton rows={3} />}>
+          <RecentActivitySection userId={userId} />
+        </Suspense>
+      </div>
     </div>
   );
 }

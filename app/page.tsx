@@ -10,5 +10,5 @@ export default async function HomePage() {
   const current = await getCurrentUser();
   if (current && !current.approved) redirect("/not-approved");
   if (current && !current.onboardingCompleted) redirect("/onboarding");
-  return current ? <DashboardView userId={current.user.id} /> : <LandingPage />;
+  return current ? <DashboardView current={current} /> : <LandingPage />;
 }

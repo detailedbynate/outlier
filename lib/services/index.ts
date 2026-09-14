@@ -23,6 +23,7 @@ import { qualityConfigFrom } from "@/lib/research/quality";
 import { YouTubeCacheRepository, YouTubeQuotaRepository } from "@/lib/database/repositories/youtube-quota";
 import { getQuotaManager, getYouTubeService, quotaDay, setQuotaUserLimits, type QuotaManager } from "@/lib/youtube";
 import { AccountService } from "./account-service";
+import { DashboardService } from "./dashboard-service";
 import { ModerationService } from "./moderation-service";
 import { ChannelService } from "./channel-service";
 import { CreditsService } from "./credits-service";
@@ -47,6 +48,7 @@ export interface Services {
   waitlist: WaitlistService;
   onboarding: OnboardingService;
   accounts: AccountService;
+  dashboard: DashboardService;
   moderation: ModerationService;
   compare: CompareService;
   rateLimits: RateLimitService;
@@ -199,9 +201,24 @@ export function getServices(): Services {
     { type: MONITOR_CHANNELS_JOB_TYPE, everyHours: 1 },
   ]);
 
+  const credits = new CreditsService(repositories.usage, config.DAILY_CREDITS, async (userId) => (await accounts.limitsFor(userId)).dailyCredits);
+  const research = new ResearchService(
+    { youtube, channels: repositories.channels, videos: repositories.videos, usage: repositories.usage, storage, enqueue },
+    { discoveryDailyLimit: config.DISCOVERY_DAILY_LIMIT, discoveryMaxChannels: config.DISCOVERY_MAX_CHANNELS, quality, regionCode },
+  );
+
   services = {
     channels,
-    credits: new CreditsService(repositories.usage, config.DAILY_CREDITS, async (userId) => (await accounts.limitsFor(userId)).dailyCredits),
+    dashboard: new DashboardService({
+      channels: repositories.channels,
+      videos: repositories.videos,
+      usage: repositories.usage,
+      credits,
+      research,
+      trending,
+      targetCountries: quality.countries,
+    }),
+    credits,
     accounts,
     moderation: new ModerationService({
       moderation: repositories.moderation,
@@ -221,10 +238,7 @@ export function getServices(): Services {
     trending,
     monitoring,
     quota: lazy(() => getQuotaManager()),
-    research: new ResearchService(
-      { youtube, channels: repositories.channels, videos: repositories.videos, usage: repositories.usage, storage, enqueue },
-      { discoveryDailyLimit: config.DISCOVERY_DAILY_LIMIT, discoveryMaxChannels: config.DISCOVERY_MAX_CHANNELS, quality, regionCode },
-    ),
+    research,
     storage,
     jobRegistry,
     scheduler,

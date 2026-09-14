@@ -52,6 +52,16 @@ export interface VideoMonitoringUpdate {
   last_checked_at: string;
 }
 
+export type FastVideo = Pick<
+  VideoRow,
+  "id" | "youtube_video_id" | "channel_id" | "title" | "view_count" | "published_at" | "views_per_hour" | "view_acceleration" | "format"
+> & {
+  /** Views per hour used for ranking. */
+  vph: number;
+  /** True when vph comes from monitoring checks rather than the since-upload average. */
+  live: boolean;
+};
+
 /** Recently published videos never checked yet are picked up automatically. */
 export const MONITOR_NEW_VIDEO_DAYS = 14;
 
@@ -165,6 +175,28 @@ export class VideoRepository {
     return rows.map((r) => ({ title: r.title, defaultAudioLanguage: r.default_audio_language, defaultLanguage: r.default_language }));
   }
 
+  /**
+   * Recent uploads with the most momentum: monitored views/hour when available,
+   * otherwise views/hour since upload. Optionally only titles matching any term.
+   */
+  async fastMoving(options: { since: Date; limit: number; format?: VideoFormat; titleTerms?: string[] }, now: Date = new Date()): Promise<FastVideo[]> {
+    let query = this.db
+      .from("videos")
+      .select("id, youtube_video_id, channel_id, title, view_count, published_at, views_per_hour, view_acceleration, format")
+      .gte("published_at", options.since.toISOString());
+    if (options.format) query = query.eq("format", options.format);
+    const terms = (options.titleTerms ?? []).map((t) => t.replace(/[\\%_*,()"]/g, "").trim()).filter((t) => t.length >= 2);
+    if (terms.length > 0) query = query.or(terms.map((t) => `title.ilike."*${t}*"`).join(","));
+    const rows = unwrap(await query.order("view_count", { ascending: false }).limit(200), "videos.fastMoving");
+    return rows
+      .map((row) => {
+        const ageHours = Math.max((now.getTime() - Date.parse(row.published_at)) / 3_600_000, 1);
+        return { ...row, vph: row.views_per_hour !== null ? Number(row.views_per_hour) : row.view_count / ageHours, live: row.views_per_hour !== null };
+      })
+      .sort((a, b) => b.vph - a.vph)
+      .slice(0, options.limit);
+  }
+
   async count(): Promise<number> {
     const result = await this.db.from("videos").select("id", { count: "exact", head: true });
     assertOk(result, "videos.count");
@@ -178,8 +210,12 @@ export class VideoRepository {
     publishedAfter?: Date;
     format?: VideoFormat;
     youtubeChannelId?: string;
+    /** Restrict to these channel UUIDs. */
+    channelIds?: string[];
   }): Promise<VideoFeedRow[]> {
+    if (options.channelIds?.length === 0) return [];
     let query = this.db.from("video_feed").select("*");
+    if (options.channelIds) query = query.in("channel_id", options.channelIds);
     if (options.publishedAfter) query = query.gte("published_at", options.publishedAfter.toISOString());
     if (options.format) query = query.eq("format", options.format);
     if (options.youtubeChannelId) query = query.eq("youtube_channel_id", options.youtubeChannelId);

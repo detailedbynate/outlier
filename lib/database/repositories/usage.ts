@@ -63,6 +63,24 @@ export class UsageRepository {
     return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([key]) => key);
   }
 
+  /** A user's most recent events, newest first. */
+  async recentForUser(userId: string, limit: number, eventTypes?: string[]): Promise<UsageEventRow[]> {
+    let query = this.db.from("usage_events").select("*").eq("user_id", userId);
+    if (eventTypes) query = query.in("event_type", eventTypes);
+    return unwrap(await query.order("occurred_at", { ascending: false }).limit(limit), "usage_events.recentForUser");
+  }
+
+  async countForUserSince(userId: string, eventTypes: string[], since: Date): Promise<number> {
+    const result = await this.db
+      .from("usage_events")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .in("event_type", eventTypes)
+      .gte("occurred_at", since.toISOString());
+    assertOk(result, "usage_events.countForUserSince");
+    return result.count ?? 0;
+  }
+
   async creditBalance(workspaceId: string): Promise<number> {
     const rows = unwrap(
       await this.db.from("workspace_credit_balances").select("*").eq("workspace_id", workspaceId).limit(1),

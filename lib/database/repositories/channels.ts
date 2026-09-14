@@ -54,6 +54,39 @@ export class ChannelRepository {
     return rows[0] ?? null;
   }
 
+  async findByIds(ids: string[]): Promise<Pick<ChannelRow, "id" | "title" | "youtube_channel_id" | "thumbnail_url" | "subscriber_count">[]> {
+    if (ids.length === 0) return [];
+    return unwrap(
+      await this.db.from("channels").select("id, title, youtube_channel_id, thumbnail_url, subscriber_count").in("id", ids),
+      "channels.findByIds",
+    );
+  }
+
+  /** Channels matching any of these YouTube ids or @handles (catalog only, no API calls). */
+  async findByIdentifiers(ids: string[], handles: string[]): Promise<ChannelRow[]> {
+    const filters = [
+      ...ids.map((id) => `youtube_channel_id.eq.${id}`),
+      ...handles.map((h) => `handle.ilike."${escapeLike(h).replace(/"/g, "")}"`),
+    ];
+    if (filters.length === 0) return [];
+    return unwrap(await this.db.from("channels").select("*").or(filters.join(",")).limit(50), "channels.findByIdentifiers");
+  }
+
+  /** Snapshots for many channels since a time, oldest first. */
+  async snapshotsForChannels(channelIds: string[], since: Date): Promise<Pick<ChannelSnapshotRow, "channel_id" | "captured_at" | "subscriber_count" | "view_count">[]> {
+    if (channelIds.length === 0) return [];
+    return unwrap(
+      await this.db
+        .from("channel_snapshots")
+        .select("channel_id, captured_at, subscriber_count, view_count")
+        .in("channel_id", channelIds)
+        .gte("captured_at", since.toISOString())
+        .order("captured_at")
+        .limit(5000),
+      "channel_snapshots.forChannels",
+    );
+  }
+
   async findById(id: string): Promise<ChannelRow | null> {
     return unwrapMaybe(await this.db.from("channels").select("*").eq("id", id).maybeSingle(), "channels.findById");
   }
