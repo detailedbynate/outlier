@@ -5,6 +5,7 @@ import { createMigratedDatabase, migrationFiles } from "../helpers/database";
 const EXPECTED_TABLES = [
   "users",
   "account_settings",
+  "moderation_actions",
   "youtube_quota_usage",
   "youtube_api_cache",
   "workspaces",
@@ -401,6 +402,25 @@ describe("supabase migrations", () => {
     expect(row).toEqual({ role: "member", quota_tier: "default", disabled: false });
     await expect(db.query(`update public.account_settings set role = 'superuser' where user_id = $1`, [userId])).rejects.toThrow(/account_settings_role_valid/);
     await expect(db.query(`update public.account_settings set daily_credits = -1 where user_id = $1`, [userId])).rejects.toThrow(/account_settings_credits_valid/);
+  });
+
+  it("logs moderation actions and fully removes accounts with their workspaces", async () => {
+    const { rows } = await db.query<{ id: string }>(`insert into auth.users (email) values ('gone@example.com') returning id`);
+    const userId = rows[0]!.id;
+    await db.query(`insert into public.account_settings (user_id, email, banned_until, ban_reason) values ($1, 'gone@example.com', now() + interval '1 day', 'spam')`, [userId]);
+    await db.query(`insert into public.moderation_actions (target_user_id, target_email, action, reason) values ($1, 'gone@example.com', 'temp_ban', 'spam')`, [userId]);
+    await expect(db.query(`insert into public.moderation_actions (target_email, action) values ('x@example.com', 'nuke')`)).rejects.toThrow(/moderation_actions_action_valid/);
+
+    const removed = await db.query<{ ok: boolean }>(`select public.delete_user_account($1) as ok`, [userId]);
+    expect(removed.rows[0]!.ok).toBe(true);
+    const left = await db.query<{ users: number; workspaces: number; settings: number; log_target: string | null }>(
+      `select (select count(*) from public.users where id = $1)::int as users,
+              (select count(*) from public.workspaces where owner_id = $1)::int as workspaces,
+              (select count(*) from public.account_settings where user_id = $1)::int as settings,
+              (select target_user_id::text from public.moderation_actions where target_email = 'gone@example.com') as log_target`,
+      [userId],
+    );
+    expect(left.rows[0]).toEqual({ users: 0, workspaces: 0, settings: 0, log_target: null });
   });
 
   it("defaults new channels to untracked", async () => {

@@ -1,6 +1,7 @@
 import "server-only";
 import { env } from "@/lib/core/env";
-import { SupabaseAccountProvisioner, SupabaseInviteSender } from "@/lib/auth/invites";
+import { SupabaseAccountProvisioner, SupabaseAuthModeration, SupabaseInviteSender } from "@/lib/auth/invites";
+import { ModerationRepository } from "@/lib/database/repositories/moderation";
 import { AccountRepository } from "@/lib/database/repositories/accounts";
 import { PreferencesRepository } from "@/lib/database/repositories/preferences";
 import { RateLimitRepository } from "@/lib/database/repositories/rate-limits";
@@ -22,6 +23,7 @@ import { qualityConfigFrom } from "@/lib/research/quality";
 import { YouTubeCacheRepository, YouTubeQuotaRepository } from "@/lib/database/repositories/youtube-quota";
 import { getQuotaManager, getYouTubeService, quotaDay, setQuotaUserLimits, type QuotaManager } from "@/lib/youtube";
 import { AccountService } from "./account-service";
+import { ModerationService } from "./moderation-service";
 import { ChannelService } from "./channel-service";
 import { CreditsService } from "./credits-service";
 import { DiscoveryService } from "./discovery-service";
@@ -45,6 +47,7 @@ export interface Services {
   waitlist: WaitlistService;
   onboarding: OnboardingService;
   accounts: AccountService;
+  moderation: ModerationService;
   compare: CompareService;
   rateLimits: RateLimitService;
   discovery: DiscoveryService;
@@ -69,6 +72,7 @@ export interface Services {
     trending: TrendingRepository;
     youtubeQuota: YouTubeQuotaRepository;
     accounts: AccountRepository;
+    moderation: ModerationRepository;
     youtubeCache: YouTubeCacheRepository;
   };
 }
@@ -109,6 +113,7 @@ export function getServices(): Services {
     trending: lazy(() => new TrendingRepository(lazyDb())),
     youtubeQuota: lazy(() => new YouTubeQuotaRepository(lazyDb())),
     accounts: lazy(() => new AccountRepository(lazyDb())),
+    moderation: lazy(() => new ModerationRepository(lazyDb())),
     youtubeCache: lazy(() => new YouTubeCacheRepository(lazyDb())),
   };
   const accounts = new AccountService(
@@ -198,6 +203,14 @@ export function getServices(): Services {
     channels,
     credits: new CreditsService(repositories.usage, config.DAILY_CREDITS, async (userId) => (await accounts.limitsFor(userId)).dailyCredits),
     accounts,
+    moderation: new ModerationService({
+      moderation: repositories.moderation,
+      accounts: repositories.accounts,
+      waitlist: repositories.waitlist,
+      auth: lazy(() => new SupabaseAuthModeration(lazyDb())),
+      onAccountChanged: (userId) => accounts.invalidate(userId),
+      isOwnerEmail: (email) => accounts.isOwnerEmail(email),
+    }),
     onboarding: new OnboardingService(repositories.preferences),
     compare: new CompareService({ channels: repositories.channels, videos: repositories.videos, channelService: channels }),
     rateLimits: new RateLimitService(repositories.rateLimits, config.RATE_LIMIT_SALT ?? config.CRON_SECRET ?? "outlier-rate-limit"),

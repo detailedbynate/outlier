@@ -17,6 +17,10 @@ function setup() {
     created_by: null,
     created_at: "2026-09-17T00:00:00Z",
     updated_at: "2026-09-17T00:00:00Z",
+    banned_until: null,
+    ban_reason: null,
+    restricted_until: null,
+    restrict_reason: null,
     ...row,
   });
   const repository = {
@@ -82,6 +86,21 @@ describe("AccountService", () => {
     const updated = await service.update(account.user_id, { dailyCredits: "20", youtubeDailyUnits: "300", disabled: true }, admin);
     expect(updated).toMatchObject({ daily_credits: 20, youtube_daily_units: 300, disabled: true });
     await expect(service.update(account.user_id, { role: "admin" }, admin)).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("gives restricted or suspended accounts nothing to spend", async () => {
+    const { service, repository } = setup();
+    const { account } = await service.create({ email: "r@example.com", dailyCredits: "500" }, owner, "https://app");
+    await repository.update(account.user_id, { restricted_until: "9999-12-31T00:00:00.000Z" });
+    service.invalidate(account.user_id);
+    expect(await service.limitsFor(account.user_id)).toMatchObject({ dailyCredits: 0, youtubeDailyUnits: 0, disabled: false });
+  });
+
+  it("creates a settings row when editing someone who joined from the waitlist", async () => {
+    const { service } = setup();
+    const userId = "00000000-0000-4000-8000-000000000077";
+    const updated = await service.update(userId, { dailyCredits: "40", email: "joined@example.com" }, owner);
+    expect(updated).toMatchObject({ user_id: userId, email: "joined@example.com", daily_credits: 40 });
   });
 
   it("returns defaults instead of failing when settings can't be read", async () => {

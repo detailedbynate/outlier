@@ -2,6 +2,7 @@ import "server-only";
 import { AppError } from "@/lib/core/errors";
 import type { DatabaseClient } from "@/lib/database/client";
 import type { AccountProvisioner } from "@/lib/services/account-service";
+import type { AuthModeration } from "@/lib/services/moderation-service";
 import type { InviteSender } from "@/lib/services/waitlist-service";
 
 const ALREADY_REGISTERED = /already (been )?registered|already exists/i;
@@ -80,5 +81,17 @@ export class SupabaseAccountProvisioner implements AccountProvisioner {
       throw new AppError("UPSTREAM_ERROR", `Invite failed: ${error?.message ?? "no user returned"}`, { cause: error, expose: true });
     }
     return { userId: data.user.id, link: null, existed: false };
+  }
+}
+
+/** Mirrors bans into Supabase Auth so existing sessions can't refresh. */
+export class SupabaseAuthModeration implements AuthModeration {
+  constructor(private readonly admin: DatabaseClient) {}
+
+  async setBan(userId: string, hours: number | null): Promise<void> {
+    // Supabase takes a Go duration; "none" lifts the ban. ~100 years = permanent.
+    const ban_duration = hours === 0 ? "none" : `${hours ?? 876_000}h`;
+    const { error } = await this.admin.auth.admin.updateUserById(userId, { ban_duration });
+    if (error) throw new AppError("UPSTREAM_ERROR", `Auth ban update failed: ${error.message}`, { cause: error });
   }
 }

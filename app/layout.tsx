@@ -83,7 +83,17 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
               </form>
             </div>
           </aside>
-          <main className="main">{children}</main>
+          <main className="main">
+            {current.moderation.status === "restricted" ? (
+              <div className="restricted-banner" role="status">
+                Your account is restricted
+                {current.moderation.until ? ` until ${new Date(current.moderation.until).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}` : ""}. You can browse, but
+                actions that use credits or YouTube data are paused.
+                {current.moderation.reason ? ` Reason: ${current.moderation.reason}` : ""}
+              </div>
+            ) : null}
+            {children}
+          </main>
         </div>
       </body>
     </html>

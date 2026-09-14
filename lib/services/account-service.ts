@@ -2,6 +2,7 @@ import { z } from "zod";
 import { AppError, ValidationError } from "@/lib/core/errors";
 import { createLogger, type Logger } from "@/lib/core/logger";
 import type { AccountRepository } from "@/lib/database/repositories/accounts";
+import { moderationState } from "@/lib/moderation/status";
 import type { AccountRole, AccountSettingsRow } from "@/types/database";
 
 /**
@@ -37,6 +38,8 @@ export const updateAccountSchema = z.object({
   youtubeDailyUnits: limitSchema,
   note: z.string().trim().max(500).optional().transform((v) => v || null),
   disabled: z.boolean().optional(),
+  /** Needed to create a settings row for accounts that don't have one yet. */
+  email: z.string().trim().toLowerCase().pipe(z.email()).optional(),
 });
 
 export interface Actor {
@@ -101,6 +104,11 @@ export class AccountService {
     const row = await this.forUser(userId, null);
     if (!row) return { role: null, disabled: false, dailyCredits: null, youtubeDailyUnits: undefined, quotaTier: "default" };
     const owner = row.role === "owner";
+    const state = moderationState(row);
+    if (!owner && state.status !== "active") {
+      // Banned or restricted: nothing to spend.
+      return { role: row.role, disabled: state.status !== "restricted", dailyCredits: 0, youtubeDailyUnits: 0, quotaTier: row.quota_tier };
+    }
     return {
       role: row.role,
       disabled: row.disabled,
@@ -108,6 +116,11 @@ export class AccountService {
       youtubeDailyUnits: owner ? null : (row.youtube_daily_units ?? undefined),
       quotaTier: row.quota_tier,
     };
+  }
+
+  /** Drop cached settings after an out-of-band change (e.g. moderation). */
+  invalidate(userId: string): void {
+    this.cache.delete(userId);
   }
 
   list(): Promise<AccountSettingsRow[]> {
@@ -145,8 +158,12 @@ export class AccountService {
     const parsed = updateAccountSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError(parsed.error.issues[0]?.message ?? "Check the form.", z.flattenError(parsed.error));
     const data = parsed.data;
-    const target = await this.deps.repository.findByUserId(userId);
-    if (!target) throw new AppError("NOT_FOUND", "Account not found.");
+    let target = await this.deps.repository.findByUserId(userId);
+    if (!target) {
+      if (!data.email) throw new AppError("NOT_FOUND", "Account not found.");
+      if (this.isOwnerEmail(data.email)) throw new AppError("FORBIDDEN", "The owner account can't be changed here.");
+      target = await this.deps.repository.upsert({ user_id: userId, email: data.email, created_by: actor.userId });
+    }
 
     if (target.role === "owner" && (data.disabled || (data.role && data.role !== "owner"))) {
       throw new AppError("FORBIDDEN", "The owner account can't be demoted or disabled.");

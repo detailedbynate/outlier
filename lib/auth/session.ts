@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { env, requireEnv } from "@/lib/core/env";
+import { moderationState, type ModerationState } from "@/lib/moderation/status";
 import { getServices } from "@/lib/services";
 import { isEmailAllowed, parseAllowedEmails } from "./access";
 
@@ -33,6 +34,8 @@ export interface CurrentUser {
   /** Founder/owner: unlimited, manages admins. */
   isOwner: boolean;
   role: "owner" | "admin" | "member" | null;
+  /** Ban/suspension/restriction currently in effect (status "active" when none). */
+  moderation: ModerationState;
   /** Finished first-run onboarding (only checked for approved users). */
   onboardingCompleted: boolean;
 }
@@ -48,13 +51,15 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const account = await services.accounts.forUser(data.user.id, email || null);
   const role = account?.role ?? null;
   const isOwner = role === "owner" || services.accounts.isOwnerEmail(email);
+  const moderation = isOwner ? moderationState(null) : moderationState(account);
+  const banned = moderation.status === "banned" || moderation.status === "suspended";
   const isAdmin = isOwner || role === "admin" || (email !== "" && parseAllowedEmails(config.ADMIN_EMAILS).has(email.toLowerCase()));
   // Accounts created at /admin/accounts are approved; disabled accounts never are.
-  let approved = !account?.disabled && (isAdmin || account !== null || isEmailAllowed(email, parseAllowedEmails(config.ALLOWED_EMAILS)));
+  let approved = !banned && (isAdmin || account !== null || isEmailAllowed(email, parseAllowedEmails(config.ALLOWED_EMAILS)));
   // With an allowlist in place, people invited from the waitlist still get in.
-  if (!approved && !account?.disabled && email) approved = await services.waitlist.isInvited(email);
+  if (!approved && !banned && email) approved = await services.waitlist.isInvited(email);
   const onboardingCompleted = approved ? await services.onboarding.isCompleted(data.user.id) : false;
-  return { user: data.user, email, approved, isAdmin: isAdmin && !account?.disabled, isOwner, role: isOwner ? "owner" : isAdmin ? "admin" : role, onboardingCompleted };
+  return { user: data.user, email, approved, isAdmin: isAdmin && !banned, isOwner, moderation, role: isOwner ? "owner" : isAdmin ? "admin" : role, onboardingCompleted };
 });
 
 /**

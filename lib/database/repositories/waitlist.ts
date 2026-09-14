@@ -42,10 +42,29 @@ export class WaitlistRepository {
     return result.count ?? 0;
   }
 
-  async list(options: { status?: WaitlistStatus; limit: number }): Promise<WaitlistEntryRow[]> {
+  async list(options: { status?: WaitlistStatus; limit: number; search?: string }): Promise<WaitlistEntryRow[]> {
     let query = this.db.from("waitlist_entries").select("*");
     if (options.status) query = query.eq("status", options.status);
+    if (options.search) {
+      const pattern = `*${options.search.replace(/[\\%_*,()"]/g, "")}*`;
+      query = query.or(`email.ilike."${pattern}",name.ilike."${pattern}",niche.ilike."${pattern}"`);
+    }
     return unwrap(await query.order("created_at", { ascending: true }).limit(options.limit), "waitlist.list");
+  }
+
+  async findByIds(ids: string[]): Promise<WaitlistEntryRow[]> {
+    if (ids.length === 0) return [];
+    return unwrap(await this.db.from("waitlist_entries").select("*").in("id", ids), "waitlist.findByIds");
+  }
+
+  async deleteMany(ids: string[]): Promise<void> {
+    if (ids.length === 0) return;
+    assertOk(await this.db.from("waitlist_entries").delete().in("id", ids), "waitlist.deleteMany");
+  }
+
+  async updateMany(ids: string[], patch: Partial<WaitlistEntryRow>): Promise<void> {
+    if (ids.length === 0) return;
+    assertOk(await this.db.from("waitlist_entries").update(patch).in("id", ids), "waitlist.updateMany");
   }
 
   async update(id: string, patch: Partial<WaitlistEntryRow>): Promise<void> {

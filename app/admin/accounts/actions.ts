@@ -6,6 +6,7 @@ import { requireAdmin } from "@/lib/auth/session";
 import { env } from "@/lib/core/env";
 import { isAppError } from "@/lib/core/errors";
 import { logger } from "@/lib/core/logger";
+import type { BulkState } from "@/components/bulk-panel";
 import { getServices } from "@/lib/services";
 
 export interface AccountFormState {
@@ -68,7 +69,7 @@ export async function updateAccount(_prev: AccountFormState, formData: FormData)
         dailyCredits: text(formData, "dailyCredits"),
         youtubeDailyUnits: text(formData, "youtubeDailyUnits"),
         note: text(formData, "note"),
-        disabled: formData.get("disabled") === "on",
+        email: text(formData, "email") || undefined,
       },
       { userId: current.user.id, role: current.isOwner ? "owner" : "admin" },
     );
@@ -77,5 +78,33 @@ export async function updateAccount(_prev: AccountFormState, formData: FormData)
   } catch (error) {
     logger.warn("update account failed", { userId, error });
     return { status: "error", message: isAppError(error) && error.expose ? error.message : "Couldn't save.", link: null };
+  }
+}
+
+export async function moderateAccounts(_prev: BulkState, formData: FormData): Promise<BulkState> {
+  const current = await requireAdmin();
+  const action = text(formData, "action");
+  try {
+    const result = await getServices().moderation.moderateAccounts(
+      {
+        action,
+        userIds: formData.getAll("ids").map(String),
+        durationHours: text(formData, "durationHours") || undefined,
+        reason: text(formData, "reason"),
+        dailyCredits: formData.has("dailyCredits") ? text(formData, "dailyCredits") : undefined,
+        youtubeDailyUnits: formData.has("youtubeDailyUnits") ? text(formData, "youtubeDailyUnits") : undefined,
+      },
+      { userId: current.user.id, role: current.isOwner ? "owner" : "admin" },
+    );
+    revalidatePath("/admin/accounts");
+    const skipped = result.skipped.length;
+    return {
+      status: result.applied === 0 && skipped > 0 ? "error" : "ok",
+      message: `Applied to ${result.applied} account${result.applied === 1 ? "" : "s"}${skipped ? `, skipped ${skipped}` : ""}.`,
+      details: result.skipped.map((s) => `${s.target}: ${s.reason}`),
+    };
+  } catch (error) {
+    logger.warn("bulk moderation failed", { action, error });
+    return { status: "error", message: isAppError(error) && error.expose ? error.message : "Couldn't apply that action." };
   }
 }

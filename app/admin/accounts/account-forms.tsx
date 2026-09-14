@@ -81,16 +81,21 @@ export function EditAccountForm({
   account,
   canEditRole,
   locked,
+  email,
 }: {
   account: { user_id: string; role: AccountRole; daily_credits: number | null; youtube_daily_units: number | null; note: string | null; disabled: boolean };
   canEditRole: boolean;
   /** Owner rows (or admins when you're not the owner) can't be changed here. */
   locked: boolean;
+  /** Whether a settings row exists yet (people who joined from the waitlist may not have one). */
+  hasSettings?: boolean;
+  email: string;
 }) {
   const [state, action, pending] = useActionState(updateAccount, initial);
   return (
     <form action={action} className="account-edit">
       <input type="hidden" name="userId" value={account.user_id} />
+      <input type="hidden" name="email" value={email} />
       {account.role === "owner" || !canEditRole ? (
         <input type="hidden" name="role" value={account.role} />
       ) : (
@@ -102,12 +107,6 @@ export function EditAccountForm({
       <input name="dailyCredits" type="number" min={0} defaultValue={account.daily_credits ?? ""} placeholder="Default" aria-label="Daily credits" disabled={locked || account.role === "owner"} />
       <input name="youtubeDailyUnits" type="number" min={0} defaultValue={account.youtube_daily_units ?? ""} placeholder="Default" aria-label="YouTube units per day" disabled={locked || account.role === "owner"} />
       <input name="note" defaultValue={account.note ?? ""} placeholder="Note" aria-label="Note" maxLength={500} disabled={locked} />
-      {account.role === "owner" ? null : (
-        <label className="checkbox-field">
-          <input type="checkbox" name="disabled" defaultChecked={account.disabled} disabled={locked} />
-          <span>Disabled</span>
-        </label>
-      )}
       <button type="submit" className="button-ghost button-small" disabled={pending || locked}>
         {pending ? "Saving…" : "Save"}
       </button>

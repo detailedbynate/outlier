@@ -283,6 +283,34 @@ export type AccountSettingsRow = {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  /** Banned until this time (far future = permanent). */
+  banned_until: string | null;
+  ban_reason: string | null;
+  /** Can sign in but can't spend credits or YouTube data until this time. */
+  restricted_until: string | null;
+  restrict_reason: string | null;
+};
+
+export type ModerationActionType =
+  | "ban"
+  | "temp_ban"
+  | "unban"
+  | "restrict"
+  | "unrestrict"
+  | "remove"
+  | "set_limits"
+  | "waitlist_remove"
+  | "waitlist_decline";
+
+export type ModerationActionRow = {
+  id: string;
+  target_user_id: string | null;
+  target_email: string;
+  action: ModerationActionType;
+  reason: string | null;
+  until: string | null;
+  actor_id: string | null;
+  created_at: string;
 };
 
 export type RateLimitRow = {
@@ -420,6 +448,7 @@ export type Database = {
       >;
       trending_pick_stats: TableDef<TrendingPickStatRow, "pick_id" | "views">;
       account_settings: TableDef<AccountSettingsRow, "user_id" | "email">;
+      moderation_actions: TableDef<ModerationActionRow, "target_email" | "action">;
       youtube_quota_usage: {
         Row: YouTubeQuotaUsageRow;
         Insert: Pick<YouTubeQuotaUsageRow, "day" | "lane" | "operation"> & Partial<YouTubeQuotaUsageRow>;
@@ -469,6 +498,10 @@ export type Database = {
       database_size_bytes: {
         Args: Record<string, never>;
         Returns: number;
+      };
+      delete_user_account: {
+        Args: { p_user_id: string };
+        Returns: boolean;
       };
       apply_video_monitoring: {
         Args: { updates: Json };
