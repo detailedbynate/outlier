@@ -16,7 +16,7 @@ export async function DashboardView({ userId }: { userId: string }) {
     storage.getStatus(),
     repositories.channels.count({ tracked: true }),
     repositories.videos.count(),
-    repositories.videos.feed({ orderBy: "outlier_score", limit: 6, publishedAfter: daysAgo(30) }),
+    repositories.videos.feed({ orderBy: "outlier_score", limit: 6, publishedAfter: daysAgo(1) }),
   ]);
 
   return (
@@ -62,13 +62,13 @@ export async function DashboardView({ userId }: { userId: string }) {
 
       <section>
         <div className="spread">
-          <h2>Top outliers · last 30 days</h2>
+          <h2>Top outliers · last 24 hours</h2>
           <Link href="/viral" className="muted">
             See all →
           </Link>
         </div>
         {topVideos.length === 0 ? (
-          <div className="card empty">Track a few channels to see their breakout videos here.</div>
+          <div className="card empty">No breakout videos in the last 24 hours yet. New uploads from tracked channels show up here as they sync.</div>
         ) : (
           <div className="video-grid">
             {topVideos.map((video) => (
