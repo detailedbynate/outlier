@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ComponentType } from "react";
-import { BookmarkIcon, ChartIcon, FlameIcon, GridIcon, ShortsIcon, UsersIcon } from "./icons";
+import { BookmarkIcon, ChartIcon, FlameIcon, GridIcon, ShortsIcon, SlidersIcon, UsersIcon } from "./icons";
 
 interface NavItem {
   href: string;
@@ -23,6 +23,7 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
     ],
   },
   { title: "Library", items: [{ href: "/channels", label: "Tracked Channels", icon: BookmarkIcon }] },
+  { title: "Account", items: [{ href: "/settings/preferences", label: "Preferences", icon: SlidersIcon }] },
 ];
 
 function isActive(pathname: string, href: string): boolean {

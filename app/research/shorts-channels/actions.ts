@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireApprovedUser } from "@/lib/auth/session";
+import { requireAdmin, requireApprovedUser } from "@/lib/auth/session";
 import { isAppError } from "@/lib/core/errors";
 import { logger } from "@/lib/core/logger";
 import { JobWorker } from "@/lib/jobs/worker";
@@ -18,6 +18,34 @@ export async function setChannelTracked(formData: FormData): Promise<void> {
   await getServices().repositories.channels.setTracked(channelId, formData.get("tracked") === "true");
   revalidatePath("/research/shorts-channels");
   revalidatePath("/channels");
+}
+
+/** Admin: remove every trending pick (the section hides until the next re-pick). */
+export async function clearTrendingPicks(): Promise<void> {
+  await requireAdmin();
+  await getServices().trending.clearAll();
+  revalidatePath("/research/shorts-channels");
+}
+
+/** Admin: hide one pick; its niche's backup pick takes its place. */
+export async function removeTrendingPick(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = String(formData.get("pickId") ?? "");
+  if (!UUID_PATTERN.test(id)) return;
+  await getServices().trending.removePick(id);
+  revalidatePath("/research/shorts-channels");
+}
+
+/** Admin: re-pick today's trending Shorts now (~600 quota units). */
+export async function repickTrending(): Promise<void> {
+  await requireAdmin();
+  const services = getServices();
+  try {
+    await services.trending.computeDailyPicks();
+  } catch (error) {
+    logger.warn("trending re-pick failed", { error });
+  }
+  revalidatePath("/research/shorts-channels");
 }
 
 export interface DiscoverState {

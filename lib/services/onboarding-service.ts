@@ -49,6 +49,18 @@ export class OnboardingService {
 
   /** Validate and save answers, marking onboarding complete. */
   async complete(userId: string, input: unknown, now: Date = new Date()): Promise<UserPreferences> {
+    const saved = await this.save(userId, input, now.toISOString());
+    this.log.info("onboarding completed", { goals: saved.goals.length, niches: saved.niches.length });
+    return saved;
+  }
+
+  /** Save edited preferences without sending the user back through onboarding (keeps the original completion time). */
+  async updatePreferences(userId: string, input: unknown, now: Date = new Date()): Promise<UserPreferences> {
+    const existing = await this.repository.findByUserId(userId);
+    return this.save(userId, input, existing?.onboarding_completed_at ?? now.toISOString());
+  }
+
+  private async save(userId: string, input: unknown, completedAt: string): Promise<UserPreferences> {
     const parsed = onboardingSchema.safeParse(input);
     if (!parsed.success) {
       throw new ValidationError(parsed.error.issues[0]?.message ?? "Some answers need another look.", z.flattenError(parsed.error));
@@ -62,9 +74,8 @@ export class OnboardingService {
       has_channel: answers.hasChannel,
       channel: answers.channel,
       competitors: answers.competitors,
-      onboarding_completed_at: now.toISOString(),
+      onboarding_completed_at: completedAt,
     });
-    this.log.info("onboarding completed", { goals: answers.goals.length, niches: answers.niches.length });
     return toPreferences(row);
   }
 

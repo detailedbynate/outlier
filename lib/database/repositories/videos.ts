@@ -108,6 +108,20 @@ export class VideoRepository {
     return byChannel;
   }
 
+  /** Titles and declared languages of a channel's latest uploads (for language detection). */
+  async languageSamples(channelUuid: string, limit = 20): Promise<{ title: string; defaultAudioLanguage: string | null; defaultLanguage: string | null }[]> {
+    const rows = unwrap(
+      await this.db
+        .from("videos")
+        .select("title, default_audio_language, default_language")
+        .eq("channel_id", channelUuid)
+        .order("published_at", { ascending: false })
+        .limit(limit),
+      "videos.languageSamples",
+    );
+    return rows.map((r) => ({ title: r.title, defaultAudioLanguage: r.default_audio_language, defaultLanguage: r.default_language }));
+  }
+
   async count(): Promise<number> {
     const result = await this.db.from("videos").select("id", { count: "exact", head: true });
     assertOk(result, "videos.count");

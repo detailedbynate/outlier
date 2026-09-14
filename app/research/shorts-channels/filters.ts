@@ -35,6 +35,11 @@ export const ACTIVITY = [
   { key: "30d", label: "Posted in 30 days", days: 30 },
 ] satisfies (Option & { days?: number })[];
 
+export const MARKETS = [
+  { key: "en", label: "English markets" },
+  { key: "any", label: "Any language / country" },
+] satisfies Option[];
+
 export const SHORTS_SHARE = [
   { key: "any", label: "60%+ Shorts" },
   { key: "80", label: "80%+ Shorts", min: 0.8 },
@@ -52,11 +57,22 @@ export const SORTS = [
   { key: "momentum", label: "Most active", column: "shorts_last_30d", group: "Channel" },
   { key: "newest", label: "Newest channels", column: "channel_created_at", group: "Channel" },
   { key: "recent", label: "Latest upload", column: "last_short_at", group: "Channel" },
+  { key: "outlier", label: "Outlier multiplier", column: "top_multiplier", group: "Signals" },
+  { key: "hits", label: "Hit rate", column: "hit_rate", group: "Signals" },
+  { key: "engagement", label: "Engagement", column: "avg_engagement", group: "Signals" },
+  { key: "pace", label: "Shorts per week", column: "shorts_per_week", group: "Signals" },
   { key: "views24", label: "Views · last 24h", column: "views_24h", group: "Realtime" },
   { key: "views48", label: "Views · last 48h", column: "views_48h", group: "Realtime" },
   { key: "subs24", label: "Subs · last 24h", column: "subs_24h", group: "Realtime" },
   { key: "subs48", label: "Subs · last 48h", column: "subs_48h", group: "Realtime" },
-] satisfies (Option & { column: ShortsChannelFilters["orderBy"]; group: "Channel" | "Realtime" })[];
+] satisfies (Option & { column: ShortsChannelFilters["orderBy"]; group: SortGroup })[];
+
+export type SortGroup = "Channel" | "Signals" | "Realtime";
+export const SORT_GROUPS: { key: SortGroup; label: string }[] = [
+  { key: "Channel", label: "Channel stats" },
+  { key: "Signals", label: "Outlier signals" },
+  { key: "Realtime", label: "Realtime growth" },
+];
 
 export function isRealtimeSort(key: string): boolean {
   return SORTS.some((s) => s.key === key && s.group === "Realtime");
@@ -75,6 +91,7 @@ export interface ShortsPageState {
   share: string;
   country: string;
   tracked: string;
+  market: string;
   videos: string;
   limit: string;
 }
@@ -89,12 +106,13 @@ const DEFAULTS: ShortsPageState = {
   share: "any",
   country: "any",
   tracked: "any",
+  market: "en",
   videos: "show",
   limit: String(PAGE_SIZE),
 };
 
 /** Filters counted on the "Advanced Filters" badge. */
-export const ADVANCED_KEYS = ["subs", "views", "age", "active", "share", "country", "tracked"] as const;
+export const ADVANCED_KEYS = ["subs", "views", "age", "active", "share", "country", "tracked", "market"] as const;
 
 export const QUICK_FILTERS: { key: string; label: string; description: string; params: Partial<ShortsPageState> }[] = [
   { key: "rising", label: "Rising new channels", description: "Under 3 months old, 10K+ avg views", params: { age: "90d", views: "10k" } },
@@ -121,12 +139,14 @@ export function parseState(params: Record<string, string | string[] | undefined>
     share: pickKey(SHORTS_SHARE, str("share")),
     country: pickKey(COUNTRIES, str("country")),
     tracked: str("tracked") === "yes" ? "yes" : "any",
+    market: pickKey(MARKETS, str("market")),
     videos: str("videos") === "hide" ? "hide" : "show",
     limit: String(Number.isInteger(limit) && limit >= PAGE_SIZE && limit <= MAX_LIMIT ? limit : PAGE_SIZE),
   };
 }
 
-export function toFilters(state: ShortsPageState): Omit<ShortsChannelFilters, "channelIds"> {
+/** `targetCountries` come from the OUTLIER_COUNTRIES setting. */
+export function toFilters(state: ShortsPageState, targetCountries: readonly string[] = []): Omit<ShortsChannelFilters, "channelIds"> {
   const find = <T extends Option>(options: readonly T[], key: string) => options.find((o) => o.key === key)!;
   const subs = find(SUBSCRIBERS, state.subs) as { min?: number; max?: number };
   const views = find(AVG_VIEWS, state.views) as { min?: number };
@@ -142,6 +162,8 @@ export function toFilters(state: ShortsPageState): Omit<ShortsChannelFilters, "c
     minShortsShare: share.min,
     country: state.country === "any" ? undefined : state.country,
     tracked: state.tracked === "yes" ? true : undefined,
+    // A specific country choice overrides the market filter's country list.
+    targetMarket: state.market === "en" ? { countries: state.country === "any" ? targetCountries : [] } : undefined,
     orderBy: find(SORTS, state.sort).column,
     limit: Number(state.limit),
   };

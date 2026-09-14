@@ -85,6 +85,34 @@ function languageMatches(code: string | null | undefined, language: string): boo
   return code.toLowerCase() === language || code.toLowerCase().startsWith(`${language}-`);
 }
 
+export interface LanguageSample {
+  title: string;
+  defaultAudioLanguage?: string | null;
+  defaultLanguage?: string | null;
+}
+
+/**
+ * Detect whether a channel's recent uploads are in `language`: declared audio/default
+ * languages win; otherwise the share of titles written mostly in Latin script decides.
+ * Returns the language code, "other", or null when there isn't enough to tell.
+ */
+export function detectContentLanguage(samples: readonly LanguageSample[], language = "en"): string | null {
+  if (samples.length === 0) return null;
+  let declaredMatch = 0;
+  let declaredOther = 0;
+  let latinTitles = 0;
+  for (const sample of samples) {
+    const declared = languageMatches(sample.defaultAudioLanguage, language) ?? languageMatches(sample.defaultLanguage, language);
+    if (declared === true) declaredMatch += 1;
+    else if (declared === false) declaredOther += 1;
+    if (latinLetterShare(sample.title) >= 0.85) latinTitles += 1;
+  }
+  const declared = declaredMatch + declaredOther;
+  if (declared >= Math.max(2, samples.length * 0.3)) return declaredMatch >= declaredOther ? language : "other";
+  if (language !== "en") return null;
+  return latinTitles / samples.length >= 0.7 ? language : "other";
+}
+
 export function engagementRate(video: YouTubeVideo): number | null {
   const views = video.statistics.viewCount;
   const { likeCount, commentCount } = video.statistics;

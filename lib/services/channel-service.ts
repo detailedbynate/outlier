@@ -3,6 +3,7 @@ import { AppError } from "@/lib/core/errors";
 import { createLogger, type Logger } from "@/lib/core/logger";
 import { channelToRow, type ChannelRepository } from "@/lib/database/repositories/channels";
 import { videoToRow, type VideoRepository } from "@/lib/database/repositories/videos";
+import { detectContentLanguage } from "@/lib/research/quality";
 import { CHANNEL_ID_PATTERN } from "@/lib/youtube/parse";
 import type { PageOptions, YouTubeService } from "@/lib/youtube/service";
 import type { StorageBudgetService } from "./storage-budget-service";
@@ -22,6 +23,8 @@ export interface ChannelServiceOptions {
   storage?: Pick<StorageBudgetService, "assertCapacity">;
   /** Only videos newer than this get stat snapshots. */
   snapshotVideoMaxAgeDays?: number;
+  /** Target content language for detection (default "en"). */
+  language?: string;
 }
 
 export interface SyncChannelVideosResult {
@@ -150,6 +153,7 @@ export class ChannelService {
     } while (pageToken && pagesFetched < maxPages);
 
     await this.refreshPerformance(channel.id, now);
+    await this.detectLanguage(channel.id, now);
     this.log.info("channel videos synced", { channelId: youtubeChannelId, videosSynced, pagesFetched });
     return { channelId: youtubeChannelId, videosSynced, pagesFetched, nextPageToken };
   }
@@ -206,6 +210,14 @@ export class ChannelService {
       }),
     );
     return { updated: saved.length, snapshots: snapshots.length };
+  }
+
+  /** Detect a channel's content language from its stored uploads (no YouTube quota). */
+  async detectLanguage(channelUuid: string, now: Date = new Date()): Promise<string | null> {
+    const samples = await this.videos.languageSamples(channelUuid, 20);
+    const language = detectContentLanguage(samples, this.options.language ?? "en");
+    await this.channels.setContentLanguage(channelUuid, language, now);
+    return language;
   }
 
   /** Recompute video_performance for a channel's recent videos, per format. */

@@ -5,7 +5,7 @@ import type { RateLimitRepository } from "@/lib/database/repositories/rate-limit
 import type { SystemRepository } from "@/lib/database/repositories/system";
 import type { ChannelService } from "@/lib/services/channel-service";
 import type { StorageBudgetService } from "@/lib/services/storage-budget-service";
-import { TRENDING_JOB_TYPE, type TrendingService } from "@/lib/services/trending-service";
+import { TRENDING_JOB_TYPE, TRENDING_REFRESH_JOB_TYPE, type TrendingService } from "@/lib/services/trending-service";
 import type { VideoService } from "@/lib/services/video-service";
 import { CHANNEL_ID_PATTERN } from "@/lib/youtube/parse";
 import type { EnqueueOptions } from "./queue";
@@ -129,13 +129,40 @@ export function createJobRegistry(deps: JobDependencies): JobRegistry {
     .register(
       defineJob({
         type: TRENDING_JOB_TYPE,
-        description: "Scheduled: pick one breakout Shorts channel in each of today's 5 niches.",
+        description: "Scheduled daily: pick one breakout Short from a small channel in each of 5 niches.",
         payloadSchema: emptyPayload,
         maxAttempts: 2,
         handler: async () => {
           const status = await deps.storage.getStatus({ fresh: true });
           if (status.level === "over_budget") return { skipped: "storage_budget" };
           return { ...(await deps.trending.computeDailyPicks()) };
+        },
+      }),
+    )
+    .register(
+      defineJob({
+        type: TRENDING_REFRESH_JOB_TYPE,
+        description: "Scheduled hourly: refresh views and subscribers for today's trending picks (~2 quota units).",
+        payloadSchema: emptyPayload,
+        maxAttempts: 1,
+        handler: async () => ({ ...(await deps.trending.refreshStats()) }),
+      }),
+    )
+    .register(
+      defineJob({
+        type: "catalog.detect_languages",
+        description: "Detect content language for channels not checked yet, from stored uploads (no YouTube quota).",
+        payloadSchema: emptyPayload,
+        maxAttempts: 1,
+        handler: async (_payload, { signal }) => {
+          let checked = 0;
+          while (!signal.aborted && checked < 2_000) {
+            const batch = await deps.channelRepository.listLanguageUnchecked(100);
+            if (batch.length === 0) break;
+            for (const channel of batch) await deps.channels.detectLanguage(channel.id);
+            checked += batch.length;
+          }
+          return { checked };
         },
       }),
     )

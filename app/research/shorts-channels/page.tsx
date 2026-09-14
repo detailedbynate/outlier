@@ -3,9 +3,13 @@ import { Dropdown } from "@/components/dropdown";
 import { ChevronDownIcon, FlameIcon, SearchIcon, ShortsIcon, SlidersIcon, SortIcon, VideoIcon, VideoOffIcon, ZapIcon } from "@/components/icons";
 import { PageHeader } from "@/components/page-header";
 import { requireApprovedUser } from "@/lib/auth/session";
+import { env } from "@/lib/core/env";
 import { timeAgo } from "@/lib/format";
+import { qualityConfigFrom } from "@/lib/research/quality";
 import { getServices } from "@/lib/services";
+import { clearTrendingPicks, repickTrending } from "./actions";
 import { ChannelCard } from "./channel-card";
+import { TrendingCard } from "./trending-card";
 import { DiscoverForm } from "./discover-form";
 import {
   ACTIVITY,
@@ -18,11 +22,13 @@ import {
   isRealtimeSort,
   COUNTRIES,
   label,
+  MARKETS,
   MAX_LIMIT,
   PAGE_SIZE,
   parseState,
   QUICK_FILTERS,
   SHORTS_SHARE,
+  SORT_GROUPS,
   SORTS,
   SUBSCRIBERS,
   toFilters,
@@ -35,7 +41,7 @@ export const maxDuration = 60;
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 export default async function ShortsChannelsPage({ searchParams }: { searchParams: SearchParams }) {
-  await requireApprovedUser();
+  const { isAdmin } = await requireApprovedUser();
   const state = parseState(await searchParams);
   const showVideos = state.videos !== "hide";
 
@@ -45,20 +51,21 @@ export default async function ShortsChannelsPage({ searchParams }: { searchParam
   const isDefaultView = !state.q && advancedCount === 0 && !quick;
 
   const { research, trending } = getServices();
+  const targetCountries = qualityConfigFrom(env()).countries;
   const [{ channels, terms }, popular, searchesLeft, picks] = await Promise.all([
-    research.browseShortsChannels(state.q, toFilters(state), showVideos ? 8 : 0),
+    research.browseShortsChannels(state.q, toFilters(state, targetCountries), showVideos ? 8 : 0),
     research.popularKeywords(10),
     research.discoverySearchesLeftToday(),
-    isDefaultView ? trending.latestPicks() : Promise.resolve(null),
+    isDefaultView ? trending.currentPicks() : Promise.resolve([]),
   ]);
-  const trendingChannels = picks ? await research.trendingToday(picks.picks, showVideos ? 8 : 0) : [];
+  const picksUpdatedAt = picks.map((p) => p.stats_updated_at ?? p.created_at).sort().at(-1);
   const canLoadMore = channels.length === Number(state.limit) && Number(state.limit) < MAX_LIMIT;
   const discoverKeyword = terms[0] ?? "";
 
   const select = (name: string, options: { key: string; label: string }[], value: string) => (
     <label className="field">
       <span>{
-        { subs: "Subscribers", views: "Average views", age: "Channel age", active: "Last upload", share: "Shorts share", country: "Country" }[name]
+        { subs: "Subscribers", views: "Average views", age: "Channel age", active: "Last upload", share: "Shorts share", country: "Country", market: "Language" }[name]
       }</span>
       <select name={name} defaultValue={value}>
         {options.map((o) => (
@@ -87,7 +94,7 @@ export default async function ShortsChannelsPage({ searchParams }: { searchParam
           autoComplete="off"
         />
         {Object.entries(state).map(([key, value]) =>
-          key === "q" || key === "limit" || value === "any" || (key === "sort" && value === "views") || (key === "videos" && value === "show") ? null : (
+          key === "q" || key === "limit" || (value === "any" && key !== "market") || (key === "market" && value === "en") || (key === "sort" && value === "views") || (key === "videos" && value === "show") ? null : (
             <input key={key} type="hidden" name={key} value={value} />
           ),
         )}
@@ -141,13 +148,13 @@ export default async function ShortsChannelsPage({ searchParams }: { searchParam
               </>
             }
           >
-            {(["Channel", "Realtime"] as const).map((group) => (
-              <div key={group} className="dropdown-group">
+            {SORT_GROUPS.map((group) => (
+              <div key={group.key} className="dropdown-group">
                 <div className="dropdown-group-title">
-                  {group === "Realtime" ? <ZapIcon size={12} /> : null}
-                  {group === "Realtime" ? "Realtime growth" : "Channel stats"}
+                  {group.key === "Realtime" ? <ZapIcon size={12} /> : group.key === "Signals" ? <FlameIcon size={12} /> : null}
+                  {group.label}
                 </div>
-                {SORTS.filter((sort) => sort.group === group).map((sort) => (
+                {SORTS.filter((sort) => sort.group === group.key).map((sort) => (
                   <Link key={sort.key} href={buildHref(state, { sort: sort.key })} className="dropdown-item" aria-current={sort.key === state.sort}>
                     {sort.label}
                   </Link>
@@ -178,6 +185,7 @@ export default async function ShortsChannelsPage({ searchParams }: { searchParam
               {select("active", ACTIVITY, state.active)}
               {select("share", SHORTS_SHARE, state.share)}
               {select("country", COUNTRIES, state.country)}
+              {select("market", MARKETS, state.market)}
               <label className="checkbox-field">
                 <input type="checkbox" name="tracked" value="yes" defaultChecked={state.tracked === "yes"} />
                 <span>Only my tracked channels</span>
@@ -198,7 +206,7 @@ export default async function ShortsChannelsPage({ searchParams }: { searchParam
         </div>
       </div>
 
-      {trendingChannels.length > 0 ? (
+      {isDefaultView && (picks.length > 0 || isAdmin) ? (
         <section className="trending-section" aria-labelledby="trending-title">
           <div className="section-head">
             <span className="section-icon">
@@ -207,20 +215,40 @@ export default async function ShortsChannelsPage({ searchParams }: { searchParam
             <div>
               <h2 id="trending-title">Trending today</h2>
               <p className="stat-note">
-                Breakout Shorts channels across {trendingChannels.length} niches
-                {picks?.updatedAt ? ` · updated ${timeAgo(picks.updatedAt)}` : ""}
+                {picks.length > 0
+                  ? `Shorts beating their channel's usual views, from smaller channels across ${picks.length} niches`
+                  : "No picks right now"}
+                {picksUpdatedAt ? ` · updated ${timeAgo(picksUpdatedAt)}` : ""}
               </p>
             </div>
+            {isAdmin ? (
+              <div className="section-head-actions">
+                <form action={repickTrending}>
+                  <button type="submit" className="button-ghost button-small" title="Search YouTube for fresh picks (~600 quota units)">
+                    Re-pick now
+                  </button>
+                </form>
+                {picks.length > 0 ? (
+                  <form action={clearTrendingPicks}>
+                    <button type="submit" className="button-ghost button-small">
+                      Clear picks
+                    </button>
+                  </form>
+                ) : null}
+              </div>
+            ) : null}
           </div>
-          <div className="channel-list">
-            {trendingChannels.map((channel) => (
-              <ChannelCard key={channel.channel_id} channel={channel} showVideos={showVideos} badge={channel.niche} />
-            ))}
-          </div>
+          {picks.length > 0 ? (
+            <div className="trend-grid">
+              {picks.map((pick) => (
+                <TrendingCard key={pick.id} pick={pick} isAdmin={isAdmin} />
+              ))}
+            </div>
+          ) : null}
         </section>
       ) : null}
 
-      {isDefaultView && trendingChannels.length > 0 ? <h2 className="section-title">All Shorts channels</h2> : null}
+      {isDefaultView && picks.length > 0 ? <h2 className="section-title">All Shorts channels</h2> : null}
 
       <div className="results-meta">
         <span>

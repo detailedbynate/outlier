@@ -3,6 +3,7 @@ import { env } from "@/lib/core/env";
 import { SupabaseInviteSender } from "@/lib/auth/invites";
 import { PreferencesRepository } from "@/lib/database/repositories/preferences";
 import { RateLimitRepository } from "@/lib/database/repositories/rate-limits";
+import { TrendingRepository } from "@/lib/database/repositories/trending";
 import { WaitlistRepository } from "@/lib/database/repositories/waitlist";
 import {
   ChannelRepository,
@@ -26,7 +27,7 @@ import { OnboardingService } from "./onboarding-service";
 import { RateLimitService } from "./rate-limit-service";
 import { ResearchService } from "./research-service";
 import { StorageBudgetService } from "./storage-budget-service";
-import { TRENDING_JOB_TYPE, TrendingService } from "./trending-service";
+import { TRENDING_JOB_TYPE, TRENDING_REFRESH_JOB_TYPE, TrendingService } from "./trending-service";
 import { VideoService } from "./video-service";
 import { WaitlistService } from "./waitlist-service";
 
@@ -55,6 +56,7 @@ export interface Services {
     waitlist: WaitlistRepository;
     preferences: PreferencesRepository;
     rateLimits: RateLimitRepository;
+    trending: TrendingRepository;
   };
 }
 
@@ -91,6 +93,7 @@ export function getServices(): Services {
     waitlist: lazy(() => new WaitlistRepository(lazyDb())),
     preferences: lazy(() => new PreferencesRepository(lazyDb())),
     rateLimits: lazy(() => new RateLimitRepository(lazyDb())),
+    trending: lazy(() => new TrendingRepository(lazyDb())),
   };
   const youtube = lazy(() => getYouTubeService());
 
@@ -101,6 +104,7 @@ export function getServices(): Services {
   const channels = new ChannelService(youtube, repositories.channels, repositories.videos, {
     storage,
     snapshotVideoMaxAgeDays: config.SNAPSHOT_VIDEO_MAX_AGE_DAYS,
+    language: config.OUTLIER_LANGUAGE.toLowerCase(),
   });
   const videos = new VideoService(youtube);
 
@@ -111,13 +115,10 @@ export function getServices(): Services {
 
   const quality = qualityConfigFrom(config);
   const regionCode = config.OUTLIER_REGION.toUpperCase();
-  const trending = new TrendingService({
-    youtube,
-    enqueue,
-    quality,
-    regionCode,
-    latestOutput: (type) => repositories.jobs.latestSucceededOutput(type),
-  });
+  const trending = new TrendingService(
+    { youtube, repository: repositories.trending, enqueue },
+    { quality, regionCode, minMultiplier: config.OUTLIER_MIN_MULTIPLIER },
+  );
 
   const jobRegistry = createJobRegistry({
     channels,
@@ -144,6 +145,8 @@ export function getServices(): Services {
     { type: "catalog.snapshot_stats", everyHours: config.STATS_SNAPSHOT_INTERVAL_HOURS },
     { type: "maintenance.prune_snapshots", everyHours: 24 },
     { type: TRENDING_JOB_TYPE, everyHours: 24 },
+    { type: TRENDING_REFRESH_JOB_TYPE, everyHours: 1 },
+    { type: "catalog.detect_languages", everyHours: 24 },
   ]);
 
   services = {

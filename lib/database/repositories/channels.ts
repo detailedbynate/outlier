@@ -160,6 +160,12 @@ export class ChannelRepository {
     if (filters.activeSince) query = query.gte("last_short_at", filters.activeSince.toISOString());
     if (filters.country) query = query.eq("country", filters.country);
     if (filters.tracked !== undefined) query = query.eq("tracked", filters.tracked);
+    if (filters.targetMarket) {
+      query = query.eq("is_target_language", true);
+      if (filters.targetMarket.countries.length > 0) {
+        query = query.or(`country.is.null,country.in.(${filters.targetMarket.countries.map((c) => escapeLike(c)).join(",")})`);
+      }
+    }
     return unwrap(
       await query.order(filters.orderBy, { ascending: false, nullsFirst: false }).limit(filters.limit),
       "shorts_channels.search",
@@ -171,6 +177,21 @@ export class ChannelRepository {
     let query = this.db.from("channels").select("youtube_channel_id").order("youtube_channel_id").limit(limit);
     if (after) query = query.gt("youtube_channel_id", after);
     return unwrap(await query, "channels.youtubeIdsPage").map((r) => r.youtube_channel_id);
+  }
+
+  async setContentLanguage(id: string, language: string | null, checkedAt: Date): Promise<void> {
+    assertOk(
+      await this.db.from("channels").update({ content_language: language, language_checked_at: checkedAt.toISOString() }).eq("id", id),
+      "channels.setContentLanguage",
+    );
+  }
+
+  /** Channels whose language hasn't been checked yet (oldest first). */
+  async listLanguageUnchecked(limit: number): Promise<Pick<ChannelRow, "id">[]> {
+    return unwrap(
+      await this.db.from("channels").select("id").is("language_checked_at", null).order("created_at").limit(limit),
+      "channels.listLanguageUnchecked",
+    );
   }
 
   async setTrackedMany(ids: string[], tracked: boolean): Promise<void> {
@@ -194,6 +215,8 @@ export interface ShortsChannelFilters {
   /** ISO 3166 alpha-2. */
   country?: string;
   tracked?: boolean;
+  /** Only channels in the target language, from listed countries (or no country set). */
+  targetMarket?: { countries: readonly string[] };
   orderBy:
     | "avg_short_views"
     | "subscriber_count"
@@ -203,7 +226,11 @@ export interface ShortsChannelFilters {
     | "views_24h"
     | "views_48h"
     | "subs_24h"
-    | "subs_48h";
+    | "subs_48h"
+    | "top_multiplier"
+    | "hit_rate"
+    | "avg_engagement"
+    | "shorts_per_week";
   limit: number;
 }
 

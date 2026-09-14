@@ -64,6 +64,8 @@ const serverEnvSchema = z.object({
   OUTLIER_MAX_SUBSCRIBERS: z.coerce.number().int().min(1).default(100_000),
   OUTLIER_MIN_VIEWS_PER_SUB: z.coerce.number().min(0).default(10),
   OUTLIER_MIN_ENGAGEMENT: z.coerce.number().min(0).max(1).default(0.01),
+  /** Trending picks need at least this multiple of their channel's median Short views. */
+  OUTLIER_MIN_MULTIPLIER: z.coerce.number().min(1).default(2),
 
   /** Credits each user gets per UTC day. Actions that spend YouTube quota cost credits. */
   DAILY_CREDITS: z.coerce.number().int().min(0).max(100_000).default(100),

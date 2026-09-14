@@ -7,13 +7,14 @@ import {
   ExternalIcon,
   EyeIcon,
   FilmIcon,
+  FlameIcon,
   MoreIcon,
   PlayCircleIcon,
   TrendingIcon,
   UsersIcon,
   ZapIcon,
 } from "@/components/icons";
-import { formatCompact, formatPercent, timeAgo } from "@/lib/format";
+import { formatCompact, formatMultiplier, formatPercent, timeAgo } from "@/lib/format";
 import type { ShortsChannelWithPreviews } from "@/lib/services/research-service";
 import { setChannelTracked } from "./actions";
 
@@ -31,6 +32,7 @@ export function ChannelCard({
   badge?: string;
 }) {
   const youtubeUrl = `https://www.youtube.com/channel/${channel.youtube_channel_id}`;
+  const topMultiplier = numberOrNull(channel.top_multiplier);
 
   return (
     <article className="channel-card">
@@ -132,6 +134,27 @@ export function ChannelCard({
         <span className="stats-right muted">Last Short {timeAgo(channel.last_short_at)}</span>
       </div>
 
+      <div className="signal-row">
+        <FlameIcon size={14} className="accent-icon" />
+        <span className={topMultiplier !== null && topMultiplier >= 2.5 ? "signal-hot" : undefined} title="Top Short's views ÷ the channel's median Short">
+          <strong>{formatMultiplier(topMultiplier)}</strong> top Short
+        </span>
+        <span className="dot-sep" title="Share of recent Shorts with at least 2× the median views">
+          <strong>{formatPercent(numberOrNull(channel.hit_rate), 0)}</strong> hit rate
+        </span>
+        <span className="dot-sep" title="(Likes + comments) ÷ views, recent Shorts">
+          <strong>{formatPercent(numberOrNull(channel.avg_engagement))}</strong> engagement
+        </span>
+        <span className="dot-sep" title="Shorts posted per week, last 4 weeks">
+          <strong>{numberOrNull(channel.shorts_per_week) ?? "—"}</strong> / week
+        </span>
+        {channel.views_per_sub !== null && !channel.hidden_subscriber_count ? (
+          <span className="dot-sep" title="Average Short views ÷ subscribers">
+            <strong>{formatMultiplier(numberOrNull(channel.views_per_sub))}</strong> views/sub
+          </span>
+        ) : null}
+      </div>
+
       {showVideos && channel.recentShorts.length > 0 ? (
         <div className="recent-shorts">
           <div className="recent-shorts-title">
@@ -150,6 +173,7 @@ export function ChannelCard({
               >
                 {/* hqdefault (480px) instead of the stored maxres image: plenty for a 120px card, a fraction of the bytes. */}
                 <img src={`https://i.ytimg.com/vi/${video.youtube_video_id}/hqdefault.jpg`} alt={video.title} loading="lazy" />
+                <ShortMultiplier views={video.view_count} median={channel.median_short_views} />
                 <span className="short-views">
                   <EyeIcon size={12} />
                   {formatCompact(video.view_count)}
@@ -161,6 +185,21 @@ export function ChannelCard({
       ) : null}
     </article>
   );
+}
+
+/** Postgres numerics can arrive as strings; normalize for display. */
+function numberOrNull(value: number | string | null | undefined): number | null {
+  if (value === null || value === undefined) return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Badge a recent Short that beat the channel's median by 1.5× or more. */
+function ShortMultiplier({ views, median }: { views: number | null; median: number | null }) {
+  if (!views || !median || median <= 0) return null;
+  const multiplier = views / median;
+  if (multiplier < 1.5) return null;
+  return <span className="outlier-badge recent-multiplier">{formatMultiplier(multiplier)}</span>;
 }
 
 function GrowthStat({ label, value }: { label: string; value: number | null }) {

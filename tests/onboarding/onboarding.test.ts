@@ -126,6 +126,13 @@ describe("OnboardingService", () => {
     expect(repository.upsert).not.toHaveBeenCalled();
   });
 
+  it("updates preferences while keeping the original completion time", async () => {
+    const { service, repository } = setup({ onboarding_completed_at: "2026-09-01T00:00:00Z" });
+    const saved = await service.updatePreferences("user-1", { ...valid, niches: ["Cooking"] }, new Date("2026-09-14T12:00:00Z"));
+    expect(repository.upsert).toHaveBeenCalledWith(expect.objectContaining({ niches: ["Cooking"], onboarding_completed_at: "2026-09-01T00:00:00Z" }));
+    expect(saved.onboardingCompletedAt).toBe("2026-09-01T00:00:00Z");
+  });
+
   it("reports completion from the stored timestamp", async () => {
     expect(await setup(null).service.isCompleted("u")).toBe(false);
     expect(await setup({ onboarding_completed_at: null }).service.isCompleted("u")).toBe(false);

@@ -78,6 +78,9 @@ export type ChannelRow = Timestamps & {
   last_synced_at: string | null;
   /** Tracked channels refresh daily; channels found by research tools refresh weekly. */
   tracked: boolean;
+  /** Detected from recent uploads: 'en', 'other', or null when unknown. */
+  content_language: string | null;
+  language_checked_at: string | null;
 };
 
 export type ChannelSnapshotRow = {
@@ -240,6 +243,40 @@ export type RateLimitRow = {
   hits: number;
 };
 
+export type TrendingPickRow = {
+  id: string;
+  pick_date: string;
+  niche: string;
+  rank: number;
+  youtube_channel_id: string;
+  channel_title: string;
+  channel_thumbnail_url: string | null;
+  channel_country: string | null;
+  subscriber_count: number | null;
+  youtube_video_id: string;
+  video_title: string;
+  video_published_at: string | null;
+  video_views: number;
+  video_likes: number | null;
+  video_comments: number | null;
+  channel_median_views: number | null;
+  outlier_multiplier: number | null;
+  underrated_score: number | null;
+  views_1h: number | null;
+  views_24h: number | null;
+  stats_updated_at: string | null;
+  created_at: string;
+};
+
+export type TrendingPickStatRow = {
+  id: string;
+  pick_id: string;
+  captured_at: string;
+  views: number;
+  likes: number | null;
+  comments: number | null;
+};
+
 export type VideoFeedRow = {
   video_id: string;
   youtube_video_id: string;
@@ -293,6 +330,16 @@ export type ShortsChannelRow = {
   subs_24h: number | null;
   subs_48h: number | null;
   stats_captured_at: string | null;
+  /** Average (likes + comments) / views across recent Shorts. */
+  avg_engagement: number | null;
+  shorts_per_week: number;
+  views_per_sub: number | null;
+  /** Share of recent Shorts with at least 2x the channel's median views. */
+  hit_rate: number;
+  /** Top recent Short views / median Short views. */
+  top_multiplier: number | null;
+  content_language: string | null;
+  is_target_language: boolean;
 };
 
 export type Database = {
@@ -315,6 +362,11 @@ export type Database = {
       credits: TableDef<CreditRow, "workspace_id" | "delta" | "source">;
       waitlist_entries: TableDef<WaitlistEntryRow, "email">;
       user_preferences: TableDef<UserPreferencesRow, "user_id">;
+      trending_picks: TableDef<
+        TrendingPickRow,
+        "pick_date" | "niche" | "youtube_channel_id" | "channel_title" | "youtube_video_id" | "video_title"
+      >;
+      trending_pick_stats: TableDef<TrendingPickStatRow, "pick_id" | "views">;
       rate_limits: {
         Row: RateLimitRow;
         Insert: Pick<RateLimitRow, "key" | "window_start"> & Partial<RateLimitRow>;

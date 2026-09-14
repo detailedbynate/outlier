@@ -292,6 +292,52 @@ describe("supabase migrations", () => {
     expect(other.rows[0]!.allowed).toBe(true);
   });
 
+  it("adds engagement, pace, hit rate, multiplier, and language to Shorts channels", async () => {
+    const { rows } = await db.query<{ id: string }>(
+      `insert into public.channels (youtube_channel_id, title, subscriber_count) values ('UCmmmmmmmmmmmmmmmmmmmmmm', 'Stats', 1000) returning id`,
+    );
+    const channelId = rows[0]!.id;
+    // Views 100, 100, 100, 500 -> median 100, top 500, one Short at >= 2x median.
+    for (const [i, views] of [100, 100, 100, 500].entries()) {
+      await db.query(
+        `insert into public.videos (youtube_video_id, channel_id, title, published_at, format, view_count, like_count, comment_count)
+         values ($1, $2, 'v', now() - make_interval(days => $3), 'short', $4, $5, 0)`,
+        [`stats${String(i).padStart(6, "0")}`, channelId, i + 1, views, views / 10],
+      );
+    }
+    await db.query(`update public.channels set content_language = 'other' where id = $1`, [channelId]);
+    const stat = (
+      await db.query<Record<string, string | number | boolean | null>>(
+        `select avg_engagement, shorts_per_week, views_per_sub, hit_rate, top_multiplier, content_language, is_target_language
+         from public.shorts_channels where channel_id = $1`,
+        [channelId],
+      )
+    ).rows[0]!;
+    expect(Number(stat.avg_engagement)).toBeCloseTo(0.1);
+    expect(Number(stat.shorts_per_week)).toBe(1);
+    expect(Number(stat.views_per_sub)).toBeCloseTo(0.2);
+    expect(Number(stat.hit_rate)).toBe(0.25);
+    expect(Number(stat.top_multiplier)).toBe(5);
+    expect(stat.is_target_language).toBe(false);
+  });
+
+  it("stores trending picks with hourly stats that cascade on delete", async () => {
+    const { rows } = await db.query<{ id: string }>(
+      `insert into public.trending_picks (pick_date, niche, youtube_channel_id, channel_title, youtube_video_id, video_title, video_views, outlier_multiplier)
+       values (current_date, 'comedy', 'UCtttttttttttttttttttttt', 'Funny', 'trendvid001', 'Clip', 900000, 3.4) returning id`,
+    );
+    await db.query(`insert into public.trending_pick_stats (pick_id, views) values ($1, 900000)`, [rows[0]!.id]);
+    await expect(
+      db.query(
+        `insert into public.trending_picks (pick_date, niche, youtube_channel_id, channel_title, youtube_video_id, video_title)
+         values (current_date, 'pets', 'UCx', 'x', 'trendvid001', 'dupe')`,
+      ),
+    ).rejects.toThrow(/trending_picks_unique_video/);
+    await db.query(`delete from public.trending_picks where id = $1`, [rows[0]!.id]);
+    const left = await db.query<{ n: number }>(`select count(*)::int as n from public.trending_pick_stats`);
+    expect(left.rows[0]!.n).toBe(0);
+  });
+
   it("defaults new channels to untracked", async () => {
     const { rows } = await db.query<{ tracked: boolean }>(
       `insert into public.channels (youtube_channel_id, title) values ('UCnnnnnnnnnnnnnnnnnnnnnn', 'New') returning tracked`,

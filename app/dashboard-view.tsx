@@ -7,7 +7,6 @@ import { TrackChannelForm } from "@/components/track-channel-form";
 import { VideoCard } from "@/components/video-card";
 import { daysAgo, formatNumber } from "@/lib/format";
 import { getServices } from "@/lib/services";
-import { resetOnboarding } from "./onboarding/actions";
 
 /** Signed-in home. Callers must check access first. */
 export async function DashboardView({ userId }: { userId: string }) {
@@ -40,11 +39,9 @@ export async function DashboardView({ userId }: { userId: string }) {
                 {preferences.channel ? ` · ${preferences.channel}` : ""}
               </p>
             </div>
-            <form action={resetOnboarding}>
-              <button type="submit" className="button-ghost">
-                Edit preferences
-              </button>
-            </form>
+            <Link href="/settings/preferences" className="button-ghost">
+              Edit preferences
+            </Link>
           </div>
           {preferences.niches.length > 0 ? (
             <div className="chips" style={{ marginTop: 14 }}>
