@@ -21,7 +21,9 @@ export class SupabaseInviteSender implements InviteSender {
     const { error } = await this.admin.auth.admin.inviteUserByEmail(email, { redirectTo });
     if (!error) return;
     if (ALREADY_REGISTERED.test(error.message)) {
-      throw new AppError("CONFLICT", "This person already has an account. Use “Copy link” to send them a sign-in link.");
+      // Existing account: send a sign-in email instead of failing.
+      await sendSignInEmail(this.admin, email, redirectTo);
+      return;
     }
     if (error.status === 429 || /rate limit/i.test(error.message)) {
       throw new AppError("RATE_LIMITED", "Supabase's email limit was hit. Use “Copy link” and send it yourself, or set up custom SMTP.");
@@ -70,7 +72,8 @@ export class SupabaseAccountProvisioner implements AccountProvisioner {
       return { userId, link, existed: existingId !== null };
     }
     if (existingId) {
-      // Already has an account: just apply the settings; they can sign in as usual.
+      // Already has an account: email them a sign-in (magic) link instead of an invite.
+      await sendSignInEmail(this.admin, email, redirectTo);
       return { userId: existingId, link: null, existed: true };
     }
     const { data, error } = await this.admin.auth.admin.inviteUserByEmail(email, { redirectTo });
@@ -94,4 +97,17 @@ export class SupabaseAuthModeration implements AuthModeration {
     const { error } = await this.admin.auth.admin.updateUserById(userId, { ban_duration });
     if (error) throw new AppError("UPSTREAM_ERROR", `Auth ban update failed: ${error.message}`, { cause: error });
   }
+}
+
+/**
+ * Email a one-time sign-in link to an existing account (Supabase "Magic link"
+ * template, sent through the configured SMTP provider).
+ */
+async function sendSignInEmail(client: DatabaseClient, email: string, redirectTo: string): Promise<void> {
+  const { error } = await client.auth.signInWithOtp({ email, options: { shouldCreateUser: false, emailRedirectTo: redirectTo } });
+  if (!error) return;
+  if (error.status === 429 || /rate limit|security purposes/i.test(error.message)) {
+    throw new AppError("RATE_LIMITED", "A sign-in email was sent to this address very recently. Wait a minute and try again, or use \"Copy sign-in link\".");
+  }
+  throw new AppError("UPSTREAM_ERROR", `Sign-in email failed: ${error.message}`, { cause: error, expose: true });
 }

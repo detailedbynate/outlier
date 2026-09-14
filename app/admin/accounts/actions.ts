@@ -48,7 +48,7 @@ export async function createAccount(_prev: AccountFormState, formData: FormData)
     const message = link
       ? `Account ready for ${account.email}. Send them this one-time sign-in link.`
       : existed
-        ? `${account.email} already had an account. Their limits were updated.`
+        ? `${account.email} already had an account, so their limits were updated and a sign-in email was sent.`
         : `Invite email sent to ${account.email}.`;
     return { status: "ok", message, link };
   } catch (error) {
