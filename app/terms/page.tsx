@@ -52,8 +52,8 @@ export default function TermsPage() {
 
       <h2>5. Credits</h2>
       <p>
-        Some features use credits. Free early-access credits reset on a schedule, have no cash value, can&apos;t be transferred,
-        and may change. Any paid plans will show their pricing and terms before you buy.
+        Outlier is a paid service. Plans and their pricing are shown before you buy. Some features use credits included with
+        your plan; credits reset on a schedule, have no cash value, can&apos;t be transferred, and may change.
       </p>
 
       <h2>6. Data and insights</h2>

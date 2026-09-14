@@ -10,11 +10,18 @@ export function scrollToSection(id: string): void {
   const target = document.getElementById(id);
   if (!target) return;
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const top = target.getBoundingClientRect().top + window.scrollY - HEADER_OFFSET;
+  const rect = target.getBoundingClientRect();
+  const field = target.querySelector<HTMLInputElement>('input:not([type="hidden"])');
+  // Forms are centered in the space below the header so the whole form (and its heading area)
+  // is in view; content sections align their top just under the header.
+  const available = window.innerHeight - HEADER_OFFSET;
+  const top =
+    field && rect.height < available
+      ? rect.top + window.scrollY - HEADER_OFFSET - (available - rect.height) / 2
+      : rect.top + window.scrollY - HEADER_OFFSET;
   window.scrollTo({ top: Math.max(top, 0), behavior: reduced ? "auto" : "smooth" });
   history.replaceState(null, "", `#${id}`);
 
-  const field = target.querySelector<HTMLInputElement>('input[type="email"], input:not([type="hidden"])');
   if (field) {
     // Focus after the scroll settles so the browser doesn't jump.
     window.setTimeout(() => field.focus({ preventScroll: true }), reduced ? 0 : 550);

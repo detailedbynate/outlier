@@ -28,17 +28,28 @@ export function Reveal({
       el.classList.add("is-visible");
       return;
     }
+    const show = () => {
+      el.classList.add("is-visible");
+      observer.disconnect();
+      clearTimeout(failsafe);
+    };
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry?.isIntersecting) {
-          el.classList.add("is-visible");
-          observer.disconnect();
-        }
+        // Reveal when on screen, or when already scrolled past (e.g. after jumping to a section
+        // or reloading mid-page) so content never stays invisible.
+        if (entry && (entry.isIntersecting || entry.boundingClientRect.bottom < 0)) show();
       },
-      { threshold: 0.18, rootMargin: "0px 0px -8% 0px" },
+      { threshold: 0, rootMargin: "0px 0px -6% 0px" },
     );
     observer.observe(el);
-    return () => observer.disconnect();
+    // Last resort: never leave content hidden if the observer doesn't fire.
+    const failsafe = setTimeout(() => {
+      if (el.getBoundingClientRect().top < window.innerHeight) show();
+    }, 2500);
+    return () => {
+      observer.disconnect();
+      clearTimeout(failsafe);
+    };
   }, []);
 
   return (

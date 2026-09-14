@@ -83,7 +83,7 @@ const FAQ = [
   },
   {
     q: "How much does it cost?",
-    a: "During early access you get free daily credits to use the research tools. We'll share pricing with the waitlist before anything changes.",
+    a: "Outlier is a paid subscription. Waitlist members get first access and will hear about launch pricing before anyone else.",
   },
   {
     q: "Do I need to connect my YouTube account?",
