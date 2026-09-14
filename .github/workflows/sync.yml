@@ -25,7 +25,8 @@ jobs:
             echo "::error::Set the APP_URL and CRON_SECRET repository secrets."
             exit 1
           fi
-          curl --fail-with-body --silent --show-error --max-time 90 \
+          # --location follows domain redirects (e.g. apex -> www); curl keeps POST on 307/308.
+          curl --fail-with-body --silent --show-error --max-time 90 --location \
             -X POST \
             -H "Authorization: Bearer $CRON_SECRET" \
             "${APP_URL%/}/api/cron/tick"
