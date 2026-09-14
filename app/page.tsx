@@ -9,5 +9,6 @@ export const dynamic = "force-dynamic";
 export default async function HomePage() {
   const current = await getCurrentUser();
   if (current && !current.approved) redirect("/not-approved");
-  return current ? <DashboardView /> : <LandingPage />;
+  if (current && !current.onboardingCompleted) redirect("/onboarding");
+  return current ? <DashboardView userId={current.user.id} /> : <LandingPage />;
 }

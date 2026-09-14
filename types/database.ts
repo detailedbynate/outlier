@@ -223,6 +223,17 @@ export type WaitlistEntryRow = Timestamps & {
   invited_by: string | null;
 };
 
+export type UserPreferencesRow = Timestamps & {
+  user_id: string;
+  goals: string[];
+  content_formats: string[];
+  niches: string[];
+  has_channel: boolean | null;
+  channel: string | null;
+  competitors: string[];
+  onboarding_completed_at: string | null;
+};
+
 export type VideoFeedRow = {
   video_id: string;
   youtube_video_id: string;
@@ -297,6 +308,7 @@ export type Database = {
       usage_events: TableDef<UsageEventRow, "event_type">;
       credits: TableDef<CreditRow, "workspace_id" | "delta" | "source">;
       waitlist_entries: TableDef<WaitlistEntryRow, "email">;
+      user_preferences: TableDef<UserPreferencesRow, "user_id">;
     };
     Views: {
       workspace_credit_balances: {

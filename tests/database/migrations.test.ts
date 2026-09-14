@@ -260,6 +260,28 @@ describe("supabase migrations", () => {
     expect(rows[0]).toEqual({ status: "pending", relrowsecurity: true });
   });
 
+  it("stores one preferences row per user and enforces allowed values", async () => {
+    const { rows } = await db.query<{ id: string }>(`insert into auth.users (email) values ('onboard@example.com') returning id`);
+    const userId = rows[0]!.id;
+    await db.query(
+      `insert into public.user_preferences (user_id, goals, content_formats, niches, has_channel, channel)
+       values ($1, array['grow_channel','find_niches'], array['shorts'], array['gaming'], true, '@me')`,
+      [userId],
+    );
+    await expect(
+      db.query(`update public.user_preferences set goals = array['world_domination'] where user_id = $1`, [userId]),
+    ).rejects.toThrow(/user_preferences_goals_valid/);
+    await expect(
+      db.query(`update public.user_preferences set has_channel = false where user_id = $1`, [userId]),
+    ).rejects.toThrow(/user_preferences_channel_consistent/);
+
+    // Re-running the migration is a no-op.
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    await db.exec(readFileSync(join(process.cwd(), "supabase/migrations/20260914000011_user_preferences.sql"), "utf8"));
+    await db.exec(readFileSync(join(process.cwd(), "supabase/migrations/20260914000010_waitlist.sql"), "utf8"));
+  });
+
   it("defaults new channels to untracked", async () => {
     const { rows } = await db.query<{ tracked: boolean }>(
       `insert into public.channels (youtube_channel_id, title) values ('UCnnnnnnnnnnnnnnnnnnnnnn', 'New') returning tracked`,

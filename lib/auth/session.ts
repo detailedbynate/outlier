@@ -30,6 +30,8 @@ export interface CurrentUser {
   email: string;
   approved: boolean;
   isAdmin: boolean;
+  /** Finished first-run onboarding (only checked for approved users). */
+  onboardingCompleted: boolean;
 }
 
 /** The signed-in user for this request (validated with Supabase Auth, not just the cookie). Cached per request. */
@@ -43,14 +45,19 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   let approved = isAdmin || isEmailAllowed(email, parseAllowedEmails(config.ALLOWED_EMAILS));
   // With an allowlist in place, people invited from the waitlist still get in.
   if (!approved && email) approved = await getServices().waitlist.isInvited(email);
-  return { user: data.user, email, approved, isAdmin };
+  const onboardingCompleted = approved ? await getServices().onboarding.isCompleted(data.user.id) : false;
+  return { user: data.user, email, approved, isAdmin, onboardingCompleted };
 });
 
-/** Use at the top of every protected page and server action. */
-export async function requireApprovedUser(): Promise<CurrentUser> {
+/**
+ * Use at the top of every protected page and server action. Users who haven't
+ * finished onboarding are sent there first (except from onboarding itself).
+ */
+export async function requireApprovedUser(options: { allowIncompleteOnboarding?: boolean } = {}): Promise<CurrentUser> {
   const current = await getCurrentUser();
   if (!current) redirect("/login");
   if (!current.approved) redirect("/not-approved");
+  if (!current.onboardingCompleted && !options.allowIncompleteOnboarding) redirect("/onboarding");
   return current;
 }
 

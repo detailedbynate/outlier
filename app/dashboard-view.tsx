@@ -7,11 +7,13 @@ import { TrackChannelForm } from "@/components/track-channel-form";
 import { VideoCard } from "@/components/video-card";
 import { daysAgo, formatNumber } from "@/lib/format";
 import { getServices } from "@/lib/services";
+import { resetOnboarding } from "./onboarding/actions";
 
 /** Signed-in home. Callers must check access first. */
-export async function DashboardView() {
-  const { storage, repositories } = getServices();
-  const [status, channelCount, videoCount, topVideos] = await Promise.all([
+export async function DashboardView({ userId }: { userId: string }) {
+  const { storage, repositories, onboarding } = getServices();
+  const [preferences, status, channelCount, videoCount, topVideos] = await Promise.all([
+    onboarding.getPreferences(userId),
     storage.getStatus(),
     repositories.channels.count({ tracked: true }),
     repositories.videos.count(),
@@ -27,6 +29,34 @@ export async function DashboardView() {
         <StatTile label="Videos in catalog" value={formatNumber(videoCount)} note="Latest uploads per channel" />
         <StorageMeter status={status} />
       </div>
+
+      {preferences ? (
+        <section className="card personalize-card">
+          <div className="spread" style={{ alignItems: "center" }}>
+            <div>
+              <h2 style={{ marginBottom: 4 }}>Your preferences</h2>
+              <p className="stat-note" style={{ margin: 0 }}>
+                {preferences.contentFormats.map((f) => (f === "shorts" ? "Shorts" : "Long-form")).join(" + ") || "All formats"}
+                {preferences.channel ? ` · ${preferences.channel}` : ""}
+              </p>
+            </div>
+            <form action={resetOnboarding}>
+              <button type="submit" className="button-ghost">
+                Edit preferences
+              </button>
+            </form>
+          </div>
+          {preferences.niches.length > 0 ? (
+            <div className="chips" style={{ marginTop: 14 }}>
+              {preferences.niches.map((niche) => (
+                <Link key={niche} href={`/research/shorts-channels?q=${encodeURIComponent(niche)}`} className="chip">
+                  {niche} →
+                </Link>
+              ))}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       <section className="card">
         <h2>Track a channel</h2>
