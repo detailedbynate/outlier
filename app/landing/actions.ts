@@ -1,8 +1,10 @@
 "use server";
 
+import { headers } from "next/headers";
 import { isAppError } from "@/lib/core/errors";
 import { logger } from "@/lib/core/logger";
 import { getServices } from "@/lib/services";
+import { clientIpFrom } from "@/lib/services/rate-limit-service";
 
 export interface WaitlistState {
   status: "idle" | "joined" | "error";
@@ -20,7 +22,9 @@ export async function joinWaitlist(_prev: WaitlistState, formData: FormData): Pr
   if (field(formData, "company")) return { status: "joined", message: "You're on the list!", position: null };
 
   try {
-    const { position, alreadyJoined } = await getServices().waitlist.join({
+    const services = getServices();
+    await services.rateLimits.enforce("waitlistIp", clientIpFrom(await headers()));
+    const { position, alreadyJoined } = await services.waitlist.join({
       email: field(formData, "email") ?? "",
       name: field(formData, "name"),
       channelUrl: field(formData, "channelUrl"),
@@ -34,7 +38,9 @@ export async function joinWaitlist(_prev: WaitlistState, formData: FormData): Pr
       message: alreadyJoined ? "You're already on the list. We'll email you when your invite is ready." : "You're on the list! We'll email you when your invite is ready.",
     };
   } catch (error) {
-    if (isAppError(error) && error.code === "VALIDATION_ERROR") return { status: "error", message: error.message, position: null };
+    if (isAppError(error) && (error.code === "VALIDATION_ERROR" || error.code === "RATE_LIMITED")) {
+      return { status: "error", message: error.message, position: null };
+    }
     logger.error("waitlist signup failed", { error });
     return { status: "error", message: "Something went wrong. Please try again.", position: null };
   }

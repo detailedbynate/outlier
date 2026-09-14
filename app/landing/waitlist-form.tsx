@@ -70,6 +70,9 @@ export function WaitlistForm() {
         <span>{pending ? "Joining…" : "Join the waitlist"}</span>
         <ArrowIcon />
       </button>
+      <p className="waitlist-legal">
+        By joining you agree to our <a href="/terms">Terms</a> and <a href="/privacy">Privacy Policy</a>.
+      </p>
     </form>
   );
 }

@@ -4,12 +4,15 @@ import type { ChannelRepository, ShortsChannelFilters } from "@/lib/database/rep
 import type { UsageRepository } from "@/lib/database/repositories/usage";
 import type { VideoPreview, VideoRepository } from "@/lib/database/repositories/videos";
 import type { EnqueueOptions } from "@/lib/jobs/queue";
+import { DEFAULT_QUALITY, rejectReason, underratedScore, type QualityConfig } from "@/lib/research/quality";
 import type { YouTubeService } from "@/lib/youtube/service";
 import type { ShortsChannelRow } from "@/types/database";
 import type { StorageBudgetService } from "./storage-budget-service";
 import type { TrendingPick } from "./trending-service";
 
 export const SHORTS_DISCOVERY_EVENT = "research.shorts_discovery";
+
+const DISCOVERY_MIN_VIEWS = 20_000;
 
 const DEFAULT_KEYWORDS = ["motivation", "cooking", "minecraft", "fitness", "facts", "roblox", "skincare", "finance", "pets", "comedy"];
 
@@ -26,6 +29,10 @@ export function parseSearchTerms(query: string): string[] {
 }
 
 export interface ResearchConfig {
+  /** Quality rules for discovered channels (defaults to DEFAULT_QUALITY). */
+  quality?: QualityConfig;
+  /** YouTube search region, e.g. "US". */
+  regionCode?: string;
   /** Discovery searches allowed per UTC day across all users (each costs 100 YouTube quota units). */
   discoveryDailyLimit: number;
   /** Max new channels ingested per discovery search. */
@@ -144,8 +151,9 @@ export class ResearchService {
 
   /**
    * Find channels posting popular Shorts for a keyword and queue them for a light
-   * sync. The Shorts channels view decides which ones actually qualify.
-   * Quota: 100 (search) + 1 (channel hydrate) now, then ~4 per queued channel.
+   * sync. Candidates must pass the quality rules (language, country, no junk,
+   * real engagement); the Shorts channels view then decides which qualify.
+   * Quota: 100 (search) + 1 (videos) + 1 (channels) now, then ~4 per queued channel.
    */
   async discoverShortsChannels(keyword: string, userId: string | null, now: Date = new Date()): Promise<DiscoveryResult> {
     const q = keyword.trim();
@@ -157,12 +165,16 @@ export class ResearchService {
     }
     await this.deps.storage.assertCapacity();
 
-    const results = await this.deps.youtube.search({
+    // Discovery covers whole niches, so allow smaller hits than Trending Today.
+    const base = this.config.quality ?? DEFAULT_QUALITY;
+    const quality = { ...base, minViews: Math.min(base.minViews, DISCOVERY_MIN_VIEWS) };
+    const results = await this.deps.youtube.searchVideos({
       q,
-      type: "video",
       videoDuration: "short",
       order: "viewCount",
       publishedAfter: new Date(now.getTime() - 90 * 86_400_000).toISOString(),
+      relevanceLanguage: quality.language,
+      regionCode: this.config.regionCode,
       maxResults: 50,
     });
     await this.deps.usage.record({
@@ -174,10 +186,21 @@ export class ResearchService {
       metadata: { results: results.items.length },
     });
 
-    // Rank channels by how many of the top results they own.
-    const hits = new Map<string, number>();
-    for (const item of results.items) if (item.channelId) hits.set(item.channelId, (hits.get(item.channelId) ?? 0) + 1);
-    const channelIds = [...hits.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
+    // Keep channels with at least one quality hit; rank by their best underrated score.
+    const channels = await this.deps.youtube.getChannels([...new Set(results.items.map((v) => v.channelId).filter(Boolean))]);
+    const channelById = new Map(channels.map((c) => [c.id, c]));
+    const bestScore = new Map<string, number>();
+    let rejected = 0;
+    for (const video of results.items) {
+      const channel = channelById.get(video.channelId);
+      if (!channel) continue;
+      if (rejectReason(video, channel, quality, { sizeRules: false })) {
+        rejected += 1;
+        continue;
+      }
+      bestScore.set(channel.id, Math.max(bestScore.get(channel.id) ?? 0, underratedScore(video, channel)));
+    }
+    const channelIds = [...bestScore.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
 
     const fresh = await this.deps.channels.recentlySyncedIds(channelIds, new Date(now.getTime() - 7 * 86_400_000));
     const toQueue = channelIds.filter((id) => !fresh.has(id)).slice(0, this.config.discoveryMaxChannels);
@@ -186,7 +209,7 @@ export class ResearchService {
       await this.deps.enqueue("channel.refresh", { channelId, light: true }, { idempotencyKey: `channel.refresh:${channelId}:${day}`, priority: 5 });
     }
 
-    this.log.info("shorts discovery", { keyword: q, found: channelIds.length, queued: toQueue.length });
+    this.log.info("shorts discovery", { keyword: q, found: channelIds.length, rejected, queued: toQueue.length });
     return {
       keyword: q,
       channelsFound: channelIds.length,

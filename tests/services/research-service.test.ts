@@ -5,44 +5,51 @@ import { escapeLike } from "@/lib/database/repositories/channels";
 import type { UsageRepository } from "@/lib/database/repositories/usage";
 import { ResearchService } from "@/lib/services/research-service";
 import type { YouTubeService } from "@/lib/youtube/service";
+import { makeChannel, makeVideo } from "../helpers/fixtures";
 
 const NOW = new Date("2026-09-13T15:00:00Z");
 const A = "UCaaaaaaaaaaaaaaaaaaaaaa";
 const B = "UCbbbbbbbbbbbbbbbbbbbbbb";
 const C = "UCcccccccccccccccccccccc";
+const D = "UCdddddddddddddddddddddd";
 
 function setup(overrides: { usedToday?: number; fresh?: string[]; maxChannels?: number } = {}) {
-  const search = vi.fn(async () => ({
-    items: [A, B, B, C, B, A].map((channelId, i) => ({ kind: "video", id: `vid${i}`, channelId })),
-    nextPageToken: null,
-    prevPageToken: null,
-    totalResults: 6,
-  }));
+  const videos = [
+    makeVideo({ id: "a0000000001", channelId: A, views: 300_000 }),
+    makeVideo({ id: "b0000000001", channelId: B, views: 900_000 }),
+    makeVideo({ id: "c0000000001", channelId: C, views: 60_000 }),
+    // Non-English channel: filtered out.
+    makeVideo({ id: "d0000000001", channelId: D, views: 5_000_000, defaultAudioLanguage: "pt" }),
+  ];
+  const searchVideos = vi.fn(async () => ({ items: videos, nextPageToken: null, prevPageToken: null, totalResults: videos.length }));
+  const getChannels = vi.fn(async (ids: readonly string[]) =>
+    ids.map((id) => makeChannel({ id, subscribers: { [A]: 20_000, [B]: 10_000, [C]: 40_000, [D]: 1_000 }[id] ?? 10_000 })),
+  );
   const enqueue = vi.fn(async () => ({}));
   const record = vi.fn(async () => ({}));
   const countSince = vi.fn(async () => overrides.usedToday ?? 0);
   const assertCapacity = vi.fn(async () => ({}));
   const service = new ResearchService(
     {
-      youtube: { search } as unknown as YouTubeService,
+      youtube: { searchVideos, getChannels } as unknown as YouTubeService,
       channels: { recentlySyncedIds: async () => new Set(overrides.fresh ?? []) } as unknown as ChannelRepository,
       usage: { record, countSince } as unknown as UsageRepository,
       storage: { assertCapacity } as never,
       enqueue,
     },
-    { discoveryDailyLimit: 10, discoveryMaxChannels: overrides.maxChannels ?? 25 },
+    { discoveryDailyLimit: 10, discoveryMaxChannels: overrides.maxChannels ?? 25, regionCode: "US" },
     createLogger(),
   );
-  return { service, search, enqueue, record, countSince, assertCapacity };
+  return { service, search: searchVideos, enqueue, record, countSince, assertCapacity };
 }
 
 describe("ResearchService.discoverShortsChannels", () => {
-  it("searches recent popular Shorts and queues channels ranked by hits", async () => {
+  it("searches English/US Shorts and queues quality channels ranked by underrated score", async () => {
     const { service, search, enqueue, record } = setup();
     const result = await service.discoverShortsChannels("  cooking hacks ", "user-1", NOW);
 
     expect(search).toHaveBeenCalledWith(
-      expect.objectContaining({ q: "cooking hacks", type: "video", videoDuration: "short", order: "viewCount", maxResults: 50 }),
+      expect.objectContaining({ q: "cooking hacks", videoDuration: "short", order: "viewCount", relevanceLanguage: "en", regionCode: "US" }),
     );
     expect(enqueue.mock.calls.map((c) => (c as unknown[])[1])).toEqual([
       { channelId: B, light: true },
@@ -75,7 +82,6 @@ describe("ResearchService.discoverShortsChannels", () => {
     expect(search).not.toHaveBeenCalled();
   });
 });
-
 describe("escapeLike", () => {
   it("escapes wildcards and filter separators", () => {
     expect(escapeLike('100%_real,(ok)*"')).toBe("100\\%\\_real  ok   ");

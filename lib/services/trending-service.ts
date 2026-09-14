@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createLogger, type Logger } from "@/lib/core/logger";
 import type { EnqueueOptions } from "@/lib/jobs/queue";
+import { DEFAULT_QUALITY, rejectReason, underratedScore, type QualityConfig, type RejectReason } from "@/lib/research/quality";
 import type { YouTubeService } from "@/lib/youtube/service";
 
 /**
@@ -31,8 +32,8 @@ export const NICHE_POOL = [
 
 export const NICHES_PER_DAY = 5;
 const CANDIDATES_PER_NICHE = 2;
-const LOOKBACK_DAYS = 3;
-const MIN_TOP_VIEWS = 100_000;
+/** A week gives enough candidates once strict quality rules are applied. */
+const LOOKBACK_DAYS = 7;
 
 const pickSchema = z.object({
   niche: z.string(),
@@ -42,7 +43,7 @@ const pickSchema = z.object({
   videoTitle: z.string(),
   videoViews: z.number(),
   subscribers: z.number().nullable(),
-  /** Top Short views / sqrt(subscribers): rewards small channels with big hits without letting tiny ones win on a modest Short. */
+  /** Underrated score (see lib/research/quality): views far above channel size, boosted by engagement. */
   score: z.number(),
   /** Backups are shown only if the primary pick doesn't qualify as a Shorts channel. */
   backup: z.boolean(),
@@ -68,6 +69,8 @@ export class TrendingService {
       youtube: YouTubeService;
       enqueue: (type: string, payload: unknown, options?: EnqueueOptions) => Promise<unknown>;
       latestOutput: (type: string) => Promise<{ output: unknown; finishedAt: string | null } | null>;
+      quality?: QualityConfig;
+      regionCode?: string;
     },
     logger?: Logger,
   ) {
@@ -77,6 +80,7 @@ export class TrendingService {
   /** Compute today's picks and queue light syncs so they show up with full stats. */
   async computeDailyPicks(now: Date = new Date()): Promise<TrendingPicks> {
     const niches = nichesForDay(now);
+    const quality = this.deps.quality ?? DEFAULT_QUALITY;
     const publishedAfter = new Date(now.getTime() - LOOKBACK_DAYS * 86_400_000).toISOString();
     const taken = new Set<string>();
     const picks: TrendingPick[] = [];
@@ -88,11 +92,12 @@ export class TrendingService {
           videoDuration: "short",
           order: "viewCount",
           publishedAfter,
-          relevanceLanguage: "en",
+          relevanceLanguage: quality.language,
+          regionCode: this.deps.regionCode,
           maxResults: 50,
         });
 
-        // Best Short per channel, then score by views relative to channel size.
+        // Best Short per channel; then keep only pairs that pass the quality bar, ranked by underrated score.
         const bestByChannel = new Map<string, (typeof videos.items)[number]>();
         for (const video of videos.items) {
           if (video.format !== "short" || taken.has(video.channelId)) continue;
@@ -100,15 +105,23 @@ export class TrendingService {
           if (!best || video.statistics.viewCount > best.statistics.viewCount) bestByChannel.set(video.channelId, video);
         }
         const channels = await this.deps.youtube.getChannels([...bestByChannel.keys()]);
+        const rejected: Partial<Record<RejectReason, number>> = {};
         const ranked = channels
-          .map((channel) => {
-            const video = bestByChannel.get(channel.id)!;
-            const subscribers = channel.statistics.subscriberCount;
-            return { channel, video, subscribers, score: video.statistics.viewCount / Math.sqrt(Math.max(subscribers ?? 0, 1_000)) };
+          .map((channel) => ({ channel, video: bestByChannel.get(channel.id)! }))
+          .filter(({ channel, video }) => {
+            const reason = rejectReason(video, channel, quality);
+            if (reason) rejected[reason] = (rejected[reason] ?? 0) + 1;
+            return reason === null;
           })
-          .filter((c) => c.video.statistics.viewCount >= MIN_TOP_VIEWS)
+          .map(({ channel, video }) => ({
+            channel,
+            video,
+            subscribers: channel.statistics.subscriberCount,
+            score: underratedScore(video, channel),
+          }))
           .sort((a, b) => b.score - a.score)
           .slice(0, CANDIDATES_PER_NICHE);
+        this.log.info("trending niche filtered", { niche, candidates: channels.length, kept: ranked.length, rejected });
 
         ranked.forEach(({ channel, video, subscribers, score }, index) => {
           taken.add(channel.id);

@@ -28,6 +28,8 @@ const serverEnvSchema = z.object({
   ADMIN_EMAILS: optionalString,
   /** Public site URL for invite links, e.g. https://outlier.vercel.app. Falls back to the request origin. */
   SITE_URL: optionalString.pipe(z.url().optional()),
+  /** Secret salt for hashing IPs/emails in rate-limit keys. Falls back to CRON_SECRET. */
+  RATE_LIMIT_SALT: optionalString,
   /** Discord invite link shown on the landing page (e.g. https://discord.gg/abc123). */
   DISCORD_INVITE_URL: optionalString.pipe(z.url().optional()),
 
@@ -53,6 +55,15 @@ const serverEnvSchema = z.object({
   /** Research discovery searches per UTC day, all users combined (100 YouTube quota units each). */
   DISCOVERY_DAILY_LIMIT: z.coerce.number().int().min(0).max(90).default(10),
   DISCOVERY_MAX_CHANNELS: z.coerce.number().int().min(1).max(50).default(25),
+
+  /** Outlier quality rules (Trending Today and Discovery). */
+  OUTLIER_LANGUAGE: z.string().regex(/^[a-z]{2}$/i).default("en"),
+  OUTLIER_REGION: z.string().regex(/^[A-Z]{2}$/i).default("US"),
+  OUTLIER_COUNTRIES: z.string().default("US,GB,CA,AU,NZ,IE"),
+  OUTLIER_MIN_VIEWS: z.coerce.number().int().min(0).default(100_000),
+  OUTLIER_MAX_SUBSCRIBERS: z.coerce.number().int().min(1).default(100_000),
+  OUTLIER_MIN_VIEWS_PER_SUB: z.coerce.number().min(0).default(10),
+  OUTLIER_MIN_ENGAGEMENT: z.coerce.number().min(0).max(1).default(0.01),
 
   /** Credits each user gets per UTC day. Actions that spend YouTube quota cost credits. */
   DAILY_CREDITS: z.coerce.number().int().min(0).max(100_000).default(100),

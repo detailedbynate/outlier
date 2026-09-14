@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Geist } from "next/font/google";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { CreditsMeter } from "@/components/credits-meter";
@@ -10,7 +10,7 @@ import { getServices } from "@/lib/services";
 import { signOut } from "./login/actions";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"], display: "swap", variable: "--font-inter" });
+const geist = Geist({ subsets: ["latin"], display: "swap", variable: "--font-sans" });
 
 export const metadata: Metadata = {
   title: "Outlier",
@@ -31,7 +31,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
 
   if (!current?.approved) {
     return (
-      <html lang="en" className={inter.variable}>
+      <html lang="en" className={geist.variable}>
         <body>
           <div className="ambient" aria-hidden="true" />
           <div className="shell">
@@ -61,7 +61,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const credits = await getServices().credits.status(current.user.id);
 
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en" className={geist.variable}>
       <body>
         <div className="ambient" aria-hidden="true" />
         <div className="app">

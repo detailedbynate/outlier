@@ -2,14 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import { createLogger } from "@/lib/core/logger";
 import { NICHE_POOL, nichesForDay, TrendingService } from "@/lib/services/trending-service";
 import type { YouTubeService } from "@/lib/youtube/service";
-import type { YouTubeChannel, YouTubeVideo } from "@/types/youtube";
+import { makeChannel, makeVideo } from "../helpers/fixtures";
 
 const NOW = new Date("2026-09-13T12:00:00Z");
 
-const video = (id: string, channelId: string, views: number, format: "short" | "long_form" = "short") =>
-  ({ id, channelId, title: `Video ${id}`, format, statistics: { viewCount: views } }) as YouTubeVideo;
-const channel = (id: string, subscribers: number | null) =>
-  ({ id, title: `Channel ${id}`, statistics: { subscriberCount: subscribers } }) as YouTubeChannel;
 
 describe("nichesForDay", () => {
   it("returns 5 distinct niches that rotate day to day", () => {
@@ -22,17 +18,17 @@ describe("nichesForDay", () => {
 });
 
 describe("TrendingService.computeDailyPicks", () => {
-  it("picks the channels punching furthest above their size in each niche", async () => {
+  it("keeps only quality, underrated Shorts and ranks the best per niche", async () => {
     const searchVideos = vi.fn(async ({ q }: { q?: string }) => ({
       items:
         q === nichesForDay(NOW)[0]
           ? [
-              video("big00000001", "UCbig", 5_000_000), // 5M / sqrt(10M) ≈ 1.6K
-              video("small000001", "UCsmall", 900_000), // 900K / sqrt(20K) ≈ 6.4K
-              video("small000002", "UCsmall", 400_000),
-              video("tiny0000001", "UCtiny", 90_000), // below the 100K floor
-              video("long0000001", "UClong", 9_000_000, "long_form"), // not a Short
-              video("mid00000001", "UCmid", 300_000), // 300K / sqrt(30K) ≈ 1.7K
+              makeVideo({ id: "big00000001", channelId: "UCbig", views: 5_000_000 }), // too big a channel
+              makeVideo({ id: "small000001", channelId: "UCsmall", views: 900_000 }),
+              makeVideo({ id: "small000002", channelId: "UCsmall", views: 400_000 }),
+              makeVideo({ id: "spain000001", channelId: "UCspain", views: 3_000_000 }), // wrong country
+              makeVideo({ id: "long0000001", channelId: "UClong", views: 9_000_000, format: "long_form" }), // not a Short
+              makeVideo({ id: "mid00000001", channelId: "UCmid", views: 400_000 }),
             ]
           : [],
       nextPageToken: null,
@@ -40,21 +36,27 @@ describe("TrendingService.computeDailyPicks", () => {
       totalResults: 0,
     }));
     const getChannels = vi.fn(async (ids: readonly string[]) =>
-      ids.map((id) => channel(id, { UCbig: 10_000_000, UCsmall: 20_000, UCtiny: 500, UCmid: 30_000 }[id] ?? null)),
+      ids.map((id) =>
+        makeChannel({
+          id,
+          country: id === "UCspain" ? "ES" : "US",
+          subscribers: { UCbig: 10_000_000, UCsmall: 20_000, UCspain: 5_000, UCmid: 30_000 }[id] ?? null,
+        }),
+      ),
     );
     const enqueue = vi.fn(async () => ({}));
     const service = new TrendingService(
-      { youtube: { searchVideos, getChannels } as unknown as YouTubeService, enqueue, latestOutput: async () => null },
+      { youtube: { searchVideos, getChannels } as unknown as YouTubeService, enqueue, latestOutput: async () => null, regionCode: "US" },
       createLogger(),
     );
 
     const result = await service.computeDailyPicks(NOW);
 
     expect(searchVideos).toHaveBeenCalledTimes(5);
-    expect(searchVideos).toHaveBeenCalledWith(expect.objectContaining({ videoDuration: "short", order: "viewCount" }));
+    expect(searchVideos).toHaveBeenCalledWith(expect.objectContaining({ videoDuration: "short", order: "viewCount", regionCode: "US", relevanceLanguage: "en" }));
     expect(result.picks.map((p) => [p.youtubeChannelId, p.videoViews, p.backup])).toEqual([
       ["UCsmall", 900_000, false],
-      ["UCmid", 300_000, true],
+      ["UCmid", 400_000, true],
     ]);
     expect(enqueue).toHaveBeenCalledWith(
       "channel.refresh",
@@ -62,7 +64,6 @@ describe("TrendingService.computeDailyPicks", () => {
       expect.objectContaining({ idempotencyKey: "channel.refresh:UCsmall:2026-09-13" }),
     );
   });
-
   it("keeps going when one niche fails", async () => {
     const searchVideos = vi.fn(async () => {
       throw new Error("quota");

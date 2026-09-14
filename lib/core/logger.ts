@@ -1,3 +1,4 @@
+import { reportError } from "./error-reporting";
 import { serializeError } from "./errors";
 
 /**
@@ -63,8 +64,14 @@ export function createLogger(bindings: LogContext = {}): Logger {
   const log =
     (level: Exclude<LogLevel, "silent">) =>
     (message: string, context: LogContext = {}) => {
+      const merged = { ...bindings, ...context };
+      // Error logs that carry an error also go to the registered reporter (Sentry in production).
+      if (level === "error" && merged.error !== undefined) {
+        const { error, ...rest } = merged;
+        reportError(error instanceof Error ? error : new Error(message), { message, ...rest });
+      }
       if (LEVEL_WEIGHT[level] < LEVEL_WEIGHT[resolveLevel()]) return;
-      write(level, message, { ...bindings, ...context });
+      write(level, message, merged);
     };
 
   return {

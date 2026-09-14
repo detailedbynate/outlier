@@ -6,7 +6,7 @@
 
 :root {
   color-scheme: light;
-  --font: var(--font-inter), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font: var(--font-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
 
   --page: #f5f4fa;
   --surface-solid: #ffffff;
@@ -2289,7 +2289,6 @@ html:has(.landing-root) {
   -webkit-backdrop-filter: blur(28px) saturate(200%) brightness(1.08);
   backdrop-filter: blur(28px) saturate(200%) brightness(1.08);
   transition:
-    max-width 0.5s var(--ease),
     background 0.35s var(--ease),
     box-shadow 0.35s var(--ease);
 }
@@ -2367,7 +2366,6 @@ html:has(.landing-root) {
 }
 
 .pill-header.is-scrolled .pill-header-inner {
-  max-width: 940px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.02) 45%, rgba(255, 255, 255, 0.04) 100%),
     rgba(10, 8, 24, 0.62);
@@ -4069,5 +4067,254 @@ body:has(.onboarding-root) .ambient {
 
   .ob-actions {
     flex-wrap: wrap;
+  }
+}
+.prose-card ul {
+  color: var(--text-secondary);
+  padding-left: 20px;
+  line-height: 1.7;
+}
+
+.prose-card a,
+.auth-card .stat-note a {
+  color: var(--accent-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.waitlist-legal {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.waitlist-legal a {
+  color: var(--text-secondary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+/* ---------------------------------------------------------------------------
+   Landing header v2: buttons, links, active state
+--------------------------------------------------------------------------- */
+.pill-header-inner {
+  max-width: 1160px;
+  min-height: 64px;
+  padding: 10px;
+}
+
+.pill-brand {
+  margin-left: 8px;
+  gap: 12px;
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.035em;
+  transition: opacity 0.2s var(--ease);
+}
+
+.pill-brand:hover {
+  opacity: 0.9;
+}
+
+.pill-brand-mark {
+  display: inline-grid;
+  place-items: center;
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.pill-brand:hover .pill-brand-mark {
+  transform: rotate(-8deg) scale(1.06);
+}
+
+/* Links sit directly on the glass (no inner tray), centered by the grid. */
+.pill-nav {
+  gap: 4px;
+  padding: 0;
+  background: none;
+  border: 0;
+  box-shadow: none;
+}
+
+.pill-nav-link {
+  position: relative;
+  padding: 9px 16px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 500;
+  color: #bcb6d3;
+  white-space: nowrap;
+  transition: color 0.25s var(--ease);
+}
+
+.pill-nav-link::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  opacity: 0;
+  transform: scale(0.85);
+  transition:
+    opacity 0.25s var(--ease),
+    transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.pill-nav-link:hover,
+.pill-nav-link:focus-visible,
+.pill-nav-link[aria-current="location"] {
+  color: #fff;
+}
+
+.pill-nav-link:hover::before,
+.pill-nav-link:focus-visible::before,
+.pill-nav-link[aria-current="location"]::before {
+  opacity: 1;
+  transform: none;
+}
+
+/* Small dot under the section currently in view. */
+.pill-nav-link::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 3px;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  border-radius: 50%;
+  background: #a78bfa;
+  opacity: 0;
+  transform: scale(0);
+  transition:
+    opacity 0.25s var(--ease),
+    transform 0.3s var(--ease);
+}
+
+.pill-nav-link[aria-current="location"]::after {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.pill-actions {
+  gap: 8px;
+}
+
+.pill-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  padding: 0 20px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: pointer;
+  transition:
+    transform 0.2s var(--ease),
+    box-shadow 0.25s var(--ease),
+    background 0.25s var(--ease),
+    border-color 0.25s var(--ease),
+    color 0.2s var(--ease);
+}
+
+.pill-button:active {
+  transform: scale(0.96);
+}
+
+.pill-button:focus-visible {
+  outline: 2px solid #a78bfa;
+  outline-offset: 3px;
+}
+
+.pill-button-ghost {
+  color: #e9e6f5;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.pill-button-ghost:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.pill-button-primary {
+  color: #fff;
+  background: linear-gradient(135deg, #6d5dfc 0%, #8b5cf6 50%, #c04de8 100%);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 6px 20px rgba(109, 93, 252, 0.45);
+}
+
+.pill-button-primary::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.35) 50%, transparent 70%);
+  transform: translateX(-120%);
+  transition: transform 0.7s var(--ease);
+}
+
+.pill-button-primary:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 10px 28px rgba(109, 93, 252, 0.6);
+}
+
+.pill-button-primary:hover::after {
+  transform: translateX(120%);
+}
+
+.pill-button-primary:active {
+  transform: scale(0.96);
+}
+
+.pill-button-lg {
+  height: 52px;
+  padding: 0 30px;
+  font-size: 16px;
+}
+
+@media (max-width: 900px) {
+  .pill-nav {
+    display: none;
+  }
+
+  .pill-header-inner {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .pill-actions {
+    gap: 6px;
+  }
+
+  .pill-button {
+    height: 38px;
+    padding: 0 13px;
+    font-size: 13.5px;
+  }
+
+  .pill-brand {
+    margin-left: 4px;
+    gap: 8px;
+    font-size: 17px;
+  }
+}
+
+/* Very narrow phones: keep both buttons, drop the wordmark (the logo stays). */
+@media (max-width: 370px) {
+  .pill-brand > span:last-child {
+    display: none;
   }
 }

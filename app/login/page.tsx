@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { safeRedirectPath } from "@/lib/auth/access";
 import { getCurrentUser } from "@/lib/auth/session";
@@ -16,6 +17,9 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       <p className="subtitle">Outlier is invite-only for now.</p>
       {error === "link" ? <p className="form-error">That link expired or was already used. Ask for a new one, or sign in below.</p> : null}
       <LoginForm next={target} />
+      <p className="stat-note" style={{ marginTop: 14, textAlign: "center" }}>
+        By signing in you agree to the <Link href="/terms">Terms</Link> and <Link href="/privacy">Privacy Policy</Link>.
+      </p>
     </div>
   );
 }

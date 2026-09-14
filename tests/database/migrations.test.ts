@@ -282,6 +282,16 @@ describe("supabase migrations", () => {
     await db.exec(readFileSync(join(process.cwd(), "supabase/migrations/20260914000010_waitlist.sql"), "utf8"));
   });
 
+  it("counts rate-limit hits per window and blocks past the maximum", async () => {
+    const hit = async () =>
+      (await db.query<{ allowed: boolean; hits: number }>(`select allowed, hits from public.rate_limit_hit('test:ip:abc', 3600, 2)`)).rows[0]!;
+    expect(await hit()).toEqual({ allowed: true, hits: 1 });
+    expect(await hit()).toEqual({ allowed: true, hits: 2 });
+    expect(await hit()).toEqual({ allowed: false, hits: 3 });
+    const other = await db.query<{ allowed: boolean }>(`select allowed from public.rate_limit_hit('test:ip:other', 3600, 2)`);
+    expect(other.rows[0]!.allowed).toBe(true);
+  });
+
   it("defaults new channels to untracked", async () => {
     const { rows } = await db.query<{ tracked: boolean }>(
       `insert into public.channels (youtube_channel_id, title) values ('UCnnnnnnnnnnnnnnnnnnnnnn', 'New') returning tracked`,

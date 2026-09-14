@@ -7,6 +7,7 @@ import { getServices } from "@/lib/services";
 import { LandingHeader } from "./landing-header";
 import { AnalyzeMock, GrowthMock, PicksMock, ResearchMock } from "./mock-visuals";
 import { Reveal } from "./motion";
+import { ScrollLink } from "./scroll-link";
 import { WaitlistForm } from "./waitlist-form";
 
 /** Hide small numbers rather than advertising an empty waitlist. */
@@ -219,15 +220,17 @@ export async function LandingPage() {
         <Reveal className="final-cta">
           <h2>Ready to find your next outlier?</h2>
           <p>Get on the list now and be one of the first people inside.</p>
-          <a href="#waitlist" className="pill-cta pill-cta-lg">
+          <ScrollLink to="waitlist" className="pill-button pill-button-primary pill-button-lg">
             Join the waitlist
-          </a>
+          </ScrollLink>
         </Reveal>
       </main>
 
       <footer className="landing-foot">
         <p>Outlier is launching soon. Built for creators who want to grow faster.</p>
         <p className="landing-foot-links">
+          <Link href="/terms">Terms</Link>
+          <span aria-hidden="true">·</span>
           <Link href="/privacy">Privacy</Link>
           <span aria-hidden="true">·</span>
           <span>Not affiliated with YouTube or Google</span>

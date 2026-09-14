@@ -1,37 +1,60 @@
 import Link from "next/link";
 
-export const metadata = { title: "Privacy · Outlier" };
+export const metadata = { title: "Privacy Policy · Outlier" };
+
+const EFFECTIVE_DATE = "September 14, 2026";
 
 export default function PrivacyPage() {
   return (
     <article className="card prose-card">
-      <h1>Privacy</h1>
-      <p className="subtitle">The short version of how Outlier handles your information.</p>
+      <h1>Privacy Policy</h1>
+      <p className="subtitle">Effective {EFFECTIVE_DATE}</p>
 
       <h2>What we collect</h2>
       <p>
-        When you join the waitlist we store your email address and anything optional you choose to add (your channel link, niche,
-        and what you&apos;d use Outlier for). When you have an account we store your email and your usage of the app, such as
-        credits spent and channels you track.
+        <strong>Waitlist:</strong> your email address and your name if you add it. <strong>Account:</strong> your email, your
+        onboarding answers (goals, content types, niches, and any channels you enter), and your usage of the app, such as credits
+        spent and channels you track. <strong>Technical:</strong> basic request data such as IP address and browser, used for
+        security, rate limiting, and error monitoring. IP addresses used for rate limiting are stored only as one-way hashes.
       </p>
 
       <h2>How we use it</h2>
       <p>
-        We use your email to send your invite and important updates about Outlier. We use the optional details to decide who to
-        invite first and what to build. We don&apos;t sell your information.
+        To send your invite and important updates, run and secure the service, personalize research and recommendations, prevent
+        abuse, and fix errors. We don&apos;t sell your personal information.
+      </p>
+
+      <h2>Service providers</h2>
+      <p>
+        We use trusted providers to run Outlier: Supabase (database and login), Vercel (hosting), an email delivery provider
+        (invites), and Sentry (error monitoring). They process data only to provide their services to us.
       </p>
 
       <h2>YouTube data</h2>
       <p>
-        Channel and video statistics shown in Outlier come from the YouTube Data API and are subject to YouTube&apos;s Terms of
-        Service. Outlier is not affiliated with YouTube or Google.
+        Outlier uses YouTube API Services to display public channel and video statistics. We don&apos;t ask for access to your
+        YouTube account. YouTube data is refreshed regularly and handled according to the{" "}
+        <a href="https://www.youtube.com/t/terms" target="_blank" rel="noreferrer">
+          YouTube Terms of Service
+        </a>{" "}
+        and the{" "}
+        <a href="https://policies.google.com/privacy" target="_blank" rel="noreferrer">
+          Google Privacy Policy
+        </a>
+        . Outlier is not affiliated with YouTube or Google.
       </p>
 
-      <h2>Removing your data</h2>
-      <p>Want off the waitlist or your account deleted? Reply to any email from us and we&apos;ll remove it.</p>
+      <h2>Your choices</h2>
+      <p>
+        You can update your preferences anytime from the dashboard. To leave the waitlist or delete your account and data, reply
+        to any email from us or ask in our Discord, and we&apos;ll take care of it.
+      </p>
+
+      <h2>Changes</h2>
+      <p>We&apos;ll update this page if our practices change and note the new effective date.</p>
 
       <p>
-        <Link href="/">← Back to Outlier</Link>
+        See also our <Link href="/terms">Terms of Service</Link>. <Link href="/">← Back to Outlier</Link>
       </p>
     </article>
   );

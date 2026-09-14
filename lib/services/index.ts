@@ -2,6 +2,7 @@ import "server-only";
 import { env } from "@/lib/core/env";
 import { SupabaseInviteSender } from "@/lib/auth/invites";
 import { PreferencesRepository } from "@/lib/database/repositories/preferences";
+import { RateLimitRepository } from "@/lib/database/repositories/rate-limits";
 import { WaitlistRepository } from "@/lib/database/repositories/waitlist";
 import {
   ChannelRepository,
@@ -15,12 +16,14 @@ import { createJobRegistry } from "@/lib/jobs/definitions";
 import { JobQueue } from "@/lib/jobs/queue";
 import type { JobRegistry } from "@/lib/jobs/registry";
 import { JobScheduler } from "@/lib/jobs/scheduler";
+import { qualityConfigFrom } from "@/lib/research/quality";
 import { getYouTubeService } from "@/lib/youtube";
 import { ChannelService } from "./channel-service";
 import { CreditsService } from "./credits-service";
 import { DiscoveryService } from "./discovery-service";
 import { JobService } from "./job-service";
 import { OnboardingService } from "./onboarding-service";
+import { RateLimitService } from "./rate-limit-service";
 import { ResearchService } from "./research-service";
 import { StorageBudgetService } from "./storage-budget-service";
 import { TRENDING_JOB_TYPE, TrendingService } from "./trending-service";
@@ -35,6 +38,7 @@ export interface Services {
   videos: VideoService;
   waitlist: WaitlistService;
   onboarding: OnboardingService;
+  rateLimits: RateLimitService;
   discovery: DiscoveryService;
   jobs: JobService;
   research: ResearchService;
@@ -50,6 +54,7 @@ export interface Services {
     system: SystemRepository;
     waitlist: WaitlistRepository;
     preferences: PreferencesRepository;
+    rateLimits: RateLimitRepository;
   };
 }
 
@@ -85,6 +90,7 @@ export function getServices(): Services {
     system: lazy(() => new SystemRepository(lazyDb())),
     waitlist: lazy(() => new WaitlistRepository(lazyDb())),
     preferences: lazy(() => new PreferencesRepository(lazyDb())),
+    rateLimits: lazy(() => new RateLimitRepository(lazyDb())),
   };
   const youtube = lazy(() => getYouTubeService());
 
@@ -103,9 +109,13 @@ export function getServices(): Services {
   const enqueue = (type: string, payload: unknown, options?: Parameters<JobQueue["enqueue"]>[2]) =>
     queueRef.current!.enqueue(type, payload, options);
 
+  const quality = qualityConfigFrom(config);
+  const regionCode = config.OUTLIER_REGION.toUpperCase();
   const trending = new TrendingService({
     youtube,
     enqueue,
+    quality,
+    regionCode,
     latestOutput: (type) => repositories.jobs.latestSucceededOutput(type),
   });
 
@@ -116,6 +126,7 @@ export function getServices(): Services {
     trending,
     channelRepository: repositories.channels,
     systemRepository: repositories.system,
+    rateLimitRepository: repositories.rateLimits,
     enqueue,
     config: {
       syncIntervalHours: config.SYNC_INTERVAL_HOURS,
@@ -139,6 +150,7 @@ export function getServices(): Services {
     channels,
     credits: new CreditsService(repositories.usage, config.DAILY_CREDITS),
     onboarding: new OnboardingService(repositories.preferences),
+    rateLimits: new RateLimitService(repositories.rateLimits, config.RATE_LIMIT_SALT ?? config.CRON_SECRET ?? "outlier-rate-limit"),
     waitlist: new WaitlistService(repositories.waitlist, lazy(() => new SupabaseInviteSender(lazyDb()))),
     videos,
     discovery: new DiscoveryService(youtube),
@@ -146,7 +158,7 @@ export function getServices(): Services {
     trending,
     research: new ResearchService(
       { youtube, channels: repositories.channels, videos: repositories.videos, usage: repositories.usage, storage, enqueue },
-      { discoveryDailyLimit: config.DISCOVERY_DAILY_LIMIT, discoveryMaxChannels: config.DISCOVERY_MAX_CHANNELS },
+      { discoveryDailyLimit: config.DISCOVERY_DAILY_LIMIT, discoveryMaxChannels: config.DISCOVERY_MAX_CHANNELS, quality, regionCode },
     ),
     storage,
     jobRegistry,

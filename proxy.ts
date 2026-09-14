@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 /** Reachable without signing in. Prefix match for entries ending in "/". */
-const PUBLIC_PATHS = ["/", "/login", "/privacy", "/auth/"];
+const PUBLIC_PATHS = ["/", "/login", "/privacy", "/terms", "/auth/"];
 
 function isPublic(pathname: string): boolean {
   return PUBLIC_PATHS.some((path) => (path.endsWith("/") && path !== "/" ? pathname.startsWith(path) : pathname === path));

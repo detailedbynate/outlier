@@ -234,6 +234,12 @@ export type UserPreferencesRow = Timestamps & {
   onboarding_completed_at: string | null;
 };
 
+export type RateLimitRow = {
+  key: string;
+  window_start: string;
+  hits: number;
+};
+
 export type VideoFeedRow = {
   video_id: string;
   youtube_video_id: string;
@@ -309,6 +315,12 @@ export type Database = {
       credits: TableDef<CreditRow, "workspace_id" | "delta" | "source">;
       waitlist_entries: TableDef<WaitlistEntryRow, "email">;
       user_preferences: TableDef<UserPreferencesRow, "user_id">;
+      rate_limits: {
+        Row: RateLimitRow;
+        Insert: Pick<RateLimitRow, "key" | "window_start"> & Partial<RateLimitRow>;
+        Update: Partial<RateLimitRow>;
+        Relationships: [];
+      };
     };
     Views: {
       workspace_credit_balances: {
@@ -340,6 +352,10 @@ export type Database = {
       database_size_bytes: {
         Args: Record<string, never>;
         Returns: number;
+      };
+      rate_limit_hit: {
+        Args: { limit_key: string; window_seconds: number; max_hits: number };
+        Returns: { allowed: boolean; hits: number; resets_at: string }[];
       };
       prune_snapshots: {
         Args: { daily_days?: number; max_days?: number };

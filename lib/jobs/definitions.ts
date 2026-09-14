@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { isAppError } from "@/lib/core/errors";
 import type { ChannelRepository } from "@/lib/database/repositories/channels";
+import type { RateLimitRepository } from "@/lib/database/repositories/rate-limits";
 import type { SystemRepository } from "@/lib/database/repositories/system";
 import type { ChannelService } from "@/lib/services/channel-service";
 import type { StorageBudgetService } from "@/lib/services/storage-budget-service";
@@ -18,6 +19,7 @@ export interface JobDependencies {
   trending: TrendingService;
   channelRepository: ChannelRepository;
   systemRepository: SystemRepository;
+  rateLimitRepository: Pick<RateLimitRepository, "deleteOlderThan">;
   /** Late-bound: the queue is created after the registry. */
   enqueue: (type: string, payload: unknown, options?: EnqueueOptions) => Promise<unknown>;
   config: {
@@ -171,6 +173,8 @@ export function createJobRegistry(deps: JobDependencies): JobRegistry {
             deps.config.snapshotDailyRetentionDays,
             deps.config.snapshotRetentionDays,
           );
+          // Rate-limit windows older than a day are never read again.
+          await deps.rateLimitRepository.deleteOlderThan(new Date(Date.now() - 86_400_000));
           const status = await deps.storage.getStatus({ fresh: true });
           return { deleted, usedBytes: status.usedBytes };
         },
