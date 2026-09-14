@@ -22,8 +22,12 @@ const serverEnvSchema = z.object({
   INTERNAL_API_KEY: optionalString,
   /** Bearer secret for /api/cron/* (called by GitHub Actions). */
   CRON_SECRET: optionalString,
-  /** Comma-separated emails allowed to use the app. Blank = any signed-in user. */
+  /** Comma-separated emails allowed to use the app. Blank = any signed-in user. People invited from the waitlist are always allowed. */
   ALLOWED_EMAILS: optionalString,
+  /** Comma-separated emails that can manage the waitlist at /admin/waitlist. */
+  ADMIN_EMAILS: optionalString,
+  /** Public site URL for invite links, e.g. https://outlier.vercel.app. Falls back to the request origin. */
+  SITE_URL: optionalString.pipe(z.url().optional()),
 
   JOB_WORKER_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(2_000),
   JOB_WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(32).default(2),

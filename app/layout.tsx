@@ -37,6 +37,24 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           <div className="shell">
             <header className="topbar">
               <Brand />
+              <nav className="topbar-actions">
+                {current ? (
+                  <form action={signOut}>
+                    <button type="submit" className="button-ghost">
+                      Sign out
+                    </button>
+                  </form>
+                ) : (
+                  <>
+                    <Link href="/login" className="topbar-link">
+                      Sign in
+                    </Link>
+                    <Link href="/#waitlist" className="button-link">
+                      Join waitlist
+                    </Link>
+                  </>
+                )}
+              </nav>
             </header>
             {children}
           </div>
@@ -54,7 +72,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <div className="app">
           <aside className="sidebar glass">
             <Brand />
-            <SidebarNav />
+            <SidebarNav isAdmin={current.isAdmin} />
             <div className="sidebar-foot">
               <CreditsMeter status={credits} />
               <form action={signOut} className="sidebar-account">

@@ -1,4 +1,3 @@
-import { timingSafeEqual } from "node:crypto";
 import { env } from "@/lib/core/env";
 import { AppError, UnauthorizedError } from "@/lib/core/errors";
 
@@ -13,10 +12,15 @@ export interface ApiPrincipal {
   userId: string | null;
 }
 
-function safeEqual(a: string, b: string): boolean {
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  return bufA.length === bufB.length && timingSafeEqual(bufA, bufB);
+/** Constant-time string comparison using only web-standard APIs (runs on Node, Vercel, and Cloudflare Workers). */
+export function safeEqual(a: string, b: string): boolean {
+  const encoder = new TextEncoder();
+  const bytesA = encoder.encode(a);
+  const bytesB = encoder.encode(b);
+  let diff = bytesA.length ^ bytesB.length;
+  const length = Math.max(bytesA.length, bytesB.length);
+  for (let i = 0; i < length; i++) diff |= (bytesA[i] ?? 0) ^ (bytesB[i] ?? 0);
+  return diff === 0;
 }
 
 export function extractBearerToken(request: Request): string | null {

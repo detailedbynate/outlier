@@ -1,5 +1,3 @@
-import { randomUUID } from "node:crypto";
-import { hostname } from "node:os";
 import { isAppError, serializeError } from "@/lib/core/errors";
 import { createLogger, type Logger } from "@/lib/core/logger";
 import type { JobRepository } from "@/lib/database/repositories/jobs";
@@ -42,7 +40,7 @@ export class JobWorker {
     private readonly registry: JobRegistry,
     options: JobWorkerOptions = {},
   ) {
-    this.workerId = options.workerId ?? `${hostname()}:${process.pid}:${randomUUID().slice(0, 8)}`;
+    this.workerId = options.workerId ?? `worker:${crypto.randomUUID().slice(0, 13)}`;
     this.concurrency = options.concurrency ?? 2;
     this.pollIntervalMs = options.pollIntervalMs ?? 2_000;
     this.staleLockTimeout = options.staleLockTimeout ?? "15 minutes";

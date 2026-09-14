@@ -1,7 +1,12 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login"];
+/** Reachable without signing in. Prefix match for entries ending in "/". */
+const PUBLIC_PATHS = ["/", "/login", "/privacy", "/auth/"];
+
+function isPublic(pathname: string): boolean {
+  return PUBLIC_PATHS.some((path) => (path.endsWith("/") && path !== "/" ? pathname.startsWith(path) : pathname === path));
+}
 
 /**
  * Refreshes the Supabase session cookie and sends signed-out visitors to /login.
@@ -29,10 +34,10 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname, search } = request.nextUrl;
-  if (!user && !PUBLIC_PATHS.includes(pathname)) {
+  if (!user && !isPublic(pathname)) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
-    loginUrl.search = pathname === "/" ? "" : `?next=${encodeURIComponent(pathname + search)}`;
+    loginUrl.search = `?next=${encodeURIComponent(pathname + search)}`;
     return NextResponse.redirect(loginUrl);
   }
   return response;

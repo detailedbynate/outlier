@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ComponentType } from "react";
-import { BookmarkIcon, ChartIcon, FlameIcon, GridIcon, ShortsIcon } from "./icons";
+import { BookmarkIcon, ChartIcon, FlameIcon, GridIcon, ShortsIcon, UsersIcon } from "./icons";
 
 interface NavItem {
   href: string;
@@ -29,11 +29,17 @@ function isActive(pathname: string, href: string): boolean {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function SidebarNav() {
+const ADMIN_SECTION: { title: string; items: NavItem[] } = {
+  title: "Admin",
+  items: [{ href: "/admin/waitlist", label: "Waitlist", icon: UsersIcon }],
+};
+
+export function SidebarNav({ isAdmin = false }: { isAdmin?: boolean }) {
   const pathname = usePathname();
+  const sections = isAdmin ? [...SECTIONS, ADMIN_SECTION] : SECTIONS;
   return (
     <nav className="sidebar-nav" aria-label="Main">
-      {SECTIONS.map((section) => (
+      {sections.map((section) => (
         <div key={section.title} className="nav-section">
           <div className="nav-section-title">{section.title}</div>
           {section.items.map((item) => {

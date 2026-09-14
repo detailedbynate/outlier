@@ -36,6 +36,15 @@ Hosted project: `supabase link --project-ref <ref>`, then `supabase db push`.
 
 **Login:** accounts are invite-only. Create them in Supabase → Authentication → Users → Add user (auto-confirm), and turn off "Allow new users to sign up". `ALLOWED_EMAILS` (comma-separated) can restrict access further. Every page and server action checks the session (`requireApprovedUser`), and `proxy.ts` redirects signed-out visitors to `/login`.
 
+### Landing page, waitlist & invites
+
+Signed-out visitors see the landing page at `/` with a waitlist form. Admins (`ADMIN_EMAILS`) invite people from `/admin/waitlist`, either by sending an invite email or by copying a one-time sign-in link. Invited people land on `/auth/confirm` and set a password at `/set-password`. Anyone invited from the waitlist is approved automatically.
+
+Supabase setup:
+- **Authentication → URL Configuration:** set Site URL to your deployed URL.
+- **Authentication → Email Templates → Invite user:** set the link to `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=invite`.
+- Supabase's built-in email only sends a few messages per hour. Add custom SMTP (e.g. Resend) before large batches, or use "Get link".
+
 ### Auto-sync on Vercel (free)
 
 `.github/workflows/sync.yml` calls `POST /api/cron/tick` every hour. Each call enqueues due recurring jobs, recovers stuck ones, and runs queued jobs for up to ~40s. Set the repository secrets `APP_URL` and `CRON_SECRET`, and set `CRON_SECRET` in Vercel.

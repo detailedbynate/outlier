@@ -246,6 +246,20 @@ describe("supabase migrations", () => {
     expect([g.views_24h, g.views_48h, g.subs_24h, g.subs_48h].map(Number)).toEqual([2000, 4000, 100, 200]);
   });
 
+  it("stores waitlist signups once per email, case-insensitively", async () => {
+    await db.query(`insert into public.waitlist_entries (email, niche) values ('Creator@Example.com', 'cooking')`);
+    await expect(db.query(`insert into public.waitlist_entries (email) values ('creator@example.com')`)).rejects.toThrow(
+      /waitlist_entries_email_key/,
+    );
+    await expect(db.query(`insert into public.waitlist_entries (email) values ('not-an-email')`)).rejects.toThrow(
+      /waitlist_email_format/,
+    );
+    const { rows } = await db.query<{ status: string; relrowsecurity: boolean }>(
+      `select w.status, c.relrowsecurity from public.waitlist_entries w, pg_class c where c.relname = 'waitlist_entries'`,
+    );
+    expect(rows[0]).toEqual({ status: "pending", relrowsecurity: true });
+  });
+
   it("defaults new channels to untracked", async () => {
     const { rows } = await db.query<{ tracked: boolean }>(
       `insert into public.channels (youtube_channel_id, title) values ('UCnnnnnnnnnnnnnnnnnnnnnn', 'New') returning tracked`,

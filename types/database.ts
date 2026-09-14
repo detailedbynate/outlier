@@ -10,6 +10,7 @@ export type WorkspaceRole = "owner" | "admin" | "member" | "viewer";
 export type VideoFormat = "long_form" | "short" | "live" | "upcoming";
 export type JobStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled";
 export type CreditSource = "grant" | "purchase" | "usage" | "refund" | "adjustment" | "expiry";
+export type WaitlistStatus = "pending" | "invited" | "joined" | "declined";
 
 type Timestamps = { created_at: string; updated_at: string };
 
@@ -208,6 +209,20 @@ export type CreditRow = {
   created_at: string;
 };
 
+export type WaitlistEntryRow = Timestamps & {
+  id: string;
+  email: string;
+  name: string | null;
+  channel_url: string | null;
+  niche: string | null;
+  use_case: string | null;
+  source: string | null;
+  status: WaitlistStatus;
+  invited_at: string | null;
+  joined_at: string | null;
+  invited_by: string | null;
+};
+
 export type VideoFeedRow = {
   video_id: string;
   youtube_video_id: string;
@@ -281,6 +296,7 @@ export type Database = {
       folder_channels: TableDef<FolderChannelRow, "folder_id" | "channel_id">;
       usage_events: TableDef<UsageEventRow, "event_type">;
       credits: TableDef<CreditRow, "workspace_id" | "delta" | "source">;
+      waitlist_entries: TableDef<WaitlistEntryRow, "email">;
     };
     Views: {
       workspace_credit_balances: {
@@ -323,6 +339,7 @@ export type Database = {
       video_format: VideoFormat;
       job_status: JobStatus;
       credit_source: CreditSource;
+      waitlist_status: WaitlistStatus;
     };
     CompositeTypes: Record<string, never>;
   };

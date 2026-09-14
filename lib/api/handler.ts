@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { AppError, serializeError, toAppError, ValidationError } from "@/lib/core/errors";
 import { createLogger, type Logger } from "@/lib/core/logger";
@@ -76,7 +75,7 @@ export function apiHandler<
   handler: (ctx: HandlerContext<z.infer<P>, z.infer<Q>, z.infer<B>>) => Promise<unknown>,
 ): (request: Request, context: RouteContext) => Promise<Response> {
   return async (request, context) => {
-    const requestId = request.headers.get("x-request-id") ?? randomUUID();
+    const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
     const url = new URL(request.url);
     const logger = log.child({ requestId, method: request.method, path: url.pathname });
     const startedAt = Date.now();

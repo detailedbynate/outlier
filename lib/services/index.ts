@@ -1,5 +1,7 @@
 import "server-only";
 import { env } from "@/lib/core/env";
+import { SupabaseInviteSender } from "@/lib/auth/invites";
+import { WaitlistRepository } from "@/lib/database/repositories/waitlist";
 import {
   ChannelRepository,
   getAdminDatabase,
@@ -21,6 +23,7 @@ import { ResearchService } from "./research-service";
 import { StorageBudgetService } from "./storage-budget-service";
 import { TRENDING_JOB_TYPE, TrendingService } from "./trending-service";
 import { VideoService } from "./video-service";
+import { WaitlistService } from "./waitlist-service";
 
 export { ChannelService, CreditsService, DiscoveryService, JobService, ResearchService, StorageBudgetService, VideoService };
 
@@ -28,6 +31,7 @@ export interface Services {
   channels: ChannelService;
   credits: CreditsService;
   videos: VideoService;
+  waitlist: WaitlistService;
   discovery: DiscoveryService;
   jobs: JobService;
   research: ResearchService;
@@ -41,6 +45,7 @@ export interface Services {
     jobs: JobRepository;
     usage: UsageRepository;
     system: SystemRepository;
+    waitlist: WaitlistRepository;
   };
 }
 
@@ -74,6 +79,7 @@ export function getServices(): Services {
     jobs: lazy(() => new JobRepository(lazyDb())),
     usage: lazy(() => new UsageRepository(lazyDb())),
     system: lazy(() => new SystemRepository(lazyDb())),
+    waitlist: lazy(() => new WaitlistRepository(lazyDb())),
   };
   const youtube = lazy(() => getYouTubeService());
 
@@ -127,6 +133,7 @@ export function getServices(): Services {
   services = {
     channels,
     credits: new CreditsService(repositories.usage, config.DAILY_CREDITS),
+    waitlist: new WaitlistService(repositories.waitlist, lazy(() => new SupabaseInviteSender(lazyDb()))),
     videos,
     discovery: new DiscoveryService(youtube),
     jobs: new JobService(queue, repositories.jobs),
