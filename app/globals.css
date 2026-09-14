@@ -2259,27 +2259,81 @@ html:has(.landing-root) {
   }
 }
 
+/*
+ * Three equal-width tracks (1fr auto 1fr) keep the nav optically centered in
+ * the pill no matter how wide the brand or the action buttons are.
+ */
 .pill-header-inner {
   position: relative;
   pointer-events: auto;
   width: 100%;
   max-width: 1080px;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: 16px;
-  padding: 10px 10px 10px 18px;
+  padding: 8px;
   border-radius: 999px;
-  background: rgba(12, 10, 28, 0.45);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  isolation: isolate;
+  /* Liquid glass: translucent tint + heavy blur/saturation of what's behind. */
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.02) 45%, rgba(255, 255, 255, 0.04) 100%),
+    rgba(14, 12, 32, 0.38);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.08) inset,
-    0 18px 50px rgba(0, 0, 0, 0.35);
-  -webkit-backdrop-filter: blur(20px) saturate(170%);
-  backdrop-filter: blur(20px) saturate(170%);
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 0 22px rgba(255, 255, 255, 0.04),
+    0 10px 30px rgba(0, 0, 0, 0.35),
+    0 30px 80px rgba(20, 10, 60, 0.35);
+  -webkit-backdrop-filter: blur(28px) saturate(200%) brightness(1.08);
+  backdrop-filter: blur(28px) saturate(200%) brightness(1.08);
   transition:
-    max-width 0.45s var(--ease),
-    background 0.3s var(--ease),
-    padding 0.3s var(--ease);
+    max-width 0.5s var(--ease),
+    background 0.35s var(--ease),
+    box-shadow 0.35s var(--ease);
+}
+
+/* Specular sheen and soft edge refraction layered inside the glass. */
+.pill-glass {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.pill-glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(60% 120% at 50% -40%, rgba(255, 255, 255, 0.14), transparent 70%),
+    radial-gradient(30% 140% at 0% 50%, rgba(139, 92, 246, 0.14), transparent 70%),
+    radial-gradient(30% 140% at 100% 50%, rgba(236, 72, 153, 0.1), transparent 70%);
+}
+
+.pill-glass::after {
+  content: "";
+  position: absolute;
+  top: -60%;
+  bottom: -60%;
+  width: 28%;
+  left: -30%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.12), transparent);
+  transform: skewX(-18deg);
+  animation: glass-sweep 9s var(--ease) 1.5s infinite;
+}
+
+@keyframes glass-sweep {
+  0%,
+  70% {
+    left: -30%;
+  }
+  100% {
+    left: 120%;
+  }
 }
 
 /* Slowly rotating gradient hairline around the pill. */
@@ -2313,11 +2367,15 @@ html:has(.landing-root) {
 }
 
 .pill-header.is-scrolled .pill-header-inner {
-  max-width: 900px;
-  background: rgba(10, 8, 22, 0.72);
+  max-width: 940px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.02) 45%, rgba(255, 255, 255, 0.04) 100%),
+    rgba(10, 8, 24, 0.62);
 }
 
 .pill-brand {
+  justify-self: start;
+  margin-left: 10px;
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -2328,30 +2386,43 @@ html:has(.landing-root) {
 }
 
 .pill-nav {
-  flex: 1;
+  justify-self: center;
   display: flex;
-  justify-content: center;
-  gap: 4px;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25);
 }
 
 .pill-nav a {
   position: relative;
-  padding: 8px 14px;
+  padding: 7px 16px;
   border-radius: 999px;
   font-size: 14px;
   font-weight: 500;
-  color: #b9b3cf;
+  color: #bfb9d6;
+  white-space: nowrap;
   transition:
     color 0.2s var(--ease),
-    background 0.2s var(--ease);
+    background 0.25s var(--ease),
+    box-shadow 0.25s var(--ease);
 }
 
-.pill-nav a:hover {
+/* Hovered link becomes a small glass bubble. */
+.pill-nav a:hover,
+.pill-nav a:focus-visible {
   color: #fff;
-  background: rgba(255, 255, 255, 0.06);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.05));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 4px 14px rgba(0, 0, 0, 0.25);
 }
 
 .pill-actions {
+  justify-self: end;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -2422,7 +2493,14 @@ html:has(.landing-root) {
   }
 
   .pill-header-inner {
-    justify-content: space-between;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pill-glass::after {
+    animation: none;
+    display: none;
   }
 }
 
