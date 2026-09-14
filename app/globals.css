@@ -808,6 +808,9 @@ input[type="text"],
 input[type="email"],
 input[type="password"],
 input[type="search"],
+input[type="number"],
+input[type="url"],
+input:not([type]),
 select {
   font: inherit;
   color: var(--text-primary);
@@ -821,6 +824,18 @@ select {
     border-color 0.2s var(--ease),
     box-shadow 0.2s var(--ease),
     background 0.2s var(--ease);
+}
+
+/* Hide number spinners so number fields match text fields. */
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 input:focus,
@@ -2545,6 +2560,7 @@ html:has(.landing-root) .topbar {
 .field input,
 .field select {
   flex: none;
+  width: 100%;
 }
 
 /* ---------------------------------------------------------------------------
