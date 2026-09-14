@@ -325,7 +325,8 @@ export class TrendingService {
       const current = byNiche.get(row.niche);
       if (!current || row.rank < current.rank) byNiche.set(row.niche, row);
     }
-    return [...byNiche.values()].map((row) => ({
+    const isGaming = (row: TrendingPickRow) => (row.niche.startsWith("gaming") ? 0 : 1);
+    return [...byNiche.values()].sort((a, b) => isGaming(a) - isGaming(b)).map((row) => ({
       ...row,
       viewsPerSub: row.subscriber_count ? Math.round((row.video_views / row.subscriber_count) * 10) / 10 : null,
       engagement:
