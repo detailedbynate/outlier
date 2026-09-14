@@ -14,7 +14,7 @@ import {
   UsersIcon,
   ZapIcon,
 } from "@/components/icons";
-import { formatCompact, formatMultiplier, formatPercent, timeAgo } from "@/lib/format";
+import { formatCompact, formatMultiplier, formatPercent, hoursSince, timeAgo } from "@/lib/format";
 import type { ShortsChannelWithPreviews } from "@/lib/services/research-service";
 import { setChannelTracked } from "./actions";
 
@@ -111,8 +111,9 @@ export function ChannelCard({
           <ZapIcon size={13} />
           Realtime
         </span>
+        <VphStat live={numberOrNull(channel.live_vph)} recent={numberOrNull(channel.recent_vph)} />
         {channel.views_24h === null && channel.views_48h === null ? (
-          <span className="muted">Collecting data · growth appears after ~24 hours of snapshots</span>
+          <span className="muted">24h/48h growth appears after ~24 hours of snapshots</span>
         ) : (
           <>
             <GrowthStat label="views 24h" value={channel.views_24h} />
@@ -177,6 +178,7 @@ export function ChannelCard({
                 <span className="short-views">
                   <EyeIcon size={12} />
                   {formatCompact(video.view_count)}
+                  <ShortVph views={video.view_count} publishedAt={video.published_at} monitored={numberOrNull(video.views_per_hour)} />
                 </span>
               </a>
             ))}
@@ -192,6 +194,28 @@ function numberOrNull(value: number | string | null | undefined): number | null 
   if (value === null || value === undefined) return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
+}
+
+/** Channel views per hour: live (from monitoring checks) when available, otherwise the since-upload average of this week's Shorts. */
+function VphStat({ live, recent }: { live: number | null; recent: number | null }) {
+  const value = live ?? recent;
+  return (
+    <span
+      className="growth-stat vph-stat"
+      data-direction={value ? "up" : "flat"}
+      title={live !== null ? "Current views per hour across recently checked Shorts" : "Average views per hour since upload, Shorts from the last 7 days"}
+    >
+      <strong>{value === null ? "—" : formatCompact(Math.round(value))}</strong> views/hr{live === null && recent !== null ? " (7d avg)" : ""}
+    </span>
+  );
+}
+
+/** Views per hour for a recent Short (monitored value, else since upload). Hidden for Shorts older than a week. */
+function ShortVph({ views, publishedAt, monitored }: { views: number; publishedAt: string; monitored: number | null }) {
+  const ageHours = hoursSince(publishedAt);
+  if (!Number.isFinite(ageHours) || ageHours > 7 * 24) return null;
+  const vph = monitored ?? views / Math.max(ageHours, 1);
+  return <span className="short-vph">· {formatCompact(Math.round(vph))}/h</span>;
 }
 
 /** Badge a recent Short that beat the channel's median by 1.5× or more. */

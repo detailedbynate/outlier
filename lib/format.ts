@@ -54,3 +54,8 @@ export function timeAgo(iso: string | null | undefined, now: Date = new Date()):
 export function daysAgo(days: number): Date {
   return new Date(Date.now() - days * 86_400_000);
 }
+
+/** Hours elapsed since an ISO timestamp (NaN when unparseable). */
+export function hoursSince(iso: string, now: Date = new Date()): number {
+  return (now.getTime() - Date.parse(iso)) / 3_600_000;
+}

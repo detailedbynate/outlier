@@ -147,6 +147,29 @@ Quota: `search.list` costs **100 units**. Most other calls cost 1. The default d
 
 Shorts classification records how sure it is (`formatSource`). A match against the Shorts playlist is authoritative. Otherwise a duration of 3 minutes or less is used as a guess.
 
+### Quota-aware ingestion
+
+`YouTubeClient` is the only code that calls the API. Every request goes through two layers:
+
+1. **Response cache** (`youtube_api_cache`): identical requests from any user reuse a recent response (videos 15 min, channels/playlist items 30 min, searches and playlists 6 h). Monitoring jobs bypass it for fresh statistics.
+2. **`QuotaManager`** (`youtube_quota_usage` + `consume_youtube_quota`): an atomic check-and-record per request, by quota day (Pacific), lane, operation, and user.
+
+| Budget (defaults) | Units |
+|---|---|
+| Daily quota (`YOUTUBE_DAILY_QUOTA`) | 10,000 |
+| Never spent (`YOUTUBE_SAFETY_BUFFER_UNITS`) | 300 |
+| Reserved for users (`YOUTUBE_USER_RESERVE_UNITS`) | 3,000 |
+| Background max | 6,700 |
+| Per user per day (`YOUTUBE_USER_DAILY_UNITS`, tier `default`; `pro` = 3×) | 1,000 |
+
+Who a request is for comes from an async context: jobs run as `background` (`job:<type>`), API routes and server actions as `user` (`api:…`, `action:…`, `page:…`). Wrap new entry points with `asUser(userId, "action:name", fn)` or `asBackground("name", fn)`.
+
+When quota is unavailable: a stale cached response (up to 2 days old) is served if there is one; jobs are **deferred** to the quota reset without using an attempt; compare falls back to stored data; tracking a known channel is queued. `GET /api/v1/quota` reports today's usage.
+
+### Background monitoring
+
+`monitor.videos` (hourly) re-checks due videos in batches of 50 (1 unit per 50): views/hour, acceleration, and outlier score vs the channel's median. Priority sets the next check: **hot** 1 h (fast, accelerating, or breaking out), **warm** 3 h (young or ≥200 views/h), **normal** 12 h, **cold** 72 h; stale videos (60+ days, slow) drop out. New uploads are picked up automatically. Hot videos raise their channel's priority; `monitor.channels` (hourly) snapshots due channels and re-syncs uploads for hot channels to find sibling breakouts.
+
 ---
 
 ## API v1

@@ -188,6 +188,57 @@ export class ChannelRepository {
     return unwrap(await query, "channels.youtubeIdsPage").map((r) => r.youtube_channel_id);
   }
 
+  /** Raise channels to at least `priority` and make them due now (never lowers an existing priority). */
+  async raiseMonitorPriority(ids: string[], priority: number, now: Date): Promise<void> {
+    if (ids.length === 0) return;
+    assertOk(
+      await this.db
+        .from("channels")
+        .update({ monitor_priority: priority, next_check_at: now.toISOString() })
+        .in("id", ids)
+        .lt("monitor_priority", priority),
+      "channels.raiseMonitorPriority",
+    );
+  }
+
+  /** Channels whose scheduled stats check is due, highest priority first. */
+  async listDueForMonitoring(now: Date, limit: number): Promise<Pick<ChannelRow, "id" | "youtube_channel_id" | "monitor_priority" | "last_synced_at">[]> {
+    return unwrap(
+      await this.db
+        .from("channels")
+        .select("id, youtube_channel_id, monitor_priority, last_synced_at")
+        .lte("next_check_at", now.toISOString())
+        .order("monitor_priority", { ascending: false })
+        .order("next_check_at")
+        .limit(limit),
+      "channels.listDueForMonitoring",
+    );
+  }
+
+  async scheduleMonitoring(ids: string[], priority: number, nextCheckAt: Date | null): Promise<void> {
+    if (ids.length === 0) return;
+    assertOk(
+      await this.db
+        .from("channels")
+        .update({ monitor_priority: priority, next_check_at: nextCheckAt?.toISOString() ?? null })
+        .in("id", ids),
+      "channels.scheduleMonitoring",
+    );
+  }
+
+  /** Typical Short views per channel (from the Shorts channels view), for breakout detection. */
+  async medianShortViews(ids: string[]): Promise<Map<string, number>> {
+    const result = new Map<string, number>();
+    for (let i = 0; i < ids.length; i += 100) {
+      const rows = unwrap(
+        await this.db.from("shorts_channels").select("channel_id, median_short_views").in("channel_id", ids.slice(i, i + 100)),
+        "channels.medianShortViews",
+      );
+      for (const row of rows) if (row.median_short_views) result.set(row.channel_id, Number(row.median_short_views));
+    }
+    return result;
+  }
+
   async setContentLanguage(id: string, language: string | null, checkedAt: Date): Promise<void> {
     assertOk(
       await this.db.from("channels").update({ content_language: language, language_checked_at: checkedAt.toISOString() }).eq("id", id),
@@ -239,7 +290,9 @@ export interface ShortsChannelFilters {
     | "top_multiplier"
     | "hit_rate"
     | "avg_engagement"
-    | "shorts_per_week";
+    | "shorts_per_week"
+    | "recent_vph"
+    | "live_vph";
   limit: number;
 }
 

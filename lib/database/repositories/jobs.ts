@@ -72,6 +72,18 @@ export class JobRepository {
     );
   }
 
+  /** Put a claimed job back in the queue for later without counting the attempt (e.g. waiting for quota). */
+  async defer(job: Pick<JobRow, "id" | "attempts">, workerId: string, runAt: Date, reason: string): Promise<void> {
+    assertOk(
+      await this.db
+        .from("jobs")
+        .update({ status: "queued", run_at: runAt.toISOString(), attempts: Math.max(job.attempts - 1, 0), last_error: reason.slice(0, 4000), locked_at: null, locked_by: null })
+        .eq("id", job.id)
+        .eq("locked_by", workerId),
+      "jobs.defer",
+    );
+  }
+
   async cancel(id: string): Promise<JobRow | null> {
     return unwrapMaybe(
       await this.db

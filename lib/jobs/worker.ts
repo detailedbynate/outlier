@@ -2,6 +2,8 @@ import { isAppError, serializeError } from "@/lib/core/errors";
 import { createLogger, type Logger } from "@/lib/core/logger";
 import type { JobRepository } from "@/lib/database/repositories/jobs";
 import type { JobRow } from "@/types/database";
+import { runWithQuotaContext } from "@/lib/youtube/quota-context";
+import { isQuotaUnavailable } from "@/lib/youtube/quota-manager";
 import { retryDelayMs } from "./backoff";
 import type { JobRegistry } from "./registry";
 import type { JobScheduler } from "./scheduler";
@@ -111,11 +113,24 @@ export class JobWorker {
       const definition = this.registry.require(job.type);
       const payload = this.registry.parsePayload(job.type, job.payload);
       log.info("job started");
-      const output = await definition.handler(payload, { job, attempt: job.attempts, logger: log, signal: this.abort.signal });
+      // Every YouTube request inside a job is background work, attributed to the job type.
+      const output = await runWithQuotaContext({ lane: "background", operation: `job:${job.type}`, fresh: definition.freshData }, () =>
+        definition.handler(payload, { job, attempt: job.attempts, logger: log, signal: this.abort.signal }),
+      );
       if (output !== undefined) await this.repository.addResult(job.id, output);
       await this.repository.markSucceeded(job.id, this.workerId);
       log.info("job succeeded", { durationMs: Date.now() - startedAt });
     } catch (error) {
+      if (isQuotaUnavailable(error)) {
+        // Out of quota isn't a failure: wait for the budget to reset and try again, without using an attempt.
+        log.warn("job deferred: youtube quota unavailable", { retryAt: error.retryAt.toISOString() });
+        try {
+          await this.repository.defer(job, this.workerId, error.retryAt, error.message);
+        } catch (deferError) {
+          log.error("could not defer job", { error: serializeError(deferError) });
+        }
+        return;
+      }
       // Validation/not-found errors won't fix themselves; everything else is retried until max_attempts.
       const permanent = isAppError(error) && !error.retryable && error.status < 500;
       const exhausted = job.attempts >= job.max_attempts;

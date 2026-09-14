@@ -338,6 +338,58 @@ describe("supabase migrations", () => {
     expect(left.rows[0]!.n).toBe(0);
   });
 
+  it("consumes YouTube quota atomically within total, lane, and per-user limits", async () => {
+    const consume = async (lane: string, user: string, units: number, userLimit: number | null = null) =>
+      (
+        await db.query<{ ok: boolean }>(`select public.consume_youtube_quota('2026-09-16', $1, 'op', $2, $3, 1000, $4, $5) as ok`, [
+          lane,
+          user,
+          units,
+          lane === "background" ? 600 : 1000,
+          userLimit,
+        ])
+      ).rows[0]!.ok;
+    expect(await consume("background", "", 500)).toBe(true);
+    expect(await consume("background", "", 101)).toBe(false); // lane cap 600
+    expect(await consume("user", "u1", 100, 150)).toBe(true);
+    expect(await consume("user", "u1", 100, 150)).toBe(false); // per-user cap
+    expect(await consume("user", "u2", 400, 500)).toBe(true); // total now 1000
+    expect(await consume("user", "u3", 1, 500)).toBe(false); // total cap
+    const usage = await db.query<{ units: number; denied: number }>(
+      `select sum(units)::int as units, sum(denied)::int as denied from public.youtube_quota_usage where day = '2026-09-16'`,
+    );
+    expect(usage.rows[0]).toEqual({ units: 1000, denied: 3 });
+  });
+
+  it("adds views per hour to Shorts channels", async () => {
+    const { rows } = await db.query<{ id: string }>(
+      `insert into public.channels (youtube_channel_id, title, subscriber_count) values ('UCvvvvvvvvvvvvvvvvvvvvvv', 'Vph', 1000) returning id`,
+    );
+    for (const [i, views] of [1000, 2000, 3000].entries()) {
+      await db.query(
+        `insert into public.videos (youtube_video_id, channel_id, title, published_at, format, view_count, views_per_hour, last_checked_at)
+         values ($1, $2, 'v', now() - interval '10 hours', 'short', $3, 50, now())`,
+        [`vphvid${String(i).padStart(5, "0")}`, rows[0]!.id, views],
+      );
+    }
+    const stat = (
+      await db.query<{ recent_vph: string; live_vph: string }>(`select recent_vph, live_vph from public.shorts_channels where channel_id = $1`, [
+        rows[0]!.id,
+      ])
+    ).rows[0]!;
+    expect(Number(stat.recent_vph)).toBeCloseTo(200, 0);
+    expect(Number(stat.live_vph)).toBe(150);
+
+    const video = (await db.query<{ id: string }>(`select id from public.videos where youtube_video_id = 'vphvid00000'`)).rows[0]!;
+    const updated = await db.query<{ n: number }>(`select public.apply_video_monitoring($1::jsonb) as n`, [
+      JSON.stringify([{ id: video.id, view_count: 5000, views_per_hour: 400, view_acceleration: 350, monitor_priority: 3, next_check_at: "2026-09-16T13:00:00Z", last_checked_at: "2026-09-16T12:00:00Z" }]),
+    ]);
+    expect(updated.rows[0]!.n).toBe(1);
+    const row = (await db.query<Record<string, unknown>>(`select view_count, like_count, monitor_priority from public.videos where id = $1`, [video.id])).rows[0]!;
+    expect(row).toMatchObject({ monitor_priority: 3, like_count: null });
+    expect(Number(row.view_count)).toBe(5000);
+  });
+
   it("defaults new channels to untracked", async () => {
     const { rows } = await db.query<{ tracked: boolean }>(
       `insert into public.channels (youtube_channel_id, title) values ('UCnnnnnnnnnnnnnnnnnnnnnn', 'New') returning tracked`,

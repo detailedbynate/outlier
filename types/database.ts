@@ -80,6 +80,8 @@ export type ChannelRow = Timestamps & {
   tracked: boolean;
   /** Detected from recent uploads: 'en', 'other', or null when unknown. */
   content_language: string | null;
+  monitor_priority: number;
+  next_check_at: string | null;
   language_checked_at: string | null;
 };
 
@@ -115,6 +117,34 @@ export type VideoRow = Timestamps & {
   comment_count: number | null;
   niche_id: string | null;
   last_synced_at: string | null;
+  /** Current views/hour from the latest two monitoring checks (or since upload). */
+  views_per_hour: number | null;
+  /** Change in views/hour since the previous check. */
+  view_acceleration: number | null;
+  monitor_priority: number;
+  next_check_at: string | null;
+  last_checked_at: string | null;
+};
+
+export type QuotaLane = "background" | "user";
+
+export type YouTubeQuotaUsageRow = {
+  day: string;
+  lane: QuotaLane;
+  operation: string;
+  user_key: string;
+  units: number;
+  requests: number;
+  denied: number;
+  updated_at: string;
+};
+
+export type YouTubeApiCacheRow = {
+  cache_key: string;
+  endpoint: string;
+  response: Json;
+  fetched_at: string;
+  expires_at: string;
 };
 
 export type VideoSnapshotRow = {
@@ -340,6 +370,10 @@ export type ShortsChannelRow = {
   top_multiplier: number | null;
   content_language: string | null;
   is_target_language: boolean;
+  /** Average views/hour since upload for Shorts from the last 7 days (no history needed). */
+  recent_vph: number | null;
+  /** Current views/hour summed across recently monitored Shorts. */
+  live_vph: number | null;
 };
 
 export type Database = {
@@ -367,6 +401,18 @@ export type Database = {
         "pick_date" | "niche" | "youtube_channel_id" | "channel_title" | "youtube_video_id" | "video_title"
       >;
       trending_pick_stats: TableDef<TrendingPickStatRow, "pick_id" | "views">;
+      youtube_quota_usage: {
+        Row: YouTubeQuotaUsageRow;
+        Insert: Pick<YouTubeQuotaUsageRow, "day" | "lane" | "operation"> & Partial<YouTubeQuotaUsageRow>;
+        Update: Partial<YouTubeQuotaUsageRow>;
+        Relationships: [];
+      };
+      youtube_api_cache: {
+        Row: YouTubeApiCacheRow;
+        Insert: Pick<YouTubeApiCacheRow, "cache_key" | "endpoint" | "response" | "expires_at"> & Partial<YouTubeApiCacheRow>;
+        Update: Partial<YouTubeApiCacheRow>;
+        Relationships: [];
+      };
       rate_limits: {
         Row: RateLimitRow;
         Insert: Pick<RateLimitRow, "key" | "window_start"> & Partial<RateLimitRow>;
@@ -404,6 +450,23 @@ export type Database = {
       database_size_bytes: {
         Args: Record<string, never>;
         Returns: number;
+      };
+      apply_video_monitoring: {
+        Args: { updates: Json };
+        Returns: number;
+      };
+      consume_youtube_quota: {
+        Args: {
+          p_day: string;
+          p_lane: QuotaLane;
+          p_operation: string;
+          p_user_key: string;
+          p_units: number;
+          p_total_limit: number;
+          p_lane_limit: number;
+          p_user_limit: number | null;
+        };
+        Returns: boolean;
       };
       rate_limit_hit: {
         Args: { limit_key: string; window_seconds: number; max_hits: number };

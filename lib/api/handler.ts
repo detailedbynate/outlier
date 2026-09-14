@@ -2,6 +2,7 @@ import { z } from "zod";
 import { AppError, serializeError, toAppError, ValidationError } from "@/lib/core/errors";
 import { createLogger, type Logger } from "@/lib/core/logger";
 import type { ApiErrorBody, ApiMeta, ApiSuccess } from "@/types/api";
+import { runWithQuotaContext, type QuotaContext } from "@/lib/youtube/quota-context";
 import { authenticateCron, authenticateRequest, type ApiPrincipal } from "./auth";
 
 const log = createLogger({ module: "api" });
@@ -62,6 +63,14 @@ export function errorResponse(error: AppError, requestId: string): Response {
   return Response.json(body, { status: error.status, headers: { "x-request-id": requestId } });
 }
 
+/** Collapse ids in paths so quota reports group by route, not by resource. */
+function routePattern(pathname: string): string {
+  return pathname
+    .split("/")
+    .map((segment) => (segment.length > 16 || /^[0-9a-f-]{16,}$/i.test(segment) || segment.startsWith("@") ? ":id" : segment))
+    .join("/");
+}
+
 /**
  * Wrap a route handler with auth, input validation, a consistent response
  * envelope, request ids, and error mapping. Routes stay thin: parse -> call service -> return.
@@ -97,7 +106,12 @@ export function apiHandler<
       }
       const body = parseWith(config.body, rawBody, "request body");
 
-      const result = await handler({ request, params, query, body, principal, requestId, logger });
+      // Cron calls are background work; everything else is a user-triggered request.
+      const quotaContext: QuotaContext =
+        config.auth === "cron"
+          ? { lane: "background", operation: `cron:${url.pathname}` }
+          : { lane: "user", userId: principal?.userId ?? null, operation: `api:${request.method} ${routePattern(url.pathname)}` };
+      const result = await runWithQuotaContext(quotaContext, () => handler({ request, params, query, body, principal, requestId, logger }));
       if (result instanceof Response) return result;
 
       const { data, meta, status } = result instanceof ApiResult ? result : new ApiResult(result);

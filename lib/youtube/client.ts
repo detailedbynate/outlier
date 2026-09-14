@@ -1,11 +1,19 @@
 import type { z } from "zod";
 import { AppError, UpstreamError } from "@/lib/core/errors";
 import { createLogger, type Logger } from "@/lib/core/logger";
+import { currentQuotaContext } from "./quota-context";
+import type { QuotaManager } from "./quota-manager";
+import { cacheKey, DEFAULT_CACHE_TTL_SECONDS, MAX_CACHED_BYTES, MAX_STALE_SECONDS, type ResponseCacheStore } from "./response-cache";
 import { youtubeErrorBodySchema } from "./schemas";
 
 /**
  * Low-level YouTube Data API v3 HTTP client: auth, timeouts, retries, response
- * validation, error mapping, and quota accounting. Knows nothing about domain types.
+ * validation, error mapping, quota gating, and response caching. Knows nothing about domain types.
+ *
+ * This is the only place that talks to the YouTube API. Per request:
+ *   1. Serve a fresh cached response if one exists (unless the context wants fresh data).
+ *   2. Ask the QuotaManager for units; if denied, fall back to a stale cached response or throw.
+ *   3. Fetch, validate, cache.
  */
 
 export type YouTubeEndpoint = "channels" | "videos" | "search" | "playlists" | "playlistItems" | "videoCategories";
@@ -38,7 +46,16 @@ export interface YouTubeClientOptions {
   sleep?: (ms: number) => Promise<void>;
   /** Called after every request (successful or not) — hook for usage_events metering. */
   onQuotaUsage?: (usage: QuotaUsage) => void;
+  /** Budget gate checked before every request. Optional so scripts/tests can run ungated. */
+  quota?: Pick<QuotaManager, "acquire">;
+  /** Shared response cache. */
+  cache?: ResponseCacheStore;
   logger?: Logger;
+}
+
+export interface RequestOptions {
+  /** Override the endpoint's default cache freshness; 0 disables reading from cache. */
+  cacheTtlSeconds?: number;
 }
 
 const RETRYABLE_REASONS = new Set(["rateLimitExceeded", "userRateLimitExceeded", "backendError", "internalError"]);
@@ -63,6 +80,8 @@ export class YouTubeClient {
   private readonly fetchImpl: typeof fetch;
   private readonly sleep: (ms: number) => Promise<void>;
   private readonly onQuotaUsage?: (usage: QuotaUsage) => void;
+  private readonly quota?: Pick<QuotaManager, "acquire">;
+  private readonly cache?: ResponseCacheStore;
   private readonly log: Logger;
 
   constructor(options: YouTubeClientOptions) {
@@ -74,15 +93,61 @@ export class YouTubeClient {
     this.fetchImpl = options.fetch ?? globalThis.fetch.bind(globalThis);
     this.sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
     this.onQuotaUsage = options.onQuotaUsage;
+    this.quota = options.quota;
+    this.cache = options.cache;
     this.log = options.logger ?? createLogger({ module: "youtube.client" });
   }
 
-  async get<T extends z.ZodType>(endpoint: YouTubeEndpoint, params: Record<string, QueryValue>, schema: T): Promise<z.infer<T>> {
+  async get<T extends z.ZodType>(
+    endpoint: YouTubeEndpoint,
+    params: Record<string, QueryValue>,
+    schema: T,
+    options: RequestOptions = {},
+  ): Promise<z.infer<T>> {
+    const context = currentQuotaContext();
+    const ttlSeconds = context.fresh ? 0 : (options.cacheTtlSeconds ?? DEFAULT_CACHE_TTL_SECONDS[endpoint]);
+    const key = this.cache ? cacheKey(endpoint, params) : null;
+
+    const cached = key ? await this.readCache(key) : null;
+    if (cached && ttlSeconds > 0 && Date.now() - cached.fetchedAt.getTime() <= ttlSeconds * 1000) {
+      const parsed = schema.safeParse(cached.body);
+      if (parsed.success) {
+        this.log.debug("youtube cache hit", { endpoint, operation: context.operation });
+        return parsed.data;
+      }
+    }
+
+    const body = await this.fetchWithQuota(endpoint, params, schema, cached);
+    // Fresh-only reads (monitoring) skip writing: their batches are rarely repeated and would just use storage.
+    if (key && ttlSeconds > 0) await this.writeCache(key, endpoint, body);
+    return body;
+  }
+
+  private async fetchWithQuota<T extends z.ZodType>(
+    endpoint: YouTubeEndpoint,
+    params: Record<string, QueryValue>,
+    schema: T,
+    cached: { body: unknown; fetchedAt: Date } | null,
+  ): Promise<z.infer<T>> {
     const url = this.buildUrl(endpoint, params);
+    const context = currentQuotaContext();
     let attempt = 0;
 
     for (;;) {
       attempt += 1;
+      if (this.quota) {
+        try {
+          await this.quota.acquire({ endpoint, units: QUOTA_COST[endpoint] }, context);
+        } catch (error) {
+          // Out of budget: a stale answer beats no answer.
+          const stale = cached && Date.now() - cached.fetchedAt.getTime() <= MAX_STALE_SECONDS * 1000 ? schema.safeParse(cached.body) : null;
+          if (stale?.success) {
+            this.log.info("youtube quota unavailable, serving stale cache", { endpoint, operation: context.operation, fetchedAt: cached!.fetchedAt });
+            return stale.data;
+          }
+          throw error;
+        }
+      }
       const startedAt = Date.now();
       let response: Response;
 
@@ -122,6 +187,27 @@ export class YouTubeClient {
         continue;
       }
       throw error;
+    }
+  }
+
+  private async readCache(key: string): Promise<{ body: unknown; fetchedAt: Date } | null> {
+    try {
+      return (await this.cache?.get(key)) ?? null;
+    } catch (error) {
+      // The cache is an optimization; never fail a request because of it.
+      this.log.warn("youtube cache read failed", { error: error instanceof Error ? error.message : String(error) });
+      return null;
+    }
+  }
+
+  private async writeCache(key: string, endpoint: YouTubeEndpoint, body: unknown): Promise<void> {
+    if (!this.cache) return;
+    try {
+      const json = JSON.stringify(body);
+      if (json.length > MAX_CACHED_BYTES) return;
+      await this.cache.set(key, endpoint, body, new Date(Date.now() + MAX_STALE_SECONDS * 1000));
+    } catch (error) {
+      this.log.warn("youtube cache write failed", { error: error instanceof Error ? error.message : String(error) });
     }
   }
 

@@ -7,6 +7,7 @@ import { logger } from "@/lib/core/logger";
 import { JobWorker } from "@/lib/jobs/worker";
 import { getServices } from "@/lib/services";
 import { CREDIT_COSTS } from "@/lib/services/credits-service";
+import { asBackground, asUser } from "@/lib/youtube/quota-context";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -41,7 +42,8 @@ export async function repickTrending(): Promise<void> {
   await requireAdmin();
   const services = getServices();
   try {
-    await services.trending.computeDailyPicks();
+    // Same work as the daily job, so it draws from the background budget.
+    await asBackground("admin:repick_trending", () => services.trending.computeDailyPicks());
   } catch (error) {
     logger.warn("trending re-pick failed", { error });
   }
@@ -65,7 +67,7 @@ export async function discoverShortsChannels(_prev: DiscoverState, formData: For
 
   try {
     await services.credits.assertAvailable(user.id, "discover_channels");
-    const result = await services.research.discoverShortsChannels(keyword, user.id);
+    const result = await asUser(user.id, "action:discover_shorts", () => services.research.discoverShortsChannels(keyword, user.id));
     await services.credits.charge(user.id, "discover_channels");
     let processed = 0;
     if (result.channelsQueued > 0) {

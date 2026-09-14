@@ -4638,3 +4638,12 @@ body:has(.onboarding-root) .ambient {
     display: none;
   }
 }
+.vph-stat strong {
+  color: var(--accent-text);
+}
+
+.short-vph {
+  opacity: 0.85;
+  font-weight: 500;
+}
+

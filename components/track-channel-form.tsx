@@ -19,6 +19,7 @@ export function TrackChannelForm() {
         </button>
       </div>
       {state.error ? <p className="form-error">{state.error}</p> : null}
+      {state.message ? <p className="stat-note">{state.message}</p> : null}
     </form>
   );
 }

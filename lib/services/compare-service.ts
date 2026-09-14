@@ -4,6 +4,7 @@ import { createLogger, type Logger } from "@/lib/core/logger";
 import type { ChannelRepository } from "@/lib/database/repositories/channels";
 import type { VideoRepository } from "@/lib/database/repositories/videos";
 import { parseChannelIdentifier } from "@/lib/youtube/parse";
+import { isQuotaUnavailable } from "@/lib/youtube/quota-manager";
 import type { ChannelRow } from "@/types/database";
 import type { ChannelService } from "./channel-service";
 
@@ -84,8 +85,15 @@ export class CompareService {
 
     const stale = !channel?.last_synced_at || now.getTime() - Date.parse(channel.last_synced_at) > FRESH_MS;
     if (!channel || stale) {
-      // Tracking keeps daily snapshots coming, so subscriber growth builds up over time.
-      channel = (await this.deps.channelService.refreshChannel(channel?.youtube_channel_id ?? identifier, { track: true }, now)).channel;
+      try {
+        // Tracking keeps daily snapshots coming, so subscriber growth builds up over time.
+        channel = (await this.deps.channelService.refreshChannel(channel?.youtube_channel_id ?? identifier, { track: true }, now)).channel;
+      } catch (error) {
+        // Out of quota: compare with the data we already have, and let the daily refresh catch up.
+        if (!channel || !isQuotaUnavailable(error)) throw error;
+        this.log.info("compare using stored data (quota unavailable)", { identifier });
+        if (!channel.tracked) await this.deps.channels.setTracked(channel.id, true);
+      }
     } else if (!channel.tracked) {
       await this.deps.channels.setTracked(channel.id, true);
     }

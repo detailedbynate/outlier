@@ -8,6 +8,8 @@ import { JobQueue } from "@/lib/jobs/queue";
 import { JobRegistry } from "@/lib/jobs/registry";
 import { defineJob } from "@/lib/jobs/types";
 import { JobWorker } from "@/lib/jobs/worker";
+import { currentQuotaContext } from "@/lib/youtube/quota-context";
+import { QuotaUnavailableError } from "@/lib/youtube/quota-manager";
 import type { JobRow } from "@/types/database";
 
 function job(overrides: Partial<JobRow> = {}): JobRow {
@@ -117,6 +119,19 @@ describe("JobWorker.run", () => {
     const [, , message, retryAt] = repo.markFailed.mock.calls[0] as unknown as [string, string, string, Date | null];
     expect(message).toBe("YouTube 503");
     expect(retryAt).toBeInstanceOf(Date);
+  });
+
+  it("runs handlers in a background quota context and defers quota-blocked jobs without using an attempt", async () => {
+    const repo = { ...fakeRepository(), defer: vi.fn(async () => {}) };
+    let seen: unknown;
+    const retryAt = new Date("2026-09-17T07:00:00Z");
+    await makeWorker(repo, registryWith(async () => {
+      seen = currentQuotaContext();
+      throw new QuotaUnavailableError("background", retryAt, "lane");
+    })).run(job({ attempts: 2 }));
+    expect(seen).toMatchObject({ lane: "background", operation: "job:test.echo" });
+    expect(repo.defer).toHaveBeenCalledWith(expect.objectContaining({ attempts: 2 }), "w1", retryAt, expect.any(String));
+    expect(repo.markFailed).not.toHaveBeenCalled();
   });
 
   it("fails permanently on validation errors or exhausted attempts", async () => {

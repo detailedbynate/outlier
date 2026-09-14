@@ -7,6 +7,7 @@ import { formatCompact, formatDuration, formatMultiplier, formatNumber, formatPe
 import { requireApprovedUser } from "@/lib/auth/session";
 import { getServices } from "@/lib/services";
 import { parseVideoId } from "@/lib/youtube/parse";
+import { asUser } from "@/lib/youtube/quota-context";
 import type { VideoAnalysis } from "@/lib/services/video-service";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +24,7 @@ export default async function AnalyzePage({ searchParams }: { searchParams: Prom
     try {
       const videoId = parseVideoId(input);
       if (!(await credits.alreadyPaid(user.id, "analyze_video", videoId))) await credits.assertAvailable(user.id, "analyze_video");
-      analysis = await videos.analyzeVideo(videoId);
+      analysis = await asUser(user.id, "page:analyze_video", () => videos.analyzeVideo(videoId));
       // Re-opening the same video today is free.
       await credits.charge(user.id, "analyze_video", videoId);
     } catch (e) {

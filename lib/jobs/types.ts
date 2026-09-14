@@ -16,6 +16,8 @@ export interface JobDefinition<TSchema extends z.ZodType = z.ZodType> {
   description: string;
   payloadSchema: TSchema;
   maxAttempts?: number;
+  /** Needs up-to-date YouTube statistics: bypass the shared response cache. */
+  freshData?: boolean;
   /** Returned JSON is stored in job_results. Return undefined to store nothing. */
   handler: (payload: z.infer<TSchema>, context: JobContext) => Promise<Json | undefined>;
 }

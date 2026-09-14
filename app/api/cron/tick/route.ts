@@ -20,5 +20,6 @@ export const POST = apiHandler({ auth: "cron" }, async ({ requestId }) => {
   const worker = new JobWorker(services.repositories.jobs, services.jobRegistry, { workerId: `cron:${requestId}` });
   const result = await worker.drain({ deadline: startedAt + WORK_BUDGET_MS, maxJobs: 100 });
 
-  return { scheduled, requeued, ...result, durationMs: Date.now() - startedAt };
+  const quota = await services.quota.summary().catch(() => null);
+  return { scheduled, requeued, ...result, quota: quota && { day: quota.day, used: quota.used, limits: quota.limits, denied: quota.denied }, durationMs: Date.now() - startedAt };
 });

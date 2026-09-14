@@ -4,6 +4,7 @@ import type { ChannelRepository } from "@/lib/database/repositories/channels";
 import type { RateLimitRepository } from "@/lib/database/repositories/rate-limits";
 import type { SystemRepository } from "@/lib/database/repositories/system";
 import type { ChannelService } from "@/lib/services/channel-service";
+import { MONITOR_CHANNELS_JOB_TYPE, MONITOR_VIDEOS_JOB_TYPE, type MonitoringService } from "@/lib/services/monitoring-service";
 import type { StorageBudgetService } from "@/lib/services/storage-budget-service";
 import { TRENDING_JOB_TYPE, TRENDING_REFRESH_JOB_TYPE, type TrendingService } from "@/lib/services/trending-service";
 import type { VideoService } from "@/lib/services/video-service";
@@ -17,6 +18,9 @@ export interface JobDependencies {
   videos: VideoService;
   storage: StorageBudgetService;
   trending: TrendingService;
+  monitoring: MonitoringService;
+  /** Housekeeping for the YouTube response cache and quota ledger. */
+  youtubeHousekeeping: { pruneCache: () => Promise<void>; pruneQuotaHistory: () => Promise<void> };
   channelRepository: ChannelRepository;
   systemRepository: SystemRepository;
   rateLimitRepository: Pick<RateLimitRepository, "deleteOlderThan">;
@@ -28,6 +32,8 @@ export interface JobDependencies {
     snapshotDailyRetentionDays: number;
     snapshotRetentionDays: number;
     statsSnapshotMaxChannels: number;
+    monitorMaxVideosPerRun: number;
+    monitorMaxChannelsPerRun: number;
   };
 }
 
@@ -145,6 +151,7 @@ export function createJobRegistry(deps: JobDependencies): JobRegistry {
         description: "Scheduled hourly: refresh views and subscribers for today's trending picks (~2 quota units).",
         payloadSchema: emptyPayload,
         maxAttempts: 1,
+        freshData: true,
         handler: async () => ({ ...(await deps.trending.refreshStats()) }),
       }),
     )
@@ -172,6 +179,7 @@ export function createJobRegistry(deps: JobDependencies): JobRegistry {
         description: "Scheduled: snapshot subscriber/view counts for every catalog channel (24h/48h growth).",
         payloadSchema: emptyPayload,
         maxAttempts: 2,
+        freshData: true,
         handler: (_payload, { signal }) =>
           skipIfOverBudget(async () => {
             let after: string | null = null;
@@ -202,9 +210,33 @@ export function createJobRegistry(deps: JobDependencies): JobRegistry {
           );
           // Rate-limit windows older than a day are never read again.
           await deps.rateLimitRepository.deleteOlderThan(new Date(Date.now() - 86_400_000));
+          await deps.youtubeHousekeeping.pruneCache();
+          await deps.youtubeHousekeeping.pruneQuotaHistory();
           const status = await deps.storage.getStatus({ fresh: true });
           return { deleted, usedBytes: status.usedBytes };
         },
+      }),
+    )
+    .register(
+      defineJob({
+        type: MONITOR_VIDEOS_JOB_TYPE,
+        description: "Scheduled: re-check due videos in batches of 50 (views/hour, acceleration, next check by priority).",
+        payloadSchema: emptyPayload,
+        maxAttempts: 1,
+        freshData: true,
+        handler: (_payload, { signal }) =>
+          skipIfOverBudget(async () => ({ ...(await deps.monitoring.monitorVideos({ maxVideos: deps.config.monitorMaxVideosPerRun, signal })) })),
+      }),
+    )
+    .register(
+      defineJob({
+        type: MONITOR_CHANNELS_JOB_TYPE,
+        description: "Scheduled: snapshot stats for channels due by priority; re-sync uploads of channels with hot videos.",
+        payloadSchema: emptyPayload,
+        maxAttempts: 1,
+        freshData: true,
+        handler: (_payload, { signal }) =>
+          skipIfOverBudget(async () => ({ ...(await deps.monitoring.monitorChannels({ maxChannels: deps.config.monitorMaxChannelsPerRun, signal })) })),
       }),
     )
     .register(

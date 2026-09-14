@@ -61,6 +61,7 @@ export const SORTS = [
   { key: "hits", label: "Hit rate", column: "hit_rate", group: "Signals" },
   { key: "engagement", label: "Engagement", column: "avg_engagement", group: "Signals" },
   { key: "pace", label: "Shorts per week", column: "shorts_per_week", group: "Signals" },
+  { key: "vph", label: "Views per hour", column: "recent_vph", group: "Realtime" },
   { key: "views24", label: "Views · last 24h", column: "views_24h", group: "Realtime" },
   { key: "views48", label: "Views · last 48h", column: "views_48h", group: "Realtime" },
   { key: "subs24", label: "Subs · last 24h", column: "subs_24h", group: "Realtime" },

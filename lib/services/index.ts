@@ -18,11 +18,13 @@ import { JobQueue } from "@/lib/jobs/queue";
 import type { JobRegistry } from "@/lib/jobs/registry";
 import { JobScheduler } from "@/lib/jobs/scheduler";
 import { qualityConfigFrom } from "@/lib/research/quality";
-import { getYouTubeService } from "@/lib/youtube";
+import { YouTubeCacheRepository, YouTubeQuotaRepository } from "@/lib/database/repositories/youtube-quota";
+import { getQuotaManager, getYouTubeService, quotaDay, type QuotaManager } from "@/lib/youtube";
 import { ChannelService } from "./channel-service";
 import { CreditsService } from "./credits-service";
 import { DiscoveryService } from "./discovery-service";
 import { JobService } from "./job-service";
+import { MONITOR_CHANNELS_JOB_TYPE, MONITOR_VIDEOS_JOB_TYPE, MonitoringService } from "./monitoring-service";
 import { CompareService } from "./compare-service";
 import { OnboardingService } from "./onboarding-service";
 import { RateLimitService } from "./rate-limit-service";
@@ -46,6 +48,9 @@ export interface Services {
   jobs: JobService;
   research: ResearchService;
   trending: TrendingService;
+  monitoring: MonitoringService;
+  /** YouTube quota budgets and usage reports. */
+  quota: QuotaManager;
   storage: StorageBudgetService;
   jobRegistry: JobRegistry;
   scheduler: JobScheduler;
@@ -59,6 +64,8 @@ export interface Services {
     preferences: PreferencesRepository;
     rateLimits: RateLimitRepository;
     trending: TrendingRepository;
+    youtubeQuota: YouTubeQuotaRepository;
+    youtubeCache: YouTubeCacheRepository;
   };
 }
 
@@ -96,6 +103,8 @@ export function getServices(): Services {
     preferences: lazy(() => new PreferencesRepository(lazyDb())),
     rateLimits: lazy(() => new RateLimitRepository(lazyDb())),
     trending: lazy(() => new TrendingRepository(lazyDb())),
+    youtubeQuota: lazy(() => new YouTubeQuotaRepository(lazyDb())),
+    youtubeCache: lazy(() => new YouTubeCacheRepository(lazyDb())),
   };
   const youtube = lazy(() => getYouTubeService());
 
@@ -122,7 +131,21 @@ export function getServices(): Services {
     { quality, regionCode, minMultiplier: config.OUTLIER_MIN_MULTIPLIER },
   );
 
+  const monitoring = new MonitoringService({
+    youtube,
+    videos: repositories.videos,
+    channels: repositories.channels,
+    channelService: channels,
+    enqueue,
+  });
+
   const jobRegistry = createJobRegistry({
+    monitoring,
+    youtubeHousekeeping: {
+      pruneCache: () => repositories.youtubeCache.pruneExpired(),
+      // Keep ~90 days of quota history for reporting.
+      pruneQuotaHistory: () => repositories.youtubeQuota.deleteBefore(quotaDay(new Date(Date.now() - 90 * 86_400_000))),
+    },
     channels,
     videos,
     storage,
@@ -137,6 +160,8 @@ export function getServices(): Services {
       snapshotDailyRetentionDays: config.SNAPSHOT_DAILY_RETENTION_DAYS,
       snapshotRetentionDays: config.SNAPSHOT_RETENTION_DAYS,
       statsSnapshotMaxChannels: config.STATS_SNAPSHOT_MAX_CHANNELS,
+      monitorMaxVideosPerRun: config.MONITOR_MAX_VIDEOS_PER_RUN,
+      monitorMaxChannelsPerRun: config.MONITOR_MAX_CHANNELS_PER_RUN,
     },
   });
   const queue = new JobQueue(repositories.jobs, jobRegistry);
@@ -149,6 +174,8 @@ export function getServices(): Services {
     { type: TRENDING_JOB_TYPE, everyHours: 24 },
     { type: TRENDING_REFRESH_JOB_TYPE, everyHours: 1 },
     { type: "catalog.detect_languages", everyHours: 24 },
+    { type: MONITOR_VIDEOS_JOB_TYPE, everyHours: 1 },
+    { type: MONITOR_CHANNELS_JOB_TYPE, everyHours: 1 },
   ]);
 
   services = {
@@ -162,6 +189,8 @@ export function getServices(): Services {
     discovery: new DiscoveryService(youtube),
     jobs: new JobService(queue, repositories.jobs),
     trending,
+    monitoring,
+    quota: lazy(() => getQuotaManager()),
     research: new ResearchService(
       { youtube, channels: repositories.channels, videos: repositories.videos, usage: repositories.usage, storage, enqueue },
       { discoveryDailyLimit: config.DISCOVERY_DAILY_LIMIT, discoveryMaxChannels: config.DISCOVERY_MAX_CHANNELS, quality, regionCode },

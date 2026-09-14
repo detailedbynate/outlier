@@ -33,7 +33,27 @@ export function videoToRow(
   };
 }
 
-export type VideoPreview = Pick<VideoRow, "channel_id" | "youtube_video_id" | "title" | "thumbnail_url" | "view_count" | "published_at">;
+export type VideoPreview = Pick<VideoRow, "channel_id" | "youtube_video_id" | "title" | "thumbnail_url" | "view_count" | "published_at" | "views_per_hour">;
+
+export type MonitoredVideo = Pick<
+  VideoRow,
+  "id" | "youtube_video_id" | "channel_id" | "view_count" | "published_at" | "views_per_hour" | "last_checked_at" | "last_synced_at" | "monitor_priority"
+>;
+
+export interface VideoMonitoringUpdate {
+  id: string;
+  view_count: number | null;
+  like_count: number | null;
+  comment_count: number | null;
+  views_per_hour: number | null;
+  view_acceleration: number | null;
+  monitor_priority: number;
+  next_check_at: string | null;
+  last_checked_at: string;
+}
+
+/** Recently published videos never checked yet are picked up automatically. */
+export const MONITOR_NEW_VIDEO_DAYS = 14;
 
 export class VideoRepository {
   constructor(private readonly db: DatabaseClient) {}
@@ -84,6 +104,29 @@ export class VideoRepository {
     );
   }
 
+  /**
+   * Videos due for a monitoring check: scheduled ones whose time has come, plus
+   * recent uploads never checked. Hottest first.
+   */
+  async listDueForMonitoring(now: Date, limit: number): Promise<MonitoredVideo[]> {
+    const recentCutoff = new Date(now.getTime() - MONITOR_NEW_VIDEO_DAYS * 86_400_000).toISOString();
+    return unwrap(
+      await this.db
+        .from("videos")
+        .select("id, youtube_video_id, channel_id, view_count, published_at, views_per_hour, last_checked_at, last_synced_at, monitor_priority")
+        .or(`next_check_at.lte."${now.toISOString()}",and(last_checked_at.is.null,published_at.gt."${recentCutoff}")`)
+        .order("monitor_priority", { ascending: false })
+        .order("next_check_at", { ascending: true, nullsFirst: true })
+        .limit(limit),
+      "videos.listDueForMonitoring",
+    );
+  }
+
+  async applyMonitoring(updates: VideoMonitoringUpdate[]): Promise<number> {
+    if (updates.length === 0) return 0;
+    return unwrap(await this.db.rpc("apply_video_monitoring", { updates: updates as never }), "videos.applyMonitoring");
+  }
+
   /** Latest Shorts for each channel (for card previews), newest first. Batched to stay under row limits. */
   async latestShortsByChannel(channelIds: string[], perChannel: number): Promise<Map<string, VideoPreview[]>> {
     const byChannel = new Map<string, VideoPreview[]>();
@@ -92,7 +135,7 @@ export class VideoRepository {
       const rows = unwrap(
         await this.db
           .from("videos")
-          .select("channel_id, youtube_video_id, title, thumbnail_url, view_count, published_at")
+          .select("channel_id, youtube_video_id, title, thumbnail_url, view_count, published_at, views_per_hour")
           .in("channel_id", batch)
           .eq("format", "short")
           .order("published_at", { ascending: false })

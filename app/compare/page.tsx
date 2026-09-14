@@ -9,6 +9,7 @@ import { isAppError } from "@/lib/core/errors";
 import { formatCompact, formatPercent } from "@/lib/format";
 import { getServices } from "@/lib/services";
 import { MAX_COMPETITORS_COMPARED, type ComparedChannel } from "@/lib/services/compare-service";
+import { asUser } from "@/lib/youtube/quota-context";
 
 export const dynamic = "force-dynamic";
 // First comparisons sync channels from YouTube.
@@ -59,7 +60,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Sear
       limited = true;
     }
   }
-  const result = hasInput && !limited ? await services.compare.compare(youInput || null, competitorInputs) : null;
+  const result = hasInput && !limited ? await asUser(user.id, "page:compare", () => services.compare.compare(youInput || null, competitorInputs)) : null;
   const columns: (ComparedChannel & { isYou: boolean })[] = result
     ? [...(result.you ? [{ ...result.you, isYou: true }] : []), ...result.competitors.map((c) => ({ ...c, isYou: false }))]
     : [];

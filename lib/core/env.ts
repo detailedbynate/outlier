@@ -18,6 +18,22 @@ const serverEnvSchema = z.object({
   YOUTUBE_API_BASE_URL: z.url().default("https://www.googleapis.com/youtube/v3"),
   YOUTUBE_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
   YOUTUBE_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(2),
+  /** Daily YouTube Data API quota for the key (default project quota is 10,000). */
+  YOUTUBE_DAILY_QUOTA: z.coerce.number().int().min(100).default(10_000),
+  /** Units background jobs can never touch, kept for user-triggered requests. */
+  YOUTUBE_USER_RESERVE_UNITS: z.coerce.number().int().min(0).default(3_000),
+  /** Units never spent by anyone (headroom for retries and clock skew). */
+  YOUTUBE_SAFETY_BUFFER_UNITS: z.coerce.number().int().min(0).default(300),
+  /** Units one user may spend per quota day on the default tier. */
+  YOUTUBE_USER_DAILY_UNITS: z.coerce.number().int().min(1).default(1_000),
+  /** Check and record quota before every request. */
+  YOUTUBE_QUOTA_ENFORCED: z.preprocess((v) => (typeof v === "string" ? !["false", "0", "no", "off"].includes(v.toLowerCase()) : v), z.boolean()).default(true),
+  /** Reuse recent API responses stored in Supabase. */
+  YOUTUBE_CACHE_ENABLED: z.preprocess((v) => (typeof v === "string" ? !["false", "0", "no", "off"].includes(v.toLowerCase()) : v), z.boolean()).default(true),
+  /** Videos checked per monitoring run (1 quota unit per 50). */
+  MONITOR_MAX_VIDEOS_PER_RUN: z.coerce.number().int().min(50).max(20_000).default(2_000),
+  /** Channels checked per monitoring run (1 quota unit per 50). */
+  MONITOR_MAX_CHANNELS_PER_RUN: z.coerce.number().int().min(50).max(20_000).default(1_000),
 
   INTERNAL_API_KEY: optionalString,
   /** Bearer secret for /api/cron/* (called by GitHub Actions). */
