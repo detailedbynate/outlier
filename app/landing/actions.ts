@@ -22,6 +22,7 @@ export async function joinWaitlist(_prev: WaitlistState, formData: FormData): Pr
   try {
     const { position, alreadyJoined } = await getServices().waitlist.join({
       email: field(formData, "email") ?? "",
+      name: field(formData, "name"),
       channelUrl: field(formData, "channelUrl"),
       niche: field(formData, "niche"),
       useCase: field(formData, "useCase"),

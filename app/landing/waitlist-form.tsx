@@ -1,10 +1,35 @@
 "use client";
 
-import Link from "next/link";
 import { useActionState } from "react";
 import { joinWaitlist, type WaitlistState } from "./actions";
 
 const initialState: WaitlistState = { status: "idle", message: null, position: null };
+
+function UserIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21a8 8 0 0 1 16 0" />
+    </svg>
+  );
+}
+
+function MailIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="m3 7 9 6 9-6" />
+    </svg>
+  );
+}
+
+function ArrowIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M5 12h14M13 6l6 6-6 6" />
+    </svg>
+  );
+}
 
 export function WaitlistForm() {
   const [state, action, pending] = useActionState(joinWaitlist, initialState);
@@ -17,57 +42,34 @@ export function WaitlistForm() {
         </div>
         {state.position ? (
           <p className="waitlist-position">
-            You&apos;re <span className="gradient-text">#{state.position.toLocaleString()}</span> on the list
+            You&apos;re <span className="landing-title-accent">#{state.position.toLocaleString()}</span> on the list
           </p>
         ) : null}
-        <p className="subtitle">{state.message}</p>
+        <p className="landing-subtitle">{state.message}</p>
       </div>
     );
   }
 
   return (
     <form action={action} className="waitlist-form">
-      <label className="field">
-        <span>Email</span>
-        <input name="email" type="email" autoComplete="email" placeholder="you@example.com" required maxLength={254} />
+      <label className="input-icon">
+        <span className="sr-only">Your name</span>
+        <UserIcon />
+        <input name="name" type="text" autoComplete="name" placeholder="Your name" maxLength={100} />
       </label>
-      <div className="waitlist-grid">
-        <label className="field">
-          <span>
-            Your channel <span className="muted">(optional)</span>
-          </span>
-          <input name="channelUrl" type="text" placeholder="youtube.com/@yourchannel" maxLength={300} />
-        </label>
-        <label className="field">
-          <span>
-            Niche <span className="muted">(optional)</span>
-          </span>
-          <input name="niche" type="text" placeholder="e.g. gaming, finance, cooking" maxLength={100} />
-        </label>
-      </div>
-      <label className="field">
-        <span>
-          What would you use Outlier for? <span className="muted">(optional)</span>
-        </span>
-        <select name="useCase" defaultValue="">
-          <option value="">Choose one</option>
-          <option value="Starting a new channel">Starting a new channel</option>
-          <option value="Growing my channel">Growing my channel</option>
-          <option value="Faceless / automation channels">Faceless / automation channels</option>
-          <option value="Agency or managing clients">Agency or managing clients</option>
-          <option value="Research and trends">Research and trends</option>
-        </select>
+      <label className="input-icon">
+        <span className="sr-only">Email address</span>
+        <MailIcon />
+        <input name="email" type="email" autoComplete="email" placeholder="Email address" required maxLength={254} />
       </label>
       {/* Honeypot for bots — hidden from people and assistive tech. */}
       <input name="company" type="text" tabIndex={-1} autoComplete="off" className="honeypot" aria-hidden="true" />
       <input name="source" type="hidden" value="landing" />
       {state.status === "error" && state.message ? <p className="form-error">{state.message}</p> : null}
-      <button type="submit" className="button-lg" disabled={pending}>
-        {pending ? "Joining…" : "Join the waitlist"}
+      <button type="submit" className="waitlist-submit" disabled={pending}>
+        <span>{pending ? "Joining…" : "Join the waitlist"}</span>
+        <ArrowIcon />
       </button>
-      <p className="stat-note waitlist-privacy">
-        We&apos;ll only email you about your Outlier invite and launch. No spam. <Link href="/privacy">Privacy</Link>
-      </p>
     </form>
   );
 }

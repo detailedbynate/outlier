@@ -45,14 +45,9 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
                     </button>
                   </form>
                 ) : (
-                  <>
-                    <Link href="/login" className="topbar-link">
-                      Sign in
-                    </Link>
-                    <Link href="/#waitlist" className="button-link">
-                      Join waitlist
-                    </Link>
-                  </>
+                  <Link href="/login" className="topbar-link">
+                    Sign in
+                  </Link>
                 )}
               </nav>
             </header>
