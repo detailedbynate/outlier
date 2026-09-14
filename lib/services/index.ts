@@ -19,6 +19,7 @@ import { DiscoveryService } from "./discovery-service";
 import { JobService } from "./job-service";
 import { ResearchService } from "./research-service";
 import { StorageBudgetService } from "./storage-budget-service";
+import { TRENDING_JOB_TYPE, TrendingService } from "./trending-service";
 import { VideoService } from "./video-service";
 
 export { ChannelService, CreditsService, DiscoveryService, JobService, ResearchService, StorageBudgetService, VideoService };
@@ -30,6 +31,7 @@ export interface Services {
   discovery: DiscoveryService;
   jobs: JobService;
   research: ResearchService;
+  trending: TrendingService;
   storage: StorageBudgetService;
   jobRegistry: JobRegistry;
   scheduler: JobScheduler;
@@ -90,10 +92,17 @@ export function getServices(): Services {
   const enqueue = (type: string, payload: unknown, options?: Parameters<JobQueue["enqueue"]>[2]) =>
     queueRef.current!.enqueue(type, payload, options);
 
+  const trending = new TrendingService({
+    youtube,
+    enqueue,
+    latestOutput: (type) => repositories.jobs.latestSucceededOutput(type),
+  });
+
   const jobRegistry = createJobRegistry({
     channels,
     videos,
     storage,
+    trending,
     channelRepository: repositories.channels,
     systemRepository: repositories.system,
     enqueue,
@@ -110,6 +119,7 @@ export function getServices(): Services {
   const scheduler = new JobScheduler({ findLatestByType: (type) => repositories.jobs.findLatestByType(type), enqueue }, [
     { type: "catalog.refresh", everyHours: config.SYNC_INTERVAL_HOURS },
     { type: "maintenance.prune_snapshots", everyHours: 24 },
+    { type: TRENDING_JOB_TYPE, everyHours: 24 },
   ]);
 
   services = {
@@ -118,6 +128,7 @@ export function getServices(): Services {
     videos,
     discovery: new DiscoveryService(youtube),
     jobs: new JobService(queue, repositories.jobs),
+    trending,
     research: new ResearchService(
       { youtube, channels: repositories.channels, videos: repositories.videos, usage: repositories.usage, storage, enqueue },
       { discoveryDailyLimit: config.DISCOVERY_DAILY_LIMIT, discoveryMaxChannels: config.DISCOVERY_MAX_CHANNELS },

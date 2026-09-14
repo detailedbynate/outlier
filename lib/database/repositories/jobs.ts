@@ -34,6 +34,28 @@ export class JobRepository {
     return rows[0] ?? null;
   }
 
+  /** Output of the most recent successful job of a type (e.g. today's trending picks). */
+  async latestSucceededOutput(type: string): Promise<{ output: Json; finishedAt: string | null } | null> {
+    const jobs = unwrap(
+      await this.db
+        .from("jobs")
+        .select("id, finished_at")
+        .eq("type", type)
+        .eq("status", "succeeded")
+        .order("finished_at", { ascending: false, nullsFirst: false })
+        .limit(1),
+      "jobs.latestSucceeded",
+    );
+    const job = jobs[0];
+    if (!job) return null;
+    const results = unwrap(
+      await this.db.from("job_results").select("output").eq("job_id", job.id).order("created_at", { ascending: false }).limit(1),
+      "job_results.latest",
+    );
+    const output = results[0]?.output;
+    return output === undefined || output === null ? null : { output, finishedAt: job.finished_at };
+  }
+
   async claim(workerId: string, batchSize: number, types?: string[]): Promise<JobRow[]> {
     return unwrap(
       await this.db.rpc("claim_jobs", { worker_id: workerId, batch_size: batchSize, job_types: types ?? null }),

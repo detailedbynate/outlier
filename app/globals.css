@@ -1648,3 +1648,57 @@ tr:last-child td {
     margin-left: 0;
   }
 }
+
+/* Trending today */
+.trending-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  margin: 4px 0 8px;
+  border-radius: 22px;
+  background:
+    radial-gradient(90% 120% at 0% 0%, var(--accent-wash), transparent 55%),
+    radial-gradient(70% 100% at 100% 0%, rgba(236, 72, 153, 0.08), transparent 60%);
+  border: 1px solid var(--accent-track);
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.section-head h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.section-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--accent-gradient);
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(236, 72, 153, 0.35);
+}
+
+.section-title {
+  margin: 8px 0 -4px;
+  font-size: 17px;
+}
+
+.niche-badge {
+  margin-left: 4px;
+  padding: 1px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: capitalize;
+  color: var(--accent-text);
+  background: var(--accent-wash);
+  border: 1px solid var(--accent-track);
+  white-space: nowrap;
+}

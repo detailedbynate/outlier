@@ -4,6 +4,7 @@ import type { ChannelRepository } from "@/lib/database/repositories/channels";
 import type { SystemRepository } from "@/lib/database/repositories/system";
 import type { ChannelService } from "@/lib/services/channel-service";
 import type { StorageBudgetService } from "@/lib/services/storage-budget-service";
+import { TRENDING_JOB_TYPE, type TrendingService } from "@/lib/services/trending-service";
 import type { VideoService } from "@/lib/services/video-service";
 import { CHANNEL_ID_PATTERN } from "@/lib/youtube/parse";
 import type { EnqueueOptions } from "./queue";
@@ -14,6 +15,7 @@ export interface JobDependencies {
   channels: ChannelService;
   videos: VideoService;
   storage: StorageBudgetService;
+  trending: TrendingService;
   channelRepository: ChannelRepository;
   systemRepository: SystemRepository;
   /** Late-bound: the queue is created after the registry. */
@@ -118,6 +120,19 @@ export function createJobRegistry(deps: JobDependencies): JobRegistry {
             );
           }
           return { enqueued: channels.length, storageBudgetUsed: Number(status.budgetUsed.toFixed(3)) };
+        },
+      }),
+    )
+    .register(
+      defineJob({
+        type: TRENDING_JOB_TYPE,
+        description: "Scheduled: pick one breakout Shorts channel in each of today's 5 niches.",
+        payloadSchema: emptyPayload,
+        maxAttempts: 2,
+        handler: async () => {
+          const status = await deps.storage.getStatus({ fresh: true });
+          if (status.level === "over_budget") return { skipped: "storage_budget" };
+          return { ...(await deps.trending.computeDailyPicks()) };
         },
       }),
     )

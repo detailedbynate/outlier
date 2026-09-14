@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { Dropdown } from "@/components/dropdown";
-import { ChevronDownIcon, SearchIcon, ShortsIcon, SlidersIcon, SortIcon, VideoIcon, VideoOffIcon } from "@/components/icons";
+import { ChevronDownIcon, FlameIcon, SearchIcon, ShortsIcon, SlidersIcon, SortIcon, VideoIcon, VideoOffIcon } from "@/components/icons";
 import { PageHeader } from "@/components/page-header";
 import { requireApprovedUser } from "@/lib/auth/session";
+import { timeAgo } from "@/lib/format";
 import { getServices } from "@/lib/services";
 import { ChannelCard } from "./channel-card";
 import { DiscoverForm } from "./discover-form";
@@ -37,15 +38,19 @@ export default async function ShortsChannelsPage({ searchParams }: { searchParam
   const state = parseState(await searchParams);
   const showVideos = state.videos !== "hide";
 
-  const { research } = getServices();
-  const [{ channels, terms }, popular, searchesLeft] = await Promise.all([
+  const advancedCount = countAdvanced(state);
+  const quick = activeQuickFilter(state);
+  // Trending picks show on the default view, before the user searches or filters.
+  const isDefaultView = !state.q && advancedCount === 0 && !quick;
+
+  const { research, trending } = getServices();
+  const [{ channels, terms }, popular, searchesLeft, picks] = await Promise.all([
     research.browseShortsChannels(state.q, toFilters(state), showVideos ? 8 : 0),
     research.popularKeywords(10),
     research.discoverySearchesLeftToday(),
+    isDefaultView ? trending.latestPicks() : Promise.resolve(null),
   ]);
-
-  const advancedCount = countAdvanced(state);
-  const quick = activeQuickFilter(state);
+  const trendingChannels = picks ? await research.trendingToday(picks.picks, showVideos ? 8 : 0) : [];
   const canLoadMore = channels.length === Number(state.limit) && Number(state.limit) < MAX_LIMIT;
   const discoverKeyword = terms[0] ?? "";
 
@@ -183,6 +188,30 @@ export default async function ShortsChannelsPage({ searchParams }: { searchParam
           </Link>
         </div>
       </div>
+
+      {trendingChannels.length > 0 ? (
+        <section className="trending-section" aria-labelledby="trending-title">
+          <div className="section-head">
+            <span className="section-icon">
+              <FlameIcon size={16} />
+            </span>
+            <div>
+              <h2 id="trending-title">Trending today</h2>
+              <p className="stat-note">
+                Breakout Shorts channels across {trendingChannels.length} niches
+                {picks?.updatedAt ? ` · updated ${timeAgo(picks.updatedAt)}` : ""}
+              </p>
+            </div>
+          </div>
+          <div className="channel-list">
+            {trendingChannels.map((channel) => (
+              <ChannelCard key={channel.channel_id} channel={channel} showVideos={showVideos} badge={channel.niche} />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {isDefaultView && trendingChannels.length > 0 ? <h2 className="section-title">All Shorts channels</h2> : null}
 
       <div className="results-meta">
         <span>

@@ -17,7 +17,16 @@ import { formatCompact, formatPercent, timeAgo } from "@/lib/format";
 import type { ShortsChannelWithPreviews } from "@/lib/services/research-service";
 import { setChannelTracked } from "./actions";
 
-export function ChannelCard({ channel, showVideos }: { channel: ShortsChannelWithPreviews; showVideos: boolean }) {
+export function ChannelCard({
+  channel,
+  showVideos,
+  badge,
+}: {
+  channel: ShortsChannelWithPreviews;
+  showVideos: boolean;
+  /** e.g. the niche a trending pick was found in. */
+  badge?: string;
+}) {
   const youtubeUrl = `https://www.youtube.com/channel/${channel.youtube_channel_id}`;
 
   return (
@@ -37,6 +46,7 @@ export function ChannelCard({ channel, showVideos }: { channel: ShortsChannelWit
               <a href={youtubeUrl} target="_blank" rel="noreferrer" className="icon-link" aria-label={`Open ${channel.title} on YouTube`}>
                 <ExternalIcon size={14} />
               </a>
+              {badge ? <span className="niche-badge">{badge}</span> : null}
             </div>
             <div className="channel-meta">
               <UsersIcon size={13} />

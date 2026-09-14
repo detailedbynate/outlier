@@ -148,9 +148,10 @@ export class ChannelRepository {
   }
 
   async searchShortsChannels(filters: ShortsChannelFilters): Promise<ShortsChannelRow[]> {
-    if (filters.channelIds && filters.channelIds.length === 0) return [];
+    if (filters.channelIds?.length === 0 || filters.youtubeChannelIds?.length === 0) return [];
     let query = this.db.from("shorts_channels").select("*");
     if (filters.channelIds) query = query.in("channel_id", filters.channelIds);
+    if (filters.youtubeChannelIds) query = query.in("youtube_channel_id", filters.youtubeChannelIds);
     if (filters.minSubscribers !== undefined) query = query.gte("subscriber_count", filters.minSubscribers);
     if (filters.maxSubscribers !== undefined) query = query.lt("subscriber_count", filters.maxSubscribers);
     if (filters.minAvgViews !== undefined) query = query.gte("avg_short_views", filters.minAvgViews);
@@ -174,6 +175,8 @@ export class ChannelRepository {
 export interface ShortsChannelFilters {
   /** Restrict to these channel UUIDs (e.g. keyword search results). */
   channelIds?: string[];
+  /** Restrict to these YouTube channel ids. */
+  youtubeChannelIds?: string[];
   minSubscribers?: number;
   maxSubscribers?: number;
   minAvgViews?: number;

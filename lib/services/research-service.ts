@@ -7,6 +7,7 @@ import type { EnqueueOptions } from "@/lib/jobs/queue";
 import type { YouTubeService } from "@/lib/youtube/service";
 import type { ShortsChannelRow } from "@/types/database";
 import type { StorageBudgetService } from "./storage-budget-service";
+import type { TrendingPick } from "./trending-service";
 
 export const SHORTS_DISCOVERY_EVENT = "research.shorts_discovery";
 
@@ -87,6 +88,42 @@ export class ResearchService {
       terms,
       channels: rows.map((row) => ({ ...row, recentShorts: previews.get(row.channel_id) ?? [] })),
     };
+  }
+
+  /**
+   * Today's trending picks resolved to full Shorts channel rows: one per niche,
+   * using the backup when the primary doesn't qualify (not mostly Shorts) or
+   * hasn't synced yet.
+   */
+  async trendingToday(
+    picks: TrendingPick[],
+    previewsPerChannel: number,
+  ): Promise<(ShortsChannelWithPreviews & { niche: string; trendingVideoViews: number })[]> {
+    if (picks.length === 0) return [];
+    const rows = await this.deps.channels.searchShortsChannels({
+      youtubeChannelIds: picks.map((p) => p.youtubeChannelId),
+      orderBy: "avg_short_views",
+      limit: picks.length,
+    });
+    const byYoutubeId = new Map(rows.map((row) => [row.youtube_channel_id, row]));
+
+    const chosen: { row: ShortsChannelRow; pick: TrendingPick }[] = [];
+    for (const niche of [...new Set(picks.map((p) => p.niche))]) {
+      const candidates = picks.filter((p) => p.niche === niche).sort((a, b) => Number(a.backup) - Number(b.backup));
+      const hit = candidates.map((pick) => ({ pick, row: byYoutubeId.get(pick.youtubeChannelId) })).find((c) => c.row);
+      if (hit?.row) chosen.push({ row: hit.row, pick: hit.pick });
+    }
+
+    const previews =
+      previewsPerChannel > 0 && this.deps.videos
+        ? await this.deps.videos.latestShortsByChannel(chosen.map((c) => c.row.channel_id), previewsPerChannel)
+        : new Map<string, VideoPreview[]>();
+    return chosen.map(({ row, pick }) => ({
+      ...row,
+      recentShorts: previews.get(row.channel_id) ?? [],
+      niche: pick.niche,
+      trendingVideoViews: pick.videoViews,
+    }));
   }
 
   /** Keywords people discovered most in the last week, padded with evergreen niches. */
