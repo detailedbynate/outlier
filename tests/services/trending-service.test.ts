@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createLogger } from "@/lib/core/logger";
 import type { TrendingRepository } from "@/lib/database/repositories/trending";
-import { deltaAgo, NICHE_POOL, nichesForDay, TrendingService } from "@/lib/services/trending-service";
+import { deltaAgo, GAMING_POOL, NICHE_POOL, nicheLabel, nichesForDay, TrendingService } from "@/lib/services/trending-service";
 import type { YouTubeService } from "@/lib/youtube/service";
 import type { TablesInsert, TrendingPickRow, TrendingPickStatRow } from "@/types/database";
 import { makeChannel, makeVideo } from "../helpers/fixtures";
@@ -70,11 +70,13 @@ function fakeRepository() {
 const page = <T,>(items: T[]) => ({ items, nextPageToken: null, prevPageToken: null, totalResults: items.length });
 
 describe("nichesForDay", () => {
-  it("returns 5 distinct niches that rotate day to day", () => {
+  it("returns 3 gaming categories then 2 other niches, rotating day to day", () => {
     const today = nichesForDay(NOW);
     const tomorrow = nichesForDay(new Date(NOW.getTime() + 86_400_000));
     expect(new Set(today).size).toBe(5);
-    expect(today.every((n) => (NICHE_POOL as readonly string[]).includes(n))).toBe(true);
+    expect(today.slice(0, 3).every((n) => (GAMING_POOL as readonly string[]).includes(n))).toBe(true);
+    expect(today.slice(3).every((n) => (NICHE_POOL as readonly string[]).includes(n))).toBe(true);
+    expect(nicheLabel(today[0]!)).toBe(`gaming · ${today[0]}`);
     expect(tomorrow).not.toEqual(today);
   });
 });
@@ -167,7 +169,7 @@ describe("TrendingService.computeDailyPicks", () => {
       throw new Error("quota");
     });
     const result = await service.computeDailyPicks(NOW);
-    expect(searchVideos).toHaveBeenCalledTimes(8);
+    expect(searchVideos).toHaveBeenCalledTimes(9); // 3+2 gaming, 2+2 other
     expect(result.picks).toBe(0);
   });
 

@@ -8,8 +8,8 @@ import type { TablesInsert, TrendingPickRow } from "@/types/database";
 import type { YouTubeChannel, YouTubeVideo } from "@/types/youtube";
 
 /**
- * "Trending today": once a day, one breakout Short (plus a backup) in each of 5
- * rotating niches, from small, English-market channels, where the Short has at
+ * "Trending today": once a day, one breakout Short (plus a backup) in each of 3
+ * rotating gaming categories and 2 other niches, from small, English-market channels, where the Short has at
  * least `minMultiplier`x the channel's normal views. Stats refresh hourly.
  *
  * Quota per day: ~100 per niche searched + ~2 per candidate checked + ~2 per hourly refresh.
@@ -18,10 +18,26 @@ import type { YouTubeChannel, YouTubeVideo } from "@/types/youtube";
 export const TRENDING_JOB_TYPE = "research.daily_trending";
 export const TRENDING_REFRESH_JOB_TYPE = "research.trending_refresh";
 
+/** Gaming leads the section: 3 picks a day from different gaming categories. */
+export const GAMING_POOL = [
+  "minecraft",
+  "roblox",
+  "fortnite",
+  "gta",
+  "call of duty",
+  "valorant",
+  "pokemon",
+  "horror games",
+  "clash royale",
+  "brawl stars",
+  "gaming funny moments",
+  "retro gaming",
+] as const;
+
+/** Plus 2 picks from other niches. */
 export const NICHE_POOL = [
   "motivation",
   "cooking",
-  "gaming",
   "fitness",
   "facts",
   "comedy",
@@ -36,13 +52,25 @@ export const NICHE_POOL = [
   "cars",
 ] as const;
 
-export const NICHES_PER_DAY = 5;
-/** Extra niches to try when some come back empty, so the section still has 5. */
-const MAX_NICHE_ATTEMPTS = 8;
+export const GAMING_PER_DAY = 3;
+export const OTHER_PER_DAY = 2;
+export const NICHES_PER_DAY = GAMING_PER_DAY + OTHER_PER_DAY;
+/** Extra niches to try per group when some come back empty. */
+const EXTRA_ATTEMPTS = 2;
 const CANDIDATES_TO_CHECK = 5;
 const PICKS_PER_NICHE = 2;
 const LOOKBACK_DAYS = 7;
 const BASELINE_SHORTS = 30;
+
+function rotate(pool: readonly string[], now: Date, perDay: number, count: number): string[] {
+  const offset = (Math.floor(now.getTime() / 86_400_000) * perDay) % pool.length;
+  return Array.from({ length: Math.min(count, pool.length) }, (_, i) => pool[(offset + i) % pool.length]!);
+}
+
+/** Display label: gaming categories are prefixed so they group visually. */
+export function nicheLabel(query: string): string {
+  return (GAMING_POOL as readonly string[]).includes(query) ? `gaming · ${query}` : query;
+}
 
 export interface TrendingConfig {
   quality?: QualityConfig;
@@ -59,10 +87,9 @@ export interface TrendingPickView extends TrendingPickRow {
 
 type ConfirmedPick = { channel: YouTubeChannel; video: YouTubeVideo; medianViews: number; multiplier: number; score: number };
 
-/** Deterministic daily rotation through the niche pool, starting at today's offset. */
-export function nichesForDay(now: Date, count = NICHES_PER_DAY): string[] {
-  const offset = (Math.floor(now.getTime() / 86_400_000) * NICHES_PER_DAY) % NICHE_POOL.length;
-  return Array.from({ length: count }, (_, i) => NICHE_POOL[(offset + i) % NICHE_POOL.length]!);
+/** Today's niches: 3 gaming categories then 2 other niches, rotating daily. */
+export function nichesForDay(now: Date): string[] {
+  return [...rotate(GAMING_POOL, now, GAMING_PER_DAY, GAMING_PER_DAY), ...rotate(NICHE_POOL, now, OTHER_PER_DAY, OTHER_PER_DAY)];
 }
 
 /** Change between the latest stat and the one closest to `hoursAgo` before it, within a tolerance. */
@@ -103,24 +130,32 @@ export class TrendingService {
   /** Compute and store today's picks, replacing any existing ones for today. */
   async computeDailyPicks(now: Date = new Date()): Promise<{ date: string; niches: string[]; picks: number }> {
     const day = now.toISOString().slice(0, 10);
-    const startOffset = Math.floor(now.getTime() / 86_400_000) * NICHES_PER_DAY;
     const takenChannels = new Set<string>();
     const rows: TablesInsert<"trending_picks">[] = [];
     const filled: string[] = [];
+    const groups = [
+      { queries: rotate(GAMING_POOL, now, GAMING_PER_DAY, GAMING_PER_DAY + EXTRA_ATTEMPTS), want: GAMING_PER_DAY },
+      { queries: rotate(NICHE_POOL, now, OTHER_PER_DAY, OTHER_PER_DAY + EXTRA_ATTEMPTS), want: OTHER_PER_DAY },
+    ];
 
-    for (let attempt = 0; attempt < MAX_NICHE_ATTEMPTS && filled.length < NICHES_PER_DAY; attempt++) {
-      const niche = NICHE_POOL[(startOffset + attempt) % NICHE_POOL.length]!;
-      try {
-        const picks = await this.pickForNiche(niche, now, takenChannels);
-        if (picks.length === 0) continue;
-        filled.push(niche);
-        picks.forEach((pick, rank) => {
-          takenChannels.add(pick.channel.id);
-          rows.push(this.toRow(day, niche, rank, pick, now));
-        });
-      } catch (error) {
-        // One failing niche shouldn't sink the day's picks.
-        this.log.warn("trending niche failed", { niche, error });
+    for (const group of groups) {
+      let got = 0;
+      for (const query of group.queries) {
+        if (got >= group.want) break;
+        try {
+          const picks = await this.pickForNiche(query, now, takenChannels);
+          if (picks.length === 0) continue;
+          const niche = nicheLabel(query);
+          filled.push(niche);
+          got += 1;
+          picks.forEach((pick, rank) => {
+            takenChannels.add(pick.channel.id);
+            rows.push(this.toRow(day, niche, rank, pick, now));
+          });
+        } catch (error) {
+          // One failing niche shouldn't sink the day's picks.
+          this.log.warn("trending niche failed", { niche: query, error });
+        }
       }
     }
 
