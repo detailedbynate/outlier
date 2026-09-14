@@ -1,4 +1,4 @@
-import { useId, type ReactNode, type SVGProps } from "react";
+import type { ReactNode, SVGProps } from "react";
 
 /** Minimal stroke icons (24px grid, currentColor). */
 function Icon({ children, size = 16, ...props }: SVGProps<SVGSVGElement> & { size?: number; children: ReactNode }) {
@@ -155,25 +155,12 @@ export const LogOutIcon = (p: P) => (
     <path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H3" />
   </Icon>
 );
-/** Brand mark: a line breaking out above its baseline — an outlier. */
+/** Brand mark: the Outlier logo (public/brand). Decorative; pair it with the "Outlier" wordmark. */
 export function BrandMark({ size = 28 }: { size?: number }) {
-  // Unique per instance: a shared id breaks when one copy sits in a hidden (display: none) element.
-  const gradientId = `brand-gradient-${useId().replace(/:/g, "")}`;
-  return (
-  <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-    <defs>
-      <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0" stopColor="#8b5cf6" />
-        <stop offset="1" stopColor="#ec4899" />
-      </linearGradient>
-    </defs>
-    <rect width="32" height="32" rx="9" fill={`url(#${gradientId})`} />
-    <path d="M7 21.5h4.5l3-4 3 2.5L25 9" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
-    <circle cx="25" cy="9" r="2.4" fill="#fff" />
-  </svg>
-  );
-}
-export const CompassIcon = (p: P) => (
+  const src = size <= 64 ? "/brand/logo-128.png" : "/brand/logo-256.png";
+  // eslint-disable-next-line @next/next/no-img-element -- tiny static asset; next/image adds nothing here
+  return <img src={src} width={size} height={size} alt="" aria-hidden="true" className="brand-mark" draggable={false} />;
+}export const CompassIcon = (p: P) => (
   <Icon {...p}>
     <circle cx="12" cy="12" r="9" />
     <path d="m15.5 8.5-2 5-5 2 2-5z" />

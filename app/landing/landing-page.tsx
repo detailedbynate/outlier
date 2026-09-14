@@ -141,8 +141,8 @@ export async function LandingPage() {
             <span className="halo-ring halo-ring-1" />
             <span className="halo-ring halo-ring-2" />
             <span className="halo-ring halo-ring-3" />
-            <span className="logo-tile">
-              <BrandMark size={40} />
+            <span className="logo-tile logo-tile-image">
+              <BrandMark size={84} />
             </span>
           </div>
 

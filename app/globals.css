@@ -4829,3 +4829,24 @@ body:has(.onboarding-root) .ambient {
 .mod-log td {
   font-size: 13px;
 }
+
+.brand-mark {
+  display: block;
+  flex: none;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 12px rgba(139, 92, 246, 0.35));
+}
+
+
+/* The logo is its own tile: drop the wrapper's box. */
+.logo-tile.logo-tile-image {
+  width: auto;
+  height: auto;
+  padding: 0;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+

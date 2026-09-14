@@ -185,7 +185,7 @@ export function OnboardingFlow({ firstName }: { firstName: string | null }) {
               <div className="ob-center">
                 <div className="ob-hero-mark">
                   <span className="ob-hero-ring" />
-                  <BrandMark size={56} />
+                  <BrandMark size={72} />
                 </div>
                 <h1 id="ob-heading" ref={headingRef} tabIndex={-1} className="ob-title">
                   Welcome to Outlier{firstName ? `, ${firstName}` : ""} <span className="wave">👋</span>
