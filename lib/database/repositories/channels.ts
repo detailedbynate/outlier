@@ -45,6 +45,15 @@ export class ChannelRepository {
     );
   }
 
+  /** Case-insensitive @handle lookup (handles are stored with the "@"). */
+  async findByHandle(handle: string): Promise<ChannelRow | null> {
+    const rows = unwrap(
+      await this.db.from("channels").select("*").ilike("handle", escapeLike(handle)).limit(1),
+      "channels.findByHandle",
+    );
+    return rows[0] ?? null;
+  }
+
   async findById(id: string): Promise<ChannelRow | null> {
     return unwrapMaybe(await this.db.from("channels").select("*").eq("id", id).maybeSingle(), "channels.findById");
   }

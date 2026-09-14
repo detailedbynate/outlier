@@ -10,6 +10,8 @@ export const RATE_LIMITS = {
   signInIp: { windowSeconds: 900, maxHits: 10 },
   /** Sign-in attempts per email, across IPs. */
   signInEmail: { windowSeconds: 900, maxHits: 8 },
+  /** Channel comparisons per user (each can sync new channels from YouTube). */
+  compareUser: { windowSeconds: 3600, maxHits: 30 },
 } as const;
 
 export type RateLimitPolicy = keyof typeof RATE_LIMITS;

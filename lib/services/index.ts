@@ -23,6 +23,7 @@ import { ChannelService } from "./channel-service";
 import { CreditsService } from "./credits-service";
 import { DiscoveryService } from "./discovery-service";
 import { JobService } from "./job-service";
+import { CompareService } from "./compare-service";
 import { OnboardingService } from "./onboarding-service";
 import { RateLimitService } from "./rate-limit-service";
 import { ResearchService } from "./research-service";
@@ -39,6 +40,7 @@ export interface Services {
   videos: VideoService;
   waitlist: WaitlistService;
   onboarding: OnboardingService;
+  compare: CompareService;
   rateLimits: RateLimitService;
   discovery: DiscoveryService;
   jobs: JobService;
@@ -153,6 +155,7 @@ export function getServices(): Services {
     channels,
     credits: new CreditsService(repositories.usage, config.DAILY_CREDITS),
     onboarding: new OnboardingService(repositories.preferences),
+    compare: new CompareService({ channels: repositories.channels, videos: repositories.videos, channelService: channels }),
     rateLimits: new RateLimitService(repositories.rateLimits, config.RATE_LIMIT_SALT ?? config.CRON_SECRET ?? "outlier-rate-limit"),
     waitlist: new WaitlistService(repositories.waitlist, lazy(() => new SupabaseInviteSender(lazyDb()))),
     videos,

@@ -39,9 +39,14 @@ export async function DashboardView({ userId }: { userId: string }) {
                 {preferences.channel ? ` · ${preferences.channel}` : ""}
               </p>
             </div>
-            <Link href="/settings/preferences" className="button-ghost">
-              Edit preferences
-            </Link>
+            <div className="row" style={{ gap: 8 }}>
+              <Link href="/compare" className="button-ghost">
+                Compare with competitors
+              </Link>
+              <Link href="/settings/preferences" className="button-ghost">
+                Edit preferences
+              </Link>
+            </div>
           </div>
           {preferences.niches.length > 0 ? (
             <div className="chips" style={{ marginTop: 14 }}>
