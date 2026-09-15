@@ -28,7 +28,7 @@ export const moderateAccountsSchema = z
     /** For temp_ban / restrict: hours (0 = permanent for restrict). */
     durationHours: z.coerce.number().int().min(0).max(24 * 365 * 5).optional(),
     reason: z.string().trim().max(500).optional().transform((v) => v || null),
-    dailyCredits: z.union([z.literal(""), z.coerce.number().int().min(0).max(1_000_000)]).optional(),
+    monthlyCredits: z.union([z.literal(""), z.coerce.number().int().min(0).max(1_000_000)]).optional(),
     youtubeDailyUnits: z.union([z.literal(""), z.coerce.number().int().min(0).max(1_000_000)]).optional(),
   })
   .superRefine((v, ctx) => {
@@ -182,7 +182,7 @@ export class ModerationService {
         return null;
       case "set_limits": {
         const patch: Partial<AccountSettingsRow> = {};
-        if (data.dailyCredits !== undefined) patch.daily_credits = data.dailyCredits === "" ? null : data.dailyCredits;
+        if (data.monthlyCredits !== undefined) patch.daily_credits = data.monthlyCredits === "" ? null : data.monthlyCredits;
         if (data.youtubeDailyUnits !== undefined) patch.youtube_daily_units = data.youtubeDailyUnits === "" ? null : data.youtubeDailyUnits;
         await ensure(patch);
         return null;

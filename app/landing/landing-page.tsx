@@ -121,7 +121,7 @@ function DiscordIcon() {
   );
 }
 
-export async function LandingPage() {
+export async function LandingPage({ referralCode = null }: { referralCode?: string | null } = {}) {
   const count = await waitlistCount();
   const discordUrl = env().DISCORD_INVITE_URL;
 
@@ -157,7 +157,7 @@ export async function LandingPage() {
           </p>
 
           <div id="waitlist" className="landing-form-wrap">
-            <WaitlistForm />
+            <WaitlistForm referralCode={referralCode} />
             {count >= SHOW_WAITLIST_COUNT_FROM ? (
               <p className="landing-count">Join {count.toLocaleString()} creators already waiting</p>
             ) : null}

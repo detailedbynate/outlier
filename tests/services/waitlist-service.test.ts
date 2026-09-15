@@ -18,6 +18,7 @@ function entry(overrides: Partial<WaitlistEntryRow> = {}): WaitlistEntryRow {
     invited_at: null,
     joined_at: null,
     invited_by: null,
+    referred_by_code: null,
     created_at: "2026-09-14T00:00:00Z",
     updated_at: "2026-09-14T00:00:00Z",
     ...overrides,

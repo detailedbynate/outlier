@@ -4,6 +4,7 @@ import { UsersIcon } from "@/components/icons";
 import { PageHeader } from "@/components/page-header";
 import { StatTile } from "@/components/stat-tile";
 import { requireAdmin } from "@/lib/auth/session";
+import { env } from "@/lib/core/env";
 import { timeAgo } from "@/lib/format";
 import { getServices } from "@/lib/services";
 import type { WaitlistStatus } from "@/types/database";
@@ -29,22 +30,36 @@ const BULK_OPTIONS: BulkOption[] = [
 export default async function AdminWaitlistPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; q?: string }>;
+  searchParams: Promise<{ status?: string; q?: string; sort?: string }>;
 }) {
   await requireAdmin();
-  const { status: rawStatus, q: rawQuery } = await searchParams;
+  const { status: rawStatus, q: rawQuery, sort: rawSort } = await searchParams;
+  const sortByReferrals = rawSort === "referrals";
   const status = TABS.find((t) => t.key === rawStatus)?.key ?? "pending";
   const q = (rawQuery ?? "").trim().slice(0, 100);
 
   const { repositories } = getServices();
-  const [entries, pending, invited, joined, declined] = await Promise.all([
+  const threshold = env().REFERRAL_PRIORITY_THRESHOLD;
+  const [listed, pending, invited, joined, declined, signupCounts] = await Promise.all([
     repositories.waitlist.list({ status, limit: 500, search: q || undefined }),
     repositories.waitlist.count("pending"),
     repositories.waitlist.count("invited"),
     repositories.waitlist.count("joined"),
     repositories.waitlist.count("declined"),
+    repositories.referrals.signupCountsByCode().catch(() => new Map<string, number>()),
   ]);
   const counts: Record<string, number> = { pending, invited, joined, declined };
+  const codes = await repositories.referrals.codesForEntries(listed.map((e) => e.id)).catch(() => new Map<string, string>());
+  const referralsOf = (entryId: string) => signupCounts.get(codes.get(entryId) ?? "") ?? 0;
+  const entries = sortByReferrals ? [...listed].sort((a, b) => referralsOf(b.id) - referralsOf(a.id)) : listed;
+  const topReferrers = listed.filter((e) => referralsOf(e.id) >= threshold).length;
+  const baseHref = (overrides: { sort?: string | null } = {}) => {
+    const params = new URLSearchParams({ status });
+    if (q) params.set("q", q);
+    const sort = overrides.sort === undefined ? (sortByReferrals ? "referrals" : null) : overrides.sort;
+    if (sort) params.set("sort", sort);
+    return `/admin/waitlist?${params.toString()}`;
+  };
 
   return (
     <div className="stack">
@@ -91,6 +106,9 @@ export default async function AdminWaitlistPage({
             Search
           </button>
         </form>
+        <Link href={baseHref({ sort: sortByReferrals ? null : "referrals" })} className="chip" aria-current={sortByReferrals}>
+          Top referrers first{topReferrers > 0 ? ` (${topReferrers} priority)` : ""}
+        </Link>
         <a
           href={`/admin/waitlist/export?status=${status}`}
           className="button-ghost"
@@ -119,6 +137,7 @@ export default async function AdminWaitlistPage({
                       <span className="sr-only">Select</span>
                     </th>
                     <th>Person</th>
+                    <th className="num" title={`${threshold}+ referrals = priority`}>Referrals</th>
                     <th>Niche</th>
                     <th>Wants to</th>
                     <th className="num">Signed up</th>
@@ -139,6 +158,7 @@ export default async function AdminWaitlistPage({
                       </td>
                       <td>
                         <strong>{entry.email}</strong>
+                        {entry.referred_by_code ? <span className="badge referral-badge">Referred</span> : null}
                         {entry.channel_url ? (
                           <div className="stat-note">
                             <a
@@ -150,6 +170,13 @@ export default async function AdminWaitlistPage({
                             </a>
                           </div>
                         ) : null}
+                      </td>
+                      <td className="num">
+                        {referralsOf(entry.id) >= threshold ? (
+                          <span className="badge referral-priority" title="Priority: invite first">{referralsOf(entry.id)} ★</span>
+                        ) : (
+                          referralsOf(entry.id)
+                        )}
                       </td>
                       <td>{entry.niche ?? <span className="muted">—</span>}</td>
                       <td>

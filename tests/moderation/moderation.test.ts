@@ -66,6 +66,7 @@ function setup() {
     invited_at: null,
     joined_at: null,
     invited_by: null,
+    referred_by_code: null,
     created_at: "2026-09-01T00:00:00Z",
     updated_at: "2026-09-01T00:00:00Z",
   }));
@@ -134,7 +135,7 @@ describe("ModerationService.moderateAccounts", () => {
     expect(rows.get(MEMBER)?.restricted_until).toBe(PERMANENT_UNTIL);
     await service.moderateAccounts({ action: "unrestrict", userIds: [MEMBER] }, owner, NOW);
     expect(rows.get(MEMBER)?.restricted_until).toBeNull();
-    await service.moderateAccounts({ action: "set_limits", userIds: [MEMBER], dailyCredits: "25", youtubeDailyUnits: "" }, owner, NOW);
+    await service.moderateAccounts({ action: "set_limits", userIds: [MEMBER], monthlyCredits: "25", youtubeDailyUnits: "" }, owner, NOW);
     expect(rows.get(MEMBER)).toMatchObject({ daily_credits: 25, youtube_daily_units: null });
 
     await service.moderateAccounts({ action: "remove", userIds: [MEMBER], reason: "requested" }, owner, NOW);

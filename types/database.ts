@@ -254,6 +254,35 @@ export type WaitlistEntryRow = Timestamps & {
   invited_at: string | null;
   joined_at: string | null;
   invited_by: string | null;
+  /** Referral code this person signed up through. */
+  referred_by_code: string | null;
+};
+
+export type ReferralCodeRow = {
+  code: string;
+  waitlist_entry_id: string | null;
+  user_id: string | null;
+  created_at: string;
+};
+
+export type ReferralRewardRow = {
+  id: string;
+  code: string;
+  referred_user_id: string;
+  referrer_user_id: string | null;
+  referred_credits: number;
+  referrer_credits: number;
+  referrer_rewarded_at: string | null;
+  created_at: string;
+};
+
+export type CreditGrantRow = {
+  id: string;
+  user_id: string;
+  amount: number;
+  reason: string;
+  source_id: string | null;
+  created_at: string;
 };
 
 export type UserPreferencesRow = Timestamps & {
@@ -275,7 +304,7 @@ export type AccountSettingsRow = {
   user_id: string;
   email: string;
   role: AccountRole;
-  /** null = app default (DAILY_CREDITS). */
+  /** Monthly credit allowance (null = MONTHLY_CREDITS). Column name predates the switch to monthly credits. */
   daily_credits: number | null;
   /** null = tier default (YOUTUBE_USER_DAILY_UNITS). */
   youtube_daily_units: number | null;
@@ -467,6 +496,9 @@ export type Database = {
       trending_pick_stats: TableDef<TrendingPickStatRow, "pick_id" | "views">;
       account_settings: TableDef<AccountSettingsRow, "user_id" | "email">;
       niche_reports: TableDef<NicheReportRow, "topic_key" | "topic">;
+      referral_codes: TableDef<ReferralCodeRow, "code">;
+      referral_rewards: TableDef<ReferralRewardRow, "code" | "referred_user_id">;
+      credit_grants: TableDef<CreditGrantRow, "user_id" | "amount" | "reason">;
       moderation_actions: TableDef<ModerationActionRow, "target_email" | "action">;
       youtube_quota_usage: {
         Row: YouTubeQuotaUsageRow;

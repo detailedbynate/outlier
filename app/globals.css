@@ -6943,3 +6943,175 @@ a.dash-row:hover {
     margin-top: 8px;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Referrals (solid colors, no gradients)
+--------------------------------------------------------------------------- */
+.referral-share {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 460px;
+  margin: 16px auto 0;
+  text-align: left;
+}
+
+.referral-share.is-compact {
+  max-width: none;
+  margin: 0;
+}
+
+.referral-progress-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.referral-progress-head span {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.referral-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.referral-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #8b5cf6;
+  box-shadow: 0 0 12px rgba(139, 92, 246, 0.7);
+  transition: width 0.6s var(--ease);
+}
+
+.referral-link {
+  display: flex;
+  gap: 8px;
+}
+
+.referral-link input {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.referral-link button {
+  flex: none;
+  background: #8b5cf6;
+  box-shadow: 0 0 16px rgba(139, 92, 246, 0.4);
+}
+
+.referral-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.referral-btn {
+  flex: 1 1 auto;
+  padding: 7px 12px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid var(--border);
+  box-shadow: none;
+  transition: border-color 0.2s var(--ease), color 0.2s var(--ease);
+}
+
+.referral-btn:hover {
+  color: var(--text-primary);
+  border-color: rgba(139, 92, 246, 0.5);
+}
+
+.referral-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.waitlist-referred {
+  margin: 0;
+  font-size: 12.5px;
+  color: #34d399;
+  text-align: center;
+}
+
+.referral-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+  padding: 48px 16px;
+}
+
+.referral-brand {
+  color: var(--text-primary);
+}
+
+.referral-card {
+  width: 100%;
+  max-width: 520px;
+  padding: 28px 24px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  text-align: center;
+}
+
+.referral-card h1 {
+  margin: 0 0 8px;
+  font-size: 26px;
+}
+
+.referral-card p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.referral-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.referral-steps {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.referral-steps strong {
+  color: var(--text-primary);
+}
+
+@media (max-width: 600px) {
+  .referral-stats {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.referral-badge {
+  margin-left: 6px;
+  color: #34d399;
+}
+
+.referral-priority {
+  color: #f472b6;
+  border-color: rgba(244, 114, 182, 0.5);
+  box-shadow: 0 0 10px rgba(244, 114, 182, 0.25);
+}
+

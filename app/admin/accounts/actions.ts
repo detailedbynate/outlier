@@ -36,7 +36,7 @@ export async function createAccount(_prev: AccountFormState, formData: FormData)
       {
         email: text(formData, "email"),
         role: text(formData, "role") || "member",
-        dailyCredits: text(formData, "dailyCredits"),
+        monthlyCredits: text(formData, "monthlyCredits"),
         youtubeDailyUnits: text(formData, "youtubeDailyUnits"),
         note: text(formData, "note"),
         delivery: text(formData, "delivery") || "link",
@@ -66,7 +66,7 @@ export async function updateAccount(_prev: AccountFormState, formData: FormData)
       userId,
       {
         role: text(formData, "role") || undefined,
-        dailyCredits: text(formData, "dailyCredits"),
+        monthlyCredits: text(formData, "monthlyCredits"),
         youtubeDailyUnits: text(formData, "youtubeDailyUnits"),
         note: text(formData, "note"),
         email: text(formData, "email") || undefined,
@@ -91,7 +91,7 @@ export async function moderateAccounts(_prev: BulkState, formData: FormData): Pr
         userIds: formData.getAll("ids").map(String),
         durationHours: text(formData, "durationHours") || undefined,
         reason: text(formData, "reason"),
-        dailyCredits: formData.has("dailyCredits") ? text(formData, "dailyCredits") : undefined,
+        monthlyCredits: formData.has("monthlyCredits") ? text(formData, "monthlyCredits") : undefined,
         youtubeDailyUnits: formData.has("youtubeDailyUnits") ? text(formData, "youtubeDailyUnits") : undefined,
       },
       { userId: current.user.id, role: current.isOwner ? "owner" : "admin" },

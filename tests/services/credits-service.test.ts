@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { CreditsService, startOfUtcDay } from "@/lib/services/credits-service";
+import { CreditsService, startOfUtcMonth } from "@/lib/services/credits-service";
 
 const NOW = new Date("2026-09-13T20:30:00Z");
 
@@ -12,11 +12,15 @@ function setup(spent: number, paidResources: string[] = []) {
   return { usage, service: new CreditsService(usage, 100) };
 }
 
-describe("CreditsService", () => {
-  it("reports today's usage and the next UTC reset", async () => {
+describe("CreditsService (monthly)", () => {
+  it("reports this month's usage and the next monthly reset", async () => {
     const { service, usage } = setup(37);
-    expect(await service.status("u1", NOW)).toEqual({ used: 37, limit: 100, remaining: 63, resetsAt: "2026-09-14T00:00:00.000Z" });
-    expect(usage.creditsSpentSince).toHaveBeenCalledWith("u1", startOfUtcDay(NOW));
+    expect(await service.status("u1", NOW)).toEqual({ used: 37, limit: 100, remaining: 63, bonus: 0, resetsAt: "2026-10-01T00:00:00.000Z" });
+    expect(usage.creditsSpentSince).toHaveBeenCalledWith("u1", startOfUtcMonth(NOW));
+  });
+
+  it("rolls over the year in December", async () => {
+    expect((await setup(0).service.status("u1", new Date("2026-12-31T23:00:00Z"))).resetsAt).toBe("2027-01-01T00:00:00.000Z");
   });
 
   it("blocks actions the user can't afford", async () => {
@@ -39,11 +43,20 @@ describe("CreditsService", () => {
   });
 });
 
-describe("CreditsService per-user limits", () => {
-  it("uses an account's daily credit override when set", async () => {
-    const usage = { creditsSpentSince: vi.fn(async () => 40), hasEventSince: vi.fn(async () => false), record: vi.fn(async () => ({}) as never) };
-    const service = new CreditsService(usage, 100, async (userId) => (userId === "vip" ? 500 : null));
+describe("CreditsService per-user limits and bonus credits", () => {
+  const usage = () => ({ creditsSpentSince: vi.fn(async () => 40), hasEventSince: vi.fn(async () => false), record: vi.fn(async () => ({}) as never) });
+
+  it("uses an account's monthly allowance override when set", async () => {
+    const service = new CreditsService(usage(), 100, async (userId) => (userId === "vip" ? 500 : null));
     expect((await service.status("vip", NOW)).limit).toBe(500);
     expect((await service.status("regular", NOW)).remaining).toBe(60);
+  });
+
+  it("adds bonus credits granted this month, but not for restricted accounts", async () => {
+    const bonusSince = vi.fn(async () => 50);
+    const service = new CreditsService(usage(), 100, async (userId) => (userId === "restricted" ? 0 : null), bonusSince);
+    expect(await service.status("u1", NOW)).toMatchObject({ limit: 150, remaining: 110, bonus: 50 });
+    expect(bonusSince).toHaveBeenCalledWith("u1", startOfUtcMonth(NOW));
+    expect(await service.status("restricted", NOW)).toMatchObject({ limit: 0, remaining: 0, bonus: 0 });
   });
 });

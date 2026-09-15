@@ -30,7 +30,13 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
       { href: "/compare", label: "Competitors", icon: UsersIcon, badge: "New" },
     ],
   },
-  { title: "Account", items: [{ href: "/settings/preferences", label: "Preferences", icon: SlidersIcon }] },
+  {
+    title: "Account",
+    items: [
+      { href: "/settings/preferences", label: "Preferences", icon: SlidersIcon },
+      { href: "/referrals", label: "Refer friends", icon: UsersIcon, badge: "Earn" },
+    ],
+  },
 ];
 
 function isActive(pathname: string, href: string): boolean {

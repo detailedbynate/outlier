@@ -2,9 +2,10 @@ import { AppError } from "@/lib/core/errors";
 import type { UsageRepository } from "@/lib/database/repositories/usage";
 
 /**
- * Daily credits: every user gets a fresh allowance each UTC day. Costs roughly
- * track the YouTube quota an action burns, so one user can't drain the shared key.
- * Paid plans later only need a different `dailyCredits` per workspace.
+ * Monthly credits: every user gets a fresh allowance at the start of each UTC
+ * month, plus any bonus credits granted that month (e.g. referral rewards).
+ * Costs roughly track the YouTube quota an action burns, so one user can't
+ * drain the shared key. Paid plans later only need a different allowance.
  */
 
 export const CREDIT_COSTS = {
@@ -22,8 +23,11 @@ export type CreditAction = keyof typeof CREDIT_COSTS;
 
 export interface CreditStatus {
   used: number;
+  /** Monthly allowance plus bonus credits granted this month. */
   limit: number;
   remaining: number;
+  /** Bonus credits included in `limit`. */
+  bonus: number;
   resetsAt: string;
 }
 
@@ -31,23 +35,40 @@ export function startOfUtcDay(now: Date): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 }
 
+export function startOfUtcMonth(now: Date): Date {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+}
+
+export function startOfNextUtcMonth(now: Date): Date {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+}
+
 export class CreditsService {
   constructor(
     private readonly usage: Pick<UsageRepository, "creditsSpentSince" | "record" | "hasEventSince">,
-    private readonly dailyCredits: number,
-    /** Per-user override (null = default). */
+    private readonly monthlyCredits: number,
+    /** Per-user allowance override (null = default). */
     private readonly limitFor?: (userId: string) => Promise<number | null>,
+    /** Bonus credits granted to a user since a time. */
+    private readonly bonusSince?: (userId: string, since: Date) => Promise<number>,
   ) {}
 
   async status(userId: string, now: Date = new Date()): Promise<CreditStatus> {
-    const dayStart = startOfUtcDay(now);
-    const [used, override] = await Promise.all([this.usage.creditsSpentSince(userId, dayStart), this.limitFor?.(userId) ?? null]);
-    const limit = override ?? this.dailyCredits;
+    const monthStart = startOfUtcMonth(now);
+    const [used, override, bonus] = await Promise.all([
+      this.usage.creditsSpentSince(userId, monthStart),
+      this.limitFor?.(userId) ?? null,
+      this.bonusSince ? this.bonusSince(userId, monthStart).catch(() => 0) : 0,
+    ]);
+    const allowance = override ?? this.monthlyCredits;
+    // Restricted accounts (allowance 0) don't get to spend bonus credits either.
+    const limit = allowance === 0 ? 0 : allowance + bonus;
     return {
       used,
       limit,
       remaining: Math.max(limit - used, 0),
-      resetsAt: new Date(dayStart.getTime() + 86_400_000).toISOString(),
+      bonus: allowance === 0 ? 0 : bonus,
+      resetsAt: startOfNextUtcMonth(now).toISOString(),
     };
   }
 
@@ -57,7 +78,7 @@ export class CreditsService {
     if (status.remaining < CREDIT_COSTS[action]) {
       throw new AppError(
         "INSUFFICIENT_CREDITS",
-        `This needs ${CREDIT_COSTS[action]} credits and you have ${status.remaining} left today. Credits reset at midnight UTC.`,
+        `This needs ${CREDIT_COSTS[action]} credits and you have ${status.remaining} left this month. Credits reset on the 1st (UTC). Invite friends to earn bonus credits.`,
         { details: { ...status, cost: CREDIT_COSTS[action] } },
       );
     }

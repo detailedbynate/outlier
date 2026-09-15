@@ -27,9 +27,10 @@ export async function GET(request: NextRequest) {
   }
 
   if (data.user.email) {
-    await getServices()
-      .waitlist.markJoined(data.user.email)
-      .catch((e: unknown) => logger.warn("could not mark waitlist entry joined", { error: e }));
+    const services = getServices();
+    await services.waitlist.markJoined(data.user.email).catch((e: unknown) => logger.warn("could not mark waitlist entry joined", { error: e }));
+    // Bonus credits for referred people and their referrers (no-op if already rewarded).
+    await services.referrals.onAccountCreated(data.user.id, data.user.email);
   }
 
   const next = type === "invite" || type === "recovery" ? "/set-password" : safeRedirectPath(searchParams.get("next"));

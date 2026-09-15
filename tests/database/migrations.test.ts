@@ -7,6 +7,9 @@ const EXPECTED_TABLES = [
   "account_settings",
   "moderation_actions",
   "niche_reports",
+  "referral_codes",
+  "referral_rewards",
+  "credit_grants",
   "youtube_quota_usage",
   "youtube_api_cache",
   "workspaces",
@@ -444,6 +447,23 @@ describe("supabase migrations", () => {
     await expect(db.query(`update public.user_preferences set competitor_alerts = array['spam'] where user_id = $1`, [rows[0]!.id])).rejects.toThrow(
       /user_preferences_competitor_alerts_valid/,
     );
+  });
+
+  it("stores referral codes, tracks referred signups, and grants credits once", async () => {
+    const waitlist = await db.query<{ id: string }>(`insert into public.waitlist_entries (email) values ('ref-owner@example.com'), ('ref-friend@example.com') returning id`);
+    const [owner, friend] = waitlist.rows;
+    await db.query(`insert into public.referral_codes (code, waitlist_entry_id) values ('abcd2345', $1)`, [owner!.id]);
+    await expect(db.query(`insert into public.referral_codes (code) values ('BAD CODE')`)).rejects.toThrow(/referral_codes_format|referral_codes_owner/);
+    await db.query(`update public.waitlist_entries set referred_by_code = 'abcd2345' where id = $1`, [friend!.id]);
+    const count = await db.query<{ n: number }>(`select count(*)::int as n from public.waitlist_entries where referred_by_code = 'abcd2345'`);
+    expect(count.rows[0]!.n).toBe(1);
+
+    const { rows } = await db.query<{ id: string }>(`insert into auth.users (email) values ('ref-friend@example.com') returning id`);
+    await db.query(`insert into public.referral_rewards (code, referred_user_id, referred_credits) values ('abcd2345', $1, 50)`, [rows[0]!.id]);
+    await expect(db.query(`insert into public.referral_rewards (code, referred_user_id) values ('abcd2345', $1)`, [rows[0]!.id])).rejects.toThrow(/referred_user_id/);
+    await db.query(`insert into public.credit_grants (user_id, amount, reason, source_id) values ($1, 50, 'referral_welcome', 'r1')`, [rows[0]!.id]);
+    await expect(db.query(`insert into public.credit_grants (user_id, amount, reason, source_id) values ($1, 50, 'referral_welcome', 'r1')`, [rows[0]!.id])).rejects.toThrow(/credit_grants_unique_source/);
+    await expect(db.query(`insert into public.credit_grants (user_id, amount, reason) values ($1, 0, 'x')`, [rows[0]!.id])).rejects.toThrow(/credit_grants_amount_positive/);
   });
 
   it("defaults new channels to untracked", async () => {

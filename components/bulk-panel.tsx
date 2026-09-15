@@ -99,7 +99,7 @@ export function BulkPanel({
         ) : null}
         {fields.has("limits") ? (
           <>
-            <input name="dailyCredits" type="number" min={0} placeholder="Credits/day (blank = default)" aria-label="Daily credits" />
+            <input name="monthlyCredits" type="number" min={0} placeholder="Credits/month (blank = default)" aria-label="Monthly credits" />
             <input name="youtubeDailyUnits" type="number" min={0} placeholder="YouTube units/day" aria-label="YouTube units per day" />
           </>
         ) : null}

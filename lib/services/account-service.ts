@@ -6,12 +6,12 @@ import { moderationState } from "@/lib/moderation/status";
 import type { AccountRole, AccountSettingsRow } from "@/types/database";
 
 /**
- * Accounts the owner/admins create and manage: role, daily credits, YouTube
+ * Accounts the owner/admins create and manage: role, monthly credits, YouTube
  * quota, and access. Owners are unlimited and can't be demoted or disabled.
  */
 
-/** Effectively unlimited daily credits for owners. */
-export const OWNER_DAILY_CREDITS = 1_000_000;
+/** Effectively unlimited monthly credits for owners. */
+export const OWNER_MONTHLY_CREDITS = 1_000_000;
 
 export interface AccountProvisioner {
   /** Create the auth account (if needed). "email" sends an invite; "link" returns a one-time sign-in link. */
@@ -26,7 +26,7 @@ const limitSchema = z
 export const createAccountSchema = z.object({
   email: z.string().trim().toLowerCase().pipe(z.email("Enter a valid email.").max(254)),
   role: z.enum(["admin", "member"]).default("member"),
-  dailyCredits: limitSchema,
+  monthlyCredits: limitSchema,
   youtubeDailyUnits: limitSchema,
   note: z.string().trim().max(500).optional().transform((v) => v || null),
   delivery: z.enum(["email", "link"]).default("link"),
@@ -34,7 +34,7 @@ export const createAccountSchema = z.object({
 
 export const updateAccountSchema = z.object({
   role: z.enum(["owner", "admin", "member"]).optional(),
-  dailyCredits: limitSchema,
+  monthlyCredits: limitSchema,
   youtubeDailyUnits: limitSchema,
   note: z.string().trim().max(500).optional().transform((v) => v || null),
   disabled: z.boolean().optional(),
@@ -50,7 +50,7 @@ export interface Actor {
 export interface AccountLimits {
   role: AccountRole | null;
   disabled: boolean;
-  dailyCredits: number | null;
+  monthlyCredits: number | null;
   /** undefined = tier default; null = no per-user cap. */
   youtubeDailyUnits: number | null | undefined;
   quotaTier: string;
@@ -102,17 +102,17 @@ export class AccountService {
   /** Limits used by credits and YouTube quota checks. */
   async limitsFor(userId: string): Promise<AccountLimits> {
     const row = await this.forUser(userId, null);
-    if (!row) return { role: null, disabled: false, dailyCredits: null, youtubeDailyUnits: undefined, quotaTier: "default" };
+    if (!row) return { role: null, disabled: false, monthlyCredits: null, youtubeDailyUnits: undefined, quotaTier: "default" };
     const owner = row.role === "owner";
     const state = moderationState(row);
     if (!owner && state.status !== "active") {
       // Banned or restricted: nothing to spend.
-      return { role: row.role, disabled: state.status !== "restricted", dailyCredits: 0, youtubeDailyUnits: 0, quotaTier: row.quota_tier };
+      return { role: row.role, disabled: state.status !== "restricted", monthlyCredits: 0, youtubeDailyUnits: 0, quotaTier: row.quota_tier };
     }
     return {
       role: row.role,
       disabled: row.disabled,
-      dailyCredits: owner ? OWNER_DAILY_CREDITS : row.daily_credits,
+      monthlyCredits: owner ? OWNER_MONTHLY_CREDITS : row.daily_credits,
       youtubeDailyUnits: owner ? null : (row.youtube_daily_units ?? undefined),
       quotaTier: row.quota_tier,
     };
@@ -142,7 +142,7 @@ export class AccountService {
       user_id: userId,
       email: data.email,
       role: data.role,
-      daily_credits: data.dailyCredits,
+      daily_credits: data.monthlyCredits,
       youtube_daily_units: data.youtubeDailyUnits,
       note: data.note,
       disabled: false,
@@ -177,7 +177,7 @@ export class AccountService {
 
     const updated = await this.deps.repository.update(userId, {
       ...(data.role ? { role: data.role } : {}),
-      daily_credits: data.dailyCredits,
+      daily_credits: data.monthlyCredits,
       youtube_daily_units: data.youtubeDailyUnits,
       note: data.note,
       ...(data.disabled !== undefined ? { disabled: data.disabled } : {}),

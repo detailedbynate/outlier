@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { ReferralShare } from "@/components/referral-share";
 import { joinWaitlist, type WaitlistState } from "./actions";
 
 const initialState: WaitlistState = { status: "idle", message: null };
@@ -31,7 +32,7 @@ function ArrowIcon() {
   );
 }
 
-export function WaitlistForm() {
+export function WaitlistForm({ referralCode = null }: { referralCode?: string | null }) {
   const [state, action, pending] = useActionState(joinWaitlist, initialState);
 
   if (state.status === "joined") {
@@ -41,6 +42,9 @@ export function WaitlistForm() {
           ✓
         </div>
         <p className="landing-subtitle">{state.message}</p>
+        {state.referral ? (
+          <ReferralShare link={state.referral.link} statusLink={state.referral.statusLink} signups={state.referral.signups} threshold={state.referral.threshold} />
+        ) : null}
       </div>
     );
   }
@@ -60,6 +64,8 @@ export function WaitlistForm() {
       {/* Honeypot for bots — hidden from people and assistive tech. */}
       <input name="company" type="text" tabIndex={-1} autoComplete="off" className="honeypot" aria-hidden="true" />
       <input name="source" type="hidden" value="landing" />
+      {referralCode ? <input name="ref" type="hidden" value={referralCode} /> : null}
+      {referralCode ? <p className="waitlist-referred">You were invited by a friend. You&apos;ll both get bonus credits when you join.</p> : null}
       {state.status === "error" && state.message ? <p className="form-error">{state.message}</p> : null}
       <button type="submit" className="waitlist-submit" disabled={pending}>
         <span>{pending ? "Joining…" : "Join the waitlist"}</span>

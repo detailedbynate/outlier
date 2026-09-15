@@ -110,7 +110,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Sea
         <p className="stat-note">
           Leave limits blank to use the defaults. &ldquo;Copy sign-in link&rdquo; works without email setup.
         </p>
-        <CreateAccountForm canCreateAdmins={current.isOwner} defaultCredits={config.DAILY_CREDITS} defaultUnits={config.YOUTUBE_USER_DAILY_UNITS} />
+        <CreateAccountForm canCreateAdmins={current.isOwner} defaultCredits={config.MONTHLY_CREDITS} defaultUnits={config.YOUTUBE_USER_DAILY_UNITS} />
       </section>
 
       <section className="card stack">
@@ -144,8 +144,8 @@ export default async function AccountsPage({ searchParams }: { searchParams: Sea
                     </th>
                     <th>Account</th>
                     <th>Status</th>
-                    <th className="num">Credits today</th>
-                    <th>Role · credits/day · YouTube units/day · note</th>
+                    <th className="num">Credits this month</th>
+                    <th>Role · credits/month · YouTube units/day · note</th>
                   </tr>
                 </thead>
                 <tbody>

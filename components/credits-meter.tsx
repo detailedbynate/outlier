@@ -3,11 +3,13 @@ import { CoinsIcon } from "./icons";
 
 function resetsIn(resetsAt: string, now: Date = new Date()): string {
   const minutes = Math.max(0, Math.round((Date.parse(resetsAt) - now.getTime()) / 60_000));
+  const days = Math.floor(minutes / 1440);
+  if (days >= 1) return `${days}d`;
   const h = Math.floor(minutes / 60);
   return h > 0 ? `${h}h ${minutes % 60}m` : `${minutes}m`;
 }
 
-/** Sidebar widget: today's credit usage. */
+/** Sidebar widget: this month's credit usage. */
 export function CreditsMeter({ status }: { status: CreditStatus }) {
   // Owner accounts have an effectively unlimited allowance.
   if (status.limit >= 1_000_000) {
@@ -17,7 +19,7 @@ export function CreditsMeter({ status }: { status: CreditStatus }) {
           <span className="credits-icon">
             <CoinsIcon size={15} />
           </span>
-          <span className="credits-title">Daily credits</span>
+          <span className="credits-title">Monthly credits</span>
         </div>
         <div className="credits-value">
           <strong>Unlimited</strong>
@@ -33,7 +35,7 @@ export function CreditsMeter({ status }: { status: CreditStatus }) {
         <span className="credits-icon">
           <CoinsIcon size={15} />
         </span>
-        <span className="credits-title">Daily credits</span>
+        <span className="credits-title">Monthly credits</span>
       </div>
       <div className="credits-value">
         <strong>{status.remaining}</strong>
@@ -42,7 +44,7 @@ export function CreditsMeter({ status }: { status: CreditStatus }) {
       <div
         className="credits-bar"
         role="meter"
-        aria-label="Credits used today"
+        aria-label="Credits used this month"
         aria-valuemin={0}
         aria-valuemax={status.limit}
         aria-valuenow={status.used}

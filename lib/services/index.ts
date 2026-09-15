@@ -3,6 +3,7 @@ import { env } from "@/lib/core/env";
 import { SupabaseAccountProvisioner, SupabaseAuthModeration, SupabaseInviteSender } from "@/lib/auth/invites";
 import { ModerationRepository } from "@/lib/database/repositories/moderation";
 import { NicheRepository } from "@/lib/database/repositories/niches";
+import { ReferralRepository } from "@/lib/database/repositories/referrals";
 import { CompetitorRepository } from "@/lib/database/repositories/competitors";
 import { AccountRepository } from "@/lib/database/repositories/accounts";
 import { PreferencesRepository } from "@/lib/database/repositories/preferences";
@@ -27,6 +28,7 @@ import { getQuotaManager, getYouTubeService, quotaDay, setQuotaUserLimits, type 
 import { AccountService } from "./account-service";
 import { DashboardService } from "./dashboard-service";
 import { NicheService } from "./niche-service";
+import { ReferralService } from "./referral-service";
 import { CompetitorService } from "./competitor-service";
 import { ModerationService } from "./moderation-service";
 import { ChannelService } from "./channel-service";
@@ -54,6 +56,7 @@ export interface Services {
   accounts: AccountService;
   dashboard: DashboardService;
   niches: NicheService;
+  referrals: ReferralService;
   competitors: CompetitorService;
   moderation: ModerationService;
   compare: CompareService;
@@ -82,6 +85,7 @@ export interface Services {
     accounts: AccountRepository;
     moderation: ModerationRepository;
     niches: NicheRepository;
+    referrals: ReferralRepository;
     competitors: CompetitorRepository;
     youtubeCache: YouTubeCacheRepository;
   };
@@ -124,6 +128,7 @@ export function getServices(): Services {
     youtubeQuota: lazy(() => new YouTubeQuotaRepository(lazyDb())),
     accounts: lazy(() => new AccountRepository(lazyDb())),
     moderation: lazy(() => new ModerationRepository(lazyDb())),
+    referrals: lazy(() => new ReferralRepository(lazyDb())),
     niches: lazy(() => new NicheRepository(lazyDb())),
     competitors: lazy(() => new CompetitorRepository(lazyDb())),
     youtubeCache: lazy(() => new YouTubeCacheRepository(lazyDb())),
@@ -211,7 +216,21 @@ export function getServices(): Services {
     { type: MONITOR_CHANNELS_JOB_TYPE, everyHours: 1 },
   ]);
 
-  const credits = new CreditsService(repositories.usage, config.DAILY_CREDITS, async (userId) => (await accounts.limitsFor(userId)).dailyCredits);
+  const credits = new CreditsService(
+    repositories.usage,
+    config.MONTHLY_CREDITS,
+    async (userId) => (await accounts.limitsFor(userId)).monthlyCredits,
+    (userId, since) => repositories.referrals.bonusSince(userId, since),
+  );
+  const referrals = new ReferralService(
+    { referrals: repositories.referrals, waitlist: repositories.waitlist, userIdByEmail: (email) => repositories.accounts.userIdByEmail(email) },
+    {
+      referrerCredits: config.REFERRAL_REFERRER_CREDITS,
+      referredCredits: config.REFERRAL_REFERRED_CREDITS,
+      priorityThreshold: config.REFERRAL_PRIORITY_THRESHOLD,
+      maxRewardsPerMonth: config.REFERRAL_MAX_REWARDS_PER_MONTH,
+    },
+  );
   const research = new ResearchService(
     { youtube, channels: repositories.channels, videos: repositories.videos, usage: repositories.usage, storage, enqueue },
     { discoveryDailyLimit: config.DISCOVERY_DAILY_LIMIT, discoveryMaxChannels: config.DISCOVERY_MAX_CHANNELS, quality, regionCode },
@@ -221,6 +240,7 @@ export function getServices(): Services {
 
   services = {
     channels,
+    referrals,
     competitors: new CompetitorService({ channels: repositories.channels, competitors: repositories.competitors, compare }),
     niches: new NicheService(
       {

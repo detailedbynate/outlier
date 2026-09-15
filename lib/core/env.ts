@@ -89,8 +89,15 @@ const serverEnvSchema = z.object({
   /** Trending picks need at least this multiple of their channel's median Short views. */
   OUTLIER_MIN_MULTIPLIER: z.coerce.number().min(1).default(2),
 
-  /** Credits each user gets per UTC day. Actions that spend YouTube quota cost credits. */
-  DAILY_CREDITS: z.coerce.number().int().min(0).max(100_000).default(100),
+  /** Credits each user gets per UTC month (plus bonus credits, e.g. from referrals). Actions that spend YouTube quota cost credits. */
+  MONTHLY_CREDITS: z.coerce.number().int().min(0).max(1_000_000).default(1_000),
+  /** Referral rewards: bonus credits for the referrer and for the person they referred, when that person creates an account. */
+  REFERRAL_REFERRER_CREDITS: z.coerce.number().int().min(0).max(100_000).default(100),
+  REFERRAL_REFERRED_CREDITS: z.coerce.number().int().min(0).max(100_000).default(50),
+  /** Waitlist referrals needed to earn priority access. */
+  REFERRAL_PRIORITY_THRESHOLD: z.coerce.number().int().min(1).max(100).default(3),
+  /** Max referral rewards one referrer can earn per month (limits abuse). */
+  REFERRAL_MAX_REWARDS_PER_MONTH: z.coerce.number().int().min(0).max(1_000).default(20),
 
   ANTHROPIC_API_KEY: optionalString,
   OPENAI_API_KEY: optionalString,

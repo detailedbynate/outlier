@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createLogger } from "@/lib/core/logger";
-import { AccountService, OWNER_DAILY_CREDITS } from "@/lib/services/account-service";
+import { AccountService, OWNER_MONTHLY_CREDITS } from "@/lib/services/account-service";
 import type { AccountSettingsRow } from "@/types/database";
 
 const OWNER_ID = "00000000-0000-4000-8000-000000000001";
@@ -54,16 +54,16 @@ describe("AccountService", () => {
     const row = await service.forUser(OWNER_ID, "founder@example.com");
     expect(row).toMatchObject({ role: "owner", email: "founder@example.com" });
     expect(rows.get(OWNER_ID)?.role).toBe("owner");
-    expect(await service.limitsFor(OWNER_ID)).toMatchObject({ role: "owner", dailyCredits: OWNER_DAILY_CREDITS, youtubeDailyUnits: null });
+    expect(await service.limitsFor(OWNER_ID)).toMatchObject({ role: "owner", monthlyCredits: OWNER_MONTHLY_CREDITS, youtubeDailyUnits: null });
   });
 
   it("creates accounts with custom limits and returns a sign-in link", async () => {
     const { service, provisioner } = setup();
-    const { account, link } = await service.create({ email: " Pal@Example.com ", role: "member", dailyCredits: "250", youtubeDailyUnits: "", delivery: "link" }, owner, "https://app/auth/confirm");
+    const { account, link } = await service.create({ email: " Pal@Example.com ", role: "member", monthlyCredits: "250", youtubeDailyUnits: "", delivery: "link" }, owner, "https://app/auth/confirm");
     expect(provisioner.provision).toHaveBeenCalledWith("pal@example.com", "https://app/auth/confirm", "link");
     expect(account).toMatchObject({ email: "pal@example.com", role: "member", daily_credits: 250, youtube_daily_units: null, created_by: OWNER_ID });
     expect(link).toContain("token_hash");
-    expect(await service.limitsFor(account.user_id)).toMatchObject({ dailyCredits: 250, youtubeDailyUnits: undefined });
+    expect(await service.limitsFor(account.user_id)).toMatchObject({ monthlyCredits: 250, youtubeDailyUnits: undefined });
   });
 
   it("only lets the owner create or manage admins, and protects the owner account", async () => {
@@ -74,7 +74,7 @@ describe("AccountService", () => {
     await expect(service.create({ email: "founder@example.com" }, owner, "https://app")).rejects.toMatchObject({ code: "CONFLICT" });
 
     const { account } = await service.create({ email: "helper@example.com", role: "admin" }, owner, "https://app");
-    await expect(service.update(account.user_id, { dailyCredits: "5" }, admin)).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(service.update(account.user_id, { monthlyCredits: "5" }, admin)).rejects.toMatchObject({ code: "FORBIDDEN" });
     await expect(service.update(OWNER_ID, { disabled: true }, owner)).rejects.toMatchObject({ code: "FORBIDDEN" });
     await expect(service.update(OWNER_ID, { role: "member" }, owner)).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
@@ -83,23 +83,23 @@ describe("AccountService", () => {
     const { service } = setup();
     const { account } = await service.create({ email: "m@example.com" }, owner, "https://app");
     const admin = { userId: "00000000-0000-4000-8000-000000000099", role: "admin" as const };
-    const updated = await service.update(account.user_id, { dailyCredits: "20", youtubeDailyUnits: "300", disabled: true }, admin);
+    const updated = await service.update(account.user_id, { monthlyCredits: "20", youtubeDailyUnits: "300", disabled: true }, admin);
     expect(updated).toMatchObject({ daily_credits: 20, youtube_daily_units: 300, disabled: true });
     await expect(service.update(account.user_id, { role: "admin" }, admin)).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
   it("gives restricted or suspended accounts nothing to spend", async () => {
     const { service, repository } = setup();
-    const { account } = await service.create({ email: "r@example.com", dailyCredits: "500" }, owner, "https://app");
+    const { account } = await service.create({ email: "r@example.com", monthlyCredits: "500" }, owner, "https://app");
     await repository.update(account.user_id, { restricted_until: "9999-12-31T00:00:00.000Z" });
     service.invalidate(account.user_id);
-    expect(await service.limitsFor(account.user_id)).toMatchObject({ dailyCredits: 0, youtubeDailyUnits: 0, disabled: false });
+    expect(await service.limitsFor(account.user_id)).toMatchObject({ monthlyCredits: 0, youtubeDailyUnits: 0, disabled: false });
   });
 
   it("creates a settings row when editing someone who joined from the waitlist", async () => {
     const { service } = setup();
     const userId = "00000000-0000-4000-8000-000000000077";
-    const updated = await service.update(userId, { dailyCredits: "40", email: "joined@example.com" }, owner);
+    const updated = await service.update(userId, { monthlyCredits: "40", email: "joined@example.com" }, owner);
     expect(updated).toMatchObject({ user_id: userId, email: "joined@example.com", daily_credits: 40 });
   });
 

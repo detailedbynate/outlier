@@ -1,6 +1,7 @@
 "use server";
 
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { REFERRAL_COOKIE, referralLinks } from "@/lib/referrals/links";
 import { isAppError } from "@/lib/core/errors";
 import { logger } from "@/lib/core/logger";
 import { getServices } from "@/lib/services";
@@ -9,6 +10,7 @@ import { clientIpFrom } from "@/lib/services/rate-limit-service";
 export interface WaitlistState {
   status: "idle" | "joined" | "error";
   message: string | null;
+  referral?: { link: string; statusLink: string; signups: number; threshold: number } | null;
 }
 
 const field = (formData: FormData, name: string) => {
@@ -23,7 +25,7 @@ export async function joinWaitlist(_prev: WaitlistState, formData: FormData): Pr
   try {
     const services = getServices();
     await services.rateLimits.enforce("waitlistIp", clientIpFrom(await headers()));
-    const { alreadyJoined } = await services.waitlist.join({
+    const { entry, alreadyJoined } = await services.waitlist.join({
       email: field(formData, "email") ?? "",
       name: field(formData, "name"),
       channelUrl: field(formData, "channelUrl"),
@@ -31,9 +33,20 @@ export async function joinWaitlist(_prev: WaitlistState, formData: FormData): Pr
       useCase: field(formData, "useCase"),
       source: field(formData, "source"),
     });
+    const refCode = field(formData, "ref") || (await cookies()).get(REFERRAL_COOKIE)?.value || null;
+    let referral: WaitlistState["referral"] = null;
+    try {
+      const code = await services.referrals.recordSignup(entry, refCode, !alreadyJoined);
+      const [links, status] = await Promise.all([referralLinks(code), services.referrals.publicStatus(code)]);
+      referral = { link: links.share, statusLink: links.status, signups: status?.signups ?? 0, threshold: status?.threshold ?? 3 };
+    } catch (error) {
+      // The signup itself succeeded; referral extras are best effort.
+      logger.warn("waitlist referral setup failed", { error });
+    }
     return {
       status: "joined",
-      message: alreadyJoined ? "You're already on the list. We'll email you when your invite is ready." : "You're on the list! We'll email you when your invite is ready.",
+      message: alreadyJoined ? "You're already on the list. Share your link to move up." : "You're on the list! Share your link to skip the line.",
+      referral,
     };
   } catch (error) {
     if (isAppError(error) && (error.code === "VALIDATION_ERROR" || error.code === "RATE_LIMITED")) {

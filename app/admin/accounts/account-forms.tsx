@@ -49,8 +49,8 @@ export function CreateAccountForm({ canCreateAdmins, defaultCredits, defaultUnit
         </select>
       </label>
       <label className="field">
-        <span>Daily credits</span>
-        <input name="dailyCredits" type="number" min={0} placeholder={`Default (${defaultCredits})`} />
+        <span>Credits / month</span>
+        <input name="monthlyCredits" type="number" min={0} placeholder={`Default (${defaultCredits})`} />
       </label>
       <label className="field">
         <span>YouTube units / day</span>
@@ -104,7 +104,7 @@ export function EditAccountForm({
           <option value="admin">Admin</option>
         </select>
       )}
-      <input name="dailyCredits" type="number" min={0} defaultValue={account.daily_credits ?? ""} placeholder="Default" aria-label="Daily credits" disabled={locked || account.role === "owner"} />
+      <input name="monthlyCredits" type="number" min={0} defaultValue={account.daily_credits ?? ""} placeholder="Default" aria-label="Monthly credits" disabled={locked || account.role === "owner"} />
       <input name="youtubeDailyUnits" type="number" min={0} defaultValue={account.youtube_daily_units ?? ""} placeholder="Default" aria-label="YouTube units per day" disabled={locked || account.role === "owner"} />
       <input name="note" defaultValue={account.note ?? ""} placeholder="Note" aria-label="Note" maxLength={500} disabled={locked} />
       <button type="submit" className="button-ghost button-small" disabled={pending || locked}>

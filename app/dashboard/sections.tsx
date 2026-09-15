@@ -125,7 +125,7 @@ export async function OverviewStats({ userId, lastVisitAt, niches }: { userId: s
         </Link>
       ))}
       <div className="dash-stat" style={{ "--i": 3 } as React.CSSProperties}>
-        <span className="dash-stat-label">Credits today</span>
+        <span className="dash-stat-label">Credits this month</span>
         <span className="dash-stat-value">{unlimited ? "∞" : formatCompact(credits.remaining)}</span>
         {unlimited ? (
           <span className="dash-stat-note">unlimited</span>
@@ -134,7 +134,7 @@ export async function OverviewStats({ userId, lastVisitAt, niches }: { userId: s
             <span className="dash-meter" role="meter" aria-valuemin={0} aria-valuemax={credits.limit} aria-valuenow={credits.remaining}>
               <span style={{ width: `${creditShare * 100}%` }} />
             </span>
-            <span className="dash-stat-note">of {formatCompact(credits.limit)} · resets midnight UTC</span>
+            <span className="dash-stat-note">of {formatCompact(credits.limit)} · resets on the 1st</span>
           </>
         )}
       </div>
