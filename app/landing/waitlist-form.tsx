@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import { joinWaitlist, type WaitlistState } from "./actions";
 
-const initialState: WaitlistState = { status: "idle", message: null, position: null };
+const initialState: WaitlistState = { status: "idle", message: null };
 
 function UserIcon() {
   return (
@@ -40,11 +40,6 @@ export function WaitlistForm() {
         <div className="waitlist-success-mark" aria-hidden="true">
           ✓
         </div>
-        {state.position ? (
-          <p className="waitlist-position">
-            You&apos;re <span className="landing-title-accent">#{state.position.toLocaleString()}</span> on the list
-          </p>
-        ) : null}
         <p className="landing-subtitle">{state.message}</p>
       </div>
     );
