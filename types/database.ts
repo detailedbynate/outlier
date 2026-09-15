@@ -265,6 +265,8 @@ export type UserPreferencesRow = Timestamps & {
   channel: string | null;
   competitors: string[];
   onboarding_completed_at: string | null;
+  /** Competitor alert kinds this user wants to see. */
+  competitor_alerts: string[];
 };
 
 export type AccountRole = "owner" | "admin" | "member";

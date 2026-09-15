@@ -19,6 +19,12 @@ export class PreferencesRepository {
     );
   }
 
+  /** Save the user's own channel and competitor list (keeps the has_channel constraint consistent). */
+  async updateChannels(userId: string, channel: string | null, competitors: string[]): Promise<void> {
+    const patch = channel ? { has_channel: true, channel, competitors } : { competitors };
+    assertOk(await this.db.from("user_preferences").update(patch).eq("user_id", userId), "user_preferences.updateChannels");
+  }
+
   /** Clear answers and the completion flag so the user goes through onboarding again. */
   async reset(userId: string): Promise<void> {
     assertOk(

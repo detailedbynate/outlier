@@ -434,6 +434,18 @@ describe("supabase migrations", () => {
     await expect(db.query(`insert into public.niche_reports (topic_key, topic) values ('Bad Key!', 'x')`)).rejects.toThrow(/niche_reports_key_format/);
   });
 
+  it("stores competitor alert preferences with valid kinds only", async () => {
+    const { rows } = await db.query<{ id: string }>(`insert into auth.users (email) values ('alerts@example.com') returning id`);
+    const saved = await db.query<{ competitor_alerts: string[] }>(
+      `insert into public.user_preferences (user_id) values ($1) returning competitor_alerts`,
+      [rows[0]!.id],
+    );
+    expect(saved.rows[0]!.competitor_alerts).toEqual(["uploads", "breakouts", "subscriber_growth", "view_growth"]);
+    await expect(db.query(`update public.user_preferences set competitor_alerts = array['spam'] where user_id = $1`, [rows[0]!.id])).rejects.toThrow(
+      /user_preferences_competitor_alerts_valid/,
+    );
+  });
+
   it("defaults new channels to untracked", async () => {
     const { rows } = await db.query<{ tracked: boolean }>(
       `insert into public.channels (youtube_channel_id, title) values ('UCnnnnnnnnnnnnnnnnnnnnnn', 'New') returning tracked`,

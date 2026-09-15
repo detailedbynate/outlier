@@ -3,6 +3,7 @@ import { env } from "@/lib/core/env";
 import { SupabaseAccountProvisioner, SupabaseAuthModeration, SupabaseInviteSender } from "@/lib/auth/invites";
 import { ModerationRepository } from "@/lib/database/repositories/moderation";
 import { NicheRepository } from "@/lib/database/repositories/niches";
+import { CompetitorRepository } from "@/lib/database/repositories/competitors";
 import { AccountRepository } from "@/lib/database/repositories/accounts";
 import { PreferencesRepository } from "@/lib/database/repositories/preferences";
 import { RateLimitRepository } from "@/lib/database/repositories/rate-limits";
@@ -26,6 +27,7 @@ import { getQuotaManager, getYouTubeService, quotaDay, setQuotaUserLimits, type 
 import { AccountService } from "./account-service";
 import { DashboardService } from "./dashboard-service";
 import { NicheService } from "./niche-service";
+import { CompetitorService } from "./competitor-service";
 import { ModerationService } from "./moderation-service";
 import { ChannelService } from "./channel-service";
 import { CreditsService } from "./credits-service";
@@ -52,6 +54,7 @@ export interface Services {
   accounts: AccountService;
   dashboard: DashboardService;
   niches: NicheService;
+  competitors: CompetitorService;
   moderation: ModerationService;
   compare: CompareService;
   rateLimits: RateLimitService;
@@ -79,6 +82,7 @@ export interface Services {
     accounts: AccountRepository;
     moderation: ModerationRepository;
     niches: NicheRepository;
+    competitors: CompetitorRepository;
     youtubeCache: YouTubeCacheRepository;
   };
 }
@@ -121,6 +125,7 @@ export function getServices(): Services {
     accounts: lazy(() => new AccountRepository(lazyDb())),
     moderation: lazy(() => new ModerationRepository(lazyDb())),
     niches: lazy(() => new NicheRepository(lazyDb())),
+    competitors: lazy(() => new CompetitorRepository(lazyDb())),
     youtubeCache: lazy(() => new YouTubeCacheRepository(lazyDb())),
   };
   const accounts = new AccountService(
@@ -212,8 +217,11 @@ export function getServices(): Services {
     { discoveryDailyLimit: config.DISCOVERY_DAILY_LIMIT, discoveryMaxChannels: config.DISCOVERY_MAX_CHANNELS, quality, regionCode },
   );
 
+  const compare = new CompareService({ channels: repositories.channels, videos: repositories.videos, channelService: channels });
+
   services = {
     channels,
+    competitors: new CompetitorService({ channels: repositories.channels, competitors: repositories.competitors, compare }),
     niches: new NicheService(
       {
         niches: repositories.niches,
@@ -247,7 +255,7 @@ export function getServices(): Services {
       isOwnerEmail: (email) => accounts.isOwnerEmail(email),
     }),
     onboarding: new OnboardingService(repositories.preferences),
-    compare: new CompareService({ channels: repositories.channels, videos: repositories.videos, channelService: channels }),
+    compare,
     rateLimits: new RateLimitService(repositories.rateLimits, config.RATE_LIMIT_SALT ?? config.CRON_SECRET ?? "outlier-rate-limit"),
     waitlist: new WaitlistService(repositories.waitlist, lazy(() => new SupabaseInviteSender(lazyDb()))),
     videos,

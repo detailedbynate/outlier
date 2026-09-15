@@ -27,7 +27,7 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
     title: "Library",
     items: [
       { href: "/channels", label: "Tracked Channels", icon: BookmarkIcon },
-      { href: "/compare", label: "You vs Competitors", icon: UsersIcon, badge: "New" },
+      { href: "/compare", label: "Competitors", icon: UsersIcon, badge: "New" },
     ],
   },
   { title: "Account", items: [{ href: "/settings/preferences", label: "Preferences", icon: SlidersIcon }] },
