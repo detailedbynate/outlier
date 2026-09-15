@@ -9,6 +9,22 @@ function resetsIn(resetsAt: string, now: Date = new Date()): string {
 
 /** Sidebar widget: today's credit usage. */
 export function CreditsMeter({ status }: { status: CreditStatus }) {
+  // Owner accounts have an effectively unlimited allowance.
+  if (status.limit >= 1_000_000) {
+    return (
+      <div className="credits glass" data-level="ok">
+        <div className="credits-head">
+          <span className="credits-icon">
+            <CoinsIcon size={15} />
+          </span>
+          <span className="credits-title">Daily credits</span>
+        </div>
+        <div className="credits-value">
+          <strong>Unlimited</strong>
+        </div>
+      </div>
+    );
+  }
   const share = status.limit === 0 ? 1 : status.used / status.limit;
   const level = share >= 1 ? "empty" : share >= 0.8 ? "low" : "ok";
   return (

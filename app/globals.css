@@ -6437,3 +6437,202 @@ a.dash-row:hover {
     margin-left: 0;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Mobile app menu (phones only; desktop layout is untouched)
+--------------------------------------------------------------------------- */
+.sidebar-menu {
+  display: contents;
+}
+
+.mobile-menu-toggle {
+  display: none;
+}
+
+@keyframes mobile-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .sidebar {
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    padding: 10px 14px;
+    padding-top: max(10px, env(safe-area-inset-top));
+  }
+
+  .mobile-menu-toggle {
+    display: inline-grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    margin-left: auto;
+    border-radius: 12px;
+  }
+
+  .mm-line {
+    transition:
+      transform 0.25s var(--ease),
+      opacity 0.2s var(--ease);
+    transform-origin: 12px 12px;
+  }
+
+  .mobile-menu-toggle[aria-expanded="true"] .mm-top {
+    transform: translateY(5px) rotate(45deg);
+  }
+
+  .mobile-menu-toggle[aria-expanded="true"] .mm-mid {
+    opacity: 0;
+  }
+
+  .mobile-menu-toggle[aria-expanded="true"] .mm-bot {
+    transform: translateY(-5px) rotate(-45deg);
+  }
+
+  .sidebar-menu {
+    display: none;
+  }
+
+  /* Open: a full-screen menu with the same sections as the desktop sidebar. */
+  .sidebar[data-open] {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    height: 100dvh;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    border-radius: 0;
+    overflow-y: auto;
+    background: var(--page);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .sidebar[data-open] .sidebar-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    width: 100%;
+    padding: 14px 2px max(24px, env(safe-area-inset-bottom));
+    animation: mobile-menu-in 0.25s var(--ease) both;
+  }
+
+  .sidebar[data-open] .sidebar-nav {
+    order: 0;
+    width: 100%;
+    flex-direction: column;
+    gap: 20px;
+    overflow: visible;
+  }
+
+  .sidebar[data-open] .nav-section {
+    flex-direction: column;
+  }
+
+  .sidebar[data-open] .nav-section-title {
+    display: block;
+  }
+
+  .sidebar[data-open] .nav-badge {
+    display: inline-flex;
+  }
+
+  .sidebar[data-open] .nav-link {
+    padding: 12px 10px;
+    font-size: 15.5px;
+  }
+
+  .sidebar[data-open] .sidebar-foot {
+    margin-left: 0;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sidebar[data-open] .credits {
+    padding: 12px;
+  }
+
+  .sidebar[data-open] .credits-head {
+    display: flex;
+  }
+
+  .sidebar[data-open] .credits-bar,
+  .sidebar[data-open] .credits-foot {
+    display: block;
+  }
+
+  .sidebar[data-open] .account-email {
+    display: inline;
+  }
+
+  html.menu-open,
+  html.menu-open body {
+    overflow: hidden;
+  }
+
+  .main {
+    padding: 18px 14px 56px;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Phone layout fixes (desktop unchanged)
+--------------------------------------------------------------------------- */
+@media (max-width: 900px) {
+  /* Stat tiles: two per row instead of one tall stack. */
+  .grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .grid-4 > .card {
+    padding: 14px;
+  }
+
+  .grid-4 .stat-value {
+    font-size: 22px;
+  }
+
+  /* Section headers with action buttons wrap cleanly. */
+  .section-head {
+    flex-wrap: wrap;
+  }
+
+  .section-head > div:not(.section-head-actions) {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .section-head-actions {
+    margin-left: 0;
+    width: 100%;
+  }
+}
+
+@media (max-width: 600px) {
+  /* Trending cards: slimmer thumbnail and one stat per line so nothing overlaps. */
+  .trend-card {
+    grid-template-columns: 84px minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .trend-stats {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 3px;
+  }
+
+  .page-header {
+    align-items: flex-start;
+  }
+
+  .page-header h1 {
+    font-size: 24px;
+  }
+}

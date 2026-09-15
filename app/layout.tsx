@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { CreditsMeter } from "@/components/credits-meter";
 import { BrandMark, LogOutIcon } from "@/components/icons";
+import { MobileMenuToggle } from "@/components/mobile-menu-toggle";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getServices } from "@/lib/services";
@@ -67,6 +68,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <div className="app">
           <aside className="sidebar glass">
             <Brand />
+            <MobileMenuToggle />
+            <div id="app-sidebar-menu" className="sidebar-menu">
             <SidebarNav isAdmin={current.isAdmin} />
             <div className="sidebar-foot">
               <CreditsMeter status={credits} />
@@ -81,6 +84,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
                   <LogOutIcon size={15} />
                 </button>
               </form>
+            </div>
             </div>
           </aside>
           <main className="main">
