@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { E2E_COOKIE, isE2EBypass } from "./lib/auth/e2e";
 
 /** Reachable without signing in. Prefix match for entries ending in "/". */
 const PUBLIC_PATHS = ["/", "/login", "/privacy", "/terms", "/auth/"];
@@ -34,7 +35,7 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname, search } = request.nextUrl;
-  if (!user && !isPublic(pathname)) {
+  if (!user && !isE2EBypass(request.cookies.get(E2E_COOKIE)?.value) && !isPublic(pathname)) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
     loginUrl.search = `?next=${encodeURIComponent(pathname + search)}`;

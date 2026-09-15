@@ -18,7 +18,7 @@ import {
 export async function DashboardView({ current }: { current: CurrentUser }) {
   const services = getServices();
   const userId = current.user.id;
-  const [preferences, lastVisitAt] = await Promise.all([services.onboarding.getPreferences(userId), services.dashboard.registerVisit(userId)]);
+  const [preferences, lastVisitAt] = await Promise.all([services.onboarding.getPreferences(userId), (current.isTestSession ? Promise.resolve(null) : services.dashboard.registerVisit(userId))]);
   const niches = preferences?.niches ?? [];
   const name = greetingName(current.email, current.user.user_metadata?.full_name as string | undefined);
 

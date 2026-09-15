@@ -36,6 +36,8 @@ const serverEnvSchema = z.object({
   MONITOR_MAX_CHANNELS_PER_RUN: z.coerce.number().int().min(50).max(20_000).default(1_000),
 
   INTERNAL_API_KEY: optionalString,
+  /** End-to-end tests only: lets Playwright sign in as the owner outside production. Never set in production. */
+  E2E_AUTH_TOKEN: optionalString,
   /** Bearer secret for /api/cron/* (called by GitHub Actions). */
   CRON_SECRET: optionalString,
   /** Comma-separated emails allowed to use the app. Blank = any signed-in user. People invited from the waitlist are always allowed. */

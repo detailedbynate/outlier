@@ -81,6 +81,17 @@ The migration tests apply every migration to an in-memory Postgres ([PGlite](htt
 
 ---
 
+## End-to-end tests (Playwright)
+
+```bash
+npm run test:e2e
+```
+
+- Uses the Microsoft Edge already installed on Windows (no browser download; the package is ~10 MB).
+- Starts its own dev server on port 3100 and signs in as the owner through a test-only cookie. The bypass (`lib/auth/e2e.ts`) only works when `NODE_ENV` isn't `production` **and** `E2E_AUTH_TOKEN` is set; never set that variable in production.
+- Checks every signed-in page on desktop (1280px) and phone (375px): renders, no errors, no sideways overflow. Also covers the mobile menu, dropdowns staying on screen, competitor tabs, and the public landing/login pages.
+- Tests only read data: no YouTube calls and no waitlist signups. Test sessions don't record dashboard visits.
+
 ## Architecture
 
 ```

@@ -8,6 +8,7 @@ import { env, requireEnv } from "@/lib/core/env";
 import { moderationState, type ModerationState } from "@/lib/moderation/status";
 import { getServices } from "@/lib/services";
 import { isEmailAllowed, parseAllowedEmails } from "./access";
+import { E2E_COOKIE, isE2EBypass } from "./e2e";
 
 /** Supabase client bound to the request's auth cookies (anon key; RLS applies). */
 export async function createSessionClient() {
@@ -38,10 +39,14 @@ export interface CurrentUser {
   moderation: ModerationState;
   /** Finished first-run onboarding (only checked for approved users). */
   onboardingCompleted: boolean;
+  /** Set for end-to-end test sessions so they don't record activity. */
+  isTestSession?: boolean;
 }
 
 /** The signed-in user for this request (validated with Supabase Auth, not just the cookie). Cached per request. */
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
+  const cookieStore = await cookies();
+  if (isE2EBypass(cookieStore.get(E2E_COOKIE)?.value)) return e2eOwner();
   const supabase = await createSessionClient();
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user) return null;
@@ -61,6 +66,23 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const onboardingCompleted = approved ? await services.onboarding.isCompleted(data.user.id) : false;
   return { user: data.user, email, approved, isAdmin: isAdmin && !banned, isOwner, moderation, role: isOwner ? "owner" : isAdmin ? "admin" : role, onboardingCompleted };
 });
+
+/** End-to-end tests sign in as the owner account (see ./e2e.ts for when this is allowed). */
+async function e2eOwner(): Promise<CurrentUser | null> {
+  const owner = (await getServices().accounts.list()).find((a) => a.role === "owner");
+  if (!owner) return null;
+  return {
+    user: { id: owner.user_id, email: owner.email, user_metadata: {} } as User,
+    email: owner.email,
+    approved: true,
+    isAdmin: true,
+    isOwner: true,
+    role: "owner",
+    moderation: moderationState(null),
+    onboardingCompleted: true,
+    isTestSession: true,
+  };
+}
 
 /**
  * Use at the top of every protected page and server action. Users who haven't
