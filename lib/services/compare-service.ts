@@ -15,7 +15,7 @@ import type { ChannelService } from "./channel-service";
 
 export const MAX_COMPETITORS_COMPARED = 5;
 /** Re-sync channels whose data is older than this before comparing. */
-const FRESH_MS = 12 * 3_600_000;
+export const FRESH_MS = 12 * 3_600_000;
 const RECENT_UPLOADS = 30;
 
 export interface ComparedChannel {
@@ -62,10 +62,11 @@ export class CompareService {
       }
     };
 
-    const youResult = you?.trim() ? await load(you.trim()) : null;
+    // Load everything in parallel: each channel needs a few YouTube calls, so a
+    // sequential loop made a full refresh take 15-20 seconds.
+    const [youResult, ...results] = await Promise.all([you?.trim() ? load(you.trim()) : Promise.resolve(null), ...wanted.map(load)]);
     const loaded: ComparedChannel[] = [];
-    for (const identifier of wanted) {
-      const result = await load(identifier);
+    for (const result of results) {
       // Skip duplicates of "you" or of each other (e.g. a URL and a handle for the same channel).
       if (result && result.channel.id !== youResult?.channel.id && !loaded.some((c) => c.channel.id === result.channel.id)) {
         loaded.push(result);

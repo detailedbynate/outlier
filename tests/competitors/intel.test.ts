@@ -14,6 +14,7 @@ import {
   type IntelSnapshot,
   type IntelVideo,
 } from "@/lib/competitors/intel";
+import { CompareService } from "@/lib/services/compare-service";
 import { CompetitorService } from "@/lib/services/competitor-service";
 import type { ChannelRow } from "@/types/database";
 
@@ -223,16 +224,44 @@ describe("CompetitorService data efficiency", () => {
   });
 
   it("syncs only missing or stale channels and gives competitors warm monitoring", async () => {
-    const { deps, service } = setup([row("fresh", "@fresh", 1), row("stale", "@stale", 30)]);
-    const result = await service.sync({ you: null, competitors: ["@fresh", "@stale", "@new"], now: NOW });
+    const { deps, service } = setup([row("fresh", "@fresh", 1), row("recent", "@recent", 10), row("stale", "@stale", 30)]);
+    const result = await service.sync({ you: null, competitors: ["@fresh", "@recent", "@stale", "@new"], now: NOW });
     expect(deps.compare.compare).toHaveBeenCalledWith(null, ["@stale", "@new"], NOW);
-    expect(result.skipped).toBe(1);
-    expect(deps.channels.raiseMonitorPriority).toHaveBeenCalledWith(["fresh", "stale"], 2, NOW);
+    expect(result.skipped).toBe(2);
+    expect(deps.channels.raiseMonitorPriority).toHaveBeenCalledWith(["fresh", "recent", "stale"], 2, NOW);
   });
 
   it("makes no YouTube calls when everything is fresh", async () => {
     const { deps, service } = setup([row("fresh", "@fresh", 1)]);
     await service.sync({ you: null, competitors: ["@fresh"], now: NOW });
     expect(deps.compare.compare).not.toHaveBeenCalled();
+  });
+});
+
+describe("CompareService loading speed", () => {
+  it("loads channels in parallel, keeping order and skipping duplicates", async () => {
+    let active = 0;
+    let peak = 0;
+    const rowFor = (identifier: string) => ({ id: identifier === "@dupe" ? "aaa" : identifier.slice(1), youtube_channel_id: "UC", handle: identifier, tracked: true, last_synced_at: null, hidden_subscriber_count: false, subscriber_count: 1, view_count: 1, video_count: 1, published_at: null });
+    const service = new CompareService(
+      {
+        channels: { findByYouTubeId: vi.fn(async () => null), findByHandle: vi.fn(async () => null), listSnapshots: vi.fn(async () => []), setTracked: vi.fn(async () => {}) },
+        videos: { recentVideos: vi.fn(async () => []) },
+        channelService: {
+          refreshChannel: vi.fn(async (identifier: string) => {
+            active += 1;
+            peak = Math.max(peak, active);
+            await new Promise((r) => setTimeout(r, 20));
+            active -= 1;
+            return { channel: rowFor(identifier) } as never;
+          }),
+        },
+      } as never,
+      createLogger(),
+    );
+    const result = await service.compare("@you", ["@aaa", "@bbb", "@dupe", "@ccc"], NOW);
+    expect(peak).toBe(5);
+    expect(result.you?.channel.id).toBe("you");
+    expect(result.competitors.map((c) => c.channel.id)).toEqual(["aaa", "bbb", "ccc"]);
   });
 });

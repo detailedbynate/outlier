@@ -20,7 +20,7 @@ import type { ChannelRepository } from "@/lib/database/repositories/channels";
 import type { CompetitorRepository } from "@/lib/database/repositories/competitors";
 import { parseChannelIdentifier } from "@/lib/youtube/parse";
 import type { ChannelRow } from "@/types/database";
-import type { CompareService } from "./compare-service";
+import { FRESH_MS, type CompareService } from "./compare-service";
 
 /**
  * Competitor intelligence. Reading is database-only: channels, snapshots,
@@ -31,8 +31,8 @@ import type { CompareService } from "./compare-service";
 
 const HISTORY_DAYS = 35;
 const VIDEO_DAYS = 90;
-/** `sync` skips channels synced more recently than this. */
-const SYNC_STALE_MS = 6 * 3_600_000;
+/** `sync` skips channels synced more recently than this (same window CompareService uses, so skips and refreshes agree). */
+const SYNC_STALE_MS = FRESH_MS;
 /** Competitors get warm monitoring (channel stats every few hours; recent uploads checked by priority). */
 const COMPETITOR_MONITOR_PRIORITY = 2;
 
