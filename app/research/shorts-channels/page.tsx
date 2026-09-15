@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Dropdown } from "@/components/dropdown";
-import { ChevronDownIcon, FlameIcon, SearchIcon, ShortsIcon, SlidersIcon, SortIcon, VideoIcon, VideoOffIcon, ZapIcon } from "@/components/icons";
+import { ChevronDownIcon, FlameIcon, ShortsIcon, SlidersIcon, SortIcon, VideoIcon, VideoOffIcon, ZapIcon } from "@/components/icons";
 import { PageHeader } from "@/components/page-header";
 import { requireApprovedUser } from "@/lib/auth/session";
 import { env } from "@/lib/core/env";
@@ -10,7 +10,7 @@ import { getServices } from "@/lib/services";
 import { clearTrendingPicks, repickTrending } from "./actions";
 import { ChannelCard } from "./channel-card";
 import { TrendingCard } from "./trending-card";
-import { DiscoverForm } from "./discover-form";
+import { SearchHero } from "./search-hero";
 import {
   ACTIVITY,
   AVG_VIEWS,
@@ -60,7 +60,20 @@ export default async function ShortsChannelsPage({ searchParams }: { searchParam
   ]);
   const picksUpdatedAt = picks.map((p) => p.stats_updated_at ?? p.created_at).sort().at(-1);
   const canLoadMore = channels.length === Number(state.limit) && Number(state.limit) < MAX_LIMIT;
-  const discoverKeyword = terms[0] ?? "";
+  // Filters ride along with the search so typing a new query keeps them.
+  const hiddenFilters = Object.entries(state)
+    .filter(
+      ([key, value]) =>
+        !(
+          key === "q" ||
+          key === "limit" ||
+          (value === "any" && key !== "market") ||
+          (key === "market" && value === "en") ||
+          (key === "sort" && value === "views") ||
+          (key === "videos" && value === "show")
+        ),
+    )
+    .map(([name, value]) => ({ name, value }));
 
   const select = (name: string, options: { key: string; label: string }[], value: string) => (
     <label className="field">
@@ -80,25 +93,7 @@ export default async function ShortsChannelsPage({ searchParams }: { searchParam
   return (
     <div className="research-page">
       <PageHeader icon={ShortsIcon} title="Shorts Channels" subtitle="Find channels winning with Shorts, by niche, size, and momentum." />
-      <form method="get" action="/research/shorts-channels" className="search-hero" role="search">
-        <SearchIcon size={18} className="search-hero-icon" />
-        <label htmlFor="q" className="sr-only">
-          Search channels by niche
-        </label>
-        <input
-          id="q"
-          name="q"
-          type="search"
-          defaultValue={state.q}
-          placeholder={'Search "recipe, cooking, food" to find food channels'}
-          autoComplete="off"
-        />
-        {Object.entries(state).map(([key, value]) =>
-          key === "q" || key === "limit" || (value === "any" && key !== "market") || (key === "market" && value === "en") || (key === "sort" && value === "views") || (key === "videos" && value === "show") ? null : (
-            <input key={key} type="hidden" name={key} value={value} />
-          ),
-        )}
-      </form>
+      <SearchHero query={state.q} hidden={hiddenFilters} searchesLeft={searchesLeft} />
 
       <div className="popular-row">
         <span className="muted">Popular this week:</span>
@@ -268,7 +263,7 @@ export default async function ShortsChannelsPage({ searchParams }: { searchParam
       {channels.length === 0 ? (
         <div className="card empty">
           {terms.length > 0
-            ? "No saved Shorts channels match yet. Discover some from YouTube below."
+            ? "No saved Shorts channels match yet. Use “Find new on YouTube” above to pull some in."
             : "No Shorts channels match these filters."}
         </div>
       ) : (
@@ -286,8 +281,6 @@ export default async function ShortsChannelsPage({ searchParams }: { searchParam
           </Link>
         </div>
       ) : null}
-
-      <DiscoverForm keyword={discoverKeyword} searchesLeft={searchesLeft} />
     </div>
   );
 }
