@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ComponentType } from "react";
-import { BookmarkIcon, ChartIcon, FlameIcon, GridIcon, ShortsIcon, SlidersIcon, UsersIcon } from "./icons";
+import { BookmarkIcon, ChartIcon, CompassIcon, FlameIcon, GridIcon, ShortsIcon, SlidersIcon, UsersIcon } from "./icons";
 
 interface NavItem {
   href: string;
@@ -17,7 +17,8 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
   {
     title: "Research tools",
     items: [
-      { href: "/research/shorts-channels", label: "Shorts Channels", icon: ShortsIcon, badge: "New" },
+      { href: "/research/niche-finder", label: "Niche Finder", icon: CompassIcon, badge: "New" },
+      { href: "/research/shorts-channels", label: "Shorts Channels", icon: ShortsIcon },
       { href: "/viral", label: "Viral Videos", icon: FlameIcon },
       { href: "/analyze", label: "Analyze Video", icon: ChartIcon },
     ],

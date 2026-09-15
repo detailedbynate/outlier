@@ -12,6 +12,8 @@ export const RATE_LIMITS = {
   signInEmail: { windowSeconds: 900, maxHits: 8 },
   /** Channel comparisons per user (each can sync new channels from YouTube). */
   compareUser: { windowSeconds: 3600, maxHits: 30 },
+  /** Niche Finder searches per user. */
+  nicheUser: { windowSeconds: 3600, maxHits: 40 },
 } as const;
 
 export type RateLimitPolicy = keyof typeof RATE_LIMITS;

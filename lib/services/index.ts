@@ -2,6 +2,7 @@ import "server-only";
 import { env } from "@/lib/core/env";
 import { SupabaseAccountProvisioner, SupabaseAuthModeration, SupabaseInviteSender } from "@/lib/auth/invites";
 import { ModerationRepository } from "@/lib/database/repositories/moderation";
+import { NicheRepository } from "@/lib/database/repositories/niches";
 import { AccountRepository } from "@/lib/database/repositories/accounts";
 import { PreferencesRepository } from "@/lib/database/repositories/preferences";
 import { RateLimitRepository } from "@/lib/database/repositories/rate-limits";
@@ -24,6 +25,7 @@ import { YouTubeCacheRepository, YouTubeQuotaRepository } from "@/lib/database/r
 import { getQuotaManager, getYouTubeService, quotaDay, setQuotaUserLimits, type QuotaManager } from "@/lib/youtube";
 import { AccountService } from "./account-service";
 import { DashboardService } from "./dashboard-service";
+import { NicheService } from "./niche-service";
 import { ModerationService } from "./moderation-service";
 import { ChannelService } from "./channel-service";
 import { CreditsService } from "./credits-service";
@@ -49,6 +51,7 @@ export interface Services {
   onboarding: OnboardingService;
   accounts: AccountService;
   dashboard: DashboardService;
+  niches: NicheService;
   moderation: ModerationService;
   compare: CompareService;
   rateLimits: RateLimitService;
@@ -75,6 +78,7 @@ export interface Services {
     youtubeQuota: YouTubeQuotaRepository;
     accounts: AccountRepository;
     moderation: ModerationRepository;
+    niches: NicheRepository;
     youtubeCache: YouTubeCacheRepository;
   };
 }
@@ -116,6 +120,7 @@ export function getServices(): Services {
     youtubeQuota: lazy(() => new YouTubeQuotaRepository(lazyDb())),
     accounts: lazy(() => new AccountRepository(lazyDb())),
     moderation: lazy(() => new ModerationRepository(lazyDb())),
+    niches: lazy(() => new NicheRepository(lazyDb())),
     youtubeCache: lazy(() => new YouTubeCacheRepository(lazyDb())),
   };
   const accounts = new AccountService(
@@ -209,6 +214,19 @@ export function getServices(): Services {
 
   services = {
     channels,
+    niches: new NicheService(
+      {
+        niches: repositories.niches,
+        youtube,
+        channels: repositories.channels,
+        videos: repositories.videos,
+        usage: repositories.usage,
+        credits,
+        storage,
+        enqueue,
+      },
+      { dailyYoutubeRefreshes: config.NICHE_DAILY_YOUTUBE_REFRESHES, language: quality.language, regionCode },
+    ),
     dashboard: new DashboardService({
       channels: repositories.channels,
       videos: repositories.videos,

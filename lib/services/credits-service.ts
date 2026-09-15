@@ -14,6 +14,8 @@ export const CREDIT_COSTS = {
   track_channel: 3,
   /** Video + channel + recent uploads for the baseline. */
   analyze_video: 2,
+  /** Niche Finder fresh research: one search + batched stats (only charged when YouTube is called). */
+  niche_research: 5,
 } as const;
 
 export type CreditAction = keyof typeof CREDIT_COSTS;

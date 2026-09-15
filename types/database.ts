@@ -313,6 +313,22 @@ export type ModerationActionRow = {
   created_at: string;
 };
 
+export type NicheReportRow = {
+  topic_key: string;
+  topic: string;
+  report: Json;
+  source: "database" | "youtube";
+  videos_analyzed: number;
+  channels_analyzed: number;
+  youtube_units: number;
+  computed_at: string | null;
+  youtube_refreshed_at: string | null;
+  refresh_claimed_at: string | null;
+  search_count: number;
+  last_searched_at: string;
+  created_at: string;
+};
+
 export type RateLimitRow = {
   key: string;
   window_start: string;
@@ -448,6 +464,7 @@ export type Database = {
       >;
       trending_pick_stats: TableDef<TrendingPickStatRow, "pick_id" | "views">;
       account_settings: TableDef<AccountSettingsRow, "user_id" | "email">;
+      niche_reports: TableDef<NicheReportRow, "topic_key" | "topic">;
       moderation_actions: TableDef<ModerationActionRow, "target_email" | "action">;
       youtube_quota_usage: {
         Row: YouTubeQuotaUsageRow;
@@ -498,6 +515,10 @@ export type Database = {
       database_size_bytes: {
         Args: Record<string, never>;
         Returns: number;
+      };
+      claim_niche_refresh: {
+        Args: { p_topic_key: string; p_topic: string; p_stale_before: string; p_lock_seconds: number };
+        Returns: boolean;
       };
       delete_user_account: {
         Args: { p_user_id: string };

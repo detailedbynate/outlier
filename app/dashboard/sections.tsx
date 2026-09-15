@@ -505,7 +505,7 @@ const SHORTCUTS: { href: string; label: string; note: string; icon: IconType; to
   { href: "/research/shorts-channels", label: "Search Channels", note: "Find Shorts channels by niche", icon: SearchIcon, tone: "violet" },
   { href: "/viral", label: "Viral Videos", note: "Videos beating their channel", icon: FlameIcon, tone: "pink" },
   { href: "/analyze", label: "Analyze Video", note: "Why did it take off?", icon: ChartIcon, tone: "blue" },
-  { href: "/research/shorts-channels?sort=vph", label: "Find Ideas", note: "Rising Shorts to learn from", icon: CompassIcon, tone: "amber" },
+  { href: "/research/niche-finder", label: "Find Ideas", note: "Research niches and sub-niches", icon: CompassIcon, tone: "amber" },
 ];
 
 export function ResearchShortcuts() {

@@ -15,7 +15,7 @@ import type { TrendingPickView, TrendingService } from "./trending-service";
  */
 
 export const DASHBOARD_VISIT_EVENT = "dashboard.visit";
-const RESEARCH_EVENTS = [SHORTS_DISCOVERY_EVENT, "credits.track_channel", "credits.analyze_video"];
+const RESEARCH_EVENTS = [SHORTS_DISCOVERY_EVENT, "niche.search", "credits.track_channel", "credits.analyze_video"];
 /** Visits closer together than this count as the same session. */
 const VISIT_SESSION_MS = 30 * 60_000;
 

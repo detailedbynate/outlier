@@ -83,6 +83,8 @@ export function activityItem(event: { id: string; event_type: string; resource_i
   switch (event.event_type) {
     case "research.shorts_discovery":
       return { id: event.id, kind: "search", label: `Searched “${resource}”`, href: `/research/shorts-channels?q=${encodeURIComponent(resource)}`, at };
+    case "niche.search":
+      return { id: event.id, kind: "search", label: `Researched niche “${resource}”`, href: `/research/niche-finder?topic=${encodeURIComponent(resource)}`, at };
     case "credits.track_channel":
       return { id: event.id, kind: "track", label: "Tracked a channel", href: resource ? `/channels/${resource}` : "/channels", at };
     case "credits.analyze_video":

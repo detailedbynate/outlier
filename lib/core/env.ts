@@ -73,6 +73,8 @@ const serverEnvSchema = z.object({
   /** Research discovery searches per UTC day, all users combined (100 YouTube quota units each). */
   DISCOVERY_DAILY_LIMIT: z.coerce.number().int().min(0).max(90).default(10),
   DISCOVERY_MAX_CHANNELS: z.coerce.number().int().min(1).max(50).default(25),
+  /** Niche Finder: topics refreshed from YouTube per UTC day, all users combined (~102 units each). Everything else is database-only. */
+  NICHE_DAILY_YOUTUBE_REFRESHES: z.coerce.number().int().min(0).max(80).default(15),
 
   /** Outlier quality rules (Trending Today and Discovery). */
   OUTLIER_LANGUAGE: z.string().regex(/^[a-z]{2}$/i).default("en"),

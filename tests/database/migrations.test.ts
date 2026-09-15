@@ -6,6 +6,7 @@ const EXPECTED_TABLES = [
   "users",
   "account_settings",
   "moderation_actions",
+  "niche_reports",
   "youtube_quota_usage",
   "youtube_api_cache",
   "workspaces",
@@ -421,6 +422,16 @@ describe("supabase migrations", () => {
       [userId],
     );
     expect(left.rows[0]).toEqual({ users: 0, workspaces: 0, settings: 0, log_target: null });
+  });
+
+  it("lets exactly one caller claim a stale niche refresh", async () => {
+    const claim = async (staleBefore: string) =>
+      (await db.query<{ ok: boolean }>(`select public.claim_niche_refresh('gaming', 'Gaming', $1::timestamptz, 120) as ok`, [staleBefore])).rows[0]!.ok;
+    expect(await claim(new Date().toISOString())).toBe(true);
+    expect(await claim(new Date().toISOString())).toBe(false); // already claimed
+    await db.query(`update public.niche_reports set refresh_claimed_at = null, youtube_refreshed_at = now() where topic_key = 'gaming'`);
+    expect(await claim(new Date(Date.now() - 86_400_000).toISOString())).toBe(false); // refreshed recently
+    await expect(db.query(`insert into public.niche_reports (topic_key, topic) values ('Bad Key!', 'x')`)).rejects.toThrow(/niche_reports_key_format/);
   });
 
   it("defaults new channels to untracked", async () => {
