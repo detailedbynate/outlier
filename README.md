@@ -185,12 +185,13 @@ When quota is unavailable: a stale cached response (up to 2 days old) is served 
 
 ## Credits & referrals
 
-Credits are a **monthly** allowance (`MONTHLY_CREDITS`, default 1000; per-account overrides in Admin → Accounts) that resets on the 1st (UTC). Bonus grants in `credit_grants` add to the allowance for the month they're granted.
+Credits are a **monthly** allowance (`MONTHLY_CREDITS`, default 400; per-account overrides in Admin → Accounts) that resets on the 1st (UTC). Bonus grants in `credit_grants` add to the allowance for the month they're granted.
 
 Every waitlist signup and account gets a code. Share link: `/?ref=CODE` (stored in a 30-day cookie); public progress: `/waitlist/CODE`; in-app: `/referrals`.
 
 - `REFERRAL_PRIORITY_THRESHOLD` (3) referred signups → priority on the waitlist (Admin → Waitlist → "Top referrers first").
-- When a referred person creates an account: they get `REFERRAL_REFERRED_CREDITS` (50), the referrer gets `REFERRAL_REFERRER_CREDITS` (100) — held until the referrer has an account, capped at `REFERRAL_MAX_REWARDS_PER_MONTH` (20). Self-referrals are ignored and each reward is granted once.
+- When a referred person creates an account: they get `REFERRAL_REFERRED_CREDITS` (50) and the referrer gets `REFERRAL_REFERRER_CREDITS` (25) — held until the referrer has an account, capped at `REFERRAL_MAX_REWARDS_PER_MONTH` (20) per month. Self-referrals are ignored and each reward is granted once.
+- `REFERRAL_MILESTONES` (`1:75,3:100,5:200,10:375`) adds a bonus on top at those friend counts, so the running total is **100 / 250 / 500 / 1000 credits** at 1 / 3 / 5 / 10 friends. Referrals are unlimited: the last milestone repeats (20, 30, … friends), so there is always a next goal.
 
 ---
 

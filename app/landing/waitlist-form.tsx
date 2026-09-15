@@ -43,7 +43,14 @@ export function WaitlistForm({ referralCode = null }: { referralCode?: string | 
         </div>
         <p className="landing-subtitle">{state.message}</p>
         {state.referral ? (
-          <ReferralShare link={state.referral.link} statusLink={state.referral.statusLink} signups={state.referral.signups} threshold={state.referral.threshold} />
+          <ReferralShare
+            link={state.referral.link}
+            statusLink={state.referral.statusLink}
+            count={state.referral.signups}
+            target={state.referral.threshold}
+            unlocks="priority access"
+            reached="Priority access unlocked — keep sharing to earn bonus credits"
+          />
         ) : null}
       </div>
     );

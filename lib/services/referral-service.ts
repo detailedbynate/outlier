@@ -1,7 +1,8 @@
 import { createLogger, type Logger } from "@/lib/core/logger";
 import type { ReferralRepository } from "@/lib/database/repositories/referrals";
 import type { WaitlistRepository } from "@/lib/database/repositories/waitlist";
-import type { ReferralCodeRow, WaitlistEntryRow } from "@/types/database";
+import { milestoneBonus, nextMilestone, type Milestone } from "@/lib/referrals/milestones";
+import type { ReferralCodeRow, ReferralRewardRow, WaitlistEntryRow } from "@/types/database";
 import { startOfUtcMonth } from "./credits-service";
 
 /**
@@ -15,6 +16,7 @@ import { startOfUtcMonth } from "./credits-service";
 export const REFERRAL_CODE_PATTERN = /^[a-z0-9]{6,16}$/;
 export const REFERRED_REASON = "referral_welcome";
 export const REFERRER_REASON = "referral_reward";
+export const MILESTONE_REASON = "referral_milestone";
 
 const ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789"; // no look-alike characters
 const CODE_LENGTH = 8;
@@ -24,6 +26,7 @@ export interface ReferralConfig {
   referredCredits: number;
   priorityThreshold: number;
   maxRewardsPerMonth: number;
+  milestones: Milestone[];
 }
 
 export interface ReferralSummary {
@@ -36,6 +39,9 @@ export interface ReferralSummary {
   threshold: number;
   referrerCredits: number;
   referredCredits: number;
+  /** The next milestone, counting friends who created an account. */
+  next: (Milestone & { remaining: number }) | null;
+  milestones: Milestone[];
 }
 
 export function generateReferralCode(random: (n: number) => Uint8Array = (n) => crypto.getRandomValues(new Uint8Array(n))): string {
@@ -128,18 +134,21 @@ export class ReferralService {
     const [signups, rewards, creditsEarned] = await Promise.all([
       this.deps.referrals.countSignups(code),
       this.deps.referrals.rewardsForCode(code),
-      this.deps.referrals.creditsEarned(userId, [REFERRER_REASON]),
+      this.deps.referrals.creditsEarned(userId, [REFERRER_REASON, MILESTONE_REASON]),
     ]);
+    const accounts = rewards.filter((r) => r.referrer_rewarded_at).length;
     return {
       code,
       signups,
-      accounts: rewards.length,
+      accounts,
       creditsEarned,
       pendingRewards: rewards.filter((r) => !r.referrer_rewarded_at).length,
       priority: signups >= this.config.priorityThreshold,
       threshold: this.config.priorityThreshold,
       referrerCredits: this.config.referrerCredits,
       referredCredits: this.config.referredCredits,
+      next: nextMilestone(this.config.milestones, accounts),
+      milestones: this.config.milestones,
     };
   }
 
@@ -164,7 +173,7 @@ export class ReferralService {
           });
           if (reward) {
             await this.deps.referrals.grant(userId, this.config.referredCredits, REFERRED_REASON, reward.id);
-            if (referrerUserId) await this.payReferrer(reward.id, referrerUserId, now);
+            if (referrerUserId) await this.payReferrer(reward, referrerUserId, now);
             this.log.info("referral converted", { code: codeRow.code, referrerHasAccount: Boolean(referrerUserId) });
           }
         }
@@ -172,7 +181,7 @@ export class ReferralService {
 
       // Rewards earned while this person was still on the waitlist.
       for (const pending of await this.deps.referrals.pendingReferrerRewards(ownCode)) {
-        if (pending.referred_user_id !== userId) await this.payReferrer(pending.id, userId, now);
+        if (pending.referred_user_id !== userId) await this.payReferrer(pending, userId, now);
       }
     } catch (error) {
       // Never block sign-in because of referral bookkeeping.
@@ -180,14 +189,25 @@ export class ReferralService {
     }
   }
 
-  private async payReferrer(rewardId: string, referrerUserId: string, now: Date): Promise<void> {
+  /** Pay the per-friend bonus, then the milestone bonus if this friend lands on one. */
+  private async payReferrer(reward: ReferralRewardRow, referrerUserId: string, now: Date): Promise<void> {
     const thisMonth = await this.deps.referrals.referrerRewardsSince(referrerUserId, startOfUtcMonth(now));
     if (thisMonth >= this.config.maxRewardsPerMonth) {
       this.log.info("referral reward capped for the month", { referrerUserId });
       return;
     }
-    const granted = await this.deps.referrals.grant(referrerUserId, this.config.referrerCredits, REFERRER_REASON, rewardId);
-    await this.deps.referrals.markReferrerRewarded(rewardId, referrerUserId, granted ? this.config.referrerCredits : 0, now);
+    const granted = await this.deps.referrals.grant(referrerUserId, this.config.referrerCredits, REFERRER_REASON, reward.id);
+    await this.deps.referrals.markReferrerRewarded(reward.id, referrerUserId, granted ? this.config.referrerCredits : 0, now);
+    if (granted) await this.payMilestone(reward.code, referrerUserId);
+  }
+
+  private async payMilestone(code: string, referrerUserId: string): Promise<void> {
+    const friends = (await this.deps.referrals.rewardsForCode(code)).filter((r) => r.referrer_rewarded_at).length;
+    const bonus = milestoneBonus(this.config.milestones, friends);
+    // The source keeps it to one payout per milestone, even if this runs twice.
+    if (bonus > 0 && (await this.deps.referrals.grant(referrerUserId, bonus, MILESTONE_REASON, `${code}:${friends}`))) {
+      this.log.info("referral milestone reached", { friends, bonus });
+    }
   }
 
   private async ownerUserId(row: ReferralCodeRow): Promise<string | null> {

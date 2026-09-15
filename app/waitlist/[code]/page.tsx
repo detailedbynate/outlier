@@ -30,7 +30,13 @@ export default async function WaitlistStatusPage({ params }: { params: Promise<{
             : `${status.signups} ${status.signups === 1 ? "friend has" : "friends have"} joined with your link.`}{" "}
           Friends who join get bonus credits, and so do you when they create their account.
         </p>
-        <ReferralShare link={links.share} signups={status.signups} threshold={status.threshold} />
+        <ReferralShare
+          link={links.share}
+          count={status.signups}
+          target={status.threshold}
+          unlocks="priority access"
+          reached="Priority access unlocked — keep sharing to earn bonus credits"
+        />
       </section>
     </main>
   );

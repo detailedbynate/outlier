@@ -4,23 +4,31 @@ import { useState } from "react";
 
 const SHARE_TEXT = "I'm on the waitlist for Outlier: it finds the YouTube videos and channels blowing up before everyone else. Join with my link:";
 
-/** Copy/share a referral link, with progress toward priority access. */
+/** Copy/share a referral link, with progress toward the next reward. */
 export function ReferralShare({
   link,
-  signups,
-  threshold,
+  count,
+  target,
+  unlocks,
+  reached,
   statusLink,
   compact = false,
 }: {
   link: string;
-  signups: number;
-  threshold: number;
+  /** Referrals so far (waitlist signups, or friends with an account). */
+  count: number;
+  /** Referrals needed for the next reward. */
+  target: number;
+  /** What the next reward is, e.g. "250 credits" or "priority access". */
+  unlocks: string;
+  /** Shown instead once there is nothing left to reach. */
+  reached?: string;
   statusLink?: string;
   compact?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
-  const progress = Math.min(signups / threshold, 1);
-  const priority = signups >= threshold;
+  const remaining = Math.max(target - count, 0);
+  const progress = target > 0 ? Math.min(count / target, 1) : 1;
   const encoded = encodeURIComponent(link);
   const text = encodeURIComponent(SHARE_TEXT);
 
@@ -48,16 +56,18 @@ export function ReferralShare({
 
   return (
     <div className={`referral-share ${compact ? "is-compact" : ""}`}>
-      <div className="referral-progress" aria-label={`${signups} of ${threshold} referrals`}>
+      <div className="referral-progress" aria-label={`${count} of ${target} referrals`}>
         <div className="referral-progress-head">
-          <strong>{priority ? "Priority access unlocked" : `Invite ${threshold - signups} more to skip the line`}</strong>
-          <span>
-            {signups}/{threshold}
-          </span>
+          <strong>
+            <span aria-hidden="true">🔥</span> {count}/{target} referrals
+          </strong>
         </div>
         <div className="referral-bar">
           <span style={{ width: `${progress * 100}%` }} />
         </div>
+        <p className="referral-progress-note">
+          {remaining > 0 ? `Refer ${remaining} more creator${remaining === 1 ? "" : "s"} to unlock ${unlocks}` : (reached ?? `You unlocked ${unlocks}`)}
+        </p>
       </div>
 
       <div className="referral-link">

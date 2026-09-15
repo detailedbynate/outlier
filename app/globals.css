@@ -6975,9 +6975,15 @@ a.dash-row:hover {
   margin-bottom: 6px;
 }
 
-.referral-progress-head span {
-  color: var(--text-muted);
+.referral-progress-head strong {
+  font-size: 15px;
   font-variant-numeric: tabular-nums;
+}
+
+.referral-progress-note {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--text-secondary);
 }
 
 .referral-bar {
@@ -7101,6 +7107,35 @@ a.dash-row:hover {
 
 .referral-steps strong {
   color: var(--text-primary);
+}
+
+.referral-tiers {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.referral-tiers li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+}
+
+.referral-tiers li.is-reached {
+  border: 1px solid #8b5cf6;
+  color: var(--text-primary);
+}
+
+.referral-tiers strong {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
 }
 
 @media (max-width: 600px) {

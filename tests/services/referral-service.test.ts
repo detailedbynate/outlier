@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import { createLogger } from "@/lib/core/logger";
 import {
   generateReferralCode,
+  MILESTONE_REASON,
   normalizeReferralCode,
   REFERRED_REASON,
   REFERRER_REASON,
+  type ReferralConfig,
   ReferralService,
 } from "@/lib/services/referral-service";
 import type { ReferralCodeRow, ReferralRewardRow, WaitlistEntryRow } from "@/types/database";
@@ -31,7 +33,12 @@ function entry(id: string, email: string, referredBy: string | null = null): Wai
 }
 
 /** In-memory tables with the same uniqueness rules as the migration. */
-function setup(config = { referrerCredits: 100, referredCredits: 50, priorityThreshold: 3, maxRewardsPerMonth: 20 }) {
+const MILESTONES = [
+  { at: 1, credits: 75 },
+  { at: 3, credits: 100 },
+];
+
+function setup(config: ReferralConfig = { referrerCredits: 25, referredCredits: 50, priorityThreshold: 3, maxRewardsPerMonth: 20, milestones: MILESTONES }) {
   const codes: ReferralCodeRow[] = [];
   const entries: WaitlistEntryRow[] = [];
   const rewards: ReferralRewardRow[] = [];
@@ -154,12 +161,20 @@ describe("ReferralService", () => {
 
     expect(grants).toEqual([
       { user_id: "bob-user", amount: 50, reason: REFERRED_REASON, source_id: rewards[0]!.id },
-      { user_id: "alice-user", amount: 100, reason: REFERRER_REASON, source_id: rewards[0]!.id },
+      { user_id: "alice-user", amount: 25, reason: REFERRER_REASON, source_id: rewards[0]!.id },
+      { user_id: "alice-user", amount: 75, reason: MILESTONE_REASON, source_id: `${aliceCode}:1` },
     ]);
     expect(rewards).toHaveLength(1);
     // Bob's account keeps Bob's own waitlist code.
     expect(await service.summary("bob-user", "bob@example.com")).toMatchObject({ code: expect.stringMatching(/^code/), signups: 0 });
-    expect(await service.summary("alice-user", "alice@example.com")).toMatchObject({ code: aliceCode, signups: 1, accounts: 1, creditsEarned: 100, pendingRewards: 0 });
+    expect(await service.summary("alice-user", "alice@example.com")).toMatchObject({
+      code: aliceCode,
+      signups: 1,
+      accounts: 1,
+      creditsEarned: 100,
+      pendingRewards: 0,
+      next: { at: 3, credits: 100, remaining: 2 },
+    });
   });
 
   it("holds the referrer's reward until they have an account", async () => {
@@ -175,12 +190,36 @@ describe("ReferralService", () => {
     await service.onAccountCreated("alice-user", "alice@example.com", NOW);
     expect(grants.map((g) => [g.user_id, g.amount])).toEqual([
       ["bob-user", 50],
-      ["alice-user", 100],
+      ["alice-user", 25],
+      ["alice-user", 75],
     ]);
   });
 
+  it("pays a milestone bonus once, when the friend count lands on it", async () => {
+    const { signUp, service, users, grants } = setup();
+    const aliceCode = await signUp("e1", "alice@example.com", null);
+    users.set("alice@example.com", "alice-user");
+    await service.onAccountCreated("alice-user", "alice@example.com", NOW);
+    for (const name of ["bob", "cara", "dan"]) {
+      await signUp(`e-${name}`, `${name}@example.com`, aliceCode);
+      users.set(`${name}@example.com`, `${name}-user`);
+      await service.onAccountCreated(`${name}-user`, `${name}@example.com`, NOW);
+      await service.onAccountCreated(`${name}-user`, `${name}@example.com`, NOW); // signing in again pays nothing extra
+    }
+    const alice = grants.filter((g) => g.user_id === "alice-user");
+    expect(alice.filter((g) => g.reason === REFERRER_REASON)).toHaveLength(3);
+    expect(alice.filter((g) => g.reason === MILESTONE_REASON)).toEqual([
+      { user_id: "alice-user", amount: 75, reason: MILESTONE_REASON, source_id: `${aliceCode}:1` },
+      { user_id: "alice-user", amount: 100, reason: MILESTONE_REASON, source_id: `${aliceCode}:3` },
+    ]);
+    // 3 x 25 per friend + 75 + 100 milestones.
+    expect(alice.reduce((sum, g) => sum + g.amount, 0)).toBe(250);
+    // The last milestone repeats, so there is always a next goal.
+    expect(await service.summary("alice-user", "alice@example.com")).toMatchObject({ accounts: 3, next: { at: 6, credits: 100, remaining: 3 } });
+  });
+
   it("caps referrer rewards per month", async () => {
-    const { signUp, service, users, grants } = setup({ referrerCredits: 100, referredCredits: 50, priorityThreshold: 3, maxRewardsPerMonth: 1 });
+    const { signUp, service, users, grants } = setup({ referrerCredits: 25, referredCredits: 50, priorityThreshold: 3, maxRewardsPerMonth: 1, milestones: MILESTONES });
     const aliceCode = await signUp("e1", "alice@example.com", null);
     users.set("alice@example.com", "alice-user");
     await service.onAccountCreated("alice-user", "alice@example.com", NOW);
@@ -189,7 +228,8 @@ describe("ReferralService", () => {
       users.set(`${name}@example.com`, `${name}-user`);
       await service.onAccountCreated(`${name}-user`, `${name}@example.com`, NOW);
     }
-    expect(grants.filter((g) => g.user_id === "alice-user")).toHaveLength(1);
+    expect(grants.filter((g) => g.user_id === "alice-user" && g.reason === REFERRER_REASON)).toHaveLength(1);
+    // The friends still get their welcome credits.
     expect(grants.filter((g) => g.reason === REFERRED_REASON)).toHaveLength(2);
   });
 

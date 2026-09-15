@@ -4,6 +4,7 @@ import { ReferralShare } from "@/components/referral-share";
 import { requireApprovedUser } from "@/lib/auth/session";
 import { formatNumber } from "@/lib/format";
 import { referralLinks } from "@/lib/referrals/links";
+import { totalCreditsAt } from "@/lib/referrals/milestones";
 import { getServices } from "@/lib/services";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +20,7 @@ export default async function ReferralsPage() {
     { label: "Friends with an account", value: formatNumber(summary.accounts) },
     { label: "Bonus credits earned", value: formatNumber(summary.creditsEarned) },
   ];
+  const next = summary.next;
 
   return (
     <div className="dash">
@@ -35,7 +37,13 @@ export default async function ReferralsPage() {
       </header>
 
       <section className="intel-card">
-        <ReferralShare link={links.share} signups={summary.signups} threshold={summary.threshold} compact />
+        <ReferralShare
+          link={links.share}
+          count={summary.accounts}
+          target={next ? next.at : summary.accounts}
+          unlocks={next ? `${formatNumber(next.credits + summary.referrerCredits)} credits` : "every reward"}
+          compact
+        />
       </section>
 
       <div className="intel-glance referral-stats">
@@ -62,9 +70,26 @@ export default async function ReferralsPage() {
           </li>
           <li>
             <strong>You both get credits.</strong> When a friend creates their account, they get <strong>{summary.referredCredits}</strong> bonus credits and you get{" "}
-            <strong>{summary.referrerCredits}</strong>, added to that month&apos;s allowance.
+            <strong>{summary.referrerCredits}</strong>, added to that month&apos;s allowance. There is no limit on how many friends you can refer.
+          </li>
+          <li>
+            <strong>Milestones pay more.</strong> Hitting {summary.milestones.map((m) => m.at).join(", ")} friends adds a bigger bonus on top
+            {summary.milestones.length > 0 ? ` (up to ${formatNumber(summary.milestones.at(-1)!.credits + summary.referrerCredits)} credits at once)` : ""}, and the
+            last milestone repeats forever.
           </li>
         </ol>
+        {summary.milestones.length > 0 ? (
+          <ul className="referral-tiers">
+            {summary.milestones.map((m) => (
+              <li key={m.at} className={summary.accounts >= m.at ? "is-reached" : ""}>
+                <span>
+                  {m.at} friend{m.at === 1 ? "" : "s"}
+                </span>
+                <strong>{formatNumber(totalCreditsAt(summary.milestones, summary.referrerCredits, m.at))} credits</strong>
+              </li>
+            ))}
+          </ul>
+        ) : null}
         {summary.pendingRewards > 0 ? <p className="intel-muted">{summary.pendingRewards} reward(s) pending.</p> : null}
       </section>
     </div>

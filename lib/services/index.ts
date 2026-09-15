@@ -4,6 +4,7 @@ import { SupabaseAccountProvisioner, SupabaseAuthModeration, SupabaseInviteSende
 import { ModerationRepository } from "@/lib/database/repositories/moderation";
 import { NicheRepository } from "@/lib/database/repositories/niches";
 import { ReferralRepository } from "@/lib/database/repositories/referrals";
+import { parseMilestones } from "@/lib/referrals/milestones";
 import { CompetitorRepository } from "@/lib/database/repositories/competitors";
 import { AccountRepository } from "@/lib/database/repositories/accounts";
 import { PreferencesRepository } from "@/lib/database/repositories/preferences";
@@ -229,6 +230,7 @@ export function getServices(): Services {
       referredCredits: config.REFERRAL_REFERRED_CREDITS,
       priorityThreshold: config.REFERRAL_PRIORITY_THRESHOLD,
       maxRewardsPerMonth: config.REFERRAL_MAX_REWARDS_PER_MONTH,
+      milestones: parseMilestones(config.REFERRAL_MILESTONES),
     },
   );
   const research = new ResearchService(
