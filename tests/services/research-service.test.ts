@@ -15,11 +15,11 @@ const D = "UCdddddddddddddddddddddd";
 
 function setup(overrides: { usedToday?: number; fresh?: string[]; known?: string[]; many?: boolean; maxChannels?: number } = {}) {
   const videos = overrides.many
-    ? Array.from({ length: 9 }, (_, i) => makeVideo({ id: `e000000000${i}`, channelId: `UC${String(i).repeat(22)}`, views: 300_000 }))
+    ? Array.from({ length: 9 }, (_, i) => makeVideo({ id: `e000000000${i}`, channelId: `UC${String(i).repeat(22)}`, views: 300_000, title: "cooking hacks" }))
     : [
-    makeVideo({ id: "a0000000001", channelId: A, views: 300_000 }),
-    makeVideo({ id: "b0000000001", channelId: B, views: 900_000 }),
-    makeVideo({ id: "c0000000001", channelId: C, views: 60_000 }),
+    makeVideo({ id: "a0000000001", channelId: A, views: 300_000, title: "cooking hacks that work" }),
+    makeVideo({ id: "b0000000001", channelId: B, views: 900_000, title: "10 cooking hacks" }),
+    makeVideo({ id: "c0000000001", channelId: C, views: 60_000, title: "cooking hacks for one" }),
     // Non-English channel: filtered out.
     makeVideo({ id: "d0000000001", channelId: D, views: 5_000_000, defaultAudioLanguage: "pt" }),
       ];
@@ -75,14 +75,14 @@ describe("ResearchService.discoverShortsChannels", () => {
 
   it("stops after one search once it has enough channels nobody had yet", async () => {
     const { service, search } = setup({ many: true });
-    const result = await service.discoverShortsChannels("cooking", null, NOW);
+    const result = await service.discoverShortsChannels("cooking hacks", null, NOW);
     expect(search).toHaveBeenCalledTimes(1);
     expect(result.channelsNew).toBeGreaterThanOrEqual(7);
   });
 
   it("digs deeper when the first search only returns channels we already have", async () => {
     const { service, search, record } = setup({ known: [A, B, C] });
-    const result = await service.discoverShortsChannels("cooking", null, NOW);
+    const result = await service.discoverShortsChannels("cooking hacks", null, NOW);
     // It pages past the first set of results, then gives up because nothing new turned up.
     expect(search).toHaveBeenCalledTimes(2);
     expect(search.mock.calls.map((call) => (call as unknown as [{ pageToken?: string }])[0].pageToken)).toEqual([undefined, "page2"]);
@@ -90,9 +90,17 @@ describe("ResearchService.discoverShortsChannels", () => {
     expect(record).toHaveBeenCalledWith(expect.objectContaining({ metadata: expect.objectContaining({ new: 0, passes: 2 }) }));
   });
 
+  it("skips channels that aren't about what was searched for", async () => {
+    const { service, enqueue, record } = setup();
+    const result = await service.discoverShortsChannels("kayak fishing", null, NOW);
+    expect(result.channelsFound).toBe(0);
+    expect(enqueue).not.toHaveBeenCalled();
+    expect(record).toHaveBeenCalledWith(expect.objectContaining({ metadata: expect.objectContaining({ offTopic: 6 }) }));
+  });
+
   it("skips recently synced channels and respects the per-search cap", async () => {
     const { service, enqueue } = setup({ fresh: [B], known: [A, B, C], maxChannels: 1 });
-    const result = await service.discoverShortsChannels("minecraft", null, NOW);
+    const result = await service.discoverShortsChannels("cooking hacks", null, NOW);
     expect(enqueue).toHaveBeenCalledTimes(1);
     expect((enqueue.mock.calls[0] as unknown[])[1]).toEqual({ channelId: A, light: true });
     expect(result.alreadyFresh).toBe(1);

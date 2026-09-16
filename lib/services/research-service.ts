@@ -5,6 +5,7 @@ import type { UsageRepository } from "@/lib/database/repositories/usage";
 import type { VideoPreview, VideoRepository } from "@/lib/database/repositories/videos";
 import type { EnqueueOptions } from "@/lib/jobs/queue";
 import { DEFAULT_QUALITY, rejectReason, underratedScore, type QualityConfig } from "@/lib/research/quality";
+import { keywordTokens, mentionsKeywords } from "@/lib/research/relevance";
 import type { YouTubeService } from "@/lib/youtube/service";
 import type { ShortsChannelRow } from "@/types/database";
 import type { StorageBudgetService } from "./storage-budget-service";
@@ -170,8 +171,12 @@ export class ResearchService {
     const base = this.config.quality ?? DEFAULT_QUALITY;
     const quality = { ...base, minViews: Math.min(base.minViews, DISCOVERY_MIN_VIEWS) };
 
+    const tokens = keywordTokens(q);
     const bestScore = new Map<string, number>();
+    // Search order is YouTube's relevance ranking; keep it for what we show first.
+    const seenOrder: string[] = [];
     let rejected = 0;
+    let offTopic = 0;
     let passes = 0;
     let seen = 0;
     let newIds: string[] = [];
@@ -195,6 +200,13 @@ export class ResearchService {
           rejected += 1;
           continue;
         }
+        // The video or the channel has to be about what was searched for.
+        const text = [video.title, video.description, video.tags.join(" "), channel.title, channel.description].join(" ");
+        if (!mentionsKeywords(text, tokens)) {
+          offTopic += 1;
+          continue;
+        }
+        if (!bestScore.has(channel.id)) seenOrder.push(channel.id);
         bestScore.set(channel.id, Math.max(bestScore.get(channel.id) ?? 0, underratedScore(video, channel)));
       }
 
@@ -214,7 +226,7 @@ export class ResearchService {
       quantity: 1,
       resource_type: "keyword",
       resource_id: q.slice(0, 100),
-      metadata: { found: ranked.length, new: newIds.length, passes, channelIds: ranked.slice(0, 50) },
+      metadata: { found: ranked.length, new: newIds.length, offTopic, passes, channelIds: seenOrder.slice(0, 50) },
     });
 
     // New channels first, then anything we have but haven't refreshed in a week.
@@ -226,7 +238,7 @@ export class ResearchService {
       await this.deps.enqueue("channel.refresh", { channelId, light: true }, { idempotencyKey: `channel.refresh:${channelId}:${day}`, priority: 5 });
     }
 
-    this.log.info("shorts discovery", { keyword: q, found: ranked.length, new: newIds.length, rejected, queued: toQueue.length, passes });
+    this.log.info("shorts discovery", { keyword: q, found: ranked.length, new: newIds.length, rejected, offTopic, queued: toQueue.length, passes });
     return {
       keyword: q,
       channelsFound: ranked.length,
