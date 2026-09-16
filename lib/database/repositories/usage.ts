@@ -63,6 +63,28 @@ export class UsageRepository {
     return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([key]) => key);
   }
 
+  /** Discoveries for this keyword, newest first, with the channels each one turned up. */
+  async discoveriesFor(eventType: string, keyword: string, since: Date, limit = 20): Promise<{ occurredAt: string; channelIds: string[] }[]> {
+    const rows = unwrap(
+      await this.db
+        .from("usage_events")
+        .select("occurred_at, metadata")
+        .eq("event_type", eventType)
+        .eq("resource_id", keyword)
+        .gte("occurred_at", since.toISOString())
+        .order("occurred_at", { ascending: false })
+        .limit(limit),
+      "usage_events.discoveriesFor",
+    );
+    return rows.map((row) => {
+      const found = (row.metadata as { channelIds?: unknown } | null)?.channelIds;
+      return {
+        occurredAt: row.occurred_at,
+        channelIds: Array.isArray(found) ? found.filter((id): id is string => typeof id === "string") : [],
+      };
+    });
+  }
+
   /** A user's most recent events, newest first. */
   async recentForUser(userId: string, limit: number, eventTypes?: string[]): Promise<UsageEventRow[]> {
     let query = this.db.from("usage_events").select("*").eq("user_id", userId);

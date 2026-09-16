@@ -70,15 +70,6 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
 
       {error ? <div className="dash-empty">{error}</div> : null}
       {result ? <Report result={result} /> : null}
-      {!topic ? (
-        <div className="dash-empty">
-          <strong>How it works</strong>
-          <p>
-            Reports are built from Outlier&apos;s stored channels and videos and shared across everyone, so most searches are instant. When a topic has
-            too little data, Outlier fetches fresh YouTube data once and saves it for future searches.
-          </p>
-        </div>
-      ) : null}
     </div>
   );
 }

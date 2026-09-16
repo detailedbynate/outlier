@@ -13,15 +13,17 @@ const B = "UCbbbbbbbbbbbbbbbbbbbbbb";
 const C = "UCcccccccccccccccccccccc";
 const D = "UCdddddddddddddddddddddd";
 
-function setup(overrides: { usedToday?: number; fresh?: string[]; maxChannels?: number } = {}) {
-  const videos = [
+function setup(overrides: { usedToday?: number; fresh?: string[]; known?: string[]; many?: boolean; maxChannels?: number } = {}) {
+  const videos = overrides.many
+    ? Array.from({ length: 9 }, (_, i) => makeVideo({ id: `e000000000${i}`, channelId: `UC${String(i).repeat(22)}`, views: 300_000 }))
+    : [
     makeVideo({ id: "a0000000001", channelId: A, views: 300_000 }),
     makeVideo({ id: "b0000000001", channelId: B, views: 900_000 }),
     makeVideo({ id: "c0000000001", channelId: C, views: 60_000 }),
     // Non-English channel: filtered out.
     makeVideo({ id: "d0000000001", channelId: D, views: 5_000_000, defaultAudioLanguage: "pt" }),
-  ];
-  const searchVideos = vi.fn(async () => ({ items: videos, nextPageToken: null, prevPageToken: null, totalResults: videos.length }));
+      ];
+  const searchVideos = vi.fn(async () => ({ items: videos, nextPageToken: "page2", prevPageToken: null, totalResults: videos.length }));
   const getChannels = vi.fn(async (ids: readonly string[]) =>
     ids.map((id) => makeChannel({ id, subscribers: { [A]: 20_000, [B]: 10_000, [C]: 40_000, [D]: 1_000 }[id] ?? 10_000 })),
   );
@@ -32,7 +34,10 @@ function setup(overrides: { usedToday?: number; fresh?: string[]; maxChannels?: 
   const service = new ResearchService(
     {
       youtube: { searchVideos, getChannels } as unknown as YouTubeService,
-      channels: { recentlySyncedIds: async () => new Set(overrides.fresh ?? []) } as unknown as ChannelRepository,
+      channels: {
+        recentlySyncedIds: async () => new Set(overrides.fresh ?? []),
+        existingIds: async () => new Set(overrides.known ?? []),
+      } as unknown as ChannelRepository,
       usage: { record, countSince } as unknown as UsageRepository,
       storage: { assertCapacity } as never,
       enqueue,
@@ -57,11 +62,36 @@ describe("ResearchService.discoverShortsChannels", () => {
       { channelId: C, light: true },
     ]);
     expect(record).toHaveBeenCalledWith(expect.objectContaining({ event_type: "research.shorts_discovery", user_id: "user-1" }));
-    expect(result).toEqual({ keyword: "cooking hacks", channelsFound: 3, channelsQueued: 3, alreadyFresh: 0, searchesLeftToday: 9 });
+    expect(result).toEqual({
+      keyword: "cooking hacks",
+      channelsFound: 3,
+      channelsNew: 3,
+      channelsQueued: 3,
+      alreadyFresh: 0,
+      searchesLeftToday: 9,
+      searchPasses: 2,
+    });
+  });
+
+  it("stops after one search once it has enough channels nobody had yet", async () => {
+    const { service, search } = setup({ many: true });
+    const result = await service.discoverShortsChannels("cooking", null, NOW);
+    expect(search).toHaveBeenCalledTimes(1);
+    expect(result.channelsNew).toBeGreaterThanOrEqual(7);
+  });
+
+  it("digs deeper when the first search only returns channels we already have", async () => {
+    const { service, search, record } = setup({ known: [A, B, C] });
+    const result = await service.discoverShortsChannels("cooking", null, NOW);
+    // It pages past the first set of results, then gives up because nothing new turned up.
+    expect(search).toHaveBeenCalledTimes(2);
+    expect(search.mock.calls.map((call) => (call as unknown as [{ pageToken?: string }])[0].pageToken)).toEqual([undefined, "page2"]);
+    expect(result.channelsNew).toBe(0);
+    expect(record).toHaveBeenCalledWith(expect.objectContaining({ metadata: expect.objectContaining({ new: 0, passes: 2 }) }));
   });
 
   it("skips recently synced channels and respects the per-search cap", async () => {
-    const { service, enqueue } = setup({ fresh: [B], maxChannels: 1 });
+    const { service, enqueue } = setup({ fresh: [B], known: [A, B, C], maxChannels: 1 });
     const result = await service.discoverShortsChannels("minecraft", null, NOW);
     expect(enqueue).toHaveBeenCalledTimes(1);
     expect((enqueue.mock.calls[0] as unknown[])[1]).toEqual({ channelId: A, light: true });
@@ -85,5 +115,53 @@ describe("ResearchService.discoverShortsChannels", () => {
 describe("escapeLike", () => {
   it("escapes wildcards and filter separators", () => {
     expect(escapeLike('100%_real,(ok)*"')).toBe("100\\%\\_real  ok   ");
+  });
+});
+
+describe("ResearchService.browseShortsChannels", () => {
+  const rows = [
+    { channel_id: "old-1", youtube_channel_id: A },
+    { channel_id: "new-1", youtube_channel_id: B },
+    { channel_id: "new-2", youtube_channel_id: C },
+  ];
+
+  function browseSetup(discoveries: { occurredAt: string; channelIds: string[] }[]) {
+    const searchShortsChannels = vi.fn(async () => rows as never);
+    const findChannelIdsByKeywords = vi.fn(async () => ["old-1"]);
+    const service = new ResearchService(
+      {
+        youtube: {} as unknown as YouTubeService,
+        channels: {
+          searchShortsChannels,
+          findChannelIdsByKeywords,
+          findByIdentifiers: async (ids: string[]) => rows.filter((r) => ids.includes(r.youtube_channel_id)).map((r) => ({ id: r.channel_id, youtube_channel_id: r.youtube_channel_id })),
+        } as unknown as ChannelRepository,
+        usage: { discoveriesFor: async () => discoveries } as unknown as UsageRepository,
+        storage: { assertCapacity: async () => ({}) } as never,
+        enqueue: vi.fn(),
+      },
+      { discoveryDailyLimit: 10, discoveryMaxChannels: 25 },
+      createLogger(),
+    );
+    return { service, searchShortsChannels };
+  }
+
+  it("includes channels the search just discovered, newest first", async () => {
+    const { service, searchShortsChannels } = browseSetup([
+      { occurredAt: NOW.toISOString(), channelIds: [C, B] },
+      { occurredAt: "2026-09-01T00:00:00Z", channelIds: [B] },
+    ]);
+    const { channels } = await service.browseShortsChannels("cooking", { orderBy: "avg_short_views", limit: 10 }, 0, NOW);
+
+    // Keyword matches plus everything discovered for this keyword.
+    expect((searchShortsChannels.mock.calls[0] as unknown as [{ channelIds: string[] }])[0].channelIds).toEqual(["old-1", "new-1", "new-2"]);
+    // The latest discovery leads, in the order it ranked them.
+    expect(channels.map((c) => c.channel_id)).toEqual(["new-2", "new-1", "old-1"]);
+  });
+
+  it("leaves the order alone when nothing was discovered for the search", async () => {
+    const { service } = browseSetup([]);
+    const { channels } = await service.browseShortsChannels("cooking", { orderBy: "avg_short_views", limit: 10 }, 0, NOW);
+    expect(channels.map((c) => c.channel_id)).toEqual(["old-1", "new-1", "new-2"]);
   });
 });

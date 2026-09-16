@@ -79,9 +79,11 @@ export async function discoverShortsChannels(_prev: DiscoverState, formData: For
 
     const remaining = Math.max(result.channelsQueued - processed, 0);
     const parts = [
-      `Found ${result.channelsFound} channels for “${result.keyword}”.`,
+      result.channelsNew > 0
+        ? `Found ${result.channelsNew} new channel${result.channelsNew === 1 ? "" : "s"} for “${result.keyword}”.`
+        : `No channels we don't already have for “${result.keyword}” — try a more specific keyword.`,
       result.channelsQueued === 0
-        ? "They were already up to date."
+        ? "Everything else was already up to date."
         : `Added ${processed}${remaining > 0 ? `, ${remaining} more will appear within the hour` : ""}.`,
       "Only channels that mostly post Shorts show in the list.",
       `Used ${CREDIT_COSTS.discover_channels} credits.`,

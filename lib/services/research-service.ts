@@ -13,6 +13,11 @@ export const SHORTS_DISCOVERY_EVENT = "research.shorts_discovery";
 
 const DISCOVERY_MIN_VIEWS = 20_000;
 
+/** A paid discovery should be worth it: keep searching until this many channels are ones we don't have. */
+const MIN_NEW_CHANNELS = 7;
+/** Each pass is one search.list call (100 units), so cap how deep a single discovery digs. */
+const MAX_SEARCH_PASSES = 3;
+
 const DEFAULT_KEYWORDS = ["motivation", "cooking", "minecraft", "fitness", "facts", "roblox", "skincare", "finance", "pets", "comedy"];
 
 export type ShortsChannelWithPreviews = ShortsChannelRow & { recentShorts: VideoPreview[] };
@@ -41,9 +46,20 @@ export interface ResearchConfig {
 export interface DiscoveryResult {
   keyword: string;
   channelsFound: number;
+  /** Channels nobody had discovered before this search. */
+  channelsNew: number;
   channelsQueued: number;
   alreadyFresh: number;
   searchesLeftToday: number;
+  /** search.list calls this discovery made. */
+  searchPasses: number;
+}
+
+/** Channels from the newest discovery for this search first, in the order that search ranked them. */
+function sortNewestFirst<T extends { channel_id: string }>(rows: T[], newestFirst: string[]): T[] {
+  if (newestFirst.length === 0) return rows;
+  const rank = new Map(newestFirst.map((id, index) => [id, index]));
+  return [...rows].sort((a, b) => (rank.get(a.channel_id) ?? Infinity) - (rank.get(b.channel_id) ?? Infinity));
 }
 
 function startOfUtcDay(now: Date): Date {
@@ -82,10 +98,11 @@ export class ResearchService {
     query: string,
     filters: Omit<ShortsChannelFilters, "channelIds">,
     previewsPerChannel: number,
+    now: Date = new Date(),
   ): Promise<{ channels: ShortsChannelWithPreviews[]; terms: string[] }> {
     const terms = parseSearchTerms(query);
-    const channelIds = terms.length > 0 ? await this.deps.channels.findChannelIdsByKeywords(terms) : undefined;
-    const rows = await this.deps.channels.searchShortsChannels({ ...filters, channelIds });
+    const match = terms.length > 0 ? await this.channelIdsFor(query, terms, now) : null;
+    const rows = sortNewestFirst(await this.deps.channels.searchShortsChannels({ ...filters, channelIds: match?.ids }), match?.newestFirst ?? []);
     const previews =
       previewsPerChannel > 0 && this.deps.videos
         ? await this.deps.videos.latestShortsByChannel(rows.map((r) => r.channel_id), previewsPerChannel)
@@ -94,6 +111,27 @@ export class ResearchService {
       terms,
       channels: rows.map((row) => ({ ...row, recentShorts: previews.get(row.channel_id) ?? [] })),
     };
+  }
+
+  /**
+   * Channels matching the search: keyword matches on what we store, plus the
+   * channels discovery pulled in for this exact search, which may not mention
+   * the keyword anywhere yet.
+   */
+  private async channelIdsFor(query: string, terms: string[], now: Date): Promise<{ ids: string[]; newestFirst: string[] }> {
+    const keyword = query.trim().toLowerCase().slice(0, 100);
+    const [byKeyword, discoveries] = await Promise.all([
+      this.deps.channels.findChannelIdsByKeywords(terms),
+      this.deps.usage.discoveriesFor(SHORTS_DISCOVERY_EVENT, keyword, new Date(now.getTime() - 30 * 86_400_000)),
+    ]);
+    const discovered = [...new Set(discoveries.flatMap((d) => d.channelIds))];
+    if (discovered.length === 0) return { ids: byKeyword, newestFirst: [] };
+
+    const rows = await this.deps.channels.findByIdentifiers(discovered, []);
+    const idByYouTubeId = new Map(rows.map((row) => [row.youtube_channel_id, row.id]));
+    // Whatever the latest search turned up goes to the top of the list.
+    const newestFirst = (discoveries[0]?.channelIds ?? []).flatMap((ytId) => idByYouTubeId.get(ytId) ?? []);
+    return { ids: [...new Set([...byKeyword, ...idByYouTubeId.values()])], newestFirst };
   }
 
   /** Keywords people discovered most in the last week, padded with evergreen niches. */
@@ -131,54 +169,82 @@ export class ResearchService {
     // Discovery covers whole niches, so allow smaller hits than Trending Today.
     const base = this.config.quality ?? DEFAULT_QUALITY;
     const quality = { ...base, minViews: Math.min(base.minViews, DISCOVERY_MIN_VIEWS) };
-    const results = await this.deps.youtube.searchVideos({
-      q,
-      videoDuration: "short",
-      order: "viewCount",
-      publishedAfter: new Date(now.getTime() - 90 * 86_400_000).toISOString(),
-      relevanceLanguage: quality.language,
-      regionCode: this.config.regionCode,
-      maxResults: 50,
-    });
+
+    const bestScore = new Map<string, number>();
+    let rejected = 0;
+    let passes = 0;
+    let seen = 0;
+    let newIds: string[] = [];
+    let ranked: string[] = [];
+    let pageToken: string | undefined;
+
+    // Each pass looks somewhere the last one didn't, so a repeat search doesn't
+    // hand back the same channels everyone has already seen.
+    for (let pass = 0; pass < MAX_SEARCH_PASSES; pass++) {
+      const plan = this.searchPass(pass, pageToken, now);
+      const results = await this.deps.youtube.searchVideos({ ...plan, q, videoDuration: "short", relevanceLanguage: quality.language, regionCode: this.config.regionCode, maxResults: 50 });
+      passes += 1;
+      pageToken = results.nextPageToken ?? undefined;
+
+      const channels = await this.deps.youtube.getChannels([...new Set(results.items.map((v) => v.channelId).filter(Boolean))]);
+      const channelById = new Map(channels.map((c) => [c.id, c]));
+      for (const video of results.items) {
+        const channel = channelById.get(video.channelId);
+        if (!channel) continue;
+        if (rejectReason(video, channel, quality, { sizeRules: false })) {
+          rejected += 1;
+          continue;
+        }
+        bestScore.set(channel.id, Math.max(bestScore.get(channel.id) ?? 0, underratedScore(video, channel)));
+      }
+
+      const grew = bestScore.size > seen;
+      seen = bestScore.size;
+      ranked = [...bestScore.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
+      const known = await this.deps.channels.existingIds(ranked);
+      newIds = ranked.filter((id) => !known.has(id));
+      if (newIds.length >= MIN_NEW_CHANNELS) break;
+      // A pass that turned up nothing new means the niche is thin; stop paying for more.
+      if (pass > 0 && !grew) break;
+    }
+
     await this.deps.usage.record({
       event_type: SHORTS_DISCOVERY_EVENT,
       user_id: userId,
       quantity: 1,
       resource_type: "keyword",
       resource_id: q.slice(0, 100),
-      metadata: { results: results.items.length },
+      metadata: { found: ranked.length, new: newIds.length, passes, channelIds: ranked.slice(0, 50) },
     });
 
-    // Keep channels with at least one quality hit; rank by their best underrated score.
-    const channels = await this.deps.youtube.getChannels([...new Set(results.items.map((v) => v.channelId).filter(Boolean))]);
-    const channelById = new Map(channels.map((c) => [c.id, c]));
-    const bestScore = new Map<string, number>();
-    let rejected = 0;
-    for (const video of results.items) {
-      const channel = channelById.get(video.channelId);
-      if (!channel) continue;
-      if (rejectReason(video, channel, quality, { sizeRules: false })) {
-        rejected += 1;
-        continue;
-      }
-      bestScore.set(channel.id, Math.max(bestScore.get(channel.id) ?? 0, underratedScore(video, channel)));
-    }
-    const channelIds = [...bestScore.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
-
-    const fresh = await this.deps.channels.recentlySyncedIds(channelIds, new Date(now.getTime() - 7 * 86_400_000));
-    const toQueue = channelIds.filter((id) => !fresh.has(id)).slice(0, this.config.discoveryMaxChannels);
+    // New channels first, then anything we have but haven't refreshed in a week.
+    const stale = ranked.filter((id) => !newIds.includes(id));
+    const fresh = await this.deps.channels.recentlySyncedIds(stale, new Date(now.getTime() - 7 * 86_400_000));
+    const toQueue = [...newIds, ...stale.filter((id) => !fresh.has(id))].slice(0, this.config.discoveryMaxChannels);
     const day = now.toISOString().slice(0, 10);
     for (const channelId of toQueue) {
       await this.deps.enqueue("channel.refresh", { channelId, light: true }, { idempotencyKey: `channel.refresh:${channelId}:${day}`, priority: 5 });
     }
 
-    this.log.info("shorts discovery", { keyword: q, found: channelIds.length, rejected, queued: toQueue.length });
+    this.log.info("shorts discovery", { keyword: q, found: ranked.length, new: newIds.length, rejected, queued: toQueue.length, passes });
     return {
       keyword: q,
-      channelsFound: channelIds.length,
+      channelsFound: ranked.length,
+      channelsNew: newIds.length,
       channelsQueued: toQueue.length,
       alreadyFresh: fresh.size,
       searchesLeftToday: left - 1,
+      searchPasses: passes,
     };
   }
+
+  /** Where each pass looks: the next page first, then a different ordering and window. */
+  private searchPass(pass: number, pageToken: string | undefined, now: Date): { order: "viewCount" | "relevance" | "date"; publishedAfter: string; pageToken?: string } {
+    const daysBack = (days: number) => new Date(now.getTime() - days * 86_400_000).toISOString();
+    if (pass === 0) return { order: "viewCount", publishedAfter: daysBack(90) };
+    if (pass === 1 && pageToken) return { order: "viewCount", publishedAfter: daysBack(90), pageToken };
+    if (pass === 1) return { order: "relevance", publishedAfter: daysBack(90) };
+    return { order: "date", publishedAfter: daysBack(30) };
+  }
+
 }

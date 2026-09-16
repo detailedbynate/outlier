@@ -1149,8 +1149,53 @@ tr:last-child td {
   white-space: nowrap;
 }
 
+.search-hero-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .search-hero-note {
   padding-left: 4px;
+  margin: 0;
+}
+
+.auto-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 999px;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  box-shadow: none;
+}
+
+.auto-toggle:hover {
+  color: var(--text-primary);
+  box-shadow: none;
+}
+
+.auto-toggle.is-on {
+  color: var(--accent-text);
+  border-color: var(--accent-track);
+  background: var(--accent-wash);
+}
+
+.auto-toggle-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--text-muted);
+}
+
+.auto-toggle.is-on .auto-toggle-dot {
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
 }
 
 .search-hero-icon {

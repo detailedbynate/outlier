@@ -10,6 +10,8 @@ import type { VideoFormat } from "@/types/database";
 export const dynamic = "force-dynamic";
 
 const RANGES = [
+  { key: "1", label: "24 hours" },
+  { key: "2", label: "48 hours" },
   { key: "7", label: "7 days" },
   { key: "30", label: "30 days" },
   { key: "90", label: "90 days" },

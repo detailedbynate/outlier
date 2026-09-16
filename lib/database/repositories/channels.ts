@@ -158,6 +158,19 @@ export class ChannelRepository {
   }
 
   /** YouTube ids from `ids` that were synced after `since` (used to skip re-ingesting fresh channels). */
+  /** Which of these YouTube channel ids we already store, at any age. */
+  async existingIds(youtubeChannelIds: string[]): Promise<Set<string>> {
+    const found = new Set<string>();
+    for (let i = 0; i < youtubeChannelIds.length; i += 200) {
+      const rows = unwrap(
+        await this.db.from("channels").select("youtube_channel_id").in("youtube_channel_id", youtubeChannelIds.slice(i, i + 200)),
+        "channels.existingIds",
+      );
+      for (const row of rows) found.add(row.youtube_channel_id);
+    }
+    return found;
+  }
+
   async recentlySyncedIds(youtubeChannelIds: string[], since: Date): Promise<Set<string>> {
     if (youtubeChannelIds.length === 0) return new Set();
     const rows = unwrap(
