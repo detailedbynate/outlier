@@ -17,7 +17,7 @@ export const maxDuration = 60;
 export const metadata: Metadata = { title: "Niche Finder · Outlier" };
 
 const STARTERS = ["gaming", "fitness", "cooking", "personal finance", "tech", "beauty"];
-const EXAMPLES = ["good niches around fitness", "top niches right now", "what should I post about gaming"];
+const EXAMPLES = ["good niches around fitness", "underrated niches right now", "what should I post about gaming"];
 const LEVEL_LABEL: Record<Level, string> = { low: "Low", medium: "Medium", high: "High" };
 const FORMAT_LABEL = { shorts: "Shorts", long_form: "Long-form", both: "Both work", unknown: "Not enough data" } as const;
 
@@ -58,7 +58,7 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
             <CompassIcon size={13} /> Research tool
           </span>
           <h1>Niche Finder</h1>
-          <p>Ask for a topic or for ideas — &ldquo;good niches around fitness&rdquo;, &ldquo;top niches right now&rdquo; — to see demand, competition and where the openings are.</p>
+          <p>Ask for a topic or for ideas — &ldquo;good niches around fitness&rdquo;, &ldquo;underrated niches&rdquo; — to see demand, competition and where the openings are.</p>
         </div>
         <form method="get" action="/research/niche-finder" className="niche-search" role="search">
           <SearchIcon size={18} />
@@ -85,9 +85,14 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
       {topNiches.length > 0 && (related.length === 0 || thin) ? (
         <IdeaBoard
           ideas={topNiches}
-          title={result ? "Other niches to explore" : "Top niches right now"}
-          sub="Best opportunity scores from what everyone has researched so far — pick one to dig in"
+          title={result ? "Other underrated niches" : "Underrated niches right now"}
+          sub="Mined from every channel Outlier tracks: real demand, room left, and small channels winning. Pick one to dig in."
         />
+      ) : null}
+      {!result && topNiches.length > 0 && topNiches.length < 4 ? (
+        <p className="dash-row-sub niche-ideas-sub">
+          Only {topNiches.length} niche{topNiches.length === 1 ? "" : "s"} clear the bar so far — the list grows as more channels are tracked.
+        </p>
       ) : null}
       {!result && topNiches.length === 0 ? (
         <div className="dash-empty">
@@ -222,6 +227,7 @@ function IdeaBoard({ ideas, title, sub }: { ideas: NicheIdea[]; title: string; s
               <span>{LEVEL_LABEL[idea.demand]} demand</span>
               <span>{LEVEL_LABEL[idea.competition]} competition</span>
               <span>{FORMAT_LABEL[idea.format]}</span>
+              {idea.smallChannelShare !== null ? <span>{formatPercent(idea.smallChannelShare, 0)} small channels</span> : null}
             </div>
             <span className="dash-row-sub">
               {formatCompact(idea.medianViewsPerDay)} views/day median · {formatCompact(idea.videos)} videos · {formatCompact(idea.channels)} channels

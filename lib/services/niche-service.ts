@@ -6,6 +6,7 @@ import type { UsageRepository } from "@/lib/database/repositories/usage";
 import { videoToRow, type VideoRepository } from "@/lib/database/repositories/videos";
 import type { EnqueueOptions } from "@/lib/jobs/queue";
 import { buildNicheReport, tokenize, topicKey, type Level, type NicheReport } from "@/lib/niches/analysis";
+import { findUnderratedNiches, underratedWindow } from "@/lib/niches/underrated";
 import { isQuotaUnavailable } from "@/lib/youtube/quota-manager";
 import type { YouTubeService } from "@/lib/youtube/service";
 import type { Json } from "@/types/database";
@@ -64,6 +65,8 @@ export interface NicheIdea {
   growth: number | null;
   videos: number;
   channels: number;
+  /** Share of the niche's views going to channels under 100K subscribers. */
+  smallChannelShare: number | null;
   searchCount: number;
   computedAt: string | null;
   /** Why it's worth a look, in one line. */
@@ -117,6 +120,7 @@ function toIdea(row: {
     growth: overall.growth,
     videos: row.videos_analyzed,
     channels: row.channels_analyzed,
+    smallChannelShare: overall.smallChannelShare,
     searchCount: row.search_count,
     computedAt: row.computed_at,
     reason: reasonFor(overall),
@@ -128,10 +132,12 @@ export class NicheService {
   private readonly config: NicheConfig;
   /** Identical in-flight requests in this process share one computation. */
   private readonly inflight = new Map<string, Promise<NicheResult>>();
+  /** Mining the library is heavy, so the board is computed once per TTL. */
+  private underratedCache: { at: number; ideas: NicheIdea[] } | null = null;
 
   constructor(
     private readonly deps: {
-      niches: Pick<NicheRepository, "getReport" | "saveReport" | "claimRefresh" | "releaseClaim" | "topicSample" | "popularTopics" | "recentReports">;
+      niches: Pick<NicheRepository, "getReport" | "saveReport" | "claimRefresh" | "releaseClaim" | "topicSample" | "popularTopics" | "recentReports" | "recentSample">;
       youtube: Pick<YouTubeService, "searchVideos" | "getChannels">;
       channels: Pick<ChannelRepository, "upsertMany">;
       videos: Pick<VideoRepository, "upsertMany">;
@@ -148,19 +154,40 @@ export class NicheService {
   }
 
   /**
-   * Niches worth starting from, best opportunity first, built from reports
-   * everyone's searches have already produced (no YouTube calls).
+   * Niches nobody is talking about yet: terms mined from the whole stored
+   * library where small channels pull real views and no one owns the space.
+   * Database only - no YouTube calls - and cached for everyone.
    */
-  async topNiches(limit = 12, options: { minVideos?: number } = {}): Promise<NicheIdea[]> {
-    const rows = await this.deps.niches.recentReports(120).catch(() => []);
-    const minVideos = options.minVideos ?? 25;
-    return rows
-      .flatMap((row) => {
-        const idea = toIdea(row);
-        return idea && idea.videos >= minVideos ? [idea] : [];
-      })
-      .sort((a, b) => b.opportunity - a.opportunity)
-      .slice(0, limit);
+  async topNiches(limit = 12, options: { now?: Date } = {}): Promise<NicheIdea[]> {
+    const now = options.now ?? new Date();
+    const cached = this.underratedCache;
+    if (cached && now.getTime() - cached.at < this.config.reportTtlMs) return cached.ideas.slice(0, limit);
+
+    try {
+      const { videos, channels } = await this.deps.niches.recentSample(underratedWindow(now, this.config.sampleDays), 2_000);
+      const ideas = findUnderratedNiches(videos, channels, { max: Math.max(limit, 12), now }).map((niche) => ({
+        topic: niche.term,
+        topicKey: topicKey(niche.term),
+        opportunity: niche.score,
+        demand: niche.metrics.demand,
+        competition: niche.metrics.competition,
+        format: niche.metrics.format.best,
+        medianViewsPerDay: niche.metrics.medianViewsPerDay,
+        growth: niche.metrics.growth,
+        videos: niche.metrics.videos,
+        channels: niche.metrics.channels,
+        smallChannelShare: niche.smallChannelViewShare,
+        searchCount: 0,
+        computedAt: now.toISOString(),
+        reason: niche.reason,
+      }));
+      this.underratedCache = { at: now.getTime(), ideas };
+      this.log.info("underrated niches mined", { sample: videos.length, found: ideas.length });
+      return ideas.slice(0, limit);
+    } catch (error) {
+      this.log.warn("underrated niche mining failed", { error });
+      return [];
+    }
   }
 
   /**

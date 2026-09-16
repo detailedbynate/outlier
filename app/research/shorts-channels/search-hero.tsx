@@ -128,7 +128,28 @@ export function SearchHero({
           <span className="auto-toggle-state">{auto ? "On" : "Off"}</span>
         </button>
       </div>
-      {pending ? <p className="notice discover-status">Searching YouTube and adding channels. This can take up to a minute.</p> : null}
+      {pending ? (
+        <div className="discover-loading" role="status" aria-live="polite">
+          <div className="discover-loading-head">
+            <span className="discover-spinner" aria-hidden="true" />
+            <div>
+              <strong>Searching YouTube for {keyword.trim() || "new channels"}</strong>
+              <p>Pulling in channels nobody has found yet, then checking their Shorts. This can take up to a minute.</p>
+            </div>
+          </div>
+          <div className="discover-skeletons" aria-hidden="true">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="discover-skeleton" style={{ animationDelay: `${i * 0.15}s` }}>
+                <span className="discover-skeleton-avatar" />
+                <span className="discover-skeleton-lines">
+                  <span />
+                  <span />
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
       {!pending && state.message ? <p className="notice discover-status">{state.message}</p> : null}
       {!pending && state.error ? <p className="form-error discover-status">{state.error}</p> : null}
     </div>

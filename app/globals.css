@@ -1699,6 +1699,119 @@ tr:last-child td {
   justify-content: center;
 }
 
+/* Discovery in progress: stands in for the results while YouTube is searched. */
+.discover-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  border-radius: 16px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  -webkit-backdrop-filter: blur(22px) saturate(170%);
+  backdrop-filter: blur(22px) saturate(170%);
+}
+
+.discover-loading-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.discover-loading-head strong {
+  display: block;
+  font-size: 15px;
+  color: var(--text-primary);
+}
+
+.discover-loading-head p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.discover-spinner {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  border: 2px solid var(--accent-track);
+  border-top-color: var(--accent);
+  animation: discover-spin 0.8s linear infinite;
+}
+
+@keyframes discover-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.discover-skeletons {
+  display: grid;
+  gap: 10px;
+}
+
+.discover-skeleton {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  animation: discover-pulse 1.4s var(--ease) infinite;
+}
+
+.discover-skeleton-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  flex: none;
+}
+
+.discover-skeleton-lines {
+  display: grid;
+  gap: 8px;
+  flex: 1;
+}
+
+.discover-skeleton-lines span {
+  height: 9px;
+  border-radius: 999px;
+  background: var(--surface-3);
+}
+
+.discover-skeleton-lines span:first-child {
+  width: 45%;
+}
+
+.discover-skeleton-lines span:last-child {
+  width: 75%;
+}
+
+@keyframes discover-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* While discovery runs, its panel replaces the "nothing matched" card. */
+.research-page:has(.discover-loading) .card.empty {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .discover-spinner,
+  .discover-skeleton {
+    animation: none;
+  }
+}
+
 .discover-status {
   margin: 0;
 }

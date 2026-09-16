@@ -36,6 +36,52 @@ export class NicheRepository {
     );
   }
 
+  private async pageOfVideos(since: Date, from: number, to: number) {
+    return unwrap(
+      await this.db
+        .from("videos")
+        .select("id, youtube_video_id, channel_id, title, tags, format, view_count, like_count, comment_count, published_at")
+        .gte("published_at", since.toISOString())
+        .order("published_at", { ascending: false })
+        .range(from, to),
+      "niches.recentSample",
+    );
+  }
+
+  /** A slice of the whole library to mine for niches, newest uploads first. */
+  async recentSample(since: Date, limit = 2_000): Promise<{ videos: NicheVideo[]; channels: Map<string, NicheChannel> }> {
+    // PostgREST caps a response at 1000 rows, so page until we have the sample.
+    const rows: Awaited<ReturnType<typeof this.pageOfVideos>> = [];
+    for (let from = 0; from < limit; from += 1_000) {
+      const page = await this.pageOfVideos(since, from, Math.min(from + 999, limit - 1));
+      rows.push(...page);
+      if (page.length < 1_000) break;
+    }
+    if (rows.length === 0) return { videos: [], channels: new Map() };
+
+    const ids = rows.map((row) => row.id);
+    const scores = new Map<string, number>();
+    for (let i = 0; i < ids.length; i += 200) {
+      const perf = unwrap(
+        await this.db.from("video_performance").select("video_id, outlier_score").in("video_id", ids.slice(i, i + 200)),
+        "niches.samplePerformance",
+      );
+      for (const row of perf) if (row.outlier_score !== null) scores.set(row.video_id, Number(row.outlier_score));
+    }
+
+    const channelIds = [...new Set(rows.map((row) => row.channel_id))];
+    const channels = new Map<string, NicheChannel>();
+    for (let i = 0; i < channelIds.length; i += 200) {
+      const found = unwrap(
+        await this.db.from("channels").select("id, youtube_channel_id, title, thumbnail_url, subscriber_count").in("id", channelIds.slice(i, i + 200)),
+        "niches.sampleChannels",
+      );
+      for (const row of found) channels.set(row.id, row);
+    }
+
+    return { videos: rows.map((row) => ({ ...row, tags: row.tags ?? [], outlier_score: scores.get(row.id) ?? null })), channels };
+  }
+
   /** Recently researched topics with their reports, for the top-niches board and related suggestions. */
   async recentReports(limit: number): Promise<Pick<NicheReportRow, "topic" | "topic_key" | "report" | "videos_analyzed" | "channels_analyzed" | "computed_at" | "search_count">[]> {
     return unwrap(
