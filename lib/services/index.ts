@@ -19,10 +19,15 @@ import {
   UsageRepository,
   VideoRepository,
 } from "@/lib/database";
-import { createJobRegistry } from "@/lib/jobs/definitions";
+import { createJobRegistry, LIBRARY_GROWTH_JOB_TYPE, NICHE_LABEL_JOB_TYPE } from "@/lib/jobs/definitions";
 import { JobQueue } from "@/lib/jobs/queue";
 import type { JobRegistry } from "@/lib/jobs/registry";
 import { JobScheduler } from "@/lib/jobs/scheduler";
+import { labelingProvider } from "@/lib/ai/select";
+import { getAIProviders } from "@/lib/ai/registry";
+import { LIBRARY_SEEDS } from "@/lib/niches/seeds";
+import { LibraryGrowthService } from "./library-growth-service";
+import { NicheLabelingService } from "./niche-labeling-service";
 import { qualityConfigFrom } from "@/lib/research/quality";
 import { YouTubeCacheRepository, YouTubeQuotaRepository } from "@/lib/database/repositories/youtube-quota";
 import { getQuotaManager, getYouTubeService, quotaDay, setQuotaUserLimits, type QuotaManager } from "@/lib/youtube";
@@ -93,6 +98,7 @@ export interface Services {
 }
 
 let services: Services | undefined;
+
 
 /**
  * Composition root: wires env-configured clients into repositories and services.
@@ -178,8 +184,34 @@ export function getServices(): Services {
     enqueue,
   });
 
+  const research = new ResearchService(
+    { youtube, channels: repositories.channels, videos: repositories.videos, usage: repositories.usage, storage, enqueue },
+    { discoveryDailyLimit: config.DISCOVERY_DAILY_LIMIT, discoveryMaxChannels: config.DISCOVERY_MAX_CHANNELS, quality, regionCode },
+  );
+
+  // Niche labeling is rule-based and free; an AI provider only gives unsure channels a second opinion.
+  const text = labelingProvider(config);
+  if (text && !getAIProviders().has("text")) getAIProviders().register("text", text);
+  const nicheLabeling = new NicheLabelingService(
+    { text, channels: repositories.channels, niches: repositories.niches },
+    { batchSize: config.NICHE_LABEL_BATCH_SIZE },
+  );
+  const libraryGrowth = new LibraryGrowthService(
+    { research, usage: repositories.usage, niches: repositories.niches, seeds: LIBRARY_SEEDS, youtube, channels: repositories.channels, enqueue },
+    {
+      searchesPerRun: config.LIBRARY_GROWTH_SEARCHES_PER_RUN,
+      dailySearches: config.LIBRARY_GROWTH_DAILY_SEARCHES,
+      reseedDays: config.LIBRARY_GROWTH_RESEED_DAYS,
+      featuredChecksPerRun: config.LIBRARY_FEATURED_CHECKS_PER_RUN,
+      featuredNewPerRun: config.LIBRARY_FEATURED_NEW_PER_RUN,
+      featuredMaxSubscribers: config.LIBRARY_FEATURED_MAX_SUBSCRIBERS,
+    },
+  );
+
   const jobRegistry = createJobRegistry({
     monitoring,
+    nicheLabeling,
+    libraryGrowth,
     youtubeHousekeeping: {
       pruneCache: () => repositories.youtubeCache.pruneExpired(),
       // Keep ~90 days of quota history for reporting.
@@ -201,6 +233,7 @@ export function getServices(): Services {
       statsSnapshotMaxChannels: config.STATS_SNAPSHOT_MAX_CHANNELS,
       monitorMaxVideosPerRun: config.MONITOR_MAX_VIDEOS_PER_RUN,
       monitorMaxChannelsPerRun: config.MONITOR_MAX_CHANNELS_PER_RUN,
+      nicheLabelMaxPerRun: config.NICHE_LABEL_MAX_PER_RUN,
     },
   });
   const queue = new JobQueue(repositories.jobs, jobRegistry);
@@ -215,6 +248,8 @@ export function getServices(): Services {
     { type: "catalog.detect_languages", everyHours: 24 },
     { type: MONITOR_VIDEOS_JOB_TYPE, everyHours: 1 },
     { type: MONITOR_CHANNELS_JOB_TYPE, everyHours: 1 },
+    { type: NICHE_LABEL_JOB_TYPE, everyHours: 1 },
+    ...(config.LIBRARY_GROWTH_SEARCHES_PER_RUN > 0 || config.LIBRARY_FEATURED_CHECKS_PER_RUN > 0 ? [{ type: LIBRARY_GROWTH_JOB_TYPE, everyHours: 6 }] : []),
   ]);
 
   const credits = new CreditsService(
@@ -232,10 +267,6 @@ export function getServices(): Services {
       maxRewardsPerMonth: config.REFERRAL_MAX_REWARDS_PER_MONTH,
       milestones: parseMilestones(config.REFERRAL_MILESTONES),
     },
-  );
-  const research = new ResearchService(
-    { youtube, channels: repositories.channels, videos: repositories.videos, usage: repositories.usage, storage, enqueue },
-    { discoveryDailyLimit: config.DISCOVERY_DAILY_LIMIT, discoveryMaxChannels: config.DISCOVERY_MAX_CHANNELS, quality, regionCode },
   );
 
   const compare = new CompareService({ channels: repositories.channels, videos: repositories.videos, channelService: channels });

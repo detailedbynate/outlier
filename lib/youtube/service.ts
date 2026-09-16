@@ -24,6 +24,7 @@ import { CHANNEL_ID_PATTERN, channelPlaylistId, chunk, parseChannelIdentifier, p
 import {
   listResponseSchema,
   rawChannelSchema,
+  rawChannelSectionSchema,
   rawPlaylistItemSchema,
   rawPlaylistSchema,
   rawSearchResultSchema,
@@ -36,6 +37,7 @@ const VIDEO_PARTS = ["snippet", "statistics", "contentDetails", "status", "topic
 const MAX_IDS_PER_REQUEST = 50;
 
 const channelList = listResponseSchema(rawChannelSchema);
+const channelSectionList = listResponseSchema(rawChannelSectionSchema);
 const videoList = listResponseSchema(rawVideoSchema);
 const playlistList = listResponseSchema(rawPlaylistSchema);
 const playlistItemList = listResponseSchema(rawPlaylistItemSchema);
@@ -125,6 +127,18 @@ export class YouTubeService {
       for (const raw of response.items) byId.set(raw.id, mapChannel(raw));
     }
     return ids.flatMap((id) => byId.get(id) ?? []);
+  }
+
+  /**
+   * Channels a creator features on their channel page (1 quota unit). Creators
+   * tend to feature peers in their own niche, which makes this a cheap way to
+   * find related channels without a 100-unit search.
+   */
+  async getFeaturedChannels(channelId: string): Promise<string[]> {
+    if (!CHANNEL_ID_PATTERN.test(channelId)) throw new ValidationError(`Invalid channel id: ${channelId}`);
+    const response = await this.client.get("channelSections", { part: ["snippet", "contentDetails"], channelId }, channelSectionList);
+    const ids = response.items.flatMap((section) => section.contentDetails?.channels ?? []);
+    return [...new Set(ids)].filter((id) => id !== channelId && CHANNEL_ID_PATTERN.test(id));
   }
 
   /**

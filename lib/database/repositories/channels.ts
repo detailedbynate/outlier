@@ -158,6 +158,131 @@ export class ChannelRepository {
   }
 
   /** YouTube ids from `ids` that were synced after `since` (used to skip re-ingesting fresh channels). */
+  /**
+   * Channels waiting for niche labels, with their recent upload titles and tags.
+   * Only channels with stored uploads: without them there is nothing to judge.
+   */
+  async listUnlabeled(limit: number): Promise<
+    (Pick<ChannelRow, "id" | "title" | "description" | "keywords" | "topic_categories" | "subscriber_count"> & {
+      recentTitles: string[];
+      recentTags: string[];
+      uploads: { title: string; tags: string[] }[];
+    })[]
+  > {
+    const channels = unwrap(
+      await this.db
+        .from("channels")
+        .select("id, title, description, keywords, topic_categories, subscriber_count")
+        .is("niche_labeled_at", null)
+        .order("created_at", { ascending: true })
+        .limit(limit * 2),
+      "channels.listUnlabeled",
+    );
+    if (channels.length === 0) return [];
+
+    const videos = unwrap(
+      await this.db
+        .from("videos")
+        .select("channel_id, title, tags, published_at")
+        .in("channel_id", channels.map((c) => c.id))
+        .order("published_at", { ascending: false })
+        .limit(channels.length * 15),
+      "channels.listUnlabeledVideos",
+    );
+    const byChannel = new Map<string, { titles: string[]; uploads: { title: string; tags: string[] }[]; tags: Map<string, number> }>();
+    for (const video of videos) {
+      const entry = byChannel.get(video.channel_id) ?? { titles: [], uploads: [], tags: new Map<string, number>() };
+      if (entry.titles.length < 12) entry.titles.push(video.title);
+      if (entry.uploads.length < 15) entry.uploads.push({ title: video.title, tags: (video.tags ?? []).slice(0, 15) });
+      for (const tag of (video.tags ?? []).slice(0, 15)) {
+        const key = tag.toLowerCase();
+        entry.tags.set(key, (entry.tags.get(key) ?? 0) + 1);
+      }
+      byChannel.set(video.channel_id, entry);
+    }
+
+    return channels
+      .flatMap((channel) => {
+        const entry = byChannel.get(channel.id);
+        if (!entry || entry.titles.length === 0) return [];
+        const recentTags = [...entry.tags.entries()].sort((a, b) => b[1] - a[1]).map(([tag]) => tag);
+        return [{ ...channel, recentTitles: entry.titles, recentTags, uploads: entry.uploads }];
+      })
+      .slice(0, limit);
+  }
+
+  async saveNicheLabel(
+    id: string,
+    label: {
+      nicheId: string | null;
+      category: string | null;
+      labels: string[];
+      formats: string[];
+      flags: string[];
+      confidence: number | null;
+      model: string;
+      labeledAt: Date;
+    },
+  ): Promise<void> {
+    assertOk(
+      await this.db
+        .from("channels")
+        .update({
+          niche_id: label.nicheId,
+          niche_category: label.category,
+          niche_labels: label.labels,
+          content_formats: label.formats,
+          quality_flags: label.flags,
+          niche_confidence: label.confidence,
+          niche_label_model: label.model,
+          niche_labeled_at: label.labeledAt.toISOString(),
+        })
+        .eq("id", id),
+      "channels.saveNicheLabel",
+    );
+  }
+
+  /** Channels labeled with a niche entity or sub-niche matching the term. */
+  async findChannelIdsByNiche(term: string, limit = 300): Promise<string[]> {
+    const clean = escapeLike(term).trim().toLowerCase();
+    if (clean.length < 2) return [];
+    const entities = unwrap(
+      await this.db.from("niches").select("id").or(`name.ilike."*${clean}*",keywords.cs.{"${clean}"}`).limit(50),
+      "niches.matchTerm",
+    ).map((n) => n.id);
+    const ids = new Set<string>();
+    if (entities.length > 0) {
+      const byEntity = unwrap(await this.db.from("channels").select("id").in("niche_id", entities).limit(limit), "channels.byNicheEntity");
+      for (const row of byEntity) ids.add(row.id);
+    }
+    const byLabel = unwrap(await this.db.from("channels").select("id").overlaps("niche_labels", [clean]).limit(limit), "channels.byNicheLabel");
+    for (const row of byLabel) ids.add(row.id);
+    return [...ids].slice(0, limit);
+  }
+
+  /**
+   * Channels whose featured channels haven't been checked yet: confidently labeled
+   * and not already huge, newest first, so growth follows creators in real niches.
+   */
+  async listForFeaturedCheck(limit: number, maxSubscribers: number): Promise<Pick<ChannelRow, "id" | "youtube_channel_id">[]> {
+    return unwrap(
+      await this.db
+        .from("channels")
+        .select("id, youtube_channel_id")
+        .is("featured_checked_at", null)
+        .gte("niche_confidence", 0.6)
+        .or(`subscriber_count.is.null,subscriber_count.lt.${Math.floor(maxSubscribers)}`)
+        .order("created_at", { ascending: false })
+        .limit(limit),
+      "channels.listForFeaturedCheck",
+    );
+  }
+
+  async markFeaturedChecked(ids: string[], at: Date): Promise<void> {
+    if (ids.length === 0) return;
+    assertOk(await this.db.from("channels").update({ featured_checked_at: at.toISOString() }).in("id", ids), "channels.markFeaturedChecked");
+  }
+
   /** Which of these YouTube channel ids we already store, at any age. */
   async existingIds(youtubeChannelIds: string[]): Promise<Set<string>> {
     const found = new Set<string>();
@@ -215,6 +340,8 @@ export class ChannelRepository {
     if (filters.activeSince) query = query.gte("last_short_at", filters.activeSince.toISOString());
     if (filters.country) query = query.eq("country", filters.country);
     if (filters.tracked !== undefined) query = query.eq("tracked", filters.tracked);
+    // Their views come from other people's work, so they'd crowd out real creators.
+    if (filters.excludeLowQuality !== false) query = query.not("quality_flags", "ov", "{reupload,compilation,spam_or_misleading}");
     if (filters.targetMarket) {
       query = query.eq("is_target_language", true);
       if (filters.targetMarket.countries.length > 0) {
@@ -323,7 +450,10 @@ export interface ShortsChannelFilters {
   tracked?: boolean;
   /** Only channels in the target language, from listed countries (or no country set). */
   targetMarket?: { countries: readonly string[] };
+  /** Leave out channels flagged as reuploads, compilations or spam (default true). */
+  excludeLowQuality?: boolean;
   orderBy:
+    | "underrated_score"
     | "avg_short_views"
     | "subscriber_count"
     | "channel_created_at"

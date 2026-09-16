@@ -142,6 +142,7 @@ describe("ResearchService.browseShortsChannels", () => {
         channels: {
           searchShortsChannels,
           findChannelIdsByKeywords,
+          findChannelIdsByNiche: async () => [],
           findByIdentifiers: async (ids: string[]) => rows.filter((r) => ids.includes(r.youtube_channel_id)).map((r) => ({ id: r.channel_id, youtube_channel_id: r.youtube_channel_id })),
         } as unknown as ChannelRepository,
         usage: { discoveriesFor: async () => discoveries } as unknown as UsageRepository,

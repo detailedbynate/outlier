@@ -466,6 +466,73 @@ describe("supabase migrations", () => {
     await expect(db.query(`insert into public.credit_grants (user_id, amount, reason) values ($1, 0, 'x')`, [rows[0]!.id])).rejects.toThrow(/credit_grants_amount_positive/);
   });
 
+  it("labels channels with a niche entity and keeps entity channel counts current", async () => {
+    const category = await db.query<{ id: string }>(`insert into public.niches (slug, name, kind) values ('gaming-labels', 'Gaming', 'category') returning id`);
+    const game = await db.query<{ id: string }>(
+      `insert into public.niches (slug, name, kind, parent_id, keywords) values ('clash-royale-labels', 'Clash Royale', 'game', $1, '{cr,clashroyale}') returning id`,
+      [category.rows[0]!.id],
+    );
+    await expect(db.query(`insert into public.niches (slug, name, kind) values ('bad-kind', 'Bad', 'genre')`)).rejects.toThrow(/niches_kind_valid/);
+
+    const channel = await db.query<{ id: string; niche_labels: string[]; quality_flags: string[]; niche_labeled_at: string | null }>(
+      `insert into public.channels (youtube_channel_id, title) values ('UClabelsxxxxxxxxxxxxxxxx', 'Deck Lab') returning id, niche_labels, quality_flags, niche_labeled_at`,
+    );
+    expect(channel.rows[0]).toMatchObject({ niche_labels: [], quality_flags: [], niche_labeled_at: null });
+
+    await db.query(
+      `update public.channels set niche_id = $1, niche_category = 'Gaming', niche_labels = '{clash royale deck guides}', quality_flags = '{}', niche_confidence = 0.92, niche_labeled_at = now(), niche_label_model = 'claude-opus-5' where id = $2`,
+      [game.rows[0]!.id, channel.rows[0]!.id],
+    );
+    await expect(db.query(`update public.channels set niche_confidence = 1.5 where id = $1`, [channel.rows[0]!.id])).rejects.toThrow(/channels_niche_confidence_range/);
+
+    await db.query(`select public.refresh_niche_channel_counts()`);
+    const counts = await db.query<{ slug: string; channel_count: number }>(
+      `select slug, channel_count from public.niches where slug in ('gaming-labels', 'clash-royale-labels') order by slug`,
+    );
+    expect(counts.rows).toEqual([
+      { slug: "clash-royale-labels", channel_count: 1 },
+      { slug: "gaming-labels", channel_count: 0 },
+    ]);
+
+    const byLabel = await db.query<{ n: number }>(`select count(*)::int as n from public.channels where niche_labels && array['clash royale deck guides']`);
+    expect(byLabel.rows[0]!.n).toBe(1);
+  });
+
+  it("ranks small channels with outsized Shorts views above huge channels by underrated score", async () => {
+    const insertChannel = async (ytId: string, title: string, subscribers: number) =>
+      (
+        await db.query<{ id: string }>(`insert into public.channels (youtube_channel_id, title, subscriber_count) values ($1, $2, $3) returning id`, [
+          ytId,
+          title,
+          subscribers,
+        ])
+      ).rows[0]!.id;
+    const small = await insertChannel("UCunderratedxxxxxxxxxxxx", "Small Gem", 4_000);
+    const huge = await insertChannel("UChugechannelxxxxxxxxxxx", "Huge Star", 8_000_000);
+
+    const views: [string, string, number[]][] = [
+      [small, "gem", [180_000, 240_000, 90_000, 400_000]],
+      [huge, "big", [900_000, 1_100_000, 950_000, 1_000_000]],
+    ];
+    for (const [channelId, prefix, counts] of views) {
+      for (const [i, count] of counts.entries()) {
+        await db.query(
+          `insert into public.videos (youtube_video_id, channel_id, title, published_at, format, view_count) values ($1, $2, $3, now() - ($4 || ' days')::interval, 'short', $5)`,
+          [`${prefix}vid${i}`.padEnd(11, "0"), channelId, `${prefix} short ${i}`, String(i + 1), count],
+        );
+      }
+    }
+
+    const { rows } = await db.query<{ title: string; underrated_score: string; niche_labels: string[]; quality_flags: string[] }>(
+      `select title, underrated_score, niche_labels, quality_flags from public.shorts_channels where channel_id in ($1, $2) order by underrated_score desc`,
+      [small, huge],
+    );
+    expect(rows.map((r) => r.title)).toEqual(["Small Gem", "Huge Star"]);
+    expect(Number(rows[0]!.underrated_score)).toBeGreaterThan(Number(rows[1]!.underrated_score) + 20);
+    expect(Number(rows[0]!.underrated_score)).toBeLessThanOrEqual(100);
+    expect(rows[0]).toMatchObject({ niche_labels: [], quality_flags: [] });
+  });
+
   it("defaults new channels to untracked", async () => {
     const { rows } = await db.query<{ tracked: boolean }>(
       `insert into public.channels (youtube_channel_id, title) values ('UCnnnnnnnnnnnnnnnnnnnnnn', 'New') returning tracked`,

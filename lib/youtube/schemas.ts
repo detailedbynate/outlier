@@ -149,6 +149,13 @@ export const rawVideoCategorySchema = z.object({
 });
 
 /** Every list endpoint shares this envelope. */
+/** A channel page section; "multiplechannels" sections list the channels a creator features. */
+export const rawChannelSectionSchema = z.object({
+  id: z.string(),
+  snippet: z.object({ type: z.string().optional(), title: z.string().optional() }).optional(),
+  contentDetails: z.object({ channels: z.array(z.string()).optional(), playlists: z.array(z.string()).optional() }).optional(),
+});
+
 export function listResponseSchema<T extends z.ZodType>(item: T) {
   return z.object({
     items: z.array(item).default([]),

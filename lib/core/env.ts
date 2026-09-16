@@ -107,6 +107,30 @@ const serverEnvSchema = z.object({
 
   ANTHROPIC_API_KEY: optionalString,
   OPENAI_API_KEY: optionalString,
+
+  /** Google AI Studio key: the free Gemini tier gives unsure channels an AI second opinion. */
+  GEMINI_API_KEY: optionalString,
+  GEMINI_MODEL: z.string().trim().min(1).default("gemini-2.5-flash"),
+  /**
+   * Who gives unsure channels a second opinion: "auto" uses Gemini when its key is set, then Claude,
+   * otherwise rules only. "rules" never calls an AI.
+   */
+  NICHE_LABEL_PROVIDER: z.enum(["auto", "gemini", "anthropic", "rules"]).default("auto"),
+  /** Claude model for niche labeling when Anthropic is the provider. */
+  NICHE_LABEL_MODEL: z.string().trim().min(1).default("claude-opus-5"),
+  /** Channels per model call when labeling. */
+  NICHE_LABEL_BATCH_SIZE: z.coerce.number().int().min(1).max(50).default(20),
+  /** Channels labeled per hourly run. */
+  NICHE_LABEL_MAX_PER_RUN: z.coerce.number().int().min(0).max(5_000).default(200),
+  /** Library growth: discovery searches per run (runs every 6h) and per UTC day. 0 turns growth off. */
+  LIBRARY_GROWTH_SEARCHES_PER_RUN: z.coerce.number().int().min(0).max(50).default(3),
+  LIBRARY_GROWTH_DAILY_SEARCHES: z.coerce.number().int().min(0).max(500).default(12),
+  /** Days before a seed niche is searched again. */
+  LIBRARY_GROWTH_RESEED_DAYS: z.coerce.number().int().min(1).max(365).default(14),
+  /** Growth through channels creators feature: checks per run (1 unit each), new creators queued per run, and the size cap for channels it follows. */
+  LIBRARY_FEATURED_CHECKS_PER_RUN: z.coerce.number().int().min(0).max(2_000).default(60),
+  LIBRARY_FEATURED_NEW_PER_RUN: z.coerce.number().int().min(0).max(2_000).default(80),
+  LIBRARY_FEATURED_MAX_SUBSCRIBERS: z.coerce.number().int().min(1_000).default(1_000_000),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;

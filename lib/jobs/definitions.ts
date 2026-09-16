@@ -4,7 +4,9 @@ import type { ChannelRepository } from "@/lib/database/repositories/channels";
 import type { RateLimitRepository } from "@/lib/database/repositories/rate-limits";
 import type { SystemRepository } from "@/lib/database/repositories/system";
 import type { ChannelService } from "@/lib/services/channel-service";
+import type { LibraryGrowthService } from "@/lib/services/library-growth-service";
 import { MONITOR_CHANNELS_JOB_TYPE, MONITOR_VIDEOS_JOB_TYPE, type MonitoringService } from "@/lib/services/monitoring-service";
+import type { NicheLabelingService } from "@/lib/services/niche-labeling-service";
 import type { StorageBudgetService } from "@/lib/services/storage-budget-service";
 import { TRENDING_JOB_TYPE, TRENDING_REFRESH_JOB_TYPE, type TrendingService } from "@/lib/services/trending-service";
 import type { VideoService } from "@/lib/services/video-service";
@@ -19,6 +21,8 @@ export interface JobDependencies {
   storage: StorageBudgetService;
   trending: TrendingService;
   monitoring: MonitoringService;
+  nicheLabeling: NicheLabelingService;
+  libraryGrowth: LibraryGrowthService;
   /** Housekeeping for the YouTube response cache and quota ledger. */
   youtubeHousekeeping: { pruneCache: () => Promise<void>; pruneQuotaHistory: () => Promise<void> };
   channelRepository: ChannelRepository;
@@ -34,8 +38,12 @@ export interface JobDependencies {
     statsSnapshotMaxChannels: number;
     monitorMaxVideosPerRun: number;
     monitorMaxChannelsPerRun: number;
+    nicheLabelMaxPerRun: number;
   };
 }
+
+export const NICHE_LABEL_JOB_TYPE = "niches.label_channels";
+export const LIBRARY_GROWTH_JOB_TYPE = "library.grow";
 
 /** Payload schemas are exported so API routes and MCP tools can reuse them. */
 export const channelSyncPayload = z.object({ identifier: z.string().trim().min(1).max(500) });
@@ -237,6 +245,24 @@ export function createJobRegistry(deps: JobDependencies): JobRegistry {
         freshData: true,
         handler: (_payload, { signal }) =>
           skipIfOverBudget(async () => ({ ...(await deps.monitoring.monitorChannels({ maxChannels: deps.config.monitorMaxChannelsPerRun, signal })) })),
+      }),
+    )
+    .register(
+      defineJob({
+        type: NICHE_LABEL_JOB_TYPE,
+        description: "Scheduled: label channels that were never labeled with a category, game or topic, and sub-niches (AI, no YouTube quota).",
+        payloadSchema: emptyPayload,
+        maxAttempts: 1,
+        handler: async (_payload, { signal }) => ({ ...(await deps.nicheLabeling.labelPending({ maxChannels: deps.config.nicheLabelMaxPerRun, signal })) }),
+      }),
+    )
+    .register(
+      defineJob({
+        type: LIBRARY_GROWTH_JOB_TYPE,
+        description: "Scheduled: discover Shorts channels for seed niches the library is thinnest on (background quota lane).",
+        payloadSchema: emptyPayload,
+        maxAttempts: 1,
+        handler: (_payload, { signal }) => skipIfOverBudget(async () => ({ ...(await deps.libraryGrowth.growOnce({ signal })) })),
       }),
     )
     .register(

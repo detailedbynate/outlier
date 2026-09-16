@@ -24,6 +24,8 @@ export const DEFAULT_CACHE_TTL_SECONDS: Record<YouTubeEndpoint, number> = {
   playlists: 6 * 3600,
   playlistItems: 30 * 60,
   videoCategories: 7 * 86_400,
+  // Featured channels rarely change.
+  channelSections: 7 * 86_400,
 };
 
 /** Responses larger than this aren't cached, to protect database storage. */

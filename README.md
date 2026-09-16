@@ -183,6 +183,25 @@ When quota is unavailable: a stale cached response (up to 2 days old) is served 
 
 ---
 
+## Niche labels & library growth
+
+Search used to match niches by text ("cooking" = any title containing "cooking"). Channels now carry **labels**, and every research tool queries them first.
+
+- **`niches.label_channels`** (hourly) labels channels that were never labeled. It's **free**: `lib/niches/rule-labeler.ts` matches each channel's recent uploads, tags, name and description against `lib/niches/dictionary.ts` (~230 games and topics with their aliases and hashtags) and uses YouTube's own topic categories for the category. Each channel gets a category, its game or topic, specific sub-niches, content formats and quality flags.
+- **Only confident labels become niches.** A game or topic has to show up in most of a channel's uploads (or its name) before the channel is linked to it. Weaker guesses are kept as searchable sub-niche tags, and don't feed niche analysis. When YouTube's topic categories contradict a weak match (a news channel that often covers AI), the topics win.
+- **Optional AI second opinion**: channels the rules weren't sure about go to an AI in batches. `NICHE_LABEL_PROVIDER=auto` uses Google Gemini when `GEMINI_API_KEY` is set (free tier; Google may use free-tier inputs, which here are public channel metadata), then Claude when `ANTHROPIC_API_KEY` is set, otherwise rules only. Answers are JSON validated against the same schema either way. If a call fails or is rate-limited, the rule label stands.
+- **Search** (Shorts Channels, Niche Finder) matches a term against niche names, aliases and sub-niches as well as text.
+- **Quality flags**: channels flagged `reupload`, `compilation` or `spam_or_misleading` are left out of niche analysis.
+- **Underrated niches** are mined from confident labels first, so they're real niches rather than title words.
+- **Shorts Channels ranks creators by `underrated_score`** by default (a column on the `shorts_channels` view, 0-100): average Short views relative to subscribers (up to 500x), how often uploads beat the channel's median, real demand, still posting, and a size factor that gives 1M+ channels nothing. On the library at the time, the top 30 went from a median of 1.7M subscribers (sorted by average views) to 8K. Channels flagged as reuploads, compilations or spam are hidden.
+- **`library.grow`** (every 6h) first follows **featured channels**: creators list peers in their niche on their channel page, and `channelSections.list` costs 1 unit versus 100 for a search. It checks `LIBRARY_FEATURED_CHECKS_PER_RUN` confidently labeled channels under `LIBRARY_FEATURED_MAX_SUBSCRIBERS` and queues up to `LIBRARY_FEATURED_NEW_PER_RUN` creators we don't have. Then it runs Shorts discovery for the seed niches in `lib/niches/seeds.ts` (~240, mostly games) the library is thinnest on, skipping any searched in the last `LIBRARY_GROWTH_RESEED_DAYS`. It runs in the background quota lane, has its own daily cap (`LIBRARY_GROWTH_DAILY_SEARCHES`), and never uses up users' daily discovery searches.
+
+**Storage:** each channel with its uploads and stat history takes roughly 100-170 KB, so the free Supabase plan (with `STORAGE_BUDGET_MB=250`) holds about 2,000 channels before ingestion pauses. A library of tens of thousands of creators needs a paid database plan.
+
+To teach the labeler a new game or topic, add it to `lib/niches/dictionary.ts` with the names people write for it.
+
+---
+
 ## Credits & referrals
 
 Credits are a **monthly** allowance (`MONTHLY_CREDITS`, default 400; per-account overrides in Admin → Accounts) that resets on the 1st (UTC). Bonus grants in `credit_grants` add to the allowance for the month they're granted.

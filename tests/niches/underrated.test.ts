@@ -70,6 +70,21 @@ describe("findUnderratedNiches", () => {
     expect(found.some((n) => n.term.includes("kite"))).toBe(true);
   });
 
+  it("uses niche labels even when the titles never name the niche", () => {
+    const labeled = (id: string, subs: number) => ({ ...channel(id, subs), niche_terms: ["geometry dash", "geometry dash level guides"] });
+    const channels = new Map([
+      ["gd-1", labeled("gd-1", 9_000)],
+      ["gd-2", labeled("gd-2", 14_000)],
+      ["gd-3", labeled("gd-3", 22_000)],
+      ["gd-4", labeled("gd-4", 31_000)],
+    ]);
+    const videos = [...channels.keys()].flatMap((id, i) =>
+      Array.from({ length: 3 }, (_, n) => video(`gd-${id}-${n}`, id, `this took me ${i}${n} hours`, 90_000 + n * 2_000, 4 + n)),
+    );
+    const found = findUnderratedNiches(videos, channels, { now: NOW, maxLibraryShare: 1 });
+    expect(found[0]?.term).toBe("geometry dash");
+  });
+
   it("ignores niches with too little behind them", () => {
     const { channels } = library();
     const thin = [video("one", "small-1", "sea glass hunting", 50_000), video("two", "small-2", "sea glass hunting", 40_000)];

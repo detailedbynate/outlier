@@ -51,7 +51,10 @@ export type NicheRow = Timestamps & {
   slug: string;
   name: string;
   description: string | null;
+  /** Aliases people search for: abbreviations, hashtags, misspellings. */
   keywords: string[];
+  kind: "category" | "game" | "topic";
+  channel_count: number;
 };
 
 export type ChannelRow = Timestamps & {
@@ -83,6 +86,18 @@ export type ChannelRow = Timestamps & {
   monitor_priority: number;
   next_check_at: string | null;
   language_checked_at: string | null;
+  /** Broad category from labeling; niche_id points at the specific game or topic. */
+  niche_category: string | null;
+  /** Specific sub-niches the channel works, e.g. "clash royale deck guides". */
+  niche_labels: string[];
+  content_formats: string[];
+  /** e.g. "reupload", "compilation", "made_for_kids". */
+  quality_flags: string[];
+  niche_confidence: number | null;
+  niche_labeled_at: string | null;
+  niche_label_model: string | null;
+  /** When library growth last looked at the channels this one features. */
+  featured_checked_at: string | null;
 };
 
 export type ChannelSnapshotRow = {
@@ -467,6 +482,13 @@ export type ShortsChannelRow = {
   recent_vph: number | null;
   /** Current views/hour summed across recently monitored Shorts. */
   live_vph: number | null;
+  niche_id: string | null;
+  niche_category: string | null;
+  niche_labels: string[];
+  quality_flags: string[];
+  niche_confidence: number | null;
+  /** 0-100: views far beyond the channel's size, frequent hits, still posting, not already huge. */
+  underrated_score: number | null;
 };
 
 export type Database = {
@@ -534,6 +556,10 @@ export type Database = {
       };
     };
     Functions: {
+      refresh_niche_channel_counts: {
+        Args: Record<string, never>;
+        Returns: undefined;
+      };
       claim_jobs: {
         Args: { worker_id: string; batch_size?: number; job_types?: string[] | null };
         Returns: JobRow[];

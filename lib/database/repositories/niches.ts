@@ -1,9 +1,12 @@
 import type { DatabaseClient } from "@/lib/database/client";
 import { assertOk, unwrap } from "@/lib/database/errors";
 import type { NicheChannel, NicheVideo } from "@/lib/niches/analysis";
-import type { NicheReportRow, TablesInsert } from "@/types/database";
+import type { NicheReportRow, NicheRow, TablesInsert } from "@/types/database";
 
 const escapePattern = (value: string) => value.replace(/[\\%_*,()"]/g, " ").trim();
+
+/** Channels with these flags don't feed niche analysis: their numbers come from other people's work. */
+const EXCLUDED_FLAGS = new Set(["reupload", "compilation", "spam_or_misleading"]);
 
 export class NicheRepository {
   constructor(private readonly db: DatabaseClient) {}
@@ -29,6 +32,53 @@ export class NicheRepository {
     assertOk(await this.db.from("niche_reports").update({ refresh_claimed_at: null }).eq("topic_key", topicKey), "niche_reports.release");
   }
 
+  /**
+   * Find or create a niche entity by slug; merges new aliases into existing ones.
+   * Returns the entity id.
+   */
+  async upsertEntity(entity: { slug: string; name: string; kind: NicheRow["kind"]; parentId: string | null; aliases: string[] }): Promise<string> {
+    const existing = unwrap(await this.db.from("niches").select("id, keywords, parent_id").eq("slug", entity.slug).limit(1), "niches.findEntity")[0];
+    if (existing) {
+      const merged = [...new Set([...existing.keywords, ...entity.aliases])].slice(0, 30);
+      const needsUpdate = merged.length !== existing.keywords.length || (!existing.parent_id && entity.parentId);
+      if (needsUpdate) {
+        assertOk(
+          await this.db
+            .from("niches")
+            .update({ keywords: merged, ...(existing.parent_id ? {} : { parent_id: entity.parentId }) })
+            .eq("id", existing.id),
+          "niches.mergeEntity",
+        );
+      }
+      return existing.id;
+    }
+    const inserted = await this.db
+      .from("niches")
+      .insert({ slug: entity.slug, name: entity.name, kind: entity.kind, parent_id: entity.parentId, keywords: entity.aliases.slice(0, 30) })
+      .select("id")
+      .single();
+    // Another labeling run created it first.
+    if (inserted.error?.code === "23505") return this.upsertEntity(entity);
+    return unwrap(inserted, "niches.insertEntity").id;
+  }
+
+  async refreshChannelCounts(): Promise<void> {
+    assertOk(await this.db.rpc("refresh_niche_channel_counts"), "niches.refreshCounts");
+  }
+
+  /** Channel counts per entity slug, for picking which niches the library is thin on. */
+  async channelCountsBySlug(slugs: string[]): Promise<Map<string, number>> {
+    const counts = new Map<string, number>();
+    for (let i = 0; i < slugs.length; i += 200) {
+      const rows = unwrap(
+        await this.db.from("niches").select("slug, channel_count").in("slug", slugs.slice(i, i + 200)),
+        "niches.countsBySlug",
+      );
+      for (const row of rows) counts.set(row.slug, row.channel_count);
+    }
+    return counts;
+  }
+
   async popularTopics(limit: number): Promise<{ topic: string; search_count: number }[]> {
     return unwrap(
       await this.db.from("niche_reports").select("topic, search_count").gt("search_count", 0).order("search_count", { ascending: false }).limit(limit),
@@ -46,6 +96,79 @@ export class NicheRepository {
         .range(from, to),
       "niches.recentSample",
     );
+  }
+
+  /** Channels labeled with a game/topic or sub-niche matching the term. */
+  private async labeledChannelIds(term: string): Promise<string[]> {
+    const clean = term.toLowerCase();
+    const entities = unwrap(
+      await this.db.from("niches").select("id").or(`name.ilike."*${clean}*",keywords.cs.{"${clean}"}`).neq("kind", "category").limit(50),
+      "niches.labeledEntities",
+    ).map((n) => n.id);
+    const ids = new Set<string>();
+    if (entities.length > 0) {
+      for (const row of unwrap(await this.db.from("channels").select("id").in("niche_id", entities).limit(300), "niches.labeledByEntity")) ids.add(row.id);
+    }
+    for (const row of unwrap(await this.db.from("channels").select("id").overlaps("niche_labels", [clean]).limit(300), "niches.labeledBySub")) ids.add(row.id);
+    return [...ids];
+  }
+
+  /**
+   * Channels for a sample, with their niche terms. Channels flagged as reuploads,
+   * compilations or spam are left out entirely.
+   */
+  private async loadChannels(ids: string[]): Promise<Map<string, NicheChannel>> {
+    const channels = new Map<string, NicheChannel>();
+    const entityIds = new Set<string>();
+    const rows: {
+      id: string;
+      youtube_channel_id: string;
+      title: string;
+      thumbnail_url: string | null;
+      subscriber_count: number | null;
+      niche_id: string | null;
+      niche_labels: string[];
+      quality_flags: string[];
+      niche_confidence: number | null;
+    }[] = [];
+    for (let i = 0; i < ids.length; i += 200) {
+      const found = unwrap(
+        await this.db
+          .from("channels")
+          .select("id, youtube_channel_id, title, thumbnail_url, subscriber_count, niche_id, niche_labels, quality_flags, niche_confidence")
+          .in("id", ids.slice(i, i + 200)),
+        "niches.sampleChannels",
+      );
+      for (const row of found) {
+        if (row.quality_flags.some((flag) => EXCLUDED_FLAGS.has(flag))) continue;
+        rows.push(row);
+        if (row.niche_id) entityIds.add(row.niche_id);
+      }
+    }
+
+    const names = new Map<string, string>();
+    const entityList = [...entityIds];
+    for (let i = 0; i < entityList.length; i += 200) {
+      const found = unwrap(await this.db.from("niches").select("id, name, kind").in("id", entityList.slice(i, i + 200)), "niches.entityNames");
+      // Categories are too broad to be a niche term.
+      for (const entity of found) if (entity.kind !== "category") names.set(entity.id, entity.name);
+    }
+
+    for (const row of rows) {
+      const entity = row.niche_id ? names.get(row.niche_id) : undefined;
+      // Unsure labels help search, but only confident ones steer niche analysis.
+      const confident = (row.niche_confidence ?? 0) >= 0.6;
+      const nicheTerms = confident ? [...(entity ? [entity.toLowerCase()] : []), ...row.niche_labels] : [];
+      channels.set(row.id, {
+        id: row.id,
+        youtube_channel_id: row.youtube_channel_id,
+        title: row.title,
+        thumbnail_url: row.thumbnail_url,
+        subscriber_count: row.subscriber_count,
+        ...(nicheTerms.length > 0 ? { niche_terms: nicheTerms } : {}),
+      });
+    }
+    return channels;
   }
 
   /** A slice of the whole library to mine for niches, newest uploads first. */
@@ -69,17 +192,12 @@ export class NicheRepository {
       for (const row of perf) if (row.outlier_score !== null) scores.set(row.video_id, Number(row.outlier_score));
     }
 
-    const channelIds = [...new Set(rows.map((row) => row.channel_id))];
-    const channels = new Map<string, NicheChannel>();
-    for (let i = 0; i < channelIds.length; i += 200) {
-      const found = unwrap(
-        await this.db.from("channels").select("id, youtube_channel_id, title, thumbnail_url, subscriber_count").in("id", channelIds.slice(i, i + 200)),
-        "niches.sampleChannels",
-      );
-      for (const row of found) channels.set(row.id, row);
-    }
+    const channels = await this.loadChannels([...new Set(rows.map((row) => row.channel_id))]);
 
-    return { videos: rows.map((row) => ({ ...row, tags: row.tags ?? [], outlier_score: scores.get(row.id) ?? null })), channels };
+    return {
+      videos: rows.filter((row) => channels.has(row.channel_id)).map((row) => ({ ...row, tags: row.tags ?? [], outlier_score: scores.get(row.id) ?? null })),
+      channels,
+    };
   }
 
   /** Recently researched topics with their reports, for the top-niches board and related suggestions. */
@@ -104,10 +222,11 @@ export class NicheRepository {
     if (term.length < 2) return { videos: [], channels: new Map() };
     const columns = "id, youtube_video_id, channel_id, title, tags, format, view_count, like_count, comment_count, published_at";
 
-    const matchingChannels = unwrap(
+    const byText = unwrap(
       await this.db.from("channels").select("id").or(`title.ilike."*${term}*",description.ilike."*${term}*",keywords.cs.{"${term}"}`).limit(300),
       "niches.topicChannels",
     ).map((c) => c.id);
+    const matchingChannels = [...new Set([...(await this.labeledChannelIds(term)), ...byText])].slice(0, 400);
 
     const byTitle = unwrap(
       await this.db.from("videos").select(columns).ilike("title", `%${term}%`).gte("published_at", since.toISOString()).order("view_count", { ascending: false }).limit(limit),
@@ -133,18 +252,11 @@ export class NicheRepository {
       for (const r of rows) if (r.outlier_score !== null) scores.set(r.video_id, Number(r.outlier_score));
     }
 
-    const channelIds = [...new Set([...byId.values()].map((v) => v.channel_id))];
-    const channels = new Map<string, NicheChannel>();
-    for (let i = 0; i < channelIds.length; i += 200) {
-      const rows = unwrap(
-        await this.db.from("channels").select("id, youtube_channel_id, title, thumbnail_url, subscriber_count").in("id", channelIds.slice(i, i + 200)),
-        "niches.channels",
-      );
-      for (const r of rows) channels.set(r.id, r);
-    }
+    const channels = await this.loadChannels([...new Set([...byId.values()].map((v) => v.channel_id))]);
 
     return {
-      videos: [...byId.values()].map((v) => ({ ...v, tags: v.tags ?? [], outlier_score: scores.get(v.id) ?? null })),
+      // Videos from channels flagged as reuploads or spam would teach the wrong lessons.
+      videos: [...byId.values()].filter((v) => channels.has(v.channel_id)).map((v) => ({ ...v, tags: v.tags ?? [], outlier_score: scores.get(v.id) ?? null })),
       channels,
     };
   }

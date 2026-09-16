@@ -18,6 +18,7 @@ import {
   buildHref,
   CHANNEL_AGE,
   clearedAdvanced,
+  DEFAULT_SORT,
   countAdvanced,
   isRealtimeSort,
   COUNTRIES,
@@ -69,7 +70,7 @@ export default async function ShortsChannelsPage({ searchParams }: { searchParam
           key === "limit" ||
           (value === "any" && key !== "market") ||
           (key === "market" && value === "en") ||
-          (key === "sort" && value === "views") ||
+          (key === "sort" && value === DEFAULT_SORT) ||
           (key === "videos" && value === "show")
         ),
     )
@@ -117,7 +118,7 @@ export default async function ShortsChannelsPage({ searchParams }: { searchParam
             {QUICK_FILTERS.map((preset) => (
               <Link
                 key={preset.key}
-                href={buildHref(state, { ...clearedAdvanced(), sort: "views", ...preset.params, limit: String(PAGE_SIZE) })}
+                href={buildHref(state, { ...clearedAdvanced(), sort: DEFAULT_SORT, ...preset.params, limit: String(PAGE_SIZE) })}
                 className="dropdown-item"
                 aria-current={quick?.key === preset.key}
               >
@@ -126,7 +127,7 @@ export default async function ShortsChannelsPage({ searchParams }: { searchParam
               </Link>
             ))}
             {quick ? (
-              <Link href={buildHref(state, { ...clearedAdvanced(), sort: "views" })} className="dropdown-item dropdown-item-muted">
+              <Link href={buildHref(state, { ...clearedAdvanced(), sort: DEFAULT_SORT })} className="dropdown-item dropdown-item-muted">
                 Clear quick filter
               </Link>
             ) : null}
@@ -172,7 +173,7 @@ export default async function ShortsChannelsPage({ searchParams }: { searchParam
           >
             <form method="get" action="/research/shorts-channels" className="advanced-form">
               {state.q ? <input type="hidden" name="q" value={state.q} /> : null}
-              {state.sort !== "views" ? <input type="hidden" name="sort" value={state.sort} /> : null}
+              {state.sort !== DEFAULT_SORT ? <input type="hidden" name="sort" value={state.sort} /> : null}
               {state.videos === "hide" ? <input type="hidden" name="videos" value="hide" /> : null}
               {select("subs", SUBSCRIBERS, state.subs)}
               {select("views", AVG_VIEWS, state.views)}

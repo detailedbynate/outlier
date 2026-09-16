@@ -109,8 +109,12 @@ export function findUnderratedNiches(
   for (const video of videos) libraryByChannel.set(video.channel_id, (libraryByChannel.get(video.channel_id) ?? 0) + 1);
 
   const byTerm = new Map<string, { videos: NicheVideo[]; channels: Map<string, number> }>();
+  // Terms that came from niche labels rather than title words: these are known to be niches.
+  const labeled = new Set<string>();
   for (const video of videos) {
-    for (const term of terms(video)) {
+    const labels = channels.get(video.channel_id)?.niche_terms ?? [];
+    for (const label of labels) labeled.add(label);
+    for (const term of new Set([...terms(video), ...labels])) {
       const entry = byTerm.get(term) ?? { videos: [], channels: new Map<string, number>() };
       entry.videos.push(video);
       entry.channels.set(video.channel_id, (entry.channels.get(video.channel_id) ?? 0) + 1);
@@ -127,7 +131,7 @@ export function findUnderratedNiches(
     if (focused < minFocusedChannels) continue;
     // Words like "funny" or "tips" show up everywhere; a niche is narrower than that.
     if (entry.videos.length > videos.length * maxLibraryShare) continue;
-    if (!looksLikeNiche(term)) continue;
+    if (!labeled.has(term) && !looksLikeNiche(term)) continue;
 
     const metrics = computeNicheMetrics(entry.videos, channels, now);
     if (metrics.medianViewsPerDay < minViewsPerDay) continue;
@@ -154,7 +158,7 @@ export function findUnderratedNiches(
   }
 
   // "clash royale" says more than "clash", so a two-word niche wins ties with its own words.
-  const specificity = (niche: UnderratedNiche) => niche.score + (niche.term.includes(" ") ? 4 : 0);
+  const specificity = (niche: UnderratedNiche) => niche.score + (labeled.has(niche.term) ? 8 : 0) + (niche.term.includes(" ") ? 4 : 0);
   const chosen: UnderratedNiche[] = [];
   for (const candidate of candidates.sort((a, b) => specificity(b) - specificity(a) || a.term.localeCompare(b.term))) {
     if (chosen.length >= max) break;

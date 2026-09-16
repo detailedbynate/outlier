@@ -11,6 +11,8 @@ import type { ShortsChannelRow } from "@/types/database";
 import type { StorageBudgetService } from "./storage-budget-service";
 
 export const SHORTS_DISCOVERY_EVENT = "research.shorts_discovery";
+/** Discovery the library-growth job runs; kept apart so it never uses up users' daily searches. */
+export const LIBRARY_GROWTH_EVENT = "research.library_growth";
 
 const DISCOVERY_MIN_VIEWS = 20_000;
 
@@ -121,10 +123,13 @@ export class ResearchService {
    */
   private async channelIdsFor(query: string, terms: string[], now: Date): Promise<{ ids: string[]; newestFirst: string[] }> {
     const keyword = query.trim().toLowerCase().slice(0, 100);
-    const [byKeyword, discoveries] = await Promise.all([
+    const [byText, byNiche, discoveries] = await Promise.all([
       this.deps.channels.findChannelIdsByKeywords(terms),
+      // Labeled channels match on what they're about, even when no title says it.
+      Promise.all(terms.map((term) => this.deps.channels.findChannelIdsByNiche(term))).then((lists) => lists.flat()),
       this.deps.usage.discoveriesFor(SHORTS_DISCOVERY_EVENT, keyword, new Date(now.getTime() - 30 * 86_400_000)),
     ]);
+    const byKeyword = [...new Set([...byNiche, ...byText])];
     const discovered = [...new Set(discoveries.flatMap((d) => d.channelIds))];
     if (discovered.length === 0) return { ids: byKeyword, newestFirst: [] };
 
@@ -157,12 +162,19 @@ export class ResearchService {
    * real engagement); the Shorts channels view then decides which qualify.
    * Quota: 100 (search) + 1 (videos) + 1 (channels) now, then ~4 per queued channel.
    */
-  async discoverShortsChannels(keyword: string, userId: string | null, now: Date = new Date()): Promise<DiscoveryResult> {
+  async discoverShortsChannels(
+    keyword: string,
+    userId: string | null,
+    now: Date = new Date(),
+    options: { source?: "user" | "growth" } = {},
+  ): Promise<DiscoveryResult> {
     const q = keyword.trim();
     if (q.length < 2 || q.length > 100) throw new ValidationError("Enter a keyword between 2 and 100 characters.");
 
-    const left = await this.discoverySearchesLeftToday(now);
-    if (left <= 0) {
+    const growth = options.source === "growth";
+    // Growth runs in the background lane and has its own daily cap in the growth service.
+    const left = growth ? 0 : await this.discoverySearchesLeftToday(now);
+    if (!growth && left <= 0) {
       throw new AppError("RATE_LIMITED", `Daily discovery limit reached (${this.config.discoveryDailyLimit} searches). Try again tomorrow.`);
     }
     await this.deps.storage.assertCapacity();
@@ -221,7 +233,7 @@ export class ResearchService {
     }
 
     await this.deps.usage.record({
-      event_type: SHORTS_DISCOVERY_EVENT,
+      event_type: growth ? LIBRARY_GROWTH_EVENT : SHORTS_DISCOVERY_EVENT,
       user_id: userId,
       quantity: 1,
       resource_type: "keyword",
@@ -245,7 +257,7 @@ export class ResearchService {
       channelsNew: newIds.length,
       channelsQueued: toQueue.length,
       alreadyFresh: fresh.size,
-      searchesLeftToday: left - 1,
+      searchesLeftToday: growth ? 0 : left - 1,
       searchPasses: passes,
     };
   }

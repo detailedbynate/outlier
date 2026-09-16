@@ -16,7 +16,7 @@ import { youtubeErrorBodySchema } from "./schemas";
  *   3. Fetch, validate, cache.
  */
 
-export type YouTubeEndpoint = "channels" | "videos" | "search" | "playlists" | "playlistItems" | "videoCategories";
+export type YouTubeEndpoint = "channels" | "videos" | "search" | "playlists" | "playlistItems" | "videoCategories" | "channelSections";
 
 /** Quota unit cost per call (https://developers.google.com/youtube/v3/determine_quota_cost). */
 export const QUOTA_COST: Record<YouTubeEndpoint, number> = {
@@ -26,6 +26,7 @@ export const QUOTA_COST: Record<YouTubeEndpoint, number> = {
   playlists: 1,
   playlistItems: 1,
   videoCategories: 1,
+  channelSections: 1,
 };
 
 export type QueryValue = string | number | boolean | readonly string[] | null | undefined;

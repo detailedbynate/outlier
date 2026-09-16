@@ -8,6 +8,7 @@ type Option = { key: string; label: string };
 export const SUBSCRIBERS = [
   { key: "any", label: "Any size" },
   { key: "u10k", label: "Under 10K", max: 10_000 },
+  { key: "u100k", label: "Under 100K", max: 100_000 },
   { key: "10k-100k", label: "10K–100K", min: 10_000, max: 100_000 },
   { key: "100k-1m", label: "100K–1M", min: 100_000, max: 1_000_000 },
   { key: "1m", label: "1M+", min: 1_000_000 },
@@ -52,6 +53,7 @@ export const COUNTRIES = [
 ] satisfies Option[];
 
 export const SORTS = [
+  { key: "underrated", label: "Most underrated", column: "underrated_score", group: "Signals" },
   { key: "views", label: "Avg views", column: "avg_short_views", group: "Channel" },
   { key: "subs", label: "Subscribers", column: "subscriber_count", group: "Channel" },
   { key: "momentum", label: "Most active", column: "shorts_last_30d", group: "Channel" },
@@ -79,8 +81,8 @@ export function isRealtimeSort(key: string): boolean {
   return SORTS.some((s) => s.key === key && s.group === "Realtime");
 }
 
-export const PAGE_SIZE = 30;
-export const MAX_LIMIT = 120;
+export const PAGE_SIZE = 40;
+export const MAX_LIMIT = 300;
 
 export interface ShortsPageState {
   q: string;
@@ -97,9 +99,12 @@ export interface ShortsPageState {
   limit: string;
 }
 
+/** Underrated creators first: the point of the tool. Big channels are one sort away. */
+export const DEFAULT_SORT = "underrated";
+
 const DEFAULTS: ShortsPageState = {
   q: "",
-  sort: "views",
+  sort: DEFAULT_SORT,
   subs: "any",
   views: "any",
   age: "any",
@@ -118,6 +123,7 @@ export const ADVANCED_KEYS = ["subs", "views", "age", "active", "share", "countr
 export const QUICK_FILTERS: { key: string; label: string; description: string; params: Partial<ShortsPageState> }[] = [
   { key: "rising", label: "Rising new channels", description: "Under 3 months old, 10K+ avg views", params: { age: "90d", views: "10k" } },
   { key: "small-viral", label: "Small channels, big views", description: "Under 10K subs, 100K+ avg views", params: { subs: "u10k", views: "100k" } },
+  { key: "gems", label: "Underrated gems", description: "Under 100K subs, 10K+ avg views, most underrated first", params: { subs: "u100k", views: "10k", sort: "underrated" } },
   { key: "consistent", label: "Posting consistently", description: "Posted this week, sorted by activity", params: { active: "7d", sort: "momentum" } },
   { key: "big", label: "Big Shorts channels", description: "1M+ subscribers", params: { subs: "1m" } },
   { key: "tracked", label: "My tracked channels", description: "Channels you bookmarked", params: { tracked: "yes" } },

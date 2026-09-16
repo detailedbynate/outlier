@@ -24,6 +24,8 @@ export interface NicheChannel {
   title: string;
   thumbnail_url: string | null;
   subscriber_count: number | null;
+  /** Niche labels when the channel has been labeled: its game or topic, then its sub-niches. */
+  niche_terms?: string[];
 }
 
 export type Level = "low" | "medium" | "high";

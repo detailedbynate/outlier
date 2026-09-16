@@ -23,6 +23,8 @@ export interface TextGenerationRequest {
   messages: ChatMessage[];
   maxOutputTokens?: number;
   temperature?: number;
+  /** How much reasoning to spend; routine classification does well at "low". */
+  effort?: "low" | "medium" | "high";
   /** Provider-specific model id; falls back to the provider default. */
   model?: string;
   signal?: AbortSignal;

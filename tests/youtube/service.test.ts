@@ -200,6 +200,25 @@ describe("YouTubeClient error handling", () => {
     expect(error).toMatchObject({ code: "UPSTREAM_ERROR", message: "YouTube API rejected the server's credentials" });
   });
 
+  it("lists the channels a creator features, for 1 quota unit", async () => {
+    const A = "UCaaaaaaaaaaaaaaaaaaaaaa";
+    const B = "UCbbbbbbbbbbbbbbbbbbbbbb";
+    const { client, calls, quota } = createFakeYouTube([
+      {
+        endpoint: "channelSections",
+        body: listBody([
+          { id: "s1", snippet: { type: "multiplechannels", title: "Friends" }, contentDetails: { channels: [A, B] } },
+          { id: "s2", snippet: { type: "singleplaylist" }, contentDetails: { playlists: ["PL123"] } },
+          { id: "s3", snippet: { type: "multiplechannels" }, contentDetails: { channels: [B, CHANNEL_ID, "not-a-channel"] } },
+        ]),
+      },
+    ]);
+    expect(await new YouTubeService(client).getFeaturedChannels(CHANNEL_ID)).toEqual([A, B]);
+    expect(calls[0]!.params.get("channelId")).toBe(CHANNEL_ID);
+    expect(quota).toEqual([{ endpoint: "channelSections", units: 1, status: 200 }]);
+    await expect(new YouTubeService(client).getFeaturedChannels("nope")).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
   it("rejects malformed success payloads", async () => {
     const { client } = createFakeYouTube([{ endpoint: "channels", body: { items: [{ nope: true }] } }]);
     await expect(new YouTubeService(client).getChannel(CHANNEL_ID)).rejects.toMatchObject({ code: "UPSTREAM_ERROR" });
