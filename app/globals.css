@@ -4909,6 +4909,81 @@ body:has(.onboarding-root) .ambient {
 }
 
 
+/* Niche Finder: browsable niche ideas */
+.niche-ideas {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.niche-ideas-sub {
+  margin: 0 0 12px;
+}
+
+.niche-idea-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.niche-idea {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  color: inherit;
+  transition:
+    border-color 0.2s var(--ease),
+    transform 0.2s var(--ease);
+}
+
+.niche-idea:hover {
+  border-color: var(--accent-track);
+  transform: translateY(-2px);
+}
+
+.niche-idea-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.niche-idea-head h3 {
+  margin: 0;
+  font-size: 15px;
+  text-transform: capitalize;
+}
+
+.niche-idea-reason {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.niche-idea-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.niche-idea .dash-row-sub {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  margin-top: auto;
+}
+
+.niche-idea-tags span {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
 /* ===========================================================================
    Dashboard: command center. Solid surfaces and glowing accents, no gradients.
 =========================================================================== */

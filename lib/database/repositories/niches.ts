@@ -36,6 +36,19 @@ export class NicheRepository {
     );
   }
 
+  /** Recently researched topics with their reports, for the top-niches board and related suggestions. */
+  async recentReports(limit: number): Promise<Pick<NicheReportRow, "topic" | "topic_key" | "report" | "videos_analyzed" | "channels_analyzed" | "computed_at" | "search_count">[]> {
+    return unwrap(
+      await this.db
+        .from("niche_reports")
+        .select("topic, topic_key, report, videos_analyzed, channels_analyzed, computed_at, search_count")
+        .not("computed_at", "is", null)
+        .order("last_searched_at", { ascending: false })
+        .limit(limit),
+      "niche_reports.recent",
+    );
+  }
+
   /**
    * Stored videos about a topic from the last `days`: titles mentioning it, plus
    * uploads from channels whose name or description mentions it.

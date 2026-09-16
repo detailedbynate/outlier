@@ -8,7 +8,8 @@ import { isAppError } from "@/lib/core/errors";
 import { formatCompact, formatPercent, timeAgo } from "@/lib/format";
 import type { Level, NicheMetrics } from "@/lib/niches/analysis";
 import { getServices } from "@/lib/services";
-import type { NicheResult } from "@/lib/services/niche-service";
+import { parseNicheQuery } from "@/lib/niches/query";
+import type { NicheIdea, NicheResult } from "@/lib/services/niche-service";
 import { asUser } from "@/lib/youtube/quota-context";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +17,7 @@ export const maxDuration = 60;
 export const metadata: Metadata = { title: "Niche Finder · Outlier" };
 
 const STARTERS = ["gaming", "fitness", "cooking", "personal finance", "tech", "beauty"];
+const EXAMPLES = ["good niches around fitness", "top niches right now", "what should I post about gaming"];
 const LEVEL_LABEL: Record<Level, string> = { low: "Low", medium: "Medium", high: "High" };
 const FORMAT_LABEL = { shorts: "Shorts", long_form: "Long-form", both: "Both work", unknown: "Not enough data" } as const;
 
@@ -23,12 +25,14 @@ type SearchParams = Promise<{ topic?: string }>;
 
 export default async function NicheFinderPage({ searchParams }: { searchParams: SearchParams }) {
   const { user } = await requireApprovedUser();
-  const topic = ((await searchParams).topic ?? "").trim().slice(0, 60);
+  const asked = ((await searchParams).topic ?? "").trim().slice(0, 120);
+  // "good niches around fitness" and "fitness" both work; "top niches" browses.
+  const { intent, topic } = parseNicheQuery(asked);
   const services = getServices();
 
   let result: NicheResult | null = null;
   let error: string | null = null;
-  if (topic) {
+  if (intent === "research" && topic) {
     try {
       await services.rateLimits.enforce("nicheUser", user.id);
       result = await asUser(user.id, "page:niche_finder", () => services.niches.research(topic, { userId: user.id }));
@@ -36,7 +40,14 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
       error = isAppError(e) && e.expose ? e.message : "Couldn't research that niche. Try again.";
     }
   }
-  const popular = topic ? [] : await services.niches.popularTopics(8);
+  const thin = !result || result.report.overall.videos === 0;
+  const [popular, allTop, related] = await Promise.all([
+    result ? Promise.resolve([]) : services.niches.popularTopics(8),
+    services.niches.topNiches(12),
+    result ? services.niches.relatedNiches(result.topic, result.report, 6) : Promise.resolve([]),
+  ]);
+  // After a report, keep the exploring going: overlapping niches if we have them, otherwise the best ones we know.
+  const topNiches = allTop.filter((idea) => idea.topicKey !== result?.topicKey).slice(0, result ? 6 : 12);
   const suggestions = [...new Set([...popular.map((p) => p.topic), ...STARTERS])].slice(0, 10);
 
   return (
@@ -47,17 +58,17 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
             <CompassIcon size={13} /> Research tool
           </span>
           <h1>Niche Finder</h1>
-          <p>Enter a topic to see its sub-niches, how much demand and competition each has, and where the openings are.</p>
+          <p>Ask for a topic or for ideas — &ldquo;good niches around fitness&rdquo;, &ldquo;top niches right now&rdquo; — to see demand, competition and where the openings are.</p>
         </div>
         <form method="get" action="/research/niche-finder" className="niche-search" role="search">
           <SearchIcon size={18} />
           <label htmlFor="topic" className="sr-only">
             Topic
           </label>
-          <input id="topic" name="topic" type="search" defaultValue={topic} placeholder="Try gaming, fitness, cooking…" maxLength={60} autoComplete="off" required />
+          <input id="topic" name="topic" type="search" defaultValue={asked} placeholder="Try “good niches around fitness” or “top niches”" maxLength={120} autoComplete="off" required />
           <button type="submit">Research</button>
         </form>
-        {!topic ? (
+        {result ? null : (
           <div className="dash-topics">
             {suggestions.map((s) => (
               <Link key={s} href={`/research/niche-finder?topic=${encodeURIComponent(s)}`} className="dash-topic">
@@ -65,11 +76,25 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
               </Link>
             ))}
           </div>
-        ) : null}
+        )}
       </header>
 
       {error ? <div className="dash-empty">{error}</div> : null}
       {result ? <Report result={result} /> : null}
+      {related.length > 0 ? <IdeaBoard ideas={related} title={`Niches next to ${result!.topic}`} sub="Other researched topics that overlap with this one" /> : null}
+      {topNiches.length > 0 && (related.length === 0 || thin) ? (
+        <IdeaBoard
+          ideas={topNiches}
+          title={result ? "Other niches to explore" : "Top niches right now"}
+          sub="Best opportunity scores from what everyone has researched so far — pick one to dig in"
+        />
+      ) : null}
+      {!result && topNiches.length === 0 ? (
+        <div className="dash-empty">
+          <strong>Not sure what to search?</strong>
+          <p>Try one of these: {EXAMPLES.map((e) => `“${e}”`).join(", ")}. Any topic works, and the report shows its sub-niches.</p>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -168,6 +193,43 @@ function Report({ result }: { result: NicheResult }) {
         </>
       )}
     </>
+  );
+}
+
+function IdeaBoard({ ideas, title, sub }: { ideas: NicheIdea[]; title: string; sub: string }) {
+  return (
+    <section className="niche-ideas" aria-label={title}>
+      <h2 className="dash-subhead">
+        <CompassIcon size={14} /> {title}
+      </h2>
+      <p className="dash-row-sub niche-ideas-sub">{sub}</p>
+      <div className="niche-idea-grid">
+        {ideas.map((idea, i) => (
+          <Link
+            key={idea.topicKey}
+            href={`/research/niche-finder?topic=${encodeURIComponent(idea.topic)}`}
+            className="dash-panel niche-idea"
+            style={{ "--i": i + 1 } as CSSProperties}
+          >
+            <header className="niche-idea-head">
+              <h3>{idea.topic}</h3>
+              <span className="niche-score" data-band={band(idea.opportunity)}>
+                {idea.opportunity}
+              </span>
+            </header>
+            <p className="niche-idea-reason">{idea.reason}</p>
+            <div className="niche-idea-tags">
+              <span>{LEVEL_LABEL[idea.demand]} demand</span>
+              <span>{LEVEL_LABEL[idea.competition]} competition</span>
+              <span>{FORMAT_LABEL[idea.format]}</span>
+            </div>
+            <span className="dash-row-sub">
+              {formatCompact(idea.medianViewsPerDay)} views/day median · {formatCompact(idea.videos)} videos · {formatCompact(idea.channels)} channels
+            </span>
+          </Link>
+        ))}
+      </div>
+    </section>
   );
 }
 

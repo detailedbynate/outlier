@@ -69,6 +69,12 @@ const STOPWORDS = new Set(
     "how what why when who which vs versus not no yes so do does did can will just get got make made new best top most more very all any every into out up " +
     "shorts short video videos viral fyp foryou foryoupage youtube subscribe like comment share trending official full part episode ep day days time " +
     "watch live stream today first last one two three 1st challenge try tried trying ever really good bad easy hard try amp quot " +
+    // Verbs and connectives that show up in half of all titles.
+    "have has had having want wants wanted need needs going go goes went come comes came take takes took give gives gave know knows knew " +
+    "think thinks thought say says said see sees saw look looks looked use uses used work works worked feel feels felt keep keeps kept " +
+    "about after again against because before between during more much never now only other over same still such than then there these " +
+    "through under until while why would could should might must also back down even here" +
+    " " +
     // Broad category words say nothing about a sub-niche.
     "game games gaming gamer gameplay gamers gameplays vlog vlogs tiktok reels reel edit edits"
   ).split(/\s+/),

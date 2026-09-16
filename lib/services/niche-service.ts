@@ -5,7 +5,7 @@ import type { NicheRepository } from "@/lib/database/repositories/niches";
 import type { UsageRepository } from "@/lib/database/repositories/usage";
 import { videoToRow, type VideoRepository } from "@/lib/database/repositories/videos";
 import type { EnqueueOptions } from "@/lib/jobs/queue";
-import { buildNicheReport, topicKey, type NicheReport } from "@/lib/niches/analysis";
+import { buildNicheReport, tokenize, topicKey, type Level, type NicheReport } from "@/lib/niches/analysis";
 import { isQuotaUnavailable } from "@/lib/youtube/quota-manager";
 import type { YouTubeService } from "@/lib/youtube/service";
 import type { Json } from "@/types/database";
@@ -52,6 +52,24 @@ export const DEFAULT_NICHE_CONFIG: NicheConfig = {
 
 export type NicheSource = "cache" | "database" | "youtube";
 
+/** A niche someone can jump into, summarised for browsing. */
+export interface NicheIdea {
+  topic: string;
+  topicKey: string;
+  opportunity: number;
+  demand: Level;
+  competition: Level;
+  format: "shorts" | "long_form" | "both" | "unknown";
+  medianViewsPerDay: number;
+  growth: number | null;
+  videos: number;
+  channels: number;
+  searchCount: number;
+  computedAt: string | null;
+  /** Why it's worth a look, in one line. */
+  reason: string;
+}
+
 export interface NicheResult {
   topic: string;
   topicKey: string;
@@ -66,6 +84,45 @@ export interface NicheResult {
   stale: boolean;
 }
 
+/** One line on why a niche is interesting, from its own numbers. */
+function reasonFor(metrics: NicheReport["overall"]): string {
+  if (metrics.growth !== null && metrics.growth >= 0.2) return `Growing fast · views/day up ${Math.round(metrics.growth * 100)}%`;
+  if (metrics.competition === "low" && metrics.demand !== "low") return "Demand with little competition";
+  if (metrics.viralRate >= 0.12) return `${Math.round(metrics.viralRate * 100)}% of uploads beat their channel's usual views`;
+  if (metrics.smallChannelShare !== null && metrics.smallChannelShare >= 0.5) return "Small channels are breaking out here";
+  if (metrics.demand === "high") return "High demand, steady audience";
+  return "Room to grow";
+}
+
+function toIdea(row: {
+  topic: string;
+  topic_key: string;
+  report: unknown;
+  videos_analyzed: number;
+  channels_analyzed: number;
+  computed_at: string | null;
+  search_count: number;
+}): NicheIdea | null {
+  const report = row.report as NicheReport | null;
+  const overall = report?.overall;
+  if (!overall || typeof overall.opportunity !== "number") return null;
+  return {
+    topic: row.topic,
+    topicKey: row.topic_key,
+    opportunity: overall.opportunity,
+    demand: overall.demand,
+    competition: overall.competition,
+    format: overall.format.best,
+    medianViewsPerDay: overall.medianViewsPerDay,
+    growth: overall.growth,
+    videos: row.videos_analyzed,
+    channels: row.channels_analyzed,
+    searchCount: row.search_count,
+    computedAt: row.computed_at,
+    reason: reasonFor(overall),
+  };
+}
+
 export class NicheService {
   private readonly log: Logger;
   private readonly config: NicheConfig;
@@ -74,7 +131,7 @@ export class NicheService {
 
   constructor(
     private readonly deps: {
-      niches: Pick<NicheRepository, "getReport" | "saveReport" | "claimRefresh" | "releaseClaim" | "topicSample" | "popularTopics">;
+      niches: Pick<NicheRepository, "getReport" | "saveReport" | "claimRefresh" | "releaseClaim" | "topicSample" | "popularTopics" | "recentReports">;
       youtube: Pick<YouTubeService, "searchVideos" | "getChannels">;
       channels: Pick<ChannelRepository, "upsertMany">;
       videos: Pick<VideoRepository, "upsertMany">;
@@ -88,6 +145,44 @@ export class NicheService {
   ) {
     this.config = { ...DEFAULT_NICHE_CONFIG, ...config };
     this.log = logger ?? createLogger({ module: "services.niche" });
+  }
+
+  /**
+   * Niches worth starting from, best opportunity first, built from reports
+   * everyone's searches have already produced (no YouTube calls).
+   */
+  async topNiches(limit = 12, options: { minVideos?: number } = {}): Promise<NicheIdea[]> {
+    const rows = await this.deps.niches.recentReports(120).catch(() => []);
+    const minVideos = options.minVideos ?? 25;
+    return rows
+      .flatMap((row) => {
+        const idea = toIdea(row);
+        return idea && idea.videos >= minVideos ? [idea] : [];
+      })
+      .sort((a, b) => b.opportunity - a.opportunity)
+      .slice(0, limit);
+  }
+
+  /**
+   * Niches next to this one: other researched topics that share a word with it
+   * or with its sub-niches, so someone can keep exploring sideways.
+   */
+  async relatedNiches(topic: string, report: NicheReport | null, limit = 6): Promise<NicheIdea[]> {
+    const rows = await this.deps.niches.recentReports(120).catch(() => []);
+    const key = topicKey(topic);
+    const words = new Set([...tokenize(topic), ...(report?.subNiches ?? []).flatMap((sub) => tokenize(sub.term))]);
+    if (words.size === 0) return [];
+
+    return rows
+      .flatMap((row) => {
+        if (row.topic_key === key) return [];
+        const idea = toIdea(row);
+        if (!idea || idea.videos < 15) return [];
+        const shared = tokenize(idea.topic).some((word) => words.has(word));
+        return shared ? [idea] : [];
+      })
+      .sort((a, b) => b.opportunity - a.opportunity)
+      .slice(0, limit);
   }
 
   popularTopics(limit = 8) {
