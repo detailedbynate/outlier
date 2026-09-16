@@ -1156,47 +1156,97 @@ tr:last-child td {
   flex-wrap: wrap;
 }
 
-.search-hero-note {
-  padding-left: 4px;
-  margin: 0;
-}
-
 .auto-toggle {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 5px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  border-radius: 999px;
-  color: var(--text-muted);
+  gap: 14px;
+  width: 100%;
+  text-align: left;
+  padding: 12px 16px;
+  font-size: 13px;
+  border-radius: 14px;
+  color: var(--text-secondary);
   background: var(--surface-2);
   border: 1px solid var(--border);
   box-shadow: none;
 }
 
 .auto-toggle:hover {
-  color: var(--text-primary);
+  border-color: var(--border-strong);
   box-shadow: none;
 }
 
+.auto-toggle:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .auto-toggle.is-on {
-  color: var(--accent-text);
   border-color: var(--accent-track);
   background: var(--accent-wash);
 }
 
-.auto-toggle-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: var(--text-muted);
+.auto-toggle-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
 }
 
-.auto-toggle.is-on .auto-toggle-dot {
-  background: var(--accent);
-  box-shadow: 0 0 8px var(--accent);
+.auto-toggle-text strong {
+  font-size: 14px;
+  color: var(--text-primary);
 }
+
+.auto-toggle-text span {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.auto-toggle-state {
+  margin-left: auto;
+  flex: none;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.auto-toggle.is-on .auto-toggle-state {
+  color: var(--accent-text);
+}
+
+.auto-switch {
+  flex: none;
+  width: 44px;
+  height: 26px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  transition: background 0.2s var(--ease);
+}
+
+.auto-switch-knob {
+  display: block;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--text-muted);
+  transition:
+    transform 0.2s var(--ease),
+    background 0.2s var(--ease);
+}
+
+.auto-toggle.is-on .auto-switch {
+  background: var(--accent-track);
+}
+
+.auto-toggle.is-on .auto-switch-knob {
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
+  transform: translateX(18px);
+}
+
 
 .search-hero-icon {
   position: absolute;

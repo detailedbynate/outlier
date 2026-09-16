@@ -102,7 +102,7 @@ export function SearchHero({
             title={
               outOfSearches
                 ? "Daily discovery limit reached. Resets at midnight UTC."
-                : "Search YouTube for channels we don't have yet · 10 credits"
+                : "Search YouTube for channels we don't have yet · 10 credits, 25 if it has to dig deeper"
             }
           >
             <CompassIcon size={15} />
@@ -111,17 +111,22 @@ export function SearchHero({
         </form>
       </div>
       <div className="search-hero-meta">
-        <button type="button" className={`auto-toggle ${auto ? "is-on" : ""}`} onClick={toggleAuto} aria-pressed={auto}>
-          <span className="auto-toggle-dot" aria-hidden="true" />
-          Auto-find new channels: {auto ? "On" : "Off"}
+        <button type="button" className={`auto-toggle ${auto ? "is-on" : ""}`} onClick={toggleAuto} aria-pressed={auto} disabled={outOfSearches}>
+          <span className="auto-switch" aria-hidden="true">
+            <span className="auto-switch-knob" />
+          </span>
+          <span className="auto-toggle-text">
+            <strong>Auto-find new channels</strong>
+            <span>
+              {outOfSearches
+                ? "Daily discovery limit reached — resets at midnight UTC"
+                : auto
+                  ? "Every search also pulls in channels nobody has found yet · 10 credits, 25 when it digs deeper"
+                  : "Searching looks at saved channels only — tap to pull in new ones too"}
+            </span>
+          </span>
+          <span className="auto-toggle-state">{auto ? "On" : "Off"}</span>
         </button>
-        <p className="stat-note search-hero-note">
-          {outOfSearches
-            ? "Daily discovery limit reached. Resets at midnight UTC."
-            : auto
-              ? "Every search also pulls in channels nobody has found yet · 10 credits per search."
-              : "Searching only looks at saved channels. Use “Find new on YouTube” to pull in new ones · 10 credits."}
-        </p>
       </div>
       {pending ? <p className="notice discover-status">Searching YouTube and adding channels. This can take up to a minute.</p> : null}
       {!pending && state.message ? <p className="notice discover-status">{state.message}</p> : null}

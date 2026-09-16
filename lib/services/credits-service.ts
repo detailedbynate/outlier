@@ -9,8 +9,10 @@ import type { UsageRepository } from "@/lib/database/repositories/usage";
  */
 
 export const CREDIT_COSTS = {
-  /** search.list (100 units) + ingesting up to 25 channels. */
+  /** One search.list (100 units) + ingesting up to 25 channels. */
   discover_channels: 10,
+  /** A search that had to dig: up to three search.list calls (300 units). */
+  discover_channels_deep: 25,
   /** Channel + uploads + Shorts playlist + video stats. */
   track_channel: 3,
   /** Video + channel + recent uploads for the baseline. */
