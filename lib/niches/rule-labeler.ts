@@ -7,6 +7,7 @@
  */
 
 import { tokenize } from "./analysis";
+import { isClipChannel } from "./focus";
 import { NICHE_DICTIONARY, type DictionaryEntry } from "./dictionary";
 import { nicheSlug, topicName, type ChannelLabel, type ContentFormat, type NicheCategory, type QualityFlag } from "./labeling";
 
@@ -172,7 +173,8 @@ const NON_LATIN = /[\u0400-\u04FF\u0600-\u06FF\u0900-\u097F\u0E00-\u0E7F\u3040-\
 
 function flagsFor(input: RuleLabelInput): QualityFlag[] {
   const flags: QualityFlag[] = [];
-  if (REUPLOAD_NOTICE.test(input.description ?? "")) flags.push("reupload");
+  // Disclaimers in the description, or a channel YouTube files under television programs (TV/movie clips).
+  if (REUPLOAD_NOTICE.test(input.description ?? "") || isClipChannel({ topicCategories: input.topicCategories, description: input.description })) flags.push("reupload");
   const titles = input.uploads.map((u) => u.title);
   if (titles.length >= 3 && titles.filter((t) => COMPILATION_TITLE.test(t)).length / titles.length >= 0.5) flags.push("compilation");
   if (titles.length >= 3 && titles.filter((t) => NON_LATIN.test(t)).length / titles.length >= 0.5) flags.push("non_english");

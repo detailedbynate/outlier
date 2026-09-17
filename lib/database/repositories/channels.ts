@@ -2,6 +2,7 @@ import type { DatabaseClient } from "@/lib/database/client";
 import { assertOk, unwrap, unwrapMaybe } from "@/lib/database/errors";
 import type { ChannelRow, ChannelSnapshotRow, ShortsChannelRow, TablesInsert } from "@/types/database";
 import type { YouTubeChannel } from "@/types/youtube";
+import { isAboutTopic, type ChannelProfile } from "@/lib/niches/focus";
 
 /** Long descriptions are the biggest per-row cost; the first part carries the useful keywords. */
 export const MAX_DESCRIPTION_CHARS = 1000;
@@ -34,6 +35,9 @@ export function channelToRow(channel: YouTubeChannel, syncedAt: Date): TablesIns
     last_synced_at: syncedAt.toISOString(),
   };
 }
+
+/** Labels below this confidence are guesses and don't place a channel in a niche on their own. */
+const LABEL_CONFIDENCE = 0.6;
 
 /** Ids per filter: UUIDs are ~40 URL bytes each and the API rejects URLs over 16 KB. */
 const IDS_PER_REQUEST = 100;
@@ -258,22 +262,67 @@ export class ChannelRepository {
     );
   }
 
-  /** Channels labeled with a niche entity or sub-niche matching the term. */
+  /**
+   * Channels confidently labeled with a game/topic or sub-niche matching the term:
+   * these are about the topic without needing to say its name in titles.
+   */
   async findChannelIdsByNiche(term: string, limit = 300): Promise<string[]> {
     const clean = escapeLike(term).trim().toLowerCase();
     if (clean.length < 2) return [];
     const entities = unwrap(
-      await this.db.from("niches").select("id").or(`name.ilike."*${clean}*",keywords.cs.{"${clean}"}`).limit(50),
+      await this.db.from("niches").select("id").or(`name.ilike."*${clean}*",keywords.cs.{"${clean}"}`).neq("kind", "category").limit(50),
       "niches.matchTerm",
     ).map((n) => n.id);
     const ids = new Set<string>();
-    if (entities.length > 0) {
-      const byEntity = unwrap(await this.db.from("channels").select("id").in("niche_id", entities).limit(limit), "channels.byNicheEntity");
-      for (const row of byEntity) ids.add(row.id);
+    for (const chunk of inChunks(entities)) {
+      const rows = unwrap(
+        await this.db.from("channels").select("id").in("niche_id", chunk).gte("niche_confidence", LABEL_CONFIDENCE).or("content_language.is.null,content_language.neq.other").limit(limit),
+        "channels.byNicheEntity",
+      );
+      for (const row of rows) ids.add(row.id);
     }
-    const byLabel = unwrap(await this.db.from("channels").select("id").overlaps("niche_labels", [clean]).limit(limit), "channels.byNicheLabel");
+    const byLabel = unwrap(
+      await this.db.from("channels").select("id").overlaps("niche_labels", [clean]).gte("niche_confidence", LABEL_CONFIDENCE).or("content_language.is.null,content_language.neq.other").limit(limit),
+      "channels.byNicheLabel",
+    );
     for (const row of byLabel) ids.add(row.id);
     return [...ids].slice(0, limit);
+  }
+
+  /**
+   * Of these channels, the ones whose recent uploads are actually about one of the
+   * topics (not one stray video), that aren't TV/movie clip channels or non-English.
+   */
+  async filterAboutTopic(channelIds: string[], topics: string[]): Promise<Set<string>> {
+    const about = new Set<string>();
+    if (channelIds.length === 0 || topics.length === 0) return about;
+
+    const profiles = new Map<string, ChannelProfile>();
+    for (const chunk of inChunks(channelIds)) {
+      const rows = unwrap(
+        await this.db.from("channels").select("id, topic_categories, description, content_language").in("id", chunk),
+        "channels.topicProfiles",
+      );
+      for (const row of rows) {
+        profiles.set(row.id, { topicCategories: row.topic_categories ?? [], description: row.description, contentLanguage: row.content_language, uploads: [] });
+      }
+    }
+    // 30 channels x 30 uploads stays under the API's 1,000-row response cap.
+    for (const chunk of inChunks(channelIds, 30)) {
+      const rows = unwrap(
+        await this.db.from("videos").select("channel_id, title, tags").in("channel_id", chunk).order("published_at", { ascending: false }).limit(chunk.length * 30),
+        "channels.topicUploads",
+      );
+      for (const row of rows) {
+        const uploads = profiles.get(row.channel_id)?.uploads;
+        if (uploads && uploads.length < 30) uploads.push({ title: row.title, tags: row.tags ?? [] });
+      }
+    }
+
+    for (const [id, profile] of profiles) {
+      if (topics.some((topic) => isAboutTopic(profile, topic))) about.add(id);
+    }
+    return about;
   }
 
   /**

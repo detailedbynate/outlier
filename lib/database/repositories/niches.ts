@@ -1,4 +1,5 @@
 import type { DatabaseClient } from "@/lib/database/client";
+import { ChannelRepository } from "@/lib/database/repositories/channels";
 import { assertOk, unwrap } from "@/lib/database/errors";
 import type { NicheChannel, NicheVideo } from "@/lib/niches/analysis";
 import type { NicheReportRow, NicheRow, TablesInsert } from "@/types/database";
@@ -112,21 +113,6 @@ export class NicheRepository {
     );
   }
 
-  /** Channels labeled with a game/topic or sub-niche matching the term. */
-  private async labeledChannelIds(term: string): Promise<string[]> {
-    const clean = term.toLowerCase();
-    const entities = unwrap(
-      await this.db.from("niches").select("id").or(`name.ilike."*${clean}*",keywords.cs.{"${clean}"}`).neq("kind", "category").limit(50),
-      "niches.labeledEntities",
-    ).map((n) => n.id);
-    const ids = new Set<string>();
-    if (entities.length > 0) {
-      for (const row of unwrap(await this.db.from("channels").select("id").in("niche_id", entities).limit(300), "niches.labeledByEntity")) ids.add(row.id);
-    }
-    for (const row of unwrap(await this.db.from("channels").select("id").overlaps("niche_labels", [clean]).limit(300), "niches.labeledBySub")) ids.add(row.id);
-    return [...ids];
-  }
-
   /**
    * Channels for a sample, with their niche terms. Channels flagged as reuploads,
    * compilations or spam are left out entirely.
@@ -236,21 +222,27 @@ export class NicheRepository {
     if (term.length < 2) return { videos: [], channels: new Map() };
     const columns = "id, youtube_video_id, channel_id, title, tags, format, view_count, like_count, comment_count, published_at";
 
+    // Channels confidently labeled with the topic are in. Channels that only mention it (in their
+    // name, description, or a video title) are in only when their recent uploads are about it:
+    // one "crime" video doesn't make a science channel a crime channel.
+    const channelRepo = new ChannelRepository(this.db);
+    const trusted = new Set(await channelRepo.findChannelIdsByNiche(topic));
     const byText = unwrap(
       await this.db.from("channels").select("id").or(`title.ilike."*${term}*",description.ilike."*${term}*",keywords.cs.{"${term}"}`).limit(300),
       "niches.topicChannels",
     ).map((c) => c.id);
-    const matchingChannels = [...new Set([...(await this.labeledChannelIds(term)), ...byText])].slice(0, 400);
-
     const byTitle = unwrap(
-      await this.db.from("videos").select(columns).ilike("title", `%${term}%`).gte("published_at", since.toISOString()).order("view_count", { ascending: false }).limit(limit),
-      "niches.videosByTitle",
-    );
+      await this.db.from("videos").select("channel_id").ilike("title", `%${term}%`).gte("published_at", since.toISOString()).order("view_count", { ascending: false }).limit(1_000),
+      "niches.channelsByVideoTitle",
+    ).map((v) => v.channel_id);
+    const weak = [...new Set([...byText, ...byTitle])].filter((id) => !trusted.has(id)).slice(0, 400);
+    const focused = await channelRepo.filterAboutTopic(weak, [topic]);
+    const matchingChannels = [...trusted, ...weak.filter((id) => focused.has(id))].slice(0, 400);
     // Chunked: hundreds of channel ids overflow the request URL.
-    const byChannel: typeof byTitle = [];
+    const pages = [];
     for (let i = 0; i < matchingChannels.length; i += 100) {
-      byChannel.push(
-        ...unwrap(
+      pages.push(
+        unwrap(
           await this.db
             .from("videos")
             .select(columns)
@@ -262,10 +254,10 @@ export class NicheRepository {
         ),
       );
     }
-    byChannel.sort((a, b) => b.view_count - a.view_count).splice(limit);
+    const byChannel = pages.flat().sort((a, b) => b.view_count - a.view_count).slice(0, limit);
 
     const byId = new Map<string, Omit<NicheVideo, "outlier_score">>();
-    for (const row of [...byTitle, ...byChannel]) byId.set(row.id, row);
+    for (const row of byChannel) byId.set(row.id, { ...row, tags: row.tags ?? [] });
     const ids = [...byId.keys()];
 
     const scores = new Map<string, number>();

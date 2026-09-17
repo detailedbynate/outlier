@@ -36,7 +36,8 @@ export const TOPIC_SEEDS = [
   // Tech
   "iphone tips", "pc building", "ai tools", "coding", "tech reviews", "smart home", "cybersecurity", "linux", "3d printing",
   // Education
-  "history facts", "space facts", "psychology facts", "language learning", "math tricks", "geography", "true crime", "science experiments",
+  "history facts", "space facts", "psychology facts", "language learning", "math tricks", "geography", "true crime", "cold cases", "crime news",
+  "courtroom", "unsolved mysteries", "serial killers", "missing persons", "science experiments",
   "philosophy", "book summaries", "study tips",
   // Lifestyle and style
   "skincare", "makeup tutorial", "mens fashion", "thrifting", "minimalism", "productivity", "morning routine", "van life", "tiny homes",

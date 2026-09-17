@@ -129,7 +129,12 @@ export class ResearchService {
       Promise.all(terms.map((term) => this.deps.channels.findChannelIdsByNiche(term))).then((lists) => lists.flat()),
       this.deps.usage.discoveriesFor(SHORTS_DISCOVERY_EVENT, keyword, new Date(now.getTime() - 30 * 86_400_000)),
     ]);
-    const byKeyword = [...new Set([...byNiche, ...byText])];
+    // Confident labels count as they are; a text match (a channel name, one video title) only
+    // counts when the channel's recent uploads are actually about the search.
+    const trusted = new Set(byNiche);
+    const weak = [...new Set(byText)].filter((id) => !trusted.has(id));
+    const focused = await this.deps.channels.filterAboutTopic(weak, terms);
+    const byKeyword = [...trusted, ...weak.filter((id) => focused.has(id))];
     const discovered = [...new Set(discoveries.flatMap((d) => d.channelIds))];
     if (discovered.length === 0) return { ids: byKeyword, newestFirst: [] };
 

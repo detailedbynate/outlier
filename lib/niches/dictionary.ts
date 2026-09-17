@@ -210,7 +210,7 @@ export const NICHE_DICTIONARY: DictionaryEntry[] = [
   learn("Language Learning", ["learn spanish", "learn english", "learn japanese"]),
   learn("Math", ["math tricks", "maths"]),
   learn("Geography", ["geography facts"]),
-  learn("True Crime", ["truecrime", "unsolved"]),
+  learn("True Crime", ["truecrime", "unsolved", "cold case", "murder case", "serial killer", "missing person", "crime story", "crimestory", "crime news", "crimenews", "court case", "courtroom", "trial footage"]),
   learn("Science Experiments", ["science experiment", "chemistry"]),
   learn("Book Summaries", ["book summary", "booktube"]),
   // Beauty and fashion
