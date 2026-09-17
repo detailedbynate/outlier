@@ -35,6 +35,13 @@ export function channelToRow(channel: YouTubeChannel, syncedAt: Date): TablesIns
   };
 }
 
+/** Ids per filter: UUIDs are ~40 URL bytes each and the API rejects URLs over 16 KB. */
+const IDS_PER_REQUEST = 100;
+
+function* inChunks<T>(values: readonly T[], size = IDS_PER_REQUEST): Generator<T[]> {
+  for (let i = 0; i < values.length; i += size) yield values.slice(i, i + size);
+}
+
 export class ChannelRepository {
   constructor(private readonly db: DatabaseClient) {}
 
@@ -182,15 +189,22 @@ export class ChannelRepository {
     );
     if (channels.length === 0) return [];
 
-    const videos = unwrap(
-      await this.db
-        .from("videos")
-        .select("channel_id, title, tags, published_at")
-        .in("channel_id", channels.map((c) => c.id))
-        .order("published_at", { ascending: false })
-        .limit(channels.length * 15),
-      "channels.listUnlabeledVideos",
-    );
+    // Chunked: hundreds of ids in one filter overflow the request URL limit.
+    const videos: { channel_id: string; title: string; tags: string[] | null; published_at: string }[] = [];
+    for (let i = 0; i < channels.length; i += 100) {
+      const ids = channels.slice(i, i + 100).map((c) => c.id);
+      videos.push(
+        ...unwrap(
+          await this.db
+            .from("videos")
+            .select("channel_id, title, tags, published_at")
+            .in("channel_id", ids)
+            .order("published_at", { ascending: false })
+            .limit(ids.length * 15),
+          "channels.listUnlabeledVideos",
+        ),
+      );
+    }
     const byChannel = new Map<string, { titles: string[]; uploads: { title: string; tags: string[] }[]; tags: Map<string, number> }>();
     for (const video of videos) {
       const entry = byChannel.get(video.channel_id) ?? { titles: [], uploads: [], tags: new Map<string, number>() };
@@ -281,8 +295,9 @@ export class ChannelRepository {
   }
 
   async markFeaturedChecked(ids: string[], at: Date): Promise<void> {
-    if (ids.length === 0) return;
-    assertOk(await this.db.from("channels").update({ featured_checked_at: at.toISOString() }).in("id", ids), "channels.markFeaturedChecked");
+    for (const chunk of inChunks(ids)) {
+      assertOk(await this.db.from("channels").update({ featured_checked_at: at.toISOString() }).in("id", chunk), "channels.markFeaturedChecked");
+    }
   }
 
   /** Which of these YouTube channel ids we already store, at any age. */
@@ -331,6 +346,25 @@ export class ChannelRepository {
 
   async searchShortsChannels(filters: ShortsChannelFilters): Promise<ShortsChannelRow[]> {
     if (filters.channelIds?.length === 0 || filters.youtubeChannelIds?.length === 0) return [];
+    // A big niche can match more channel ids than fit in one request: query in chunks, then merge in order.
+    if (filters.channelIds && filters.channelIds.length > IDS_PER_REQUEST) {
+      const rows: ShortsChannelRow[] = [];
+      for (const chunk of inChunks(filters.channelIds)) rows.push(...(await this.searchShortsChannels({ ...filters, channelIds: chunk })));
+      const column = filters.orderBy;
+      const value = (row: ShortsChannelRow) => {
+        const v = row[column as keyof ShortsChannelRow];
+        return v === null || v === undefined ? null : typeof v === "string" && Number.isNaN(Number(v)) ? Date.parse(v) : Number(v);
+      };
+      return rows
+        .sort((a, b) => {
+          const av = value(a);
+          const bv = value(b);
+          if (av === null) return bv === null ? 0 : 1;
+          if (bv === null) return -1;
+          return bv - av;
+        })
+        .slice(0, filters.limit);
+    }
     let query = this.db.from("shorts_channels").select("*");
     if (filters.channelIds) query = query.in("channel_id", filters.channelIds);
     if (filters.youtubeChannelIds) query = query.in("youtube_channel_id", filters.youtubeChannelIds);
@@ -365,15 +399,16 @@ export class ChannelRepository {
 
   /** Raise channels to at least `priority` and make them due now (never lowers an existing priority). */
   async raiseMonitorPriority(ids: string[], priority: number, now: Date): Promise<void> {
-    if (ids.length === 0) return;
-    assertOk(
-      await this.db
-        .from("channels")
-        .update({ monitor_priority: priority, next_check_at: now.toISOString() })
-        .in("id", ids)
-        .lt("monitor_priority", priority),
-      "channels.raiseMonitorPriority",
-    );
+    for (const chunk of inChunks(ids)) {
+      assertOk(
+        await this.db
+          .from("channels")
+          .update({ monitor_priority: priority, next_check_at: now.toISOString() })
+          .in("id", chunk)
+          .lt("monitor_priority", priority),
+        "channels.raiseMonitorPriority",
+      );
+    }
   }
 
   /** Channels whose scheduled stats check is due, highest priority first. */
@@ -391,14 +426,15 @@ export class ChannelRepository {
   }
 
   async scheduleMonitoring(ids: string[], priority: number, nextCheckAt: Date | null): Promise<void> {
-    if (ids.length === 0) return;
-    assertOk(
-      await this.db
-        .from("channels")
-        .update({ monitor_priority: priority, next_check_at: nextCheckAt?.toISOString() ?? null })
-        .in("id", ids),
-      "channels.scheduleMonitoring",
-    );
+    for (const chunk of inChunks(ids)) {
+      assertOk(
+        await this.db
+          .from("channels")
+          .update({ monitor_priority: priority, next_check_at: nextCheckAt?.toISOString() ?? null })
+          .in("id", chunk),
+        "channels.scheduleMonitoring",
+      );
+    }
   }
 
   /** Typical Short views per channel (from the Shorts channels view), for breakout detection. */
@@ -431,7 +467,7 @@ export class ChannelRepository {
 
   async setTrackedMany(ids: string[], tracked: boolean): Promise<void> {
     if (ids.length === 0) return;
-    assertOk(await this.db.from("channels").update({ tracked }).in("id", ids), "channels.setTrackedMany");
+    for (const chunk of inChunks(ids)) assertOk(await this.db.from("channels").update({ tracked }).in("id", chunk), "channels.setTrackedMany");
   }
 }
 

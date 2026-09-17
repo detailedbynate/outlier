@@ -246,12 +246,23 @@ export class NicheRepository {
       await this.db.from("videos").select(columns).ilike("title", `%${term}%`).gte("published_at", since.toISOString()).order("view_count", { ascending: false }).limit(limit),
       "niches.videosByTitle",
     );
-    const byChannel = matchingChannels.length
-      ? unwrap(
-          await this.db.from("videos").select(columns).in("channel_id", matchingChannels).gte("published_at", since.toISOString()).order("view_count", { ascending: false }).limit(limit),
+    // Chunked: hundreds of channel ids overflow the request URL.
+    const byChannel: typeof byTitle = [];
+    for (let i = 0; i < matchingChannels.length; i += 100) {
+      byChannel.push(
+        ...unwrap(
+          await this.db
+            .from("videos")
+            .select(columns)
+            .in("channel_id", matchingChannels.slice(i, i + 100))
+            .gte("published_at", since.toISOString())
+            .order("view_count", { ascending: false })
+            .limit(limit),
           "niches.videosByChannel",
-        )
-      : [];
+        ),
+      );
+    }
+    byChannel.sort((a, b) => b.view_count - a.view_count).splice(limit);
 
     const byId = new Map<string, Omit<NicheVideo, "outlier_score">>();
     for (const row of [...byTitle, ...byChannel]) byId.set(row.id, row);
