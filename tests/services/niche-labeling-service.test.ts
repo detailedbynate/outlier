@@ -7,10 +7,11 @@ import { NicheLabelingService, REVIEWED_MODEL } from "@/lib/services/niche-label
 
 const NOW = new Date("2026-09-16T12:00:00Z");
 
-function channel(id: string, titles: string[], title = `Channel ${id}`) {
+function channel(id: string, titles: string[], title = `Channel ${id}`, labeledAt: string | null = null) {
   return {
     id,
     title,
+    niche_labeled_at: labeledAt,
     description: null,
     keywords: [],
     topic_categories: [],
@@ -63,6 +64,19 @@ function setup(options: { pending?: ReturnType<typeof channel>[]; respond?: (cal
 }
 
 describe("NicheLabelingService", () => {
+  it("doesn't rewrite channels it already labeled when the AI couldn't get to them", async () => {
+    const earlier = "2026-09-16T00:00:00Z";
+    const { service, saved } = setup({
+      ai: true,
+      pending: [channel("old", ["what a day", "random stuff"], "Old", earlier), vagueChannel("new")],
+      respond: () => new Error("429 quota"),
+    });
+    const result = await service.labelPending({ maxChannels: 10, now: () => NOW });
+    expect(saved.has("old")).toBe(false);
+    expect(saved.get("new")).toMatchObject({ model: RULES_MODEL });
+    expect(result.labeled).toBe(1);
+  });
+
   it("labels channels for free with rules when there's no AI provider", async () => {
     const { service, saved, upserts, generateObject, refreshChannelCounts } = setup({ pending: [clashChannel("a"), clashChannel("b"), vagueChannel("c")] });
     const result = await service.labelPending({ maxChannels: 10, now: () => NOW });

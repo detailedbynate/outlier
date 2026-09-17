@@ -170,7 +170,7 @@ export class ChannelRepository {
    * Only channels with stored uploads: without them there is nothing to judge.
    */
   async listUnlabeled(limit: number, options: { includeUnsureRuleLabels?: boolean } = {}): Promise<
-    (Pick<ChannelRow, "id" | "title" | "description" | "keywords" | "topic_categories" | "subscriber_count"> & {
+    (Pick<ChannelRow, "id" | "title" | "description" | "keywords" | "topic_categories" | "subscriber_count" | "niche_labeled_at"> & {
       recentTitles: string[];
       recentTags: string[];
       uploads: { title: string; tags: string[] }[];
@@ -179,7 +179,7 @@ export class ChannelRepository {
     const channels = unwrap(
       await this.db
         .from("channels")
-        .select("id, title, description, keywords, topic_categories, subscriber_count")
+        .select("id, title, description, keywords, topic_categories, subscriber_count, niche_labeled_at")
         // With an AI provider, channels the free rules weren't sure about get another look.
         .or(options.includeUnsureRuleLabels ? "niche_labeled_at.is.null,and(niche_label_model.eq.rules-v1,niche_confidence.lt.0.6)" : "niche_labeled_at.is.null")
         .order("niche_labeled_at", { ascending: true, nullsFirst: true })

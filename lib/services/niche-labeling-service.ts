@@ -78,6 +78,9 @@ export class NicheLabelingService {
     for (const { channel, label } of ruled) {
       if (options.signal?.aborted) break;
       const ai = aiLabels.get(channel.id);
+      // Already labeled by rules and the AI didn't get to it (limits, outage): nothing changed, so
+      // don't rewrite the row. Rewriting hundreds of identical rows every run just bloats the table.
+      if (!ai && !reviewed.has(channel.id) && channel.niche_labeled_at) continue;
       // The AI looked and couldn't do better: mark it so the channel isn't sent again every run.
       const model = ai?.model ?? (reviewed.has(channel.id) ? REVIEWED_MODEL : RULES_MODEL);
       await this.save(channel.id, ai?.label ?? label, model, now(), entityIds);
