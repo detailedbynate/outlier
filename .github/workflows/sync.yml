@@ -1,10 +1,11 @@
 name: Scheduled sync
 
 # Runs the job queue on the deployed app: daily channel refreshes and snapshot pruning.
-# Requires repository secrets APP_URL (e.g. https://outlier.vercel.app) and CRON_SECRET.
+# The schedule is off: the app's own server runs outlier-tick.timer every two
+# minutes, which is both faster and free. Kept for manual runs against a
+# deployment that has no scheduler of its own.
+# Requires repository secrets APP_URL and CRON_SECRET.
 on:
-  schedule:
-    - cron: "7 * * * *" # hourly, off the top of the hour when GitHub is busiest
   workflow_dispatch: {}
 
 concurrency:
