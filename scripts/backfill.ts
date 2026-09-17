@@ -16,12 +16,15 @@
  */
 import { logger } from "@/lib/core/logger";
 
+// Featured channels find a new creator for about a unit of quota; a search costs
+// 100-300 units and most English-market results get filtered out. So searches get
+// a small daily slice and featured channels get the rest.
 const BACKFILL_DEFAULTS: Record<string, string> = {
   YOUTUBE_USER_RESERVE_UNITS: "500",
-  LIBRARY_FEATURED_CHECKS_PER_RUN: "150",
-  LIBRARY_FEATURED_NEW_PER_RUN: "250",
-  LIBRARY_GROWTH_SEARCHES_PER_RUN: "4",
-  LIBRARY_GROWTH_DAILY_SEARCHES: "40",
+  LIBRARY_FEATURED_CHECKS_PER_RUN: "300",
+  LIBRARY_FEATURED_NEW_PER_RUN: "400",
+  LIBRARY_GROWTH_SEARCHES_PER_RUN: "2",
+  LIBRARY_GROWTH_DAILY_SEARCHES: "16",
   LIBRARY_GROWTH_RESEED_DAYS: "3",
 };
 

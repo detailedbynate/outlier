@@ -188,6 +188,7 @@ export class ResearchService {
     // Search order is YouTube's relevance ranking; keep it for what we show first.
     const seenOrder: string[] = [];
     let rejected = 0;
+    const rejectedBy: Record<string, number> = {};
     let offTopic = 0;
     let passes = 0;
     let seen = 0;
@@ -208,8 +209,10 @@ export class ResearchService {
       for (const video of results.items) {
         const channel = channelById.get(video.channelId);
         if (!channel) continue;
-        if (rejectReason(video, channel, quality, { sizeRules: false })) {
+        const reason = rejectReason(video, channel, quality, { sizeRules: false });
+        if (reason) {
           rejected += 1;
+          rejectedBy[reason] = (rejectedBy[reason] ?? 0) + 1;
           continue;
         }
         // The video or the channel has to be about what was searched for.
@@ -250,7 +253,7 @@ export class ResearchService {
       await this.deps.enqueue("channel.refresh", { channelId, light: true }, { idempotencyKey: `channel.refresh:${channelId}:${day}`, priority: 5 });
     }
 
-    this.log.info("shorts discovery", { keyword: q, found: ranked.length, new: newIds.length, rejected, offTopic, queued: toQueue.length, passes });
+    this.log.info("shorts discovery", { keyword: q, found: ranked.length, new: newIds.length, rejected, rejectedBy, offTopic, queued: toQueue.length, passes });
     return {
       keyword: q,
       channelsFound: ranked.length,
