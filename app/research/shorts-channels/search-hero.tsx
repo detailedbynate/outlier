@@ -3,10 +3,20 @@
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { CompassIcon, SearchIcon } from "@/components/icons";
+import { useTypewriter } from "@/components/use-typewriter";
 import { discoverShortsChannels, type DiscoverState } from "./actions";
 
 const initialState: DiscoverState = { message: null, error: null };
 const AUTO_KEY = "outlier.shorts.autodiscover";
+
+/** Example searches the placeholder types out, one after another. */
+const PLACEHOLDERS = [
+  'Search "recipe, cooking, food" to find food channels',
+  'Try "clash royale" for Clash Royale creators',
+  'Try "minecraft, roblox" to search two niches at once',
+  'Try "skincare" or "gym motivation"',
+  'Try "my singing monsters"',
+] as const;
 
 /** Auto-find is on unless this browser turned it off. */
 const autoFind = {
@@ -49,6 +59,8 @@ export function SearchHero({
 }) {
   const router = useRouter();
   const [keyword, setKeyword] = useState(query);
+  // Only animate while the placeholder is actually visible.
+  const placeholder = useTypewriter(PLACEHOLDERS, keyword.length === 0);
   const auto = useSyncExternalStore(autoFind.subscribe, autoFind.enabled, () => true);
   const [state, action, pending] = useActionState(discoverShortsChannels, initialState);
   const formRef = useRef<HTMLFormElement>(null);
@@ -86,7 +98,7 @@ export function SearchHero({
             type="search"
             value={keyword}
             onChange={(event) => setKeyword(event.target.value)}
-            placeholder={'Search "recipe, cooking, food" to find food channels'}
+            placeholder={placeholder}
             autoComplete="off"
           />
           {hidden.map((field) => (
