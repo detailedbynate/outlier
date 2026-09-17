@@ -1,0 +1,34 @@
+name: Deploy
+
+# Ships main to the server: pull, build, restart. The SSH key is restricted to a
+# single deploy command on the server, so it can do nothing else.
+# Requires repository secrets DEPLOY_SSH_KEY and DEPLOY_HOST.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Deploy over SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          if [ -z "$DEPLOY_SSH_KEY" ] || [ -z "$DEPLOY_HOST" ]; then
+            echo "::error::Set the DEPLOY_SSH_KEY and DEPLOY_HOST repository secrets."
+            exit 1
+          fi
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy
+          chmod 600 ~/.ssh/deploy
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          # The server ignores whatever we ask for and runs its deploy script.
+          ssh -i ~/.ssh/deploy -o BatchMode=yes "root@$DEPLOY_HOST" deploy
