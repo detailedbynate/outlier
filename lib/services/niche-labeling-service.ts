@@ -30,6 +30,9 @@ export interface NicheLabelingConfig {
 
 type PendingChannel = Awaited<ReturnType<ChannelRepository["listUnlabeled"]>>[number];
 
+/** A rule label the AI provider already looked at without improving; not re-sent. */
+export const REVIEWED_MODEL = "rules-v1-reviewed";
+
 /**
  * Labels channels that were never labeled. Rules label every channel for free;
  * when an AI provider is configured, only the channels the rules weren't sure
@@ -54,7 +57,7 @@ export class NicheLabelingService {
     const result: LabelRunResult = { labeled: 0, byAi: 0, categoryOnly: 0, batches: 0, inputTokens: 0, outputTokens: 0 };
     const now = options.now ?? (() => new Date());
 
-    const pending = await this.deps.channels.listUnlabeled(options.maxChannels);
+    const pending = await this.deps.channels.listUnlabeled(options.maxChannels, { includeUnsureRuleLabels: this.deps.text !== null });
     const ruled = pending.map((channel) => ({
       channel,
       label: labelWithRules({
@@ -67,14 +70,17 @@ export class NicheLabelingService {
     }));
 
     const unsure = this.deps.text ? ruled.filter((r) => r.label.confidence < CONFIDENT) : [];
-    const aiLabels = unsure.length > 0 ? await this.labelWithAi(unsure.map((r) => r.channel), result, options.signal) : new Map<string, { label: RuleLabel; model: string }>();
+    const reviewed = new Set<string>();
+    const aiLabels = unsure.length > 0 ? await this.labelWithAi(unsure.map((r) => r.channel), result, reviewed, options.signal) : new Map<string, { label: RuleLabel; model: string }>();
 
     // Most channels share a handful of games and categories: look each entity up once per run.
     const entityIds = new Map<string, Promise<string>>();
     for (const { channel, label } of ruled) {
       if (options.signal?.aborted) break;
       const ai = aiLabels.get(channel.id);
-      await this.save(channel.id, ai?.label ?? label, ai?.model ?? RULES_MODEL, now(), entityIds);
+      // The AI looked and couldn't do better: mark it so the channel isn't sent again every run.
+      const model = ai?.model ?? (reviewed.has(channel.id) ? REVIEWED_MODEL : RULES_MODEL);
+      await this.save(channel.id, ai?.label ?? label, model, now(), entityIds);
       result.labeled += 1;
       if (ai) result.byAi += 1;
       if (!(ai?.label ?? label).primary) result.categoryOnly += 1;
@@ -86,7 +92,12 @@ export class NicheLabelingService {
   }
 
   /** Second opinion for unsure channels. Failures just leave the rule labels in place. */
-  private async labelWithAi(channels: PendingChannel[], result: LabelRunResult, signal?: AbortSignal): Promise<Map<string, { label: RuleLabel; model: string }>> {
+  private async labelWithAi(
+    channels: PendingChannel[],
+    result: LabelRunResult,
+    reviewed: Set<string>,
+    signal?: AbortSignal,
+  ): Promise<Map<string, { label: RuleLabel; model: string }>> {
     const labels = new Map<string, { label: RuleLabel; model: string }>();
     for (let i = 0; i < channels.length && !signal?.aborted; i += this.config.batchSize) {
       const batch = channels.slice(i, i + this.config.batchSize);
@@ -114,6 +125,7 @@ export class NicheLabelingService {
         result.inputTokens += response.usage.inputTokens;
         result.outputTokens += response.usage.outputTokens;
         const byRef = new Map(response.object.channels.map((label) => [label.ref, label]));
+        for (const channel of batch) reviewed.add(channel.id);
         for (const [index, channel] of batch.entries()) {
           const raw = byRef.get(`c${index + 1}`);
           const label = raw ? normalizeLabel(raw) : null;
@@ -121,8 +133,10 @@ export class NicheLabelingService {
         }
       } catch (error) {
         this.log.warn("AI niche labeling batch failed; keeping rule labels", { size: batch.length, error });
-        // Outages and rate limits: don't keep hammering the provider this run.
+        // Outages and rate limits: stop for this run and try these channels again later.
         if (!isAppError(error)) break;
+        // The model answered unusably: count them as reviewed.
+        for (const channel of batch) reviewed.add(channel.id);
       }
     }
     return labels;

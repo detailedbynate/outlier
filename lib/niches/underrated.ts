@@ -5,6 +5,9 @@
  */
 
 import { computeNicheMetrics, tokenize, type NicheChannel, type NicheMetrics, type NicheVideo } from "./analysis";
+import { creatorsFor, examplesFor, type NicheCreator, type NicheExample } from "./examples";
+
+export type { NicheCreator, NicheExample } from "./examples";
 
 const DAY = 86_400_000;
 const SMALL_CHANNEL_SUBS = 100_000;
@@ -12,6 +15,10 @@ const SMALL_CHANNEL_SUBS = 100_000;
 export interface UnderratedNiche {
   term: string;
   metrics: NicheMetrics;
+  /** Best-performing uploads relative to their channel's size, one per channel. */
+  examples: NicheExample[];
+  /** Channels under 250K subscribers with the highest average views. */
+  creators: NicheCreator[];
   /** 0-100: demand a small channel can actually reach. */
   score: number;
   /** Share of this niche's views going to channels under 100K subscribers. */
@@ -154,7 +161,15 @@ export function findUnderratedNiches(
     const viral = clamp01(metrics.viralRate / 0.25);
     const room = clamp01(1 - dominanceOf(metrics));
     const score = Math.round(100 * (0.3 * smallChannelViewShare + 0.25 * demand + 0.2 * viral + 0.15 * room + 0.1 * growth));
-    candidates.push({ term, metrics, score, smallChannelViewShare: Math.round(smallChannelViewShare * 1000) / 1000, reason: reasonFor(metrics, smallChannelViewShare) });
+    candidates.push({
+      term,
+      metrics,
+      examples: examplesFor(entry.videos, channels),
+      creators: creatorsFor(entry.videos, channels),
+      score,
+      smallChannelViewShare: Math.round(smallChannelViewShare * 1000) / 1000,
+      reason: reasonFor(metrics, smallChannelViewShare),
+    });
   }
 
   // "clash royale" says more than "clash", so a two-word niche wins ties with its own words.

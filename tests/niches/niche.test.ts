@@ -233,3 +233,28 @@ describe("NicheService (database-first)", () => {
     expect(() => service.research("x", { userId: null })).toThrow(/between 2 and 60/);
   });
 });
+
+describe("sub-niches and topic aliases", () => {
+  it("doesn't offer a topic's own abbreviation as a niche inside it", async () => {
+    const { topicAliases } = await import("@/lib/niches/analysis");
+    expect(topicAliases("My Singing Monsters")).toEqual(expect.arrayContaining(["msm", "mysingingmonsters"]));
+    expect(topicAliases("a topic nobody listed")).toEqual([]);
+
+    const videos: NicheVideo[] = Array.from({ length: 12 }, (_, i) => ({
+      id: `v${i}`,
+      youtube_video_id: `vid${i}`.padEnd(11, "0"),
+      channel_id: `c${i % 4}`,
+      title: i % 2 ? `msm wubbox breeding guide ${i}` : `msm rare island tour ${i}`,
+      tags: [],
+      format: "short",
+      view_count: 10_000 + i,
+      like_count: 100,
+      comment_count: 10,
+      published_at: new Date(Date.UTC(2026, 8, 1 + i)).toISOString(),
+      outlier_score: null,
+    }));
+    const terms = discoverSubNiches(videos, "my singing monsters").map((s) => s.term);
+    expect(terms).not.toContain("msm");
+    expect(terms.join(" ")).toMatch(/wubbox|island|breeding/);
+  });
+});

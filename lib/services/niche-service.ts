@@ -6,7 +6,7 @@ import type { UsageRepository } from "@/lib/database/repositories/usage";
 import { videoToRow, type VideoRepository } from "@/lib/database/repositories/videos";
 import type { EnqueueOptions } from "@/lib/jobs/queue";
 import { buildNicheReport, tokenize, topicKey, type Level, type NicheReport } from "@/lib/niches/analysis";
-import { findUnderratedNiches, underratedWindow } from "@/lib/niches/underrated";
+import { findUnderratedNiches, underratedWindow, type NicheCreator, type NicheExample } from "@/lib/niches/underrated";
 import { isQuotaUnavailable } from "@/lib/youtube/quota-manager";
 import type { YouTubeService } from "@/lib/youtube/service";
 import type { Json } from "@/types/database";
@@ -71,6 +71,9 @@ export interface NicheIdea {
   computedAt: string | null;
   /** Why it's worth a look, in one line. */
   reason: string;
+  /** Uploads that show what's working, from smaller channels. */
+  examples: NicheExample[];
+  creators: NicheCreator[];
 }
 
 export interface NicheResult {
@@ -88,7 +91,7 @@ export interface NicheResult {
 }
 
 /** One line on why a niche is interesting, from its own numbers. */
-function reasonFor(metrics: NicheReport["overall"]): string {
+export function reasonFor(metrics: NicheReport["overall"]): string {
   if (metrics.growth !== null && metrics.growth >= 0.2) return `Growing fast · views/day up ${Math.round(metrics.growth * 100)}%`;
   if (metrics.competition === "low" && metrics.demand !== "low") return "Demand with little competition";
   if (metrics.viralRate >= 0.12) return `${Math.round(metrics.viralRate * 100)}% of uploads beat their channel's usual views`;
@@ -124,6 +127,24 @@ function toIdea(row: {
     searchCount: row.search_count,
     computedAt: row.computed_at,
     reason: reasonFor(overall),
+    examples: (overall.breakouts ?? []).slice(0, 3).map((b) => ({
+      youtubeVideoId: b.youtube_video_id,
+      title: b.title,
+      channelTitle: b.channel_title,
+      views: b.view_count,
+      subscribers: null,
+      publishedAt: b.published_at,
+    })),
+    creators: (overall.topChannels ?? [])
+      .filter((c) => c.subscriber_count === null || c.subscriber_count < 250_000)
+      .slice(0, 4)
+      .map((c) => ({
+        youtubeChannelId: c.youtube_channel_id,
+        title: c.title,
+        thumbnailUrl: c.thumbnail_url,
+        subscribers: c.subscriber_count,
+        avgViews: c.videos > 0 ? Math.round(c.views / c.videos) : 0,
+      })),
   };
 }
 
@@ -180,6 +201,8 @@ export class NicheService {
         searchCount: 0,
         computedAt: now.toISOString(),
         reason: niche.reason,
+        examples: niche.examples,
+        creators: niche.creators,
       }));
       this.underratedCache = { at: now.getTime(), ideas };
       this.log.info("underrated niches mined", { sample: videos.length, found: ideas.length });

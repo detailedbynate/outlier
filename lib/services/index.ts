@@ -72,6 +72,8 @@ export interface Services {
   research: ResearchService;
   trending: TrendingService;
   monitoring: MonitoringService;
+  nicheLabeling: NicheLabelingService;
+  libraryGrowth: LibraryGrowthService;
   /** YouTube quota budgets and usage reports. */
   quota: QuotaManager;
   storage: StorageBudgetService;
@@ -316,6 +318,8 @@ export function getServices(): Services {
     jobs: new JobService(queue, repositories.jobs),
     trending,
     monitoring,
+    nicheLabeling,
+    libraryGrowth,
     quota: lazy(() => getQuotaManager()),
     research,
     storage,

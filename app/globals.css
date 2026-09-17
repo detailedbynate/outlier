@@ -5105,6 +5105,284 @@ body:has(.onboarding-root) .ambient {
   margin: 0 0 12px;
 }
 
+/* Niche answers: up to three cards, one example each, "See more" for the rest */
+.niche-answer {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.niche-answer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.niche-answer-head h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.niche-answer-head h2 span {
+  color: var(--accent-text);
+  text-transform: capitalize;
+}
+
+.niche-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  align-items: start;
+  margin-bottom: 14px;
+}
+
+@media (max-width: 1100px) {
+  .niche-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.niche-feature {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+}
+
+.niche-feature-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.niche-feature-rank {
+  flex: none;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent-text);
+  padding-top: 3px;
+}
+
+.niche-feature-titles {
+  flex: 1;
+  min-width: 0;
+}
+
+.niche-feature-titles h3 {
+  margin: 0 0 4px;
+  font-size: 17px;
+  text-transform: capitalize;
+}
+
+.niche-feature-titles p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.niche-example {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: inherit;
+  min-width: 0;
+}
+
+.niche-example.is-featured {
+  flex-direction: row;
+  gap: 12px;
+  align-items: stretch;
+  padding: 8px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  transition: border-color 0.2s var(--ease), background 0.2s var(--ease);
+}
+
+.niche-example.is-featured:hover {
+  border-color: var(--accent-track);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.niche-example-thumb {
+  position: relative;
+  flex: none;
+  display: block;
+}
+
+.niche-example.is-featured .niche-example-thumb {
+  width: 96px;
+}
+
+.niche-example img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 9 / 14;
+  object-fit: cover;
+  border-radius: 9px;
+  background: var(--surface-2);
+  transition: transform 0.25s var(--ease), filter 0.25s var(--ease);
+}
+
+.niche-example:hover img {
+  filter: brightness(1.1);
+}
+
+.niche-example-views {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.78);
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.niche-example-text {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.niche-example-title {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.niche-example.is-featured .niche-example-title {
+  font-size: 14px;
+  -webkit-line-clamp: 3;
+}
+
+.niche-example-channel {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.niche-examples {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.niche-more > summary,
+.niche-topic-details > summary {
+  cursor: pointer;
+  list-style: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-text);
+  user-select: none;
+}
+
+.niche-more > summary::-webkit-details-marker,
+.niche-topic-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.niche-more > summary::after {
+  content: " ↓";
+}
+
+.niche-more[open] > summary::after {
+  content: " ↑";
+}
+
+.niche-more-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+  animation: dropdown-item-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.niche-topic-details {
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.niche-topic-details[open] > summary {
+  margin-bottom: 12px;
+}
+
+.niche-creators-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.niche-creator-list {
+  display: grid;
+  gap: 4px;
+}
+
+.niche-creator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  color: inherit;
+  transition: background 0.15s var(--ease);
+}
+
+.niche-creator:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.niche-creator img,
+.niche-creator-blank {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  object-fit: cover;
+}
+
+.niche-creator span {
+  display: grid;
+  min-width: 0;
+}
+
+.niche-creator strong {
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.niche-creator em {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .niche-more-body {
+    animation: none;
+  }
+}
+
 .niche-idea-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));

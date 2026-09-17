@@ -1,3 +1,6 @@
+import { NICHE_DICTIONARY } from "./dictionary";
+import { creatorsFor, examplesFor, type NicheCreator, type NicheExample } from "./examples";
+
 /**
  * Niche analysis from stored videos and channels. Pure functions, no I/O:
  * sub-niche discovery from titles and tags, per-niche metrics, and opportunity scoring.
@@ -59,6 +62,9 @@ export interface NicheMetrics {
 export interface SubNiche {
   term: string;
   metrics: NicheMetrics;
+  /** Uploads from smaller channels that beat their size (missing on reports cached before this existed). */
+  examples?: NicheExample[];
+  creators?: NicheCreator[];
 }
 
 const DAY = 86_400_000;
@@ -111,6 +117,22 @@ function videoTerms(video: Pick<NicheVideo, "title" | "tags">, exclude: Set<stri
   return terms;
 }
 
+/** Other names for a topic from the niche dictionary ("my singing monsters" -> "msm", "mysingingmonsters"). */
+export function topicAliases(topic: string): string[] {
+  const key = normalizeName(topic);
+  const entry = NICHE_DICTIONARY.find((e) => normalizeName(e.name) === key || e.aliases.some((a) => normalizeName(a) === key));
+  if (!entry) return [];
+  return [...new Set([entry.name, ...entry.aliases].map(normalizeName).filter((a) => a && a !== key))];
+}
+
+const normalizeName = (value: string) =>
+  value
+    .normalize("NFKD")
+    .replace(/[^\x00-\x7F]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
 /**
  * Sub-niches that actually appear in the data: terms shared by several videos
  * from several channels, excluding the topic itself. Overlapping terms are
@@ -118,7 +140,9 @@ function videoTerms(video: Pick<NicheVideo, "title" | "tags">, exclude: Set<stri
  */
 export function discoverSubNiches(videos: readonly NicheVideo[], topic: string, max = 8): { term: string; videoIds: Set<string> }[] {
   const topicWords = topic.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
-  const exclude = new Set([...tokenize(topic), topicWords.join("")]);
+  // "msm" is just My Singing Monsters again, not a niche inside it.
+  const aliasWords = topicAliases(topic).flatMap((alias) => [...alias.split(" "), alias.replace(/ /g, "")]);
+  const exclude = new Set([...tokenize(topic), topicWords.join(""), ...aliasWords]);
   // Variants of the topic ("game" for "gaming", "cooks" for "cooking") aren't sub-niches either.
   const isTopicVariant = (term: string) =>
     term.split(" ").every((word) => topicWords.some((t) => t.length >= 4 && word.length >= 4 && (t.startsWith(word.slice(0, 4)) || word.startsWith(t.slice(0, 4)))));
@@ -274,7 +298,15 @@ export interface NicheReport {
 export function buildNicheReport(topic: string, videos: readonly NicheVideo[], channels: ReadonlyMap<string, NicheChannel>, now: Date = new Date()): NicheReport {
   const byId = new Map(videos.map((v) => [v.id, v]));
   const subNiches = discoverSubNiches(videos, topic)
-    .map(({ term, videoIds }) => ({ term, metrics: computeNicheMetrics([...videoIds].map((id) => byId.get(id)!), channels, now) }))
+    .map(({ term, videoIds }) => {
+      const subVideos = [...videoIds].map((id) => byId.get(id)!);
+      return {
+        term,
+        metrics: computeNicheMetrics(subVideos, channels, now),
+        examples: examplesFor(subVideos, channels, 6),
+        creators: creatorsFor(subVideos, channels),
+      };
+    })
     .sort((a, b) => b.metrics.opportunity - a.metrics.opportunity);
   return { topic, overall: computeNicheMetrics(videos, channels, now), subNiches };
 }

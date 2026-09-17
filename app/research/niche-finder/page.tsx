@@ -9,7 +9,8 @@ import { formatCompact, formatPercent, timeAgo } from "@/lib/format";
 import type { Level, NicheMetrics } from "@/lib/niches/analysis";
 import { getServices } from "@/lib/services";
 import { parseNicheQuery } from "@/lib/niches/query";
-import type { NicheIdea, NicheResult } from "@/lib/services/niche-service";
+import type { NicheCreator, NicheExample } from "@/lib/niches/examples";
+import { reasonFor, type NicheIdea, type NicheResult } from "@/lib/services/niche-service";
 import { asUser } from "@/lib/youtube/quota-context";
 
 export const dynamic = "force-dynamic";
@@ -85,6 +86,7 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
       {topNiches.length > 0 && (related.length === 0 || thin) ? (
         <IdeaBoard
           ideas={topNiches}
+          featured={result ? 0 : 3}
           title={result ? "Other underrated niches" : "Underrated niches right now"}
           sub="Mined from every channel Outlier tracks: real demand, room left, and small channels winning. Pick one to dig in."
         />
@@ -108,6 +110,7 @@ function Report({ result }: { result: NicheResult }) {
   const { report } = result;
   const overall = report.overall;
   const sourceLabel = result.source === "youtube" ? "Fresh from YouTube" : result.source === "cache" ? "Saved report" : "From Outlier data";
+  const top = report.subNiches.slice(0, 3);
 
   return (
     <>
@@ -132,110 +135,245 @@ function Report({ result }: { result: NicheResult }) {
           </Link>
         </div>
       ) : (
-        <>
-          <section className="dash-panel niche-overview" style={{ "--i": 0 } as CSSProperties}>
-            <ScoreRing score={overall.opportunity} label="Opportunity" />
-            <div className="niche-overview-main">
-              <h2 className="niche-topic">{result.topic}</h2>
-              <p className="dash-row-sub">
-                Overall topic · {LEVEL_LABEL[overall.confidence]} confidence
-              </p>
-              <MetricGrid metrics={overall} />
-            </div>
-          </section>
-
-          <section className="niche-subs" aria-label="Sub-niches">
-            <h2 className="dash-subhead">
-              <CompassIcon size={14} /> Sub-niches · best opportunities first
+        <section className="niche-answer" aria-label={`Top niches in ${result.topic}`}>
+          <header className="niche-answer-head">
+            <h2>
+              {top.length > 0 ? `Top ${top.length} niche${top.length === 1 ? "" : "s"} in ` : ""}
+              <span>{result.topic}</span>
             </h2>
-            {report.subNiches.length === 0 ? (
-              <div className="dash-empty">
-                <strong>No clear sub-niches yet</strong>
-                <p>There isn&apos;t enough variety in the stored videos to split this topic. The overall numbers above still apply.</p>
-              </div>
-            ) : (
-              <div className="niche-grid">
-                {report.subNiches.map((sub, i) => (
-                  <article key={sub.term} className="dash-panel niche-card" style={{ "--i": i + 1 } as CSSProperties}>
-                    <header className="niche-card-head">
-                      <div>
-                        <h3>{sub.term}</h3>
-                        <span className="dash-row-sub">
-                          {sub.metrics.videos} videos · {sub.metrics.channels} channels · {LEVEL_LABEL[sub.metrics.confidence]} confidence
-                        </span>
-                      </div>
-                      <span className="niche-score" data-band={band(sub.metrics.opportunity)}>
-                        {sub.metrics.opportunity}
-                      </span>
-                    </header>
-                    <MetricGrid metrics={sub.metrics} compact />
-                    <FormatSplit metrics={sub.metrics} />
-                    <details className="niche-details">
-                      <summary>Top channels and breakout videos</summary>
-                      <Lists metrics={sub.metrics} />
-                    </details>
-                    <Link href={`/research/niche-finder?topic=${encodeURIComponent(sub.term)}`} className="dash-link">
-                      Research “{sub.term}” →
-                    </Link>
-                  </article>
-                ))}
-              </div>
-            )}
-          </section>
+            <span className="niche-score" data-band={band(overall.opportunity)} title="Opportunity for the topic as a whole">
+              {overall.opportunity}
+            </span>
+          </header>
 
-          <section className="dash-panel" style={{ "--i": 2 } as CSSProperties}>
-            <header className="dash-panel-head">
-              <span className="dash-icon" data-tone="pink">
-                <FlameIcon size={16} />
-              </span>
-              <div className="dash-panel-titles">
-                <h2>Leaders and breakouts in {result.topic}</h2>
-                <p>Who&apos;s winning and which videos beat their channel&apos;s usual views</p>
+          {top.length === 0 ? (
+            <div className="dash-empty">
+              <strong>No clear niches inside “{result.topic}” yet</strong>
+              <p>There isn&apos;t enough variety in the stored videos to split this topic. The topic details below still apply.</p>
+            </div>
+          ) : (
+            <div className="niche-cards">
+              {top.map((sub, i) => (
+                <NicheCard
+                  key={sub.term}
+                  rank={i + 1}
+                  name={sub.term}
+                  score={sub.metrics.opportunity}
+                  reason={reasonFor(sub.metrics)}
+                  metrics={sub.metrics}
+                  examples={sub.examples ?? breakoutExamples(sub.metrics)}
+                  creators={sub.creators ?? []}
+                />
+              ))}
+            </div>
+          )}
+
+          <details className="niche-topic-details">
+            <summary>Topic details for {result.topic}</summary>
+            <div className="niche-overview">
+              <ScoreRing score={overall.opportunity} label="Opportunity" />
+              <div className="niche-overview-main">
+                <p className="dash-row-sub">Whole topic · {LEVEL_LABEL[overall.confidence]} confidence</p>
+                <MetricGrid metrics={overall} />
               </div>
-            </header>
+            </div>
             <Lists metrics={overall} />
-          </section>
-        </>
+          </details>
+        </section>
       )}
     </>
   );
 }
 
-function IdeaBoard({ ideas, title, sub }: { ideas: NicheIdea[]; title: string; sub: string }) {
+/** Older cached reports have breakouts but no examples. */
+function breakoutExamples(metrics: NicheMetrics): NicheExample[] {
+  return metrics.breakouts.map((b) => ({
+    youtubeVideoId: b.youtube_video_id,
+    title: b.title,
+    channelTitle: b.channel_title,
+    views: b.view_count,
+    subscribers: null,
+    publishedAt: b.published_at,
+  }));
+}
+
+function IdeaBoard({ ideas, title, sub, featured = 0 }: { ideas: NicheIdea[]; title: string; sub: string; featured?: number }) {
+  const top = ideas.slice(0, featured);
+  const rest = ideas.slice(featured);
   return (
     <section className="niche-ideas" aria-label={title}>
       <h2 className="dash-subhead">
         <CompassIcon size={14} /> {title}
       </h2>
       <p className="dash-row-sub niche-ideas-sub">{sub}</p>
-      <div className="niche-idea-grid">
-        {ideas.map((idea, i) => (
-          <Link
-            key={idea.topicKey}
-            href={`/research/niche-finder?topic=${encodeURIComponent(idea.topic)}`}
-            className="dash-panel niche-idea"
-            style={{ "--i": i + 1 } as CSSProperties}
-          >
-            <header className="niche-idea-head">
-              <h3>{idea.topic}</h3>
-              <span className="niche-score" data-band={band(idea.opportunity)}>
-                {idea.opportunity}
-              </span>
-            </header>
-            <p className="niche-idea-reason">{idea.reason}</p>
-            <div className="niche-idea-tags">
-              <span>{LEVEL_LABEL[idea.demand]} demand</span>
-              <span>{LEVEL_LABEL[idea.competition]} competition</span>
-              <span>{FORMAT_LABEL[idea.format]}</span>
-              {idea.smallChannelShare !== null ? <span>{formatPercent(idea.smallChannelShare, 0)} small channels</span> : null}
-            </div>
-            <span className="dash-row-sub">
-              {formatCompact(idea.medianViewsPerDay)} views/day median · {formatCompact(idea.videos)} videos · {formatCompact(idea.channels)} channels
-            </span>
-          </Link>
-        ))}
-      </div>
+      {top.length > 0 ? (
+        <div className="niche-cards">
+          {top.map((idea, i) => (
+            <NicheCard
+              key={idea.topicKey}
+              rank={i + 1}
+              name={idea.topic}
+              score={idea.opportunity}
+              reason={idea.reason}
+              tags={{ demand: idea.demand, competition: idea.competition, format: idea.format, smallShare: idea.smallChannelShare }}
+              examples={idea.examples}
+              creators={idea.creators}
+            />
+          ))}
+        </div>
+      ) : null}
+      {rest.length > 0 ? (
+        <div className="niche-idea-grid">
+          {rest.map((idea, i) => (
+            <Link
+              key={idea.topicKey}
+              href={`/research/niche-finder?topic=${encodeURIComponent(idea.topic)}`}
+              className="dash-panel niche-idea"
+              style={{ "--i": i + 1 } as CSSProperties}
+            >
+              <header className="niche-idea-head">
+                <h3>{idea.topic}</h3>
+                <span className="niche-score" data-band={band(idea.opportunity)}>
+                  {idea.opportunity}
+                </span>
+              </header>
+              <p className="niche-idea-reason">{idea.reason}</p>
+              <IdeaTags demand={idea.demand} competition={idea.competition} format={idea.format} smallShare={idea.smallChannelShare} />
+            </Link>
+          ))}
+        </div>
+      ) : null}
     </section>
+  );
+}
+
+interface TagValues {
+  demand: Level;
+  competition: Level;
+  format: keyof typeof FORMAT_LABEL;
+  smallShare: number | null;
+}
+
+function IdeaTags({ demand, competition, format, smallShare }: TagValues) {
+  return (
+    <div className="niche-idea-tags">
+      <span>{LEVEL_LABEL[demand]} demand</span>
+      <span>{LEVEL_LABEL[competition]} competition</span>
+      <span>{FORMAT_LABEL[format]}</span>
+      {smallShare !== null ? <span>{formatPercent(smallShare, 0)} small channels</span> : null}
+    </div>
+  );
+}
+
+/**
+ * One niche answer: why it's worth it and one example that proves it. "See more"
+ * opens the rest of the examples, the small creators behind them, and the numbers.
+ */
+function NicheCard({
+  rank,
+  name,
+  score,
+  reason,
+  examples,
+  creators,
+  metrics,
+  tags,
+}: {
+  rank: number;
+  name: string;
+  score: number;
+  reason: string;
+  examples: NicheExample[];
+  creators: NicheCreator[];
+  metrics?: NicheMetrics;
+  tags?: TagValues;
+}) {
+  const [lead, ...more] = examples;
+  const tagValues: TagValues | undefined = metrics
+    ? { demand: metrics.demand, competition: metrics.competition, format: metrics.format.best, smallShare: metrics.smallChannelShare }
+    : tags;
+
+  return (
+    <article className="dash-panel niche-feature" style={{ "--i": rank } as CSSProperties}>
+      <header className="niche-feature-head">
+        <span className="niche-feature-rank">#{rank}</span>
+        <div className="niche-feature-titles">
+          <h3>{name}</h3>
+          <p>{reason}</p>
+        </div>
+        <span className="niche-score" data-band={band(score)}>
+          {score}
+        </span>
+      </header>
+
+      {lead ? <ExampleVideo example={lead} featured /> : <p className="dash-row-sub">No example videos stored yet.</p>}
+
+      <details className="niche-more">
+        <summary>See more</summary>
+        <div className="niche-more-body">
+          {tagValues ? <IdeaTags {...tagValues} /> : null}
+          {more.length > 0 ? (
+            <div className="niche-examples">
+              {more.slice(0, 5).map((example) => (
+                <ExampleVideo key={example.youtubeVideoId} example={example} />
+              ))}
+            </div>
+          ) : null}
+          {creators.length > 0 ? (
+            <div className="niche-creators">
+              <span className="niche-creators-label">Small creators winning here</span>
+              <div className="niche-creator-list">
+                {creators.map((creator) => (
+                  <a
+                    key={creator.youtubeChannelId}
+                    href={`https://www.youtube.com/channel/${creator.youtubeChannelId}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="niche-creator"
+                  >
+                    {creator.thumbnailUrl ? <img src={creator.thumbnailUrl} alt="" loading="lazy" /> : <span className="niche-creator-blank" />}
+                    <span>
+                      <strong>{creator.title}</strong>
+                      <em>
+                        {creator.subscribers !== null ? `${formatCompact(creator.subscribers)} subs · ` : ""}
+                        {formatCompact(creator.avgViews)} avg views
+                      </em>
+                    </span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {metrics ? <MetricGrid metrics={metrics} compact /> : null}
+          <Link href={`/research/niche-finder?topic=${encodeURIComponent(name)}`} className="dash-link">
+            Dig into {name} →
+          </Link>
+        </div>
+      </details>
+    </article>
+  );
+}
+
+function ExampleVideo({ example, featured = false }: { example: NicheExample; featured?: boolean }) {
+  return (
+    <a
+      href={`https://www.youtube.com/shorts/${example.youtubeVideoId}`}
+      target="_blank"
+      rel="noreferrer"
+      className={`niche-example ${featured ? "is-featured" : ""}`}
+    >
+      <span className="niche-example-thumb">
+        <img src={`https://i.ytimg.com/vi/${example.youtubeVideoId}/hqdefault.jpg`} alt="" loading="lazy" />
+        <span className="niche-example-views">{formatCompact(example.views)} views</span>
+      </span>
+      <span className="niche-example-text">
+        <span className="niche-example-title">{example.title}</span>
+        <span className="niche-example-channel">
+          {example.channelTitle}
+          {example.subscribers !== null ? ` · ${formatCompact(example.subscribers)} subs` : ""}
+        </span>
+      </span>
+    </a>
   );
 }
 
@@ -301,24 +439,6 @@ function MetricGrid({ metrics, compact = false }: { metrics: NicheMetrics; compa
         </div>
       ))}
     </dl>
-  );
-}
-
-function FormatSplit({ metrics }: { metrics: NicheMetrics }) {
-  const { shorts, longForm, best, shortsViewsPerDay, longViewsPerDay } = metrics.format;
-  const total = shorts + longForm;
-  if (total === 0) return null;
-  const shortsShare = shorts / total;
-  return (
-    <div className="niche-format" title={`Shorts ${formatCompact(shortsViewsPerDay)}/day · Long-form ${formatCompact(longViewsPerDay)}/day`}>
-      <div className="niche-format-bar">
-        <span className="is-shorts" style={{ width: `${shortsShare * 100}%` }} />
-        <span className="is-long" style={{ width: `${(1 - shortsShare) * 100}%` }} />
-      </div>
-      <span className="dash-row-sub">
-        {shorts} Shorts · {longForm} long-form · <strong>Opportunity: {FORMAT_LABEL[best]}</strong>
-      </span>
-    </div>
   );
 }
 

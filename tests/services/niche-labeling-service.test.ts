@@ -3,7 +3,7 @@ import type { TextProvider } from "@/lib/ai/types";
 import { AppError } from "@/lib/core/errors";
 import { createLogger } from "@/lib/core/logger";
 import { RULES_MODEL } from "@/lib/niches/rule-labeler";
-import { NicheLabelingService } from "@/lib/services/niche-labeling-service";
+import { NicheLabelingService, REVIEWED_MODEL } from "@/lib/services/niche-labeling-service";
 
 const NOW = new Date("2026-09-16T12:00:00Z");
 
@@ -96,12 +96,15 @@ describe("NicheLabelingService", () => {
   it("keeps the rule labels when AI fails or skips a channel", async () => {
     const skipped = setup({ ai: true, pending: [vagueChannel("a"), vagueChannel("b")], respond: () => ({ channels: [aiLabel("c2", "   ")] }) });
     expect(await skipped.service.labelPending({ maxChannels: 10, now: () => NOW })).toMatchObject({ labeled: 2, byAi: 0 });
-    expect(skipped.saved.get("a")).toMatchObject({ model: RULES_MODEL });
+    // The AI saw it and couldn't place it either: don't send it again.
+    expect(skipped.saved.get("a")).toMatchObject({ model: REVIEWED_MODEL });
 
     const broken = setup({ ai: true, pending: [vagueChannel("a")], respond: () => new AppError("UPSTREAM_ERROR", "bad json") });
     expect(await broken.service.labelPending({ maxChannels: 10, now: () => NOW })).toMatchObject({ labeled: 1, byAi: 0 });
 
     const down = setup({ ai: true, pending: [vagueChannel("a"), vagueChannel("b"), vagueChannel("c")], respond: () => new Error("529 overloaded") });
     expect(await down.service.labelPending({ maxChannels: 10, now: () => NOW })).toMatchObject({ labeled: 3, byAi: 0, batches: 1 });
+    // An outage isn't a review: these stay eligible for the next run.
+    expect(down.saved.get("a")).toMatchObject({ model: RULES_MODEL });
   });
 });

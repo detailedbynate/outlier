@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { NicheChannel, NicheVideo } from "@/lib/niches/analysis";
+import { creatorsFor, examplesFor } from "@/lib/niches/examples";
 import { findUnderratedNiches } from "@/lib/niches/underrated";
 
 const NOW = new Date("2026-09-15T12:00:00Z");
@@ -97,5 +98,28 @@ describe("findUnderratedNiches", () => {
       Array.from({ length: 3 }, (_, n) => video(`quiet-${id}-${n}`, id, `stamp collecting tips ${i}${n}`, 200, 30)),
     );
     expect(findUnderratedNiches(quiet, channels, { now: NOW, minVideos: 6, minChannels: 3, maxLibraryShare: 0.6 })).toEqual([]);
+  });
+
+  it("shows example Shorts from small channels that beat their size, one per channel", () => {
+    const channels = new Map([
+      ["tiny", channel("tiny", 2_000)],
+      ["mid", channel("mid", 80_000)],
+      ["giant", channel("giant", 5_000_000)],
+    ]);
+    const videos = [
+      video("t1", "tiny", "tiny hit", 400_000),
+      video("t2", "tiny", "tiny second", 300_000),
+      video("m1", "mid", "mid hit", 900_000),
+      video("g1", "giant", "giant hit", 20_000_000),
+    ];
+    const examples = examplesFor(videos, channels);
+    // Views per subscriber: tiny 200x beats mid 11x; the giant is too big to count as proof.
+    expect(examples.map((e) => e.title)).toEqual(["tiny hit", "mid hit"]);
+    expect(examples[0]).toMatchObject({ youtubeVideoId: "t1".padEnd(11, "0"), channelTitle: "tiny", subscribers: 2_000, views: 400_000 });
+
+    expect(creatorsFor(videos, channels).map((c) => [c.title, c.avgViews])).toEqual([
+      ["mid", 900_000],
+      ["tiny", 350_000],
+    ]);
   });
 });
