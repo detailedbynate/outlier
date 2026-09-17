@@ -133,9 +133,9 @@ export class NicheLabelingService {
         }
       } catch (error) {
         this.log.warn("AI niche labeling batch failed; keeping rule labels", { size: batch.length, error });
-        // Outages and rate limits: stop for this run and try these channels again later.
-        if (!isAppError(error)) break;
-        // The model answered unusably: count them as reviewed.
+        // Only an unusable answer about these channels counts as a review. Outages, rate limits and
+        // setup problems (retired model, bad key) stop the run so the channels are tried again later.
+        if (!isAppError(error) || error.code !== "UPSTREAM_ERROR") break;
         for (const channel of batch) reviewed.add(channel.id);
       }
     }

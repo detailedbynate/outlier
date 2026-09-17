@@ -102,6 +102,11 @@ describe("NicheLabelingService", () => {
     const broken = setup({ ai: true, pending: [vagueChannel("a")], respond: () => new AppError("UPSTREAM_ERROR", "bad json") });
     expect(await broken.service.labelPending({ maxChannels: 10, now: () => NOW })).toMatchObject({ labeled: 1, byAi: 0 });
 
+    const misconfigured = setup({ ai: true, pending: [vagueChannel("a"), vagueChannel("b")], respond: () => new AppError("CONFIG_ERROR", "model retired") });
+    expect(await misconfigured.service.labelPending({ maxChannels: 10, now: () => NOW })).toMatchObject({ labeled: 2, byAi: 0, batches: 1 });
+    // A setup problem isn't a review either: fix the model and these get their AI look.
+    expect(misconfigured.saved.get("a")).toMatchObject({ model: RULES_MODEL });
+
     const down = setup({ ai: true, pending: [vagueChannel("a"), vagueChannel("b"), vagueChannel("c")], respond: () => new Error("529 overloaded") });
     expect(await down.service.labelPending({ maxChannels: 10, now: () => NOW })).toMatchObject({ labeled: 3, byAi: 0, batches: 1 });
     // An outage isn't a review: these stay eligible for the next run.

@@ -3,8 +3,8 @@ import { z } from "zod";
 import { AppError } from "@/lib/core/errors";
 import type { TextGenerationRequest, TextGenerationResult, TextProvider, TokenUsage } from "./types";
 
-/** A stable model on Google's free tier. Newer free models can be set with GEMINI_MODEL. */
-export const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
+/** On Google's free tier. gemini-2.5-flash is closed to new keys; override with GEMINI_MODEL. */
+export const DEFAULT_GEMINI_MODEL = "gemini-3.6-flash";
 
 /**
  * Gemini through Google's official SDK. Structured answers use a JSON schema
@@ -63,8 +63,9 @@ export class GeminiTextProvider implements TextProvider {
     } catch (error) {
       // Rate limits and outages are the caller's cue to stop for this run: surface them as plain errors.
       if (error instanceof ApiError && (error.status === 429 || error.status >= 500)) throw error;
+      // A retired model, bad key or bad request is setup, not an answer about these channels.
       if (error instanceof ApiError) {
-        throw new AppError("UPSTREAM_ERROR", `Gemini rejected the request (${error.status}).`, { cause: error, retryable: false });
+        throw new AppError("CONFIG_ERROR", `Gemini rejected the request (${error.status}): ${error.message}`, { cause: error, retryable: false });
       }
       throw error;
     }

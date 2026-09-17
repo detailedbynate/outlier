@@ -39,6 +39,7 @@ for (const file of [".env.local", ".env"]) {
 }
 
 const CYCLE_JOB_MINUTES = 12;
+const REPORT_EVERY_CYCLES = 4;
 const IDLE_WAIT_MINUTES = 20;
 const MINUTE = 60_000;
 
@@ -106,6 +107,22 @@ async function main(): Promise<void> {
       return null;
     });
 
+    // Every few cycles, build Niche Finder reports for the games and topics the library knows
+    // well, so searches for them answer instantly. Reports come from stored data; a thin topic may
+    // make one capped YouTube fetch.
+    let reports = 0;
+    if (cycle % REPORT_EVERY_CYCLES === 1) {
+      const entities = await services.repositories.niches.listEntities({ minChannels: 3, limit: 60 }).catch(() => []);
+      for (const entity of entities) {
+        if (controller.signal.aborted) break;
+        await runWithQuotaContext({ lane: "background", operation: "backfill:niche_report" }, () => services.niches.research(entity.name, { userId: null }))
+          .then(() => {
+            reports += 1;
+          })
+          .catch((error: unknown) => logger.warn("backfill niche report failed", { niche: entity.name, error }));
+      }
+    }
+
     const total = await services.repositories.channels.count();
     const quota = await services.quota.summary().catch(() => null);
     logger.info("backfill cycle", {
@@ -117,6 +134,7 @@ async function main(): Promise<void> {
       jobsRun: jobs.processed,
       labeled: labels?.labeled ?? 0,
       labeledByAi: labels?.byAi ?? 0,
+      nicheReports: reports,
       storageMb: Math.round(storage.usedBytes / 1_048_576),
       quotaUsedToday: quota ? `${quota.used.total}/${quota.limits.daily}` : null,
     });

@@ -62,6 +62,20 @@ export class NicheRepository {
     return unwrap(inserted, "niches.insertEntity").id;
   }
 
+  /** Games and topics with enough labeled channels to be worth a report, biggest first. */
+  async listEntities(options: { minChannels: number; limit: number }): Promise<Pick<NicheRow, "name" | "slug" | "kind" | "channel_count">[]> {
+    return unwrap(
+      await this.db
+        .from("niches")
+        .select("name, slug, kind, channel_count")
+        .in("kind", ["game", "topic"])
+        .gte("channel_count", options.minChannels)
+        .order("channel_count", { ascending: false })
+        .limit(options.limit),
+      "niches.listEntities",
+    );
+  }
+
   async refreshChannelCounts(): Promise<void> {
     assertOk(await this.db.rpc("refresh_niche_channel_counts"), "niches.refreshCounts");
   }

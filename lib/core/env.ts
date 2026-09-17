@@ -110,7 +110,7 @@ const serverEnvSchema = z.object({
 
   /** Google AI Studio key: the free Gemini tier gives unsure channels an AI second opinion. */
   GEMINI_API_KEY: optionalString,
-  GEMINI_MODEL: z.string().trim().min(1).default("gemini-2.5-flash"),
+  GEMINI_MODEL: z.string().trim().min(1).default("gemini-3.6-flash"),
   /**
    * Who gives unsure channels a second opinion: "auto" uses Gemini when its key is set, then Claude,
    * otherwise rules only. "rules" never calls an AI.

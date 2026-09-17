@@ -64,7 +64,7 @@ describe("GeminiTextProvider", () => {
     expect(isAppError(limitedError)).toBe(false);
 
     const badKey = fakeClient(new ApiError({ message: "bad key", status: 400 }));
-    await expect(new GeminiTextProvider({ client: badKey.client }).generateText({ messages: [{ role: "user", content: "x" }] })).rejects.toThrow(/rejected the request \(400\)/);
+    await expect(new GeminiTextProvider({ client: badKey.client }).generateText({ messages: [{ role: "user", content: "x" }] })).rejects.toMatchObject({ code: "CONFIG_ERROR" });
   });
 });
 
