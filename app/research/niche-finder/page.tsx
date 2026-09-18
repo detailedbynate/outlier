@@ -266,8 +266,9 @@ function IdeaTags({ demand, competition, format, smallShare }: TagValues) {
 }
 
 /**
- * One niche answer: why it's worth it and one example that proves it. "See more"
- * opens the rest of the examples, the small creators behind them, and the numbers.
+ * One niche answer: why it's worth it and one example that proves it, followed by
+ * the rest of the examples, the small creators behind them, and the numbers
+ * (shown by default, collapsible).
  */
 function NicheCard({
   rank,
@@ -308,8 +309,11 @@ function NicheCard({
 
       {lead ? <ExampleVideo example={lead} featured /> : <p className="dash-row-sub">No example videos stored yet.</p>}
 
-      <details className="niche-more">
-        <summary>See more</summary>
+      <details className="niche-more" open>
+        <summary>
+          <span className="niche-more-hide">Hide details</span>
+          <span className="niche-more-show">Show details</span>
+        </summary>
         <div className="niche-more-body">
           {tagValues ? <IdeaTags {...tagValues} /> : null}
           {more.length > 0 ? (

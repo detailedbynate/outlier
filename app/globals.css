@@ -5344,6 +5344,11 @@ body:has(.onboarding-root) .ambient {
   content: " ↑";
 }
 
+.niche-more[open] .niche-more-show,
+.niche-more:not([open]) .niche-more-hide {
+  display: none;
+}
+
 .niche-more-body {
   display: flex;
   flex-direction: column;
