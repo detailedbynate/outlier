@@ -3,6 +3,8 @@ import { Geist } from "next/font/google";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { CreditsMeter } from "@/components/credits-meter";
+import { LowCreditsPrompt } from "@/components/low-credits-prompt";
+import { LOW_CREDITS_THRESHOLD } from "@/lib/services/credits-service";
 import { BrandMark, LogOutIcon } from "@/components/icons";
 import { MobileMenuToggle } from "@/components/mobile-menu-toggle";
 import { SidebarNav } from "@/components/sidebar-nav";
@@ -98,6 +100,9 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             ) : null}
             {children}
           </main>
+          {credits.limit < 1_000_000 && current.moderation.status !== "restricted" ? (
+            <LowCreditsPrompt remaining={credits.remaining} threshold={LOW_CREDITS_THRESHOLD} month={credits.resetsAt.slice(0, 7)} />
+          ) : null}
         </div>
       </body>
     </html>

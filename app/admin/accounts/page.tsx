@@ -10,7 +10,7 @@ import { formatNumber, timeAgo } from "@/lib/format";
 import { DURATIONS, moderationState, type AccountStatus } from "@/lib/moderation/status";
 import { getServices } from "@/lib/services";
 import type { AccountRole } from "@/types/database";
-import { CreateAccountForm, EditAccountForm } from "./account-forms";
+import { AdjustCreditsForm, CreateAccountForm, EditAccountForm } from "./account-forms";
 import { moderateAccounts } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -170,7 +170,11 @@ export default async function AccountsPage({ searchParams }: { searchParams: Sea
                           {row.state.until ? <div className="stat-note">until {new Date(row.state.until).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}</div> : null}
                           {row.state.reason ? <div className="stat-note">“{row.state.reason}”</div> : null}
                         </td>
-                        <td className="num">{row.role === "owner" ? "Unlimited" : status ? `${formatNumber(status.used)} / ${formatNumber(status.limit)}` : "—"}</td>
+                        <td className="num">
+                          {row.role === "owner" ? "Unlimited" : status ? `${formatNumber(status.used)} / ${formatNumber(status.monthly)}` : "—"}
+                          {status && status.extra > 0 ? <div className="stat-note">+{formatNumber(status.extra)} extra</div> : null}
+                          {current.isOwner && row.role !== "owner" ? <AdjustCreditsForm userId={row.id} extra={status?.extra ?? 0} /> : null}
+                        </td>
                         <td>
                           <EditAccountForm
                             account={{

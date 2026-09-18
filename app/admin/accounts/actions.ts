@@ -108,3 +108,19 @@ export async function moderateAccounts(_prev: BulkState, formData: FormData): Pr
     return { status: "error", message: isAppError(error) && error.expose ? error.message : "Couldn't apply that action." };
   }
 }
+/** Owner only: add or remove a user's extra credits (these don't reset monthly). */
+export async function adjustCredits(_prev: AccountFormState, formData: FormData): Promise<AccountFormState> {
+  const current = await requireAdmin();
+  if (!current.isOwner) return { status: "error", message: "Only the owner can change credits.", link: null };
+  const userId = text(formData, "userId");
+  if (!UUID_PATTERN.test(userId)) return { status: "error", message: "Invalid account.", link: null };
+  const amount = Number(text(formData, "amount"));
+  try {
+    const { extra } = await getServices().credits.adjust(userId, amount, text(formData, "note") || null, current.user.id);
+    revalidatePath("/admin/accounts");
+    return { status: "ok", message: `${amount > 0 ? "Added" : "Removed"} ${Math.abs(amount)}. Extra credits now ${extra}.`, link: null };
+  } catch (error) {
+    logger.warn("adjust credits failed", { userId, error });
+    return { status: "error", message: isAppError(error) && error.expose ? error.message : "Couldn't change credits.", link: null };
+  }
+}

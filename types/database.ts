@@ -300,6 +300,18 @@ export type CreditGrantRow = {
   created_at: string;
 };
 
+export type CreditLedgerRow = {
+  id: string;
+  user_id: string;
+  /** Positive adds credits, negative removes or spends them. */
+  amount: number;
+  kind: "purchase" | "admin" | "spend";
+  note: string | null;
+  stripe_session_id: string | null;
+  actor_id: string | null;
+  created_at: string;
+};
+
 export type UserPreferencesRow = Timestamps & {
   user_id: string;
   goals: string[];
@@ -523,6 +535,7 @@ export type Database = {
       referral_codes: TableDef<ReferralCodeRow, "code">;
       referral_rewards: TableDef<ReferralRewardRow, "code" | "referred_user_id">;
       credit_grants: TableDef<CreditGrantRow, "user_id" | "amount" | "reason">;
+      credit_ledger: TableDef<CreditLedgerRow, "user_id" | "amount" | "kind">;
       moderation_actions: TableDef<ModerationActionRow, "target_email" | "action">;
       youtube_quota_usage: {
         Row: YouTubeQuotaUsageRow;

@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import type { AccountRole } from "@/types/database";
-import { createAccount, updateAccount, type AccountFormState } from "./actions";
+import { adjustCredits, createAccount, updateAccount, type AccountFormState } from "./actions";
 
 const initial: AccountFormState = { status: "idle", message: null, link: null };
 
@@ -109,6 +109,21 @@ export function EditAccountForm({
       <input name="note" defaultValue={account.note ?? ""} placeholder="Note" aria-label="Note" maxLength={500} disabled={locked} />
       <button type="submit" className="button-ghost button-small" disabled={pending || locked}>
         {pending ? "Saving…" : "Save"}
+      </button>
+      <Status state={state} />
+    </form>
+  );
+}
+/** Owner only: add credits (positive) or take them back (negative). */
+export function AdjustCreditsForm({ userId, extra }: { userId: string; extra: number }) {
+  const [state, action, pending] = useActionState(adjustCredits, initial);
+  return (
+    <form action={action} className="account-edit credit-adjust">
+      <input type="hidden" name="userId" value={userId} />
+      <input name="amount" type="number" step={1} required placeholder="+100 or -50" aria-label={`Credits to add or remove (has ${extra} extra)`} />
+      <input name="note" placeholder="Reason (optional)" aria-label="Reason" maxLength={200} />
+      <button type="submit" className="button-ghost button-small" disabled={pending}>
+        {pending ? "Saving…" : "Add / remove"}
       </button>
       <Status state={state} />
     </form>

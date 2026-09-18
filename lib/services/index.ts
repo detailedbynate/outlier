@@ -4,6 +4,7 @@ import { SupabaseAccountProvisioner, SupabaseAuthModeration, SupabaseInviteSende
 import { ModerationRepository } from "@/lib/database/repositories/moderation";
 import { NicheRepository } from "@/lib/database/repositories/niches";
 import { ReferralRepository } from "@/lib/database/repositories/referrals";
+import { CreditLedgerRepository } from "@/lib/database/repositories/credit-ledger";
 import { parseMilestones } from "@/lib/referrals/milestones";
 import { CompetitorRepository } from "@/lib/database/repositories/competitors";
 import { AccountRepository } from "@/lib/database/repositories/accounts";
@@ -94,6 +95,7 @@ export interface Services {
     moderation: ModerationRepository;
     niches: NicheRepository;
     referrals: ReferralRepository;
+    creditLedger: CreditLedgerRepository;
     competitors: CompetitorRepository;
     youtubeCache: YouTubeCacheRepository;
   };
@@ -138,6 +140,7 @@ export function getServices(): Services {
     accounts: lazy(() => new AccountRepository(lazyDb())),
     moderation: lazy(() => new ModerationRepository(lazyDb())),
     referrals: lazy(() => new ReferralRepository(lazyDb())),
+    creditLedger: lazy(() => new CreditLedgerRepository(lazyDb())),
     niches: lazy(() => new NicheRepository(lazyDb())),
     competitors: lazy(() => new CompetitorRepository(lazyDb())),
     youtubeCache: lazy(() => new YouTubeCacheRepository(lazyDb())),
@@ -259,6 +262,7 @@ export function getServices(): Services {
     config.MONTHLY_CREDITS,
     async (userId) => (await accounts.limitsFor(userId)).monthlyCredits,
     (userId, since) => repositories.referrals.bonusSince(userId, since),
+    repositories.creditLedger,
   );
   const referrals = new ReferralService(
     { referrals: repositories.referrals, waitlist: repositories.waitlist, userIdByEmail: (email) => repositories.accounts.userIdByEmail(email) },

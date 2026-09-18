@@ -15,7 +15,7 @@ function setup(spent: number, paidResources: string[] = []) {
 describe("CreditsService (monthly)", () => {
   it("reports this month's usage and the next monthly reset", async () => {
     const { service, usage } = setup(37);
-    expect(await service.status("u1", NOW)).toEqual({ used: 37, limit: 100, remaining: 63, bonus: 0, resetsAt: "2026-10-01T00:00:00.000Z" });
+    expect(await service.status("u1", NOW)).toEqual({ used: 37, limit: 100, remaining: 63, bonus: 0, monthly: 100, extra: 0, resetsAt: "2026-10-01T00:00:00.000Z" });
     expect(usage.creditsSpentSince).toHaveBeenCalledWith("u1", startOfUtcMonth(NOW));
   });
 

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { CreditStatus } from "@/lib/services/credits-service";
 import { CoinsIcon } from "./icons";
 
@@ -9,7 +10,7 @@ function resetsIn(resetsAt: string, now: Date = new Date()): string {
   return h > 0 ? `${h}h ${minutes % 60}m` : `${minutes}m`;
 }
 
-/** Sidebar widget: this month's credit usage. */
+/** Sidebar widget: this month's credit usage, extra credits, and where to buy more. */
 export function CreditsMeter({ status }: { status: CreditStatus }) {
   // Owner accounts have an effectively unlimited allowance.
   if (status.limit >= 1_000_000) {
@@ -19,7 +20,7 @@ export function CreditsMeter({ status }: { status: CreditStatus }) {
           <span className="credits-icon">
             <CoinsIcon size={15} />
           </span>
-          <span className="credits-title">Monthly credits</span>
+          <span className="credits-title">Credits</span>
         </div>
         <div className="credits-value">
           <strong>Unlimited</strong>
@@ -35,7 +36,7 @@ export function CreditsMeter({ status }: { status: CreditStatus }) {
         <span className="credits-icon">
           <CoinsIcon size={15} />
         </span>
-        <span className="credits-title">Monthly credits</span>
+        <span className="credits-title">Credits</span>
       </div>
       <div className="credits-value">
         <strong>{status.remaining}</strong>
@@ -53,7 +54,11 @@ export function CreditsMeter({ status }: { status: CreditStatus }) {
       </div>
       <div className="credits-foot">
         {status.used} used · resets in {resetsIn(status.resetsAt)}
+        {status.extra > 0 ? ` · ${status.extra} bought` : ""}
       </div>
+      <Link href="/billing" className="credits-buy">
+        Buy credits
+      </Link>
     </div>
   );
 }

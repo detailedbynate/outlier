@@ -1,0 +1,39 @@
+import type Stripe from "stripe";
+import { env } from "@/lib/core/env";
+import { logger } from "@/lib/core/logger";
+import { fulfillCheckout, getStripe } from "@/lib/billing/stripe";
+
+export const dynamic = "force-dynamic";
+
+/**
+ * POST /api/stripe/webhook — Stripe tells us a Checkout finished. The signature
+ * is checked against the raw body, so this can't use the JSON API handler.
+ */
+export async function POST(request: Request): Promise<Response> {
+  const secret = env().STRIPE_WEBHOOK_SECRET;
+  if (!secret || !env().STRIPE_SECRET_KEY) return new Response("Payments aren't set up.", { status: 503 });
+
+  const signature = request.headers.get("stripe-signature");
+  if (!signature) return new Response("Missing signature.", { status: 400 });
+  const body = await request.text();
+
+  let event: Stripe.Event;
+  try {
+    event = getStripe().webhooks.constructEvent(body, signature, secret);
+  } catch (error) {
+    logger.warn("stripe webhook signature rejected", { error });
+    return new Response("Bad signature.", { status: 400 });
+  }
+
+  // Card payments complete immediately; bank methods confirm later with async_payment_succeeded.
+  if (event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded") {
+    try {
+      await fulfillCheckout(event.data.object);
+    } catch (error) {
+      // A 500 makes Stripe retry, and fulfilling twice is harmless.
+      logger.error("stripe fulfillment failed", { eventId: event.id, error });
+      return new Response("Fulfillment failed.", { status: 500 });
+    }
+  }
+  return Response.json({ received: true });
+}

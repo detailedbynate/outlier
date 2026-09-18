@@ -105,17 +105,26 @@ const serverEnvSchema = z.object({
   /** Max referral rewards one referrer can earn per month (limits abuse). */
   REFERRAL_MAX_REWARDS_PER_MONTH: z.coerce.number().int().min(0).max(1_000).default(20),
 
+  /** Stripe secret key (sk_live_… or sk_test_…). Credit purchases are off without it. */
+  STRIPE_SECRET_KEY: optionalString,
+  /** Signing secret of the Stripe webhook pointed at /api/stripe/webhook (whsec_…). */
+  STRIPE_WEBHOOK_SECRET: optionalString,
+
   ANTHROPIC_API_KEY: optionalString,
   OPENAI_API_KEY: optionalString,
 
   /** Google AI Studio key: the free Gemini tier gives unsure channels an AI second opinion. */
   GEMINI_API_KEY: optionalString,
   GEMINI_MODEL: z.string().trim().min(1).default("gemini-3.6-flash"),
+  /** OpenRouter key: its free models take over when Gemini's free tier is rate-limited. */
+  OPENROUTER_API_KEY: optionalString,
+  /** Comma-separated OpenRouter models, tried in order. Blank uses a built-in list of free ones. */
+  OPENROUTER_MODELS: optionalString,
   /**
-   * Who gives unsure channels a second opinion: "auto" uses Gemini when its key is set, then Claude,
-   * otherwise rules only. "rules" never calls an AI.
+   * Who gives unsure channels a second opinion: "auto" uses Gemini, falling back to OpenRouter's free
+   * models, whichever keys are set; Claude only when neither is; otherwise rules only. "rules" never calls an AI.
    */
-  NICHE_LABEL_PROVIDER: z.enum(["auto", "gemini", "anthropic", "rules"]).default("auto"),
+  NICHE_LABEL_PROVIDER: z.enum(["auto", "gemini", "openrouter", "anthropic", "rules"]).default("auto"),
   /** Claude model for niche labeling when Anthropic is the provider. */
   NICHE_LABEL_MODEL: z.string().trim().min(1).default("claude-opus-5"),
   /** Channels per model call when labeling. */
