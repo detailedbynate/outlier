@@ -19,3 +19,6 @@ export function findPack(id: string | null | undefined): CreditPack | null {
 export function formatPrice(cents: number): string {
   return `$${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2)}`;
 }
+
+/** Stripe product tax code: software as a service, business use. */
+export const CREDIT_TAX_CODE = "txcd_10103001";

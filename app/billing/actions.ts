@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { requireApprovedUser } from "@/lib/auth/session";
 import { env } from "@/lib/core/env";
 import { logger } from "@/lib/core/logger";
-import { findPack } from "@/lib/billing/packs";
+import { CREDIT_TAX_CODE, findPack } from "@/lib/billing/packs";
 import { getStripe } from "@/lib/billing/stripe";
 
 async function siteUrl(): Promise<string> {
@@ -27,13 +27,20 @@ export async function startCheckout(formData: FormData): Promise<void> {
   try {
     const session = await getStripe().checkout.sessions.create({
       mode: "payment",
+      // Stripe is the seller of record: it handles sales tax/VAT, fraud and disputes.
+      managed_payments: { enabled: true },
       line_items: [
         {
           quantity: 1,
           price_data: {
             currency: "usd",
             unit_amount: pack.priceCents,
-            product_data: { name: `${pack.credits.toLocaleString("en-US")} Outlier credits`, description: "Credits never expire." },
+            product_data: {
+              name: `${pack.credits.toLocaleString("en-US")} Outlier credits`,
+              description: "Credits never expire.",
+              // Stripe manages tax (Managed Payments), which needs a digital-goods tax code: SaaS, business use.
+              tax_code: CREDIT_TAX_CODE,
+            },
           },
         },
       ],
