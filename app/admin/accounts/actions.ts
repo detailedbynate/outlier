@@ -108,6 +108,25 @@ export async function moderateAccounts(_prev: BulkState, formData: FormData): Pr
     return { status: "error", message: isAppError(error) && error.expose ? error.message : "Couldn't apply that action." };
   }
 }
+/** A fresh one-time sign-in link for an account, for when the first one was lost or used. */
+export async function newSignInLink(_prev: AccountFormState, formData: FormData): Promise<AccountFormState> {
+  const current = await requireAdmin();
+  const userId = text(formData, "userId");
+  if (!UUID_PATTERN.test(userId)) return { status: "error", message: "Invalid account.", link: null };
+  try {
+    const link = await getServices().accounts.accessLink(
+      userId,
+      text(formData, "email"),
+      { userId: current.user.id, role: current.isOwner ? "owner" : "admin" },
+      await confirmUrl(),
+    );
+    return { status: "ok", message: "New link ready. It works once and lets them set a password.", link };
+  } catch (error) {
+    logger.warn("new sign-in link failed", { userId, error });
+    return { status: "error", message: isAppError(error) && error.expose ? error.message : "Couldn't create a link.", link: null };
+  }
+}
+
 /** Owner only: add or remove a user's extra credits (these don't reset monthly). */
 export async function adjustCredits(_prev: AccountFormState, formData: FormData): Promise<AccountFormState> {
   const current = await requireAdmin();

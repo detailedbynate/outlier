@@ -10,7 +10,7 @@ import { formatNumber, timeAgo } from "@/lib/format";
 import { DURATIONS, moderationState, type AccountStatus } from "@/lib/moderation/status";
 import { getServices } from "@/lib/services";
 import type { AccountRole } from "@/types/database";
-import { AdjustCreditsForm, CreateAccountForm, EditAccountForm } from "./account-forms";
+import { AdjustCreditsForm, CreateAccountForm, EditAccountForm, NewSignInLinkForm } from "./account-forms";
 import { moderateAccounts } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -190,6 +190,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Sea
                             hasSettings={row.settings !== null}
                             email={row.email}
                           />
+                          {protectedRow ? null : <NewSignInLinkForm userId={row.id} email={row.email} />}
                         </td>
                       </tr>
                     );

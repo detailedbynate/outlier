@@ -16,6 +16,8 @@ export const OWNER_MONTHLY_CREDITS = 1_000_000;
 export interface AccountProvisioner {
   /** Create the auth account (if needed). "email" sends an invite; "link" returns a one-time sign-in link. */
   provision(email: string, redirectTo: string, delivery: "email" | "link"): Promise<{ userId: string; link: string | null; existed: boolean }>;
+  /** A fresh one-time link for an existing account that lands on "set your password". */
+  accessLink(email: string, redirectTo: string): Promise<string>;
 }
 
 const limitSchema = z
@@ -185,6 +187,21 @@ export class AccountService {
     this.cache.delete(userId);
     this.log.info("account updated", { userId, by: actor.userId });
     return updated;
+  }
+
+  /**
+   * A new one-time sign-in link for someone who lost theirs or never used it.
+   * It lets them set a password, so it also works as a password reset.
+   */
+  async accessLink(userId: string, email: string, actor: Actor, redirectTo: string): Promise<string> {
+    this.assertManager(actor);
+    if (this.isOwnerEmail(email)) throw new AppError("FORBIDDEN", "The owner account can't be changed here.");
+    const target = await this.deps.repository.findByUserId(userId);
+    if (target?.role === "owner") throw new AppError("FORBIDDEN", "The owner account can't be changed here.");
+    if (target?.role === "admin" && actor.role !== "owner") throw new AppError("FORBIDDEN", "Only the owner can manage admins.");
+    const link = await this.deps.provisioner.accessLink(email, redirectTo);
+    this.log.info("sign-in link created", { userId, by: actor.userId });
+    return link;
   }
 
   private assertManager(actor: Actor): void {

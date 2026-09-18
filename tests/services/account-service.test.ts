@@ -41,6 +41,7 @@ function setup() {
   let next = 10;
   const provisioner = {
     provision: vi.fn(async () => ({ userId: `00000000-0000-4000-8000-0000000000${next++}`, link: "https://app/auth/confirm?token_hash=x&type=invite", existed: false })),
+    accessLink: vi.fn(async () => "https://app/auth/confirm?token_hash=y&type=recovery"),
   };
   const service = new AccountService({ repository, provisioner }, { ownerEmails: ["Founder@Example.com"] }, createLogger());
   return { service, repository, provisioner, rows };
@@ -64,6 +65,21 @@ describe("AccountService", () => {
     expect(account).toMatchObject({ email: "pal@example.com", role: "member", daily_credits: 250, youtube_daily_units: null, created_by: OWNER_ID });
     expect(link).toContain("token_hash");
     expect(await service.limitsFor(account.user_id)).toMatchObject({ monthlyCredits: 250, youtubeDailyUnits: undefined });
+  });
+
+  it("makes a fresh sign-in link for an account, but not for the owner or (unless you're the owner) admins", async () => {
+    const { service, provisioner } = setup();
+    const { account } = await service.create({ email: "pal@example.com", delivery: "link" }, owner, "https://app/auth/confirm");
+    expect(await service.accessLink(account.user_id, "pal@example.com", owner, "https://app/auth/confirm")).toContain("type=recovery");
+    expect(provisioner.accessLink).toHaveBeenCalledWith("pal@example.com", "https://app/auth/confirm");
+
+    await expect(service.accessLink(OWNER_ID, "founder@example.com", owner, "https://app/auth/confirm")).rejects.toMatchObject({ code: "FORBIDDEN" });
+    const { account: admin } = await service.create({ email: "boss@example.com", role: "admin", delivery: "link" }, owner, "https://app/auth/confirm");
+    const anAdmin = { userId: "00000000-0000-4000-8000-000000000099", role: "admin" as const };
+    await expect(service.accessLink(admin.user_id, "boss@example.com", anAdmin, "https://app/auth/confirm")).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(service.accessLink(account.user_id, "pal@example.com", { userId: "x", role: "member" }, "https://app/auth/confirm")).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
   });
 
   it("only lets the owner create or manage admins, and protects the owner account", async () => {

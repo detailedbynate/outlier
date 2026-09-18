@@ -4943,6 +4943,10 @@ body:has(.onboarding-root) .ambient {
   width: 160px;
 }
 
+.sign-in-link {
+  margin-top: 6px;
+}
+
 .credit-adjust {
   justify-content: flex-end;
   margin-top: 6px;

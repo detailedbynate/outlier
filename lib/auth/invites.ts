@@ -52,6 +52,18 @@ export class SupabaseInviteSender implements InviteSender {
   }
 }
 
+/** One-time link that signs an existing account in and sends it to /set-password. */
+async function createPasswordLink(client: DatabaseClient, email: string, redirectTo: string): Promise<string> {
+  const result = await client.auth.admin.generateLink({ type: "recovery", email, options: { redirectTo } });
+  if (result.error || !result.data.properties?.hashed_token) {
+    throw new AppError("UPSTREAM_ERROR", `Could not create a sign-in link: ${result.error?.message ?? "no token"}`, { cause: result.error, expose: true });
+  }
+  const url = new URL(redirectTo);
+  url.searchParams.set("token_hash", result.data.properties.hashed_token);
+  url.searchParams.set("type", "recovery");
+  return url.toString();
+}
+
 /** Creates accounts for /admin/accounts: an invite email, or a one-time link to send yourself. */
 export class SupabaseAccountProvisioner implements AccountProvisioner {
   private readonly invites: SupabaseInviteSender;
@@ -84,6 +96,10 @@ export class SupabaseAccountProvisioner implements AccountProvisioner {
       throw new AppError("UPSTREAM_ERROR", `Invite failed: ${error?.message ?? "no user returned"}`, { cause: error, expose: true });
     }
     return { userId: data.user.id, link: null, existed: false };
+  }
+
+  accessLink(email: string, redirectTo: string): Promise<string> {
+    return createPasswordLink(this.admin, email, redirectTo);
   }
 }
 

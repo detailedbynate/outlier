@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import type { AccountRole } from "@/types/database";
-import { adjustCredits, createAccount, updateAccount, type AccountFormState } from "./actions";
+import { adjustCredits, createAccount, newSignInLink, updateAccount, type AccountFormState } from "./actions";
 
 const initial: AccountFormState = { status: "idle", message: null, link: null };
 
@@ -114,6 +114,21 @@ export function EditAccountForm({
     </form>
   );
 }
+/** Makes a fresh sign-in link to copy and send, when the first one was lost or already used. */
+export function NewSignInLinkForm({ userId, email }: { userId: string; email: string }) {
+  const [state, action, pending] = useActionState(newSignInLink, initial);
+  return (
+    <form action={action} className="account-edit sign-in-link">
+      <input type="hidden" name="userId" value={userId} />
+      <input type="hidden" name="email" value={email} />
+      <button type="submit" className="button-ghost button-small" disabled={pending}>
+        {pending ? "Creating…" : "New sign-in link"}
+      </button>
+      <Status state={state} />
+    </form>
+  );
+}
+
 /** Owner only: add credits (positive) or take them back (negative). */
 export function AdjustCreditsForm({ userId, extra }: { userId: string; extra: number }) {
   const [state, action, pending] = useActionState(adjustCredits, initial);
