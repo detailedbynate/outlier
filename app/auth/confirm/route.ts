@@ -2,10 +2,22 @@ import type { EmailOtpType } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { safeRedirectPath } from "@/lib/auth/access";
 import { createSessionClient } from "@/lib/auth/session";
+import { env } from "@/lib/core/env";
 import { logger } from "@/lib/core/logger";
 import { getServices } from "@/lib/services";
 
 const ALLOWED_TYPES = new Set<EmailOtpType>(["invite", "email", "magiclink", "recovery", "signup"]);
+
+/**
+ * Where to send people afterwards. Behind the reverse proxy, request.url is the
+ * app's own address (localhost:3000), so use the public site URL instead.
+ */
+function siteOrigin(request: NextRequest): string {
+  const configured = env().SITE_URL;
+  if (configured) return configured;
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  return host ? `${request.headers.get("x-forwarded-proto") ?? "https"}://${host}` : request.url;
+}
 
 /**
  * GET /auth/confirm?token_hash=…&type=invite — verifies an emailed link and
@@ -15,7 +27,8 @@ export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
-  const failure = new URL("/login?error=link", request.url);
+  const origin = siteOrigin(request);
+  const failure = new URL("/login?error=link", origin);
 
   if (!tokenHash || !type || !ALLOWED_TYPES.has(type)) return NextResponse.redirect(failure);
 
@@ -34,5 +47,5 @@ export async function GET(request: NextRequest) {
   }
 
   const next = type === "invite" || type === "recovery" ? "/set-password" : safeRedirectPath(searchParams.get("next"));
-  return NextResponse.redirect(new URL(next, request.url));
+  return NextResponse.redirect(new URL(next, origin));
 }
