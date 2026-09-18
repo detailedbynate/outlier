@@ -8,6 +8,9 @@ export const DEFAULT_OPENROUTER_MODELS = ["deepseek/deepseek-v4-flash-0731:free"
 
 const ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
 
+/** Output budget multiplier so reasoning doesn't crowd out the answer. Free models cost nothing per token. */
+const REASONING_HEADROOM = 3;
+
 /** Thrown for 429s and outages so a fallback chain moves on to the next provider. */
 export class OpenRouterUnavailableError extends Error {
   constructor(
@@ -94,7 +97,10 @@ export class OpenRouterTextProvider implements TextProvider {
         model,
         ...(fallbacks.length ? { models: [model, ...fallbacks] } : {}),
         messages,
-        ...(request.maxOutputTokens ? { max_tokens: request.maxOutputTokens } : {}),
+        // The free models reason before answering, and that counts against max_tokens: keep the
+        // reasoning short and out of the reply, and leave room for it on top of the answer.
+        reasoning: { effort: request.effort ?? "low", exclude: true },
+        ...(request.maxOutputTokens ? { max_tokens: request.maxOutputTokens * REASONING_HEADROOM } : {}),
         ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
         ...(jsonSchema ? { response_format: { type: "json_schema", json_schema: { name: jsonSchema.name, strict: true, schema: jsonSchema.schema } } } : {}),
       }),

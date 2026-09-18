@@ -16,12 +16,19 @@ describe("OpenRouterTextProvider", () => {
   it("sends the schema and model fallbacks, and validates the answer", async () => {
     const fetch = reply(200, { model: "qwen/qwen3.8-27b:free", choices: [{ message: { content: '{"queries":["stoic philosophy"]}' }, finish_reason: "stop" }], usage: { prompt_tokens: 12, completion_tokens: 8 } });
     const provider = new OpenRouterTextProvider({ apiKey: "k", models: ["a:free", "b:free"], fetch });
-    const result = await provider.generateObject(request);
+    const result = await provider.generateObject({ ...request, maxOutputTokens: 1_000, effort: "low" });
     expect(result).toEqual({ object: { queries: ["stoic philosophy"] }, model: "qwen/qwen3.8-27b:free", usage: { inputTokens: 12, outputTokens: 8 } });
 
     const init = fetch.mock.calls[0]![1]!;
     const body = JSON.parse(String(init.body));
-    expect(body).toMatchObject({ model: "a:free", models: ["a:free", "b:free"], response_format: { type: "json_schema", json_schema: { name: "plan", strict: true } } });
+    expect(body).toMatchObject({
+      model: "a:free",
+      models: ["a:free", "b:free"],
+      response_format: { type: "json_schema", json_schema: { name: "plan", strict: true } },
+      // Reasoning stays short and out of the answer, with room left for it.
+      reasoning: { effort: "low", exclude: true },
+      max_tokens: 3_000,
+    });
     expect((init.headers as Record<string, string>).Authorization).toBe("Bearer k");
   });
 
