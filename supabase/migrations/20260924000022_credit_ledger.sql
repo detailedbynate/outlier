@@ -24,4 +24,10 @@ create table if not exists public.credit_ledger (
 create index if not exists credit_ledger_user_time_idx on public.credit_ledger (user_id, created_at desc);
 alter table public.credit_ledger enable row level security;
 -- Only the server (service role) reads and writes it; RLS keeps users out.
-grant all on public.credit_ledger to service_role;
+do $$
+begin
+  -- Supabase has this role; plain Postgres (tests) doesn't.
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    grant all on public.credit_ledger to service_role;
+  end if;
+end $$;
