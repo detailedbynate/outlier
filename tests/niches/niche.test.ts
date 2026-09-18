@@ -105,7 +105,7 @@ describe("niche analysis", () => {
 });
 
 describe("NicheService (database-first)", () => {
-  function setup(options: { sampleVideos?: NicheVideo[]; searchError?: Error } = {}) {
+  function setup(options: { sampleVideos?: NicheVideo[]; searchError?: Error; ai?: { generateObject: ReturnType<typeof vi.fn> } } = {}) {
     let stored: NicheReportRow | null = null;
     let claimed = false;
     let sample = options.sampleVideos ?? [];
@@ -152,7 +152,7 @@ describe("NicheService (database-first)", () => {
     };
     const enqueue = vi.fn(async () => ({}));
     const service = new NicheService(
-      { niches, youtube, channels, videos, usage, credits, enqueue } as never,
+      { niches, youtube, channels, videos, usage, credits, enqueue, ai: options.ai } as never,
       { minVideos: 20, minChannels: 5 },
       createLogger(),
     );
@@ -165,6 +165,39 @@ describe("NicheService (database-first)", () => {
     expect(result).toMatchObject({ source: "database", unitsSpent: 0, stale: false });
     expect(result.report.subNiches.length).toBeGreaterThan(0);
     expect(youtube.searchVideos).not.toHaveBeenCalled();
+  });
+
+  it("lets the AI plan extra searches for a topic with no data, and keeps its related words", async () => {
+    const ai = {
+      generateObject: vi.fn(async () => ({
+        object: { queries: ["stoic philosophy", "Marcus Aurelius lessons", "one too many"], related: ["Stoic", "marcus aurelius", "stoicism"] },
+        model: "test",
+        usage: {},
+      })),
+    };
+    const { service, youtube, niches } = setup({ ai });
+    const result = await service.research("stoicism", { userId: "u1", now: NOW });
+    expect((youtube.searchVideos.mock.calls as unknown as [{ q: string }][]).map(([params]) => params.q)).toEqual(["stoicism", "stoic philosophy", "marcus aurelius lessons"]);
+    // Three searches (101 each) plus one channel batch.
+    expect(result).toMatchObject({ source: "youtube", unitsSpent: 304 });
+    expect(niches.topicSample).toHaveBeenLastCalledWith("stoicism", expect.any(Date), undefined, ["stoic", "marcus aurelius"]);
+    expect(niches.saveReport).toHaveBeenLastCalledWith(expect.objectContaining({ search_terms: ["stoic", "marcus aurelius"] }));
+  });
+
+  it("searches the topic as typed when the AI fails", async () => {
+    const ai = { generateObject: vi.fn(async () => Promise.reject(new Error("rate limited"))) };
+    const { service, youtube } = setup({ ai });
+    const result = await service.research("stoicism", { userId: "u1", now: NOW });
+    expect(youtube.searchVideos).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({ source: "youtube", unitsSpent: 102 });
+  });
+
+  it("doesn't ask the AI when the topic already has some stored data", async () => {
+    const ai = { generateObject: vi.fn() };
+    const { service, youtube } = setup({ ai, sampleVideos: gamingSample().slice(0, 3) });
+    await service.research("gaming", { userId: "u1", now: NOW });
+    expect(ai.generateObject).not.toHaveBeenCalled();
+    expect(youtube.searchVideos).toHaveBeenCalledTimes(1);
   });
 
   it("fetches from YouTube once for thin topics, stores results, then reuses the cache for everyone", async () => {

@@ -370,6 +370,8 @@ export type NicheReportRow = {
   computed_at: string | null;
   youtube_refreshed_at: string | null;
   refresh_claimed_at: string | null;
+  /** AI-suggested related words that also count as this topic. */
+  search_terms: string[];
   search_count: number;
   last_searched_at: string;
   created_at: string;

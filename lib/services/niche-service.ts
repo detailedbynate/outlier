@@ -1,3 +1,5 @@
+import { z } from "zod";
+import type { TextProvider } from "@/lib/ai/types";
 import { AppError, ValidationError } from "@/lib/core/errors";
 import { createLogger, type Logger } from "@/lib/core/logger";
 import { channelToRow, type ChannelRepository } from "@/lib/database/repositories/channels";
@@ -10,6 +12,7 @@ import { findUnderratedNiches, underratedWindow, type NicheCreator, type NicheEx
 import { isQuotaUnavailable } from "@/lib/youtube/quota-manager";
 import type { YouTubeService } from "@/lib/youtube/service";
 import type { Json } from "@/types/database";
+import type { YouTubeVideo } from "@/types/youtube";
 import type { CreditsService } from "./credits-service";
 import type { StorageBudgetService } from "./storage-budget-service";
 
@@ -19,6 +22,10 @@ import type { StorageBudgetService } from "./storage-budget-service";
  *   report cache (shared, 6h) → stored videos/channels → YouTube only when the
  *   stored sample is too thin, at most once per topic per day across all users
  *   (one search.list + one batched channels.list ≈ 102 units) → store → analyze.
+ *
+ * When nothing at all is stored for a topic, the AI turns it into a few better
+ * YouTube searches (≈ 101 units each) and related words, and the related words
+ * are saved with the topic so the channels found keep matching it later.
  *
  * Every YouTube request goes through the normal quota gate; if quota is
  * unavailable the report is built from stored data and flagged as possibly older.
@@ -34,6 +41,8 @@ export interface NicheConfig {
   youtubeRefreshMs: number;
   /** YouTube refreshes per UTC day across all topics (each ≈ 102 units). */
   dailyYoutubeRefreshes: number;
+  /** YouTube searches for a topic with no stored data at all (AI-planned). */
+  discoverySearches: number;
   /** Stored sample needed before skipping YouTube. */
   minVideos: number;
   minChannels: number;
@@ -46,6 +55,7 @@ export const DEFAULT_NICHE_CONFIG: NicheConfig = {
   reportTtlMs: 6 * 3_600_000,
   youtubeRefreshMs: 24 * 3_600_000,
   dailyYoutubeRefreshes: 15,
+  discoverySearches: 3,
   minVideos: 40,
   minChannels: 8,
   sampleDays: 90,
@@ -166,6 +176,8 @@ export class NicheService {
       credits?: Pick<CreditsService, "status" | "charge">;
       storage?: Pick<StorageBudgetService, "assertCapacity">;
       enqueue?: (type: string, payload: unknown, options?: EnqueueOptions) => Promise<unknown>;
+      /** Plans searches for topics with no stored data. Without it, the topic is searched as typed. */
+      ai?: Pick<TextProvider, "generateObject"> | null;
     },
     config: Partial<NicheConfig> = {},
     logger?: Logger,
@@ -272,7 +284,8 @@ export class NicheService {
 
     // 2. Stored data.
     const since = new Date(now.getTime() - this.config.sampleDays * 86_400_000);
-    let sample = await this.deps.niches.topicSample(topic, since);
+    let related = cached?.search_terms ?? [];
+    let sample = await this.deps.niches.topicSample(topic, since, undefined, related);
     let source: NicheSource = "database";
     let unitsSpent = 0;
     let notice: string | null = null;
@@ -284,12 +297,13 @@ export class NicheService {
 
     // 3. YouTube, only when the stored sample is too thin.
     if (thin && !refreshedRecently) {
-      const outcome = await this.tryRefreshFromYouTube(topic, key, userId, now);
+      const outcome = await this.tryRefreshFromYouTube(topic, key, userId, now, sample.videos.length === 0);
       if (outcome.status === "refreshed") {
         source = "youtube";
         unitsSpent = outcome.units;
         youtubeRefreshedAt = now.toISOString();
-        sample = await this.deps.niches.topicSample(topic, since);
+        related = [...new Set([...related, ...outcome.related])].slice(0, 4);
+        sample = await this.deps.niches.topicSample(topic, since, undefined, related);
       } else {
         notice = outcome.notice;
         stale = outcome.status === "quota";
@@ -308,6 +322,7 @@ export class NicheService {
       channels: sample.channels.size,
       units: unitsSpent,
       youtubeRefreshedAt,
+      related,
     });
     await this.recordSearch(userId, key, source, unitsSpent, now);
     this.log.info("niche researched", { topic: key, source, units: unitsSpent, videos: sample.videos.length, channels: sample.channels.size, stale });
@@ -320,7 +335,8 @@ export class NicheService {
     key: string,
     userId: string | null,
     now: Date,
-  ): Promise<{ status: "refreshed"; units: number } | { status: "skipped" | "quota"; notice: string }> {
+    empty: boolean,
+  ): Promise<{ status: "refreshed"; units: number; related: string[] } | { status: "skipped" | "quota"; notice: string }> {
     const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
     if ((await this.deps.usage.countSince(NICHE_REFRESH_EVENT, dayStart)) >= this.config.dailyYoutubeRefreshes) {
       return { status: "skipped", notice: "Showing stored data only: today's fresh-research limit was reached. Try again tomorrow for newer data." };
@@ -342,18 +358,25 @@ export class NicheService {
     }
 
     try {
-      // One search (100 units) hydrated with batched video stats (1 unit), then channels in one batch (1 unit).
-      const results = await this.deps.youtube.searchVideos({
-        q: topic,
-        order: "viewCount",
-        publishedAfter: new Date(now.getTime() - 30 * 86_400_000).toISOString(),
-        relevanceLanguage: this.config.language,
-        regionCode: this.config.regionCode,
-        maxResults: 50,
-      });
+      // Nothing stored at all: let the AI pick better searches than the raw words.
+      const plan = empty ? await this.planDiscovery(topic) : { queries: [topic], related: [] };
+      // Each search (100 units) is hydrated with batched video stats (1 unit); channels follow in batches of 50 (1 unit each).
+      const found = new Map<string, YouTubeVideo>();
+      for (const q of plan.queries) {
+        const page = await this.deps.youtube.searchVideos({
+          q,
+          order: "viewCount",
+          publishedAfter: new Date(now.getTime() - 30 * 86_400_000).toISOString(),
+          relevanceLanguage: this.config.language,
+          regionCode: this.config.regionCode,
+          maxResults: 50,
+        });
+        for (const video of page.items) found.set(video.id, video);
+      }
+      const results = { items: [...found.values()] };
       const channelIds = [...new Set(results.items.map((v) => v.channelId).filter(Boolean))];
       const channels = channelIds.length ? await this.deps.youtube.getChannels(channelIds) : [];
-      const units = 101 + (channelIds.length ? 1 : 0);
+      const units = plan.queries.length * 101 + Math.ceil(channelIds.length / 50);
 
       const saved = await this.deps.channels.upsertMany(channels.map((c) => ({ ...channelToRow(c, now), last_synced_at: undefined })));
       const uuidByYoutubeId = new Map(saved.map((c) => [c.youtube_channel_id, c.id]));
@@ -370,7 +393,7 @@ export class NicheService {
         quantity: 1,
         resource_type: "niche",
         resource_id: key,
-        metadata: { units, videos: results.items.length, channels: channels.length } as Json,
+        metadata: { units, videos: results.items.length, channels: channels.length, queries: plan.queries } as Json,
         occurred_at: now.toISOString(),
       });
       if (userId && this.deps.credits) await this.deps.credits.charge(userId, "niche_research", key, now);
@@ -383,7 +406,7 @@ export class NicheService {
           { idempotencyKey: `channel.refresh:${channel.youtube_channel_id}:${now.toISOString().slice(0, 10)}`, priority: -5 },
         );
       }
-      return { status: "refreshed", units };
+      return { status: "refreshed", units, related: plan.related };
     } catch (error) {
       await this.deps.niches.releaseClaim(key).catch(() => {});
       if (isQuotaUnavailable(error)) {
@@ -397,12 +420,48 @@ export class NicheService {
     }
   }
 
+  /**
+   * YouTube searches and related words for a topic we know nothing about. Falls
+   * back to searching the topic as typed when no AI is set up or it fails.
+   */
+  private async planDiscovery(topic: string): Promise<{ queries: string[]; related: string[] }> {
+    const fallback = { queries: [topic], related: [] };
+    if (!this.deps.ai) return fallback;
+    try {
+      const { object } = await this.deps.ai.generateObject({
+        system: DISCOVERY_PROMPT,
+        messages: [{ role: "user", content: `Topic: ${topic}` }],
+        schema: discoveryPlanSchema,
+        schemaName: "niche_discovery_plan",
+        maxOutputTokens: 400,
+        effort: "low",
+      });
+      const tidy = (values: string[]) =>
+        [...new Set(values.map((v) => v.replace(/\s+/g, " ").trim().toLowerCase()).filter((v) => v.length >= 2 && v.length <= 60))];
+      // The topic as typed always goes first; the AI only adds to it.
+      const queries = tidy([topic, ...object.queries]).slice(0, this.config.discoverySearches);
+      const related = tidy(object.related).filter((word) => topicKey(word) !== topicKey(topic)).slice(0, 4);
+      return { queries, related };
+    } catch (error) {
+      this.log.warn("niche discovery planning failed, searching the topic as typed", { topic, error });
+      return fallback;
+    }
+  }
+
   private async saveSearch(
     key: string,
     topic: string,
     cached: Awaited<ReturnType<NicheRepository["getReport"]>>,
     now: Date,
-    computed: { report: NicheReport; source: "database" | "youtube"; videos: number; channels: number; units: number; youtubeRefreshedAt: string | null } | null,
+    computed: {
+      report: NicheReport;
+      source: "database" | "youtube";
+      videos: number;
+      channels: number;
+      units: number;
+      youtubeRefreshedAt: string | null;
+      related: string[];
+    } | null,
   ): Promise<void> {
     try {
       await this.deps.niches.saveReport({
@@ -419,6 +478,7 @@ export class NicheService {
               youtube_units: (cached?.youtube_units ?? 0) + computed.units,
               computed_at: now.toISOString(),
               youtube_refreshed_at: computed.youtubeRefreshedAt,
+              search_terms: computed.related,
               refresh_claimed_at: null,
             }
           : {}),
@@ -444,6 +504,19 @@ export class NicheService {
 }
 
 export const NICHE_REFRESH_CREDITS = 5;
+
+const discoveryPlanSchema = z.object({
+  queries: z.array(z.string()),
+  related: z.array(z.string()),
+});
+
+const DISCOVERY_PROMPT = `You help Outlier, a YouTube research tool, find channels for a niche it has no data on yet.
+
+Given a topic someone typed, return:
+- queries: two or three YouTube searches that would surface videos from channels that make this kind of content. Use the words creators put in their titles rather than restating the topic. Add "shorts" only if the topic is usually short-form.
+- related: up to four short words or phrases (one to three words) that mean the same niche and would appear in those channels' video titles: other names, key people, common terms. Skip broad words that would match unrelated channels ("tips", "video", "life").
+
+Example for "stoicism": queries ["stoic philosophy", "marcus aurelius lessons"], related ["stoic", "marcus aurelius", "seneca"].`;
 
 function isReport(value: unknown): value is NicheReport {
   return typeof value === "object" && value !== null && "overall" in value && "subNiches" in value;

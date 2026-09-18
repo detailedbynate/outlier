@@ -215,28 +215,35 @@ export class NicheRepository {
 
   /**
    * Stored videos about a topic from the last `days`: titles mentioning it, plus
-   * uploads from channels whose name or description mentions it.
+   * uploads from channels whose name or description mentions it. `related` adds
+   * other words for the same topic (AI-suggested), matched the same way.
    */
-  async topicSample(topic: string, since: Date, limit = 1_500): Promise<{ videos: NicheVideo[]; channels: Map<string, NicheChannel> }> {
-    const term = escapePattern(topic);
-    if (term.length < 2) return { videos: [], channels: new Map() };
+  async topicSample(topic: string, since: Date, limit = 1_500, related: string[] = []): Promise<{ videos: NicheVideo[]; channels: Map<string, NicheChannel> }> {
+    const topics = [...new Set([topic, ...related].map((t) => t.trim()).filter((t) => escapePattern(t).length >= 2))].slice(0, 5);
+    if (topics.length === 0 || escapePattern(topic).length < 2) return { videos: [], channels: new Map() };
     const columns = "id, youtube_video_id, channel_id, title, tags, format, view_count, like_count, comment_count, published_at";
 
     // Channels confidently labeled with the topic are in. Channels that only mention it (in their
     // name, description, or a video title) are in only when their recent uploads are about it:
     // one "crime" video doesn't make a science channel a crime channel.
     const channelRepo = new ChannelRepository(this.db);
-    const trusted = new Set(await channelRepo.findChannelIdsByNiche(topic));
-    const byText = unwrap(
-      await this.db.from("channels").select("id").or(`title.ilike."*${term}*",description.ilike."*${term}*",keywords.cs.{"${term}"}`).limit(300),
-      "niches.topicChannels",
-    ).map((c) => c.id);
-    const byTitle = unwrap(
-      await this.db.from("videos").select("channel_id").ilike("title", `%${term}%`).gte("published_at", since.toISOString()).order("view_count", { ascending: false }).limit(1_000),
-      "niches.channelsByVideoTitle",
-    ).map((v) => v.channel_id);
-    const weak = [...new Set([...byText, ...byTitle])].filter((id) => !trusted.has(id)).slice(0, 400);
-    const focused = await channelRepo.filterAboutTopic(weak, [topic]);
+    const trusted = new Set<string>();
+    const mentions: string[] = [];
+    for (const t of topics) {
+      const term = escapePattern(t);
+      for (const id of await channelRepo.findChannelIdsByNiche(t)) trusted.add(id);
+      const byText = unwrap(
+        await this.db.from("channels").select("id").or(`title.ilike."*${term}*",description.ilike."*${term}*",keywords.cs.{"${term}"}`).limit(300),
+        "niches.topicChannels",
+      ).map((c) => c.id);
+      const byTitle = unwrap(
+        await this.db.from("videos").select("channel_id").ilike("title", `%${term}%`).gte("published_at", since.toISOString()).order("view_count", { ascending: false }).limit(1_000),
+        "niches.channelsByVideoTitle",
+      ).map((v) => v.channel_id);
+      mentions.push(...byText, ...byTitle);
+    }
+    const weak = [...new Set(mentions)].filter((id) => !trusted.has(id)).slice(0, 400);
+    const focused = await channelRepo.filterAboutTopic(weak, topics);
     const matchingChannels = [...trusted, ...weak.filter((id) => focused.has(id))].slice(0, 400);
     // Chunked: hundreds of channel ids overflow the request URL.
     const pages = [];

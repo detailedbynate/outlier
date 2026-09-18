@@ -287,6 +287,7 @@ export function getServices(): Services {
         credits,
         storage,
         enqueue,
+        ai: text,
       },
       { dailyYoutubeRefreshes: config.NICHE_DAILY_YOUTUBE_REFRESHES, language: quality.language, regionCode },
     ),
