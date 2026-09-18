@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/page-header";
 import { requireApprovedUser } from "@/lib/auth/session";
 import { EMPTY_DRAFT, type OnboardingDraft } from "@/lib/onboarding/flow";
 import { getServices } from "@/lib/services";
+import { ChangePasswordForm } from "./password-form";
 import { PreferencesForm } from "./preferences-form";
 
 export const dynamic = "force-dynamic";
@@ -25,8 +26,9 @@ export default async function PreferencesPage() {
 
   return (
     <div className="research-page">
-      <PageHeader icon={SlidersIcon} title="Preferences" subtitle="What you research, the formats you make, and who you follow." />
+      <PageHeader icon={SlidersIcon} title="Preferences" subtitle="What you research, the formats you make, who you follow, and your password." />
       <PreferencesForm initial={initial} />
+      <ChangePasswordForm />
     </div>
   );
 }

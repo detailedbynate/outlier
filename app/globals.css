@@ -2116,6 +2116,36 @@ tr:last-child td {
   border: 1px solid var(--border);
 }
 
+.password-section {
+  max-width: 880px;
+  margin-top: 16px;
+}
+
+.password-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.password-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+}
+
+.password-actions p {
+  margin: 0;
+}
+
+@media (max-width: 700px) {
+  .password-form {
+    grid-template-columns: 1fr;
+  }
+}
+
 .prefs-saved {
   color: #34d399;
   font-weight: 600;
