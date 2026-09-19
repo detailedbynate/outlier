@@ -30,6 +30,8 @@ type WebDuration = "all" | "under_three_mins" | "three_to_twenty_mins" | "over_t
 
 /** Result pages followed for one search (each is a free page read, but not free time). */
 const MAX_SEARCH_PAGES = 3;
+/** How much longer a follow-up page may wait for its slot than the first page did. */
+const CONTINUATION_WAIT_FACTOR = 3;
 
 /**
  * Orders the web search can express. It has no date, title, or videoCount sort,
@@ -107,8 +109,8 @@ export class InnerTubeSearch {
     const cacheKey = `search:${type}:${prioritize}:${uploadDate}:${duration}:${params.q.toLowerCase()}`;
 
     const parse = params.type === "video" ? videoResults : channelResults;
-    const run = <T>(label: string, fn: () => Promise<T>, key?: string) =>
-      this.gate.run({ label, cacheKey: key, lane: options.lane, maxWaitMs: options.maxWaitMs }, fn);
+    const run = <T>(label: string, fn: () => Promise<T>, key?: string, maxWaitMs = options.maxWaitMs) =>
+      this.gate.run({ label, cacheKey: key, lane: options.lane, maxWaitMs }, fn);
 
     let response = await run(`search:${params.q.slice(0, 40)}`, async () => {
       const yt = await this.yt();
@@ -124,10 +126,19 @@ export class InnerTubeSearch {
 
     const results = parse(response);
     // A page holds about 20 results; follow continuations only if the caller wants more.
+    // Later pages may wait a little longer than the first, since results are already in hand.
+    const pageWait = options.maxWaitMs === undefined ? undefined : options.maxWaitMs * CONTINUATION_WAIT_FACTOR;
     for (let page = 1; results.length < limit && page < MAX_SEARCH_PAGES; page += 1) {
       if (!response.has_continuation) break;
       const previous = response;
-      response = await run(`search:${params.q.slice(0, 40)}:p${page + 1}`, () => previous.getContinuation(), `${cacheKey}:p${page + 1}`);
+      try {
+        response = await run(`search:${params.q.slice(0, 40)}:p${page + 1}`, () => previous.getContinuation(), `${cacheKey}:p${page + 1}`, pageWait);
+      } catch {
+        // Whatever stopped the next page (busy, a pause, a parse error) doesn't
+        // invalidate the results we already have: fewer results beats a 100-unit
+        // API search, and an empty first page still falls back.
+        break;
+      }
       const seen = new Set(results.map((r) => r.id));
       for (const result of parse(response)) if (!seen.has(result.id)) results.push(result);
     }

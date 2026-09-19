@@ -66,8 +66,12 @@ const serverEnvSchema = z.object({
   INNERTUBE_CACHE_TTL_SECONDS: z.coerce.number().int().min(0).max(86_400).default(1_800),
   /** Uploads read per channel. */
   INNERTUBE_MAX_VIDEOS: z.coerce.number().int().min(5).max(50).default(30),
-  /** Interactive reads per minute, on top of the background rate: someone is waiting on these. */
-  INNERTUBE_USER_REQUESTS_PER_MINUTE: z.coerce.number().min(1).max(240).default(12),
+  /**
+   * Interactive reads per minute, on top of the background rate: someone is waiting
+   * on these. One search can read up to three result pages, so this is a few times
+   * the number of searches per minute it supports.
+   */
+  INNERTUBE_USER_REQUESTS_PER_MINUTE: z.coerce.number().min(1).max(240).default(30),
   /** How long an interactive read waits for a slot before falling back to the API. */
   INNERTUBE_USER_MAX_WAIT_MS: z.coerce.number().int().min(0).max(30_000).default(2_000),
   /** Run searches on YouTube's web endpoints (free) instead of search.list (100 units). */

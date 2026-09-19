@@ -127,11 +127,13 @@ come from there: `searchVideos`/`searchChannels` still hydrate through
 exact numbers. A discovery run went from ~101 units to ~1.
 
 Interactive reads use the gate's **user lane** — their own allowance
-(`INNERTUBE_USER_REQUESTS_PER_MINUTE`, 12/min) on top of the scraper's pace, served
+(`INNERTUBE_USER_REQUESTS_PER_MINUTE`, 30/min) on top of the scraper's pace, served
 ahead of queued background reads, and refused after
 `INNERTUBE_USER_MAX_WAIT_MS` (2s) rather than making anyone wait. A refusal, a
 failure, an empty result, or an open breaker all fall back to the API in the same
-request.
+request. Follow-up result pages may wait three times as long, and if one is
+refused the search returns the results already in hand instead of paying 100
+units for the same thing.
 
 These stay on the API deliberately, because the web search can't express them
 faithfully: paging by token, searches inside one channel, playlist searches, the

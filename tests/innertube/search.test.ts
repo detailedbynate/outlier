@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { InnerTubeBlockedError, InnerTubeBusyError, InnerTubeGate } from "@/lib/innertube/gate";
-import { durationFilter, SCRAPEABLE_ORDERS, uploadDateBucket, type InnerTubeSearch } from "@/lib/innertube/search";
+import { durationFilter, InnerTubeSearch, SCRAPEABLE_ORDERS, uploadDateBucket } from "@/lib/innertube/search";
 import { SearchFirstYouTubeService } from "@/lib/youtube/search-first";
 import type { YouTubeClient } from "@/lib/youtube/client";
 import type { Page, YouTubeSearchResult } from "@/types/youtube";
@@ -126,6 +126,52 @@ describe("SearchFirstYouTubeService", () => {
     await expect(service.search({ q: "", type: "video" })).rejects.toThrow(/Invalid search parameters/);
     expect(client.get).not.toHaveBeenCalled();
     expect(scraped.search).not.toHaveBeenCalled();
+  });
+});
+
+describe("InnerTubeSearch paging", () => {
+  /** A fake InnerTube whose first page has a continuation, mimicking a real result page. */
+  function fakeYouTube(pages: number, onContinuation?: () => never) {
+    let page = 0;
+    const build = (): unknown => {
+      page += 1;
+      const results = Array.from({ length: 20 }, (_, i) => ({ type: "Video", video_id: `v${page}${String(i).padStart(9, "0")}`, title: `Result ${page}.${i}` }));
+      return {
+        results,
+        has_continuation: page < pages,
+        getContinuation: async () => {
+          onContinuation?.();
+          return build();
+        },
+      };
+    };
+    return { search: async () => build() };
+  }
+
+  const searchWith = (yt: unknown) => {
+    const search = new InnerTubeSearch(new InnerTubeGate({ requestsPerMinute: 6_000, userRequestsPerMinute: 6_000 }));
+    // The session is created lazily; stand in for it.
+    (search as unknown as { client: Promise<unknown> }).client = Promise.resolve(yt);
+    return search;
+  };
+
+  it("follows continuations to fill the requested count", async () => {
+    const results = await searchWith(fakeYouTube(3)).search({ q: "cars", type: "video", maxResults: 50 });
+    expect(results).toHaveLength(50);
+  });
+
+  it("stops at one page when that is enough", async () => {
+    const results = await searchWith(fakeYouTube(3)).search({ q: "cars", type: "video", maxResults: 10 });
+    expect(results).toHaveLength(10);
+  });
+
+  it("keeps the results it has when a follow-up page is refused", async () => {
+    const yt = fakeYouTube(3, () => {
+      throw new InnerTubeBusyError(9_000);
+    });
+    // The whole search used to be thrown away here, and the caller paid 100 units for it.
+    const results = await searchWith(yt).search({ q: "cars", type: "video", maxResults: 50 }, { lane: "user", maxWaitMs: 100 });
+    expect(results).toHaveLength(20);
   });
 });
 
