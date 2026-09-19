@@ -160,7 +160,8 @@ describe("breakouts, patterns, opportunities, alerts", () => {
 
   it("identifies topics and formats that outperform, from real uploads", () => {
     const working = whatsWorking(competitorSet(), NOW);
-    const topic = working.topics.find((t) => t.label.includes("minecraft") || t.label.includes("speedrun"));
+    // Mined topics are shown under their proper name now ("Minecraft", not "minecraft").
+    const topic = working.topics.find((t) => /minecraft|speedrun/i.test(t.label));
     expect(topic).toBeDefined();
     expect(topic!.channels).toBe(2);
     expect(topic!.lift!).toBeGreaterThan(1);
@@ -172,7 +173,7 @@ describe("breakouts, patterns, opportunities, alerts", () => {
     const you = channelProfile(channel("you"), [1, 2, 3, 4, 5].map((i) => video("you", { title: `Cooking ${i}`, format: "long_form", duration_seconds: 600, published_at: hoursAgo(24 * i) })), [], NOW);
     const opps = findOpportunities(you, profiles, NOW);
     const gap = opps.find((o) => o.kind === "topic_gap");
-    expect(gap?.detail).toMatch(/2 competitors posted 3 videos about “(minecraft|speedrun|minecraft speedrun)” in the last 30 days, averaging 60K views/);
+    expect(gap?.detail).toMatch(/2 competitors posted 3 videos about “(Minecraft|Speedrun|Minecraft Speedrun)” in the last 30 days, averaging 60K views/i);
     expect(opps.some((o) => o.title === "Shorts opportunity")).toBe(true);
     expect(findOpportunities(null, [], NOW)).toEqual([]);
   });

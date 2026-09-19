@@ -58,6 +58,7 @@ export const NICHE_DICTIONARY: DictionaryEntry[] = [
   game("Clash Royale", ["clashroyale", "clash royal"]),
   game("Clash of Clans", ["clashofclans", "coc"]),
   game("Brawl Stars", ["brawlstars"]),
+  game("The Battle Cats", ["battle cats", "thebattlecats", "battlecats"]),
   game("My Singing Monsters", ["msm", "mysingingmonsters", "singing monsters", "wubbox"]),
   game("Subway Surfers", ["subwaysurfers"]),
   game("Geometry Dash", ["geometrydash", "gd"]),

@@ -1,5 +1,6 @@
 import { NICHE_DICTIONARY } from "./dictionary";
 import { creatorsFor, examplesFor, type NicheCreator, type NicheExample } from "./examples";
+import { canonicalNiche, displayNicheName, isUsefulNiche, nicheKey, normalizeName } from "./naming";
 
 /**
  * Niche analysis from stored videos and channels. Pure functions, no I/O:
@@ -90,11 +91,17 @@ const STOPWORDS = new Set(
 
 /** Lowercase, trimmed, single-spaced key (also the cache key). */
 export function topicKey(topic: string): string {
-  return topic.toLowerCase().replace(/[^a-z0-9 &'+.-]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
+  return topic
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase().replace(/[^a-z0-9 &'+.-]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
 }
 
 export function tokenize(text: string): string[] {
   return text
+    // Accents fold into their base letter first; splitting on them turned "Pokémon" into "pok" and "mon".
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
     .toLowerCase()
     .replace(/#/g, " ")
     .split(/[^a-z0-9']+/)
@@ -125,20 +132,19 @@ export function topicAliases(topic: string): string[] {
   return [...new Set([entry.name, ...entry.aliases].map(normalizeName).filter((a) => a && a !== key))];
 }
 
-const normalizeName = (value: string) =>
-  value
-    .normalize("NFKD")
-    .replace(/[^\x00-\x7F]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
 
 /**
  * Sub-niches that actually appear in the data: terms shared by several videos
  * from several channels, excluding the topic itself. Overlapping terms are
  * collapsed (e.g. "minecraft" beats "minecraft build").
  */
-export function discoverSubNiches(videos: readonly NicheVideo[], topic: string, max = 8): { term: string; videoIds: Set<string> }[] {
+export function discoverSubNiches(
+  videos: readonly NicheVideo[],
+  topic: string,
+  max = 8,
+  /** Niche labels for the channels in the sample: terms already known to be niches. */
+  labeled: ReadonlySet<string> = new Set(),
+): { term: string; videoIds: Set<string> }[] {
   const topicWords = topic.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
   // "msm" is just My Singing Monsters again, not a niche inside it.
   const aliasWords = topicAliases(topic).flatMap((alias) => [...alias.split(" "), alias.replace(/ /g, "")]);
@@ -157,19 +163,30 @@ export function discoverSubNiches(videos: readonly NicheVideo[], topic: string, 
   }
 
   const minVideos = Math.max(3, Math.ceil(videos.length * 0.02));
+  const titlesById = new Map(videos.map((v) => [v.id, v.title]));
   const candidates = [...byTerm.entries()]
     .filter(([term, e]) => e.videos.size >= minVideos && e.channels.size >= 2 && !isTopicVariant(term))
     // A term dominating the whole sample is a synonym of the topic, not a sub-niche.
     .filter(([, e]) => e.videos.size <= videos.length * 0.8)
+    // "update" and "lore" are what these uploads say, not what they are about.
+    .filter(([term, e]) => isUsefulNiche(term, { labeled, titles: [...e.videos].map((id) => titlesById.get(id) ?? "") }))
     .map(([term, e]) => ({ term, videoIds: e.videos, score: e.videos.size * Math.log2(1 + e.channels.size) }))
     .sort((a, b) => b.score - a.score || a.term.localeCompare(b.term));
 
   const chosen: { term: string; videoIds: Set<string> }[] = [];
+  const takenNames = new Set<string>();
+  // "arthur morgan" reads better than "arthurmorgan": when both were mined, keep the spaced one.
+  const spaced = new Set(candidates.filter((c) => c.term.includes(" ")).map((c) => nicheKey(c.term)));
   for (const candidate of candidates) {
+    if (!candidate.term.includes(" ") && spaced.has(nicheKey(candidate.term)) && !canonicalNiche(candidate.term)) continue;
     if (chosen.length >= max) break;
     const words = new Set(candidate.term.split(" "));
-    if (chosen.some((c) => c.term.split(" ").some((w) => words.has(w)))) continue;
-    chosen.push({ term: candidate.term, videoIds: candidate.videoIds });
+    if (chosen.some((c) => normalizeName(c.term).split(" ").some((w) => words.has(w)))) continue;
+    // "rdr2" and "red dead" are one niche under one name, so only the first of them shows.
+    const name = displayNicheName(candidate.term);
+    if (takenNames.has(nicheKey(name))) continue;
+    takenNames.add(nicheKey(name));
+    chosen.push({ term: name, videoIds: candidate.videoIds });
   }
   return chosen;
 }
@@ -297,7 +314,9 @@ export interface NicheReport {
 /** Full report: the topic overall plus discovered sub-niches, best opportunities first. */
 export function buildNicheReport(topic: string, videos: readonly NicheVideo[], channels: ReadonlyMap<string, NicheChannel>, now: Date = new Date()): NicheReport {
   const byId = new Map(videos.map((v) => [v.id, v]));
-  const subNiches = discoverSubNiches(videos, topic)
+  // What the labeler already decided these channels are about beats anything mined from titles.
+  const labeled = new Set([...channels.values()].flatMap((c) => c.niche_terms ?? []));
+  const subNiches = discoverSubNiches(videos, topic, 8, labeled)
     .map(({ term, videoIds }) => {
       const subVideos = [...videoIds].map((id) => byId.get(id)!);
       return {

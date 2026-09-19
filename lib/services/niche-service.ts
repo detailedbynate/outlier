@@ -8,6 +8,7 @@ import type { UsageRepository } from "@/lib/database/repositories/usage";
 import { videoToRow, type VideoRepository } from "@/lib/database/repositories/videos";
 import type { EnqueueOptions } from "@/lib/jobs/queue";
 import { buildNicheReport, tokenize, topicKey, type Level, type NicheReport } from "@/lib/niches/analysis";
+import { canonicalNiche } from "@/lib/niches/naming";
 import { findUnderratedNiches, underratedWindow, type NicheCreator, type NicheExample } from "@/lib/niches/underrated";
 import { isQuotaUnavailable } from "@/lib/youtube/quota-manager";
 import type { YouTubeService } from "@/lib/youtube/service";
@@ -247,8 +248,25 @@ export class NicheService {
       .slice(0, limit);
   }
 
-  popularTopics(limit = 8) {
-    return this.deps.niches.popularTopics(limit).catch(() => []);
+  /**
+   * Topics to suggest on the Niche Finder. These come from what people searched
+   * for, so only searches that resolve to a niche the dictionary knows are shown:
+   * whatever someone typed into the box is never offered back to everybody, and
+   * the chips stay useful rather than being a search log.
+   */
+  async popularTopics(limit = 8): Promise<{ topic: string; search_count: number }[]> {
+    // Ask for extra rows: most searches won't be recognizable niches.
+    const rows = await this.deps.niches.popularTopics(limit * 6).catch(() => []);
+    const seen = new Set<string>();
+    const suggestions: { topic: string; search_count: number }[] = [];
+    for (const row of rows) {
+      const name = canonicalNiche(row.topic);
+      if (!name || seen.has(name)) continue;
+      seen.add(name);
+      suggestions.push({ ...row, topic: name });
+      if (suggestions.length >= limit) break;
+    }
+    return suggestions;
   }
 
   research(topic: string, options: { userId: string | null; now?: Date } = { userId: null }): Promise<NicheResult> {

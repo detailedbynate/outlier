@@ -6,6 +6,7 @@
 
 import { computeNicheMetrics, tokenize, type NicheChannel, type NicheMetrics, type NicheVideo } from "./analysis";
 import { creatorsFor, examplesFor, type NicheCreator, type NicheExample } from "./examples";
+import { canonicalNiche, displayNicheName, isUsefulNiche, nicheKey, normalizeName } from "./naming";
 
 export type { NicheCreator, NicheExample } from "./examples";
 
@@ -77,25 +78,6 @@ function reasonFor(metrics: NicheMetrics, smallShare: number): string {
   return `${Math.round(metrics.medianViewsPerDay).toLocaleString("en-US")} views a day per upload, with room to grow`;
 }
 
-/** "barbarian" is a niche, "stopped" and "insane" are not. */
-function looksLikeNiche(term: string): boolean {
-  const words = term.split(" ");
-  if (words.some((word) => BROAD_WORDS.has(word))) return false;
-  // A single short word is usually filler, and verbs aren't topics.
-  if (words.length === 1 && words[0]!.length < 4) return false;
-  return !words.every((word) => /(?:ed|ing)$/.test(word));
-}
-
-/** Words that describe half of YouTube, so they can never be the niche itself. */
-const BROAD_WORDS = new Set(
-  (
-    "comedy funny meme memes real fake tips hacks diy craft crafts life hack asmr edit edits clips clip moment moments compilation reaction reactions " +
-    "story storytime update news review reviews guide tutorial how tips tricks facts fact top best worst insane crazy amazing satisfying oddly " +
-    "money rich poor kids family friends school work home food drink music song songs dance art drawing paint build building " +
-    "process idea ideas thing things stuff part parts level levels mode collab collabs version episode series content creator creators"
-  ).split(" "),
-);
-
 /**
  * Mine every term in the sample, keep the ones a newcomer could break into, and
  * rank by how much demand goes to small channels.
@@ -138,7 +120,8 @@ export function findUnderratedNiches(
     if (focused < minFocusedChannels) continue;
     // Words like "funny" or "tips" show up everywhere; a niche is narrower than that.
     if (entry.videos.length > videos.length * maxLibraryShare) continue;
-    if (!labeled.has(term) && !looksLikeNiche(term)) continue;
+    // Show niches, not title words: known names and labels pass, a bare word has to read like a name.
+    if (!isUsefulNiche(term, { labeled, titles: entry.videos.map((v) => v.title) })) continue;
 
     const metrics = computeNicheMetrics(entry.videos, channels, now);
     if (metrics.medianViewsPerDay < minViewsPerDay) continue;
@@ -175,11 +158,19 @@ export function findUnderratedNiches(
   // "clash royale" says more than "clash", so a two-word niche wins ties with its own words.
   const specificity = (niche: UnderratedNiche) => niche.score + (labeled.has(niche.term) ? 8 : 0) + (niche.term.includes(" ") ? 4 : 0);
   const chosen: UnderratedNiche[] = [];
+  const takenNames = new Set<string>();
+  // "arthur morgan" reads better than "arthurmorgan": when both were mined, keep the spaced one.
+  const spaced = new Set(candidates.filter((c) => c.term.includes(" ")).map((c) => nicheKey(c.term)));
   for (const candidate of candidates.sort((a, b) => specificity(b) - specificity(a) || a.term.localeCompare(b.term))) {
+    if (!candidate.term.includes(" ") && spaced.has(nicheKey(candidate.term)) && !canonicalNiche(candidate.term)) continue;
     if (chosen.length >= max) break;
-    const words = new Set(candidate.term.split(" "));
-    if (chosen.some((c) => c.term.split(" ").some((word) => words.has(word)))) continue;
-    chosen.push(candidate);
+    const words = new Set(normalizeName(candidate.term).split(" "));
+    if (chosen.some((c) => normalizeName(c.term).split(" ").some((word) => words.has(word)))) continue;
+    // "rdr2" and "red dead" are the same niche: show it once, under its proper name.
+    const name = displayNicheName(candidate.term);
+    if (takenNames.has(nicheKey(name))) continue;
+    takenNames.add(nicheKey(name));
+    chosen.push({ ...candidate, term: name });
   }
   return chosen;
 }

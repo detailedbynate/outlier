@@ -49,11 +49,12 @@ describe("findUnderratedNiches", () => {
     const { videos, channels } = library();
     const found = findUnderratedNiches(videos, channels, { now: NOW, minVideos: 6, minChannels: 3, maxLibraryShare: 0.6 });
 
-    const terms = found.map((n) => n.term);
+    // Terms come back under a display name ("Kite Surfing"), so compare case-insensitively.
+    const terms = found.map((n) => n.term.toLowerCase());
     expect(terms.some((t) => t.includes("kite"))).toBe(true);
     expect(terms.some((t) => t.includes("talk") || t.includes("night"))).toBe(false);
 
-    const kite = found.find((n) => n.term.includes("kite"))!;
+    const kite = found.find((n) => n.term.toLowerCase().includes("kite"))!;
     expect(kite.smallChannelViewShare).toBe(1);
     expect(kite.score).toBeGreaterThan(40);
     expect(kite.reason).toContain("Small channels");
@@ -67,8 +68,8 @@ describe("findUnderratedNiches", () => {
       ...["small-1", "small-2", "small-3", "small-4"].map((id, i) => video(`say-${id}`, id, `honestly the wind was wild ${i}`, 130_000, 6)),
     ];
     const found = findUnderratedNiches(sprinkled, channels, { now: NOW, minVideos: 4, minChannels: 4, maxLibraryShare: 0.6 });
-    expect(found.map((n) => n.term)).not.toContain("honestly");
-    expect(found.some((n) => n.term.includes("kite"))).toBe(true);
+    expect(found.map((n) => n.term.toLowerCase())).not.toContain("honestly");
+    expect(found.some((n) => n.term.toLowerCase().includes("kite"))).toBe(true);
   });
 
   it("uses niche labels even when the titles never name the niche", () => {
@@ -83,7 +84,8 @@ describe("findUnderratedNiches", () => {
       Array.from({ length: 3 }, (_, n) => video(`gd-${id}-${n}`, id, `this took me ${i}${n} hours`, 90_000 + n * 2_000, 4 + n)),
     );
     const found = findUnderratedNiches(videos, channels, { now: NOW, maxLibraryShare: 1 });
-    expect(found[0]?.term).toBe("geometry dash");
+    // The label is shown under the dictionary's spelling of the game.
+    expect(found[0]?.term).toBe("Geometry Dash");
   });
 
   it("ignores niches with too little behind them", () => {

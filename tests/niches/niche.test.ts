@@ -51,15 +51,16 @@ describe("niche analysis", () => {
     expect(topicKey("  Personal   FINANCE!! ")).toBe("personal finance");
   });
 
-  it("discovers sub-niches shared across channels, without the topic word or noise", () => {
+  it("discovers sub-niches shared across channels, named properly, without the topic word or noise", () => {
     const subs = discoverSubNiches(gamingSample(), "gaming").map((s) => s.term);
-    expect(subs).toContain("minecraft");
-    expect(subs).toContain("roblox");
-    expect(subs).not.toContain("gaming");
-    expect(subs).not.toContain("part");
-    expect(subs.some((t) => t.startsWith("game"))).toBe(false);
+    // Mined terms are shown under the name the dictionary knows them by.
+    expect(subs).toContain("Minecraft");
+    expect(subs).toContain("Roblox");
+    expect(subs).not.toContain("Gaming");
+    expect(subs).not.toContain("Part");
+    expect(subs.some((t) => t.toLowerCase().startsWith("game"))).toBe(false);
     // Overlapping terms collapse into one sub-niche.
-    expect(subs.filter((t) => t.includes("minecraft"))).toHaveLength(1);
+    expect(subs.filter((t) => t.toLowerCase().includes("minecraft"))).toHaveLength(1);
   });
 
   it("ignores joined and stemmed forms of the topic", () => {
@@ -67,7 +68,7 @@ describe("niche analysis", () => {
       video({ channel: ch, title: "clashroyale emotes deck" }),
       video({ channel: ch, title: "Clash Royale ladder push tips" }),
     ]);
-    const subs = discoverSubNiches(rows, "clash royale").map((s) => s.term);
+    const subs = discoverSubNiches(rows, "clash royale").map((s) => s.term.toLowerCase());
     expect(subs).not.toContain("clashroyale");
     expect(subs.some((t) => t.includes("emotes"))).toBe(true);
   });
@@ -286,7 +287,7 @@ describe("sub-niches and topic aliases", () => {
       published_at: new Date(Date.UTC(2026, 8, 1 + i)).toISOString(),
       outlier_score: null,
     }));
-    const terms = discoverSubNiches(videos, "my singing monsters").map((s) => s.term);
+    const terms = discoverSubNiches(videos, "my singing monsters").map((s) => s.term.toLowerCase());
     expect(terms).not.toContain("msm");
     expect(terms.join(" ")).toMatch(/wubbox|island|breeding/);
   });
