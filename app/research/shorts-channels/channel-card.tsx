@@ -7,14 +7,13 @@ import {
   ExternalIcon,
   EyeIcon,
   FilmIcon,
-  FlameIcon,
   MoreIcon,
   PlayCircleIcon,
   TrendingIcon,
   UsersIcon,
   ZapIcon,
 } from "@/components/icons";
-import { formatCompact, formatMultiplier, formatPercent, hoursSince, timeAgo } from "@/lib/format";
+import { formatCompact, formatMultiplier, hoursSince, timeAgo } from "@/lib/format";
 import type { ShortsChannelWithPreviews } from "@/lib/services/research-service";
 import { setChannelTracked } from "./actions";
 
@@ -106,54 +105,45 @@ export function ChannelCard({
         </div>
       </header>
 
-      <div className={`growth-row ${highlightGrowth ? "is-highlighted" : ""}`}>
-        <span className="growth-label">
-          <ZapIcon size={13} />
-          Realtime
-        </span>
-        <VphStat live={numberOrNull(channel.live_vph)} recent={numberOrNull(channel.recent_vph)} />
-        {channel.views_24h === null && channel.views_48h === null ? (
-          <span className="muted">24h/48h growth appears after ~24 hours of snapshots</span>
-        ) : (
-          <>
-            <GrowthStat label="views 24h" value={channel.views_24h} />
-            <GrowthStat label="views 48h" value={channel.views_48h} />
-            <GrowthStat label="subs 24h" value={channel.hidden_subscriber_count ? null : channel.subs_24h} />
-            <GrowthStat label="subs 48h" value={channel.hidden_subscriber_count ? null : channel.subs_48h} />
-          </>
-        )}
+      <div className={`growth-panel ${highlightGrowth ? "is-highlighted" : ""}`}>
+        <div className="growth-panel-head">
+          <span className="growth-label">
+            <ZapIcon size={14} />
+            Realtime
+          </span>
+          {channel.views_24h === null && channel.views_48h === null ? (
+            <span className="growth-note">24h/48h growth appears after ~24 hours of snapshots</span>
+          ) : null}
+        </div>
+        <div className="growth-tiles">
+          <VphStat live={numberOrNull(channel.live_vph)} recent={numberOrNull(channel.recent_vph)} />
+          {channel.views_24h === null && channel.views_48h === null ? null : (
+            <>
+              <GrowthStat label="views 24h" value={channel.views_24h} />
+              <GrowthStat label="views 48h" value={channel.views_48h} />
+              <GrowthStat label="subs 24h" value={channel.hidden_subscriber_count ? null : channel.subs_24h} />
+              <GrowthStat label="subs 48h" value={channel.hidden_subscriber_count ? null : channel.subs_48h} />
+            </>
+          )}
+        </div>
       </div>
 
-      <div className="channel-stats-row">
-        <ZapIcon size={14} className="accent-icon" />
-        <span>
-          <strong>{channel.shorts_last_30d}</strong> Shorts in 30 days
+      <div className="channel-facts">
+        <span title="Shorts posted in the last 30 days">
+          <strong>{channel.shorts_last_30d}</strong> Shorts/30d
         </span>
-        <span className="dot-sep">Median {formatCompact(channel.median_short_views)}</span>
-        <span className="dot-sep">Top Short {formatCompact(channel.top_short_views)}</span>
-        <span className="dot-sep">{formatPercent(channel.shorts_share, 0)} Shorts</span>
-        <span className="stats-right muted">Last Short {timeAgo(channel.last_short_at)}</span>
-      </div>
-
-      <div className="signal-row">
-        <FlameIcon size={14} className="accent-icon" />
-        <span className={topMultiplier !== null && topMultiplier >= 2.5 ? "signal-hot" : undefined} title="Top Short's views ÷ the channel's median Short">
+        <span className="dot-sep" title="Median views of recent Shorts">
+          <strong>{formatCompact(channel.median_short_views)}</strong> median
+        </span>
+        <span
+          className={`dot-sep ${topMultiplier !== null && topMultiplier >= 2.5 ? "signal-hot" : ""}`}
+          title={`Top Short's views (${formatCompact(channel.top_short_views)}) ÷ the channel's median Short`}
+        >
           <strong>{formatMultiplier(topMultiplier)}</strong> top Short
         </span>
-        <span className="dot-sep" title="Share of recent Shorts with at least 2× the median views">
-          <strong>{formatPercent(numberOrNull(channel.hit_rate), 0)}</strong> hit rate
+        <span className="facts-right muted" title="The rest of this channel's numbers are on its details page">
+          Last Short {timeAgo(channel.last_short_at)}
         </span>
-        <span className="dot-sep" title="(Likes + comments) ÷ views, recent Shorts">
-          <strong>{formatPercent(numberOrNull(channel.avg_engagement))}</strong> engagement
-        </span>
-        <span className="dot-sep" title="Shorts posted per week, last 4 weeks">
-          <strong>{numberOrNull(channel.shorts_per_week) ?? "—"}</strong> / week
-        </span>
-        {channel.views_per_sub !== null && !channel.hidden_subscriber_count ? (
-          <span className="dot-sep" title="Average Short views ÷ subscribers">
-            <strong>{formatMultiplier(numberOrNull(channel.views_per_sub))}</strong> views/sub
-          </span>
-        ) : null}
       </div>
 
       {showVideos && channel.recentShorts.length > 0 ? (
@@ -201,11 +191,12 @@ function VphStat({ live, recent }: { live: number | null; recent: number | null 
   const value = live ?? recent;
   return (
     <span
-      className="growth-stat vph-stat"
+      className="growth-tile"
       data-direction={value ? "up" : "flat"}
       title={live !== null ? "Current views per hour across recently checked Shorts" : "Average views per hour since upload, Shorts from the last 7 days"}
     >
-      <strong>{value === null ? "—" : formatCompact(Math.round(value))}</strong> views/hr{live === null && recent !== null ? " (7d avg)" : ""}
+      <strong>{value === null ? "—" : formatCompact(Math.round(value))}</strong>
+      <span className="growth-tile-label">views/hr{live === null && recent !== null ? " · 7d avg" : ""}</span>
     </span>
   );
 }
@@ -229,19 +220,20 @@ function ShortMultiplier({ views, median }: { views: number | null; median: numb
 function GrowthStat({ label, value }: { label: string; value: number | null }) {
   if (value === null) {
     return (
-      <span className="growth-stat">
-        <strong className="muted">—</strong> {label}
+      <span className="growth-tile">
+        <strong className="muted">—</strong>
+        <span className="growth-tile-label">{label}</span>
       </span>
     );
   }
   const direction = value > 0 ? "up" : value < 0 ? "down" : "flat";
   return (
-    <span className="growth-stat" data-direction={direction}>
+    <span className="growth-tile" data-direction={direction}>
       <strong>
         {value > 0 ? "+" : value < 0 ? "−" : ""}
         {formatCompact(Math.abs(value))}
-      </strong>{" "}
-      {label}
+      </strong>
+      <span className="growth-tile-label">{label}</span>
     </span>
   );
 }
