@@ -121,6 +121,7 @@ export interface RunOptions {
 export class InnerTubeGate {
   private readonly options: InnerTubeGateOptions;
 
+
   private readonly log: Logger;
 
   private readonly now: () => number;
@@ -165,6 +166,17 @@ export class InnerTubeGate {
       queued: this.queue.length,
       running: this.running,
     };
+  }
+
+  /** Requests per minute the gate is currently pacing to. */
+  get requestsPerMinute(): number {
+    return this.options.requestsPerMinute;
+  }
+
+  /** Change the global rate. Requests already waiting keep the gap they were given. */
+  setRequestsPerMinute(perMinute: number): void {
+    if (!(perMinute > 0)) throw new Error(`requestsPerMinute must be positive, got ${perMinute}`);
+    this.options.requestsPerMinute = perMinute;
   }
 
   takeStats(): GateStats {

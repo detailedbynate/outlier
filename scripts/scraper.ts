@@ -9,10 +9,14 @@
  * read fails it uses the API for that channel; if YouTube shows a bot check it
  * pauses and the worker's API refresh covers everything until it resumes.
  *
- * Speed, retries, caching, and the circuit breaker all belong to the shared
- * InnerTube gate (INNERTUBE_* settings, see .env.example); this script only
- * decides which channels to read and when to wait. SCRAPER_BATCH sets how many
- * channels a round picks up.
+ * Retries, caching, and the circuit breaker belong to the shared InnerTube gate
+ * (INNERTUBE_* settings, see .env.example); this script decides which channels
+ * to read, when to wait, and how fast to go.
+ *
+ * Speed ramps itself: one clean day at a rate earns the next step up the ladder
+ * (INNERTUBE_RAMP_STEPS), and a bot check gives the step back and settles one
+ * rung below what YouTube refused. INNERTUBE_RAMP_STEPS=4 alone pins the rate.
+ * SCRAPER_BATCH sets how many channels a round picks up.
  */
 import { logger } from "@/lib/core/logger";
 
@@ -57,6 +61,7 @@ async function main(): Promise<void> {
   const { getServices, ChannelService } = await import("@/lib/services");
   const { runWithQuotaContext } = await import("@/lib/youtube");
   const { createHybridSource, getGate, InnerTubeBlockedError } = await import("@/lib/innertube");
+  const { clampState, decide, FileRampStore, initialState, parseSteps } = await import("@/lib/innertube/ramp");
 
   const config = env();
   getAdminDatabase();
@@ -82,7 +87,16 @@ async function main(): Promise<void> {
   };
   process.once("SIGINT", () => stop("SIGINT"));
   process.once("SIGTERM", () => stop("SIGTERM"));
-  logger.info("scraper started", { batch, perMinute: config.INNERTUBE_REQUESTS_PER_MINUTE });
+  // The ladder search survives restarts, so a deploy doesn't forget what YouTube already refused.
+  const steps = parseSteps(process.env.INNERTUBE_RAMP_STEPS, [config.INNERTUBE_REQUESTS_PER_MINUTE]);
+  const cleanHours = numberSetting("INNERTUBE_RAMP_CLEAN_HOURS", 24, 1, 168);
+  const rampStore = new FileRampStore();
+  const stored = await rampStore.read();
+  let ramp = clampState(stored ?? initialState(new Date()), steps, new Date());
+  // Save it now, so restarts don't keep resetting the clock on the current step.
+  if (!stored) await rampStore.write(ramp);
+  gate.setRequestsPerMinute(steps[ramp.step]!);
+  logger.info("scraper started", { batch, perMinute: gate.requestsPerMinute, steps, cleanHours, ceiling: ramp.ceiling });
 
   const skipUntil = new Map<string, number>();
 
@@ -127,7 +141,25 @@ async function main(): Promise<void> {
     }
 
     const state = gate.state();
-    logger.info("scraper round", { due: due.length, refreshed, reads: source.takeCounts(), gate: gate.takeStats() });
+    const stats = gate.takeStats();
+    logger.info("scraper round", { due: due.length, refreshed, reads: source.takeCounts(), gate: stats });
+
+    // Step up after a clean stretch, step down the moment YouTube pushes back.
+    const decision = decide(ramp, { blocks: stats.blocks, now: new Date(), steps, cleanHours });
+    if (decision.change) {
+      gate.setRequestsPerMinute(decision.rate);
+      await rampStore.write(decision.state);
+      const log = decision.change === "up" ? logger.info : logger.warn;
+      log("scraper ramp", {
+        change: decision.change,
+        perMinute: decision.rate,
+        step: `${decision.state.step + 1}/${steps.length}`,
+        ceiling: decision.state.ceiling,
+        frozen: decision.state.frozen,
+        reason: decision.reason,
+      });
+    }
+    ramp = decision.state;
 
     // While the gate is paused, don't spin: the worker's API refresh covers channels meanwhile.
     if (state.open && state.openUntil) {

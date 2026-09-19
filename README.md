@@ -99,6 +99,19 @@ per-user caps), so a fallback can be refused there and the scraper waits rather
 than digging into the users' reserve. Handle lookups, paging, per-format
 listings, and 50-channel batches stay on the API deliberately.
 
+**The rate finds its own level.** There is no published limit on these
+endpoints — only YouTube's tolerance — so the scraper walks up a ladder,
+`INNERTUBE_RAMP_STEPS` (`4,6,9,12,16,20,25` per minute). One clean
+`INNERTUBE_RAMP_CLEAN_HOURS` (24) at a rate earns the next step; a single block
+gives the step back, records the refused rate as the ceiling, and freezes the
+ladder one rung below it. The position lives in `scraper-ramp.json` under
+`INNERTUBE_STATE_DIR` (systemd's `StateDirectory`), so restarts and deploys don't
+forget what YouTube already refused. Set `INNERTUBE_RAMP_STEPS` to a single value
+to pin the rate, and delete the file to start a fresh search.
+
+Roughly, one channel costs 4 page reads, so 4/min is ~1,400 channels/day and
+25/min is ~9,000 — which is where `videos.list` becomes the binding limit again.
+
 While the breaker is open the worker's ordinary API refresh covers everything, so
 stopping the scraper changes no behaviour except quota use. Round size is
 `SCRAPER_BATCH` (20); on the server it runs as its own capped service — see
