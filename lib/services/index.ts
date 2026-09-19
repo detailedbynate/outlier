@@ -32,6 +32,7 @@ import { NicheLabelingService } from "./niche-labeling-service";
 import { qualityConfigFrom } from "@/lib/research/quality";
 import { YouTubeCacheRepository, YouTubeQuotaRepository } from "@/lib/database/repositories/youtube-quota";
 import { getQuotaManager, getYouTubeService, quotaDay, setQuotaUserLimits, type QuotaManager } from "@/lib/youtube";
+import { createHybridSource } from "@/lib/innertube";
 import { AccountService } from "./account-service";
 import { DashboardService } from "./dashboard-service";
 import { NicheService } from "./niche-service";
@@ -162,7 +163,11 @@ export function getServices(): Services {
     budgetMb: config.STORAGE_BUDGET_MB,
     planLimitMb: config.SUPABASE_PLAN_LIMIT_MB,
   });
-  const channels = new ChannelService(youtube, repositories.channels, repositories.videos, {
+  // Channel ingestion reads YouTube's web pages first (about 1 quota unit per
+  // channel instead of 3-4) and falls back to the API per channel. User-triggered
+  // work takes the gate's interactive lane; jobs queue behind the scraper.
+  const channelSource = config.INNERTUBE_INGEST_ENABLED ? lazy(() => createHybridSource()) : youtube;
+  const channels = new ChannelService(channelSource, repositories.channels, repositories.videos, {
     storage,
     snapshotVideoMaxAgeDays: config.SNAPSHOT_VIDEO_MAX_AGE_DAYS,
     language: config.OUTLIER_LANGUAGE.toLowerCase(),

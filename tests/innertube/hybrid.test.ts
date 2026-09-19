@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
+import { runWithQuotaContext } from "@/lib/youtube/quota-context";
 import { HybridYouTubeSource } from "@/lib/innertube/hybrid";
 import { InnerTubeBlockedError, InnerTubeGate } from "@/lib/innertube/gate";
-import { parseCountText, type InnerTubeSource } from "@/lib/innertube/source";
+import { InnerTubeSource, parseCountText } from "@/lib/innertube/source";
 import { NotFoundError } from "@/lib/core/errors";
 import type { YouTubeService } from "@/lib/youtube/service";
 import type { YouTubeChannel, YouTubeVideo } from "@/types/youtube";
@@ -88,6 +89,23 @@ describe("HybridYouTubeSource", () => {
     expect(source.paused).toBe(false);
     gate.trip("captcha");
     expect(source.paused).toBe(true);
+  });
+
+  it("reads a user's channel in the interactive lane, and a job's in the background one", async () => {
+    const gate = new InnerTubeGate({ requestsPerMinute: 6_000, userRequestsPerMinute: 6_000 });
+    const run = vi.spyOn(gate, "run");
+    const source = new InnerTubeSource(gate, { maxVideos: 10, userMaxWaitMs: 1_500 });
+    // Stand in for the InnerTube session: the lane is chosen before any request goes out.
+    (source as unknown as { client: Promise<unknown> }).client = Promise.resolve({
+      getChannel: async () => ({ metadata: { external_id: CHANNEL_ID, title: "Someone" }, has_about: false, has_videos: false, has_shorts: false, header: undefined }),
+    });
+
+    await runWithQuotaContext({ lane: "user", operation: "action:track_channel" }, () => source.getChannel(CHANNEL_ID));
+    expect(run.mock.calls[0]?.[0]).toMatchObject({ lane: "user", maxWaitMs: 1_500 });
+
+    await runWithQuotaContext({ lane: "background", operation: "job:channel.refresh" }, () => source.getUploads(CHANNEL_ID));
+    expect(run.mock.calls.at(-1)?.[0]).toMatchObject({ lane: "background" });
+    expect(run.mock.calls.at(-1)?.[0].maxWaitMs).toBeUndefined();
   });
 
   it("resolves handles through the API, which knows how to look them up", async () => {

@@ -20,6 +20,9 @@ export { HybridYouTubeSource } from "./hybrid";
 export function createHybridSource(options: { apiFallback?: boolean } = {}): HybridYouTubeSource {
   const config = env();
   const gate = getGate();
-  const source = new InnerTubeSource(gate, { maxVideos: config.INNERTUBE_MAX_VIDEOS });
+  const source = new InnerTubeSource(gate, {
+    maxVideos: config.INNERTUBE_MAX_VIDEOS,
+    userMaxWaitMs: config.INNERTUBE_USER_MAX_WAIT_MS,
+  });
   return new HybridYouTubeSource(source, getYouTubeService(), gate, { apiFallback: options.apiFallback ?? true });
 }

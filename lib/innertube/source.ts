@@ -1,6 +1,7 @@
 import { Innertube, Log, type YT } from "youtubei.js";
 import { NotFoundError } from "@/lib/core/errors";
 import { parseChannelKeywords } from "@/lib/youtube/parse";
+import { currentQuotaContext } from "@/lib/youtube/quota-context";
 import type { YouTubeChannel } from "@/types/youtube";
 import type { InnerTubeGate } from "./gate";
 
@@ -18,6 +19,8 @@ type YTChannel = YT.Channel;
 export interface InnerTubeSourceOptions {
   /** Uploads to read per channel (the first page of each tab holds about 30). */
   maxVideos: number;
+  /** How long a user-lane read waits for a slot before giving up (the caller then uses the API). */
+  userMaxWaitMs?: number;
 }
 
 export interface ChannelUploads {
@@ -57,6 +60,17 @@ export class InnerTubeSource {
     Log.setLevel(Log.Level.NONE);
   }
 
+  /**
+   * User-triggered work goes in the interactive lane and gives up quickly; jobs
+   * and the scraper take the background lane. The quota context already says
+   * which is which, so callers don't have to pass it.
+   */
+  private laneOptions(): { lane: "user" | "background"; maxWaitMs?: number } {
+    return currentQuotaContext().lane === "user"
+      ? { lane: "user", maxWaitMs: this.options.userMaxWaitMs }
+      : { lane: "background" };
+  }
+
   private async yt(): Promise<Innertube> {
     this.client ??= Innertube.create({ retrieve_player: false, generate_session_locally: true, lang: "en", location: "US" });
     return this.client;
@@ -67,7 +81,7 @@ export class InnerTubeSource {
    * reading channel info and uploads cost one page load, not two.
    */
   private channelPage(channelId: string): Promise<YTChannel> {
-    return this.gate.run({ label: `channel:${channelId}`, cacheKey: `channel:${channelId}` }, async () => {
+    return this.gate.run({ label: `channel:${channelId}`, cacheKey: `channel:${channelId}`, ...this.laneOptions() }, async () => {
       const yt = await this.yt();
       const channel = await yt.getChannel(channelId).catch((error: unknown) => {
         if (error instanceof Error && /does ?n[o']t exist|not found|unavailable|404/i.test(error.message)) throw new NotFoundError("YouTube channel", channelId);
@@ -84,7 +98,7 @@ export class InnerTubeSource {
     const meta = channel.metadata;
 
     const about = channel.has_about
-      ? await this.gate.run({ label: `about:${channelId}`, cacheKey: `about:${channelId}` }, () => channel.getAbout())
+      ? await this.gate.run({ label: `about:${channelId}`, cacheKey: `about:${channelId}`, ...this.laneOptions() }, () => channel.getAbout())
       : null;
     const details = (about && "metadata" in about ? about.metadata : about) as Record<string, unknown> | null;
     const header = channel.header as { content?: { banner?: { image?: { url: string }[] } } } | undefined;
@@ -130,10 +144,10 @@ export class InnerTubeSource {
         .filter((id): id is string => typeof id === "string" && /^[\w-]{11}$/.test(id));
 
     const longForm = channel.has_videos
-      ? idsOf((await this.gate.run({ label: `videos:${channelId}`, cacheKey: `videos:${channelId}` }, () => channel.getVideos())).videos)
+      ? idsOf((await this.gate.run({ label: `videos:${channelId}`, cacheKey: `videos:${channelId}`, ...this.laneOptions() }, () => channel.getVideos())).videos)
       : [];
     const shorts = channel.has_shorts
-      ? idsOf((await this.gate.run({ label: `shorts:${channelId}`, cacheKey: `shorts:${channelId}` }, () => channel.getShorts())).videos)
+      ? idsOf((await this.gate.run({ label: `shorts:${channelId}`, cacheKey: `shorts:${channelId}`, ...this.laneOptions() }, () => channel.getShorts())).videos)
       : [];
 
     // Interleave so both formats make the cut; the API batch sorts out dates.

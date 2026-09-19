@@ -74,16 +74,22 @@ const serverEnvSchema = z.object({
   INNERTUBE_USER_REQUESTS_PER_MINUTE: z.coerce.number().min(1).max(240).default(30),
   /** How long an interactive read waits for a slot before falling back to the API. */
   INNERTUBE_USER_MAX_WAIT_MS: z.coerce.number().int().min(0).max(30_000).default(2_000),
+  /** Read channel pages and uploads from the web endpoints for ingestion (~1 unit per channel instead of 3-4). */
+  INNERTUBE_INGEST_ENABLED: z.preprocess((v) => (typeof v === "string" ? !["false", "0", "no", "off"].includes(v.toLowerCase()) : v), z.boolean()).default(true),
   /** Run searches on YouTube's web endpoints (free) instead of search.list (100 units). */
   INNERTUBE_SEARCH_ENABLED: z.preprocess((v) => (typeof v === "string" ? !["false", "0", "no", "off"].includes(v.toLowerCase()) : v), z.boolean()).default(true),
 
   JOB_WORKER_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(2_000),
   JOB_WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(32).default(2),
 
-  /** Supabase plan's database size limit (free tier: 500 MB). */
-  SUPABASE_PLAN_LIMIT_MB: z.coerce.number().positive().default(500),
-  /** Ingestion stops once the database reaches this size. Keep well under the plan limit. */
-  STORAGE_BUDGET_MB: z.coerce.number().positive().default(250),
+  /**
+   * Space the database is allowed to grow into: the disk on a self-hosted box, or
+   * the plan's limit on a managed one. (Named for Supabase because that is where
+   * this started; production has run on its own server since 2026-09-17.)
+   */
+  SUPABASE_PLAN_LIMIT_MB: z.coerce.number().positive().default(180_000),
+  /** Ingestion stops once the database reaches this size. Keep well under the limit above. */
+  STORAGE_BUDGET_MB: z.coerce.number().positive().default(150_000),
 
   SYNC_INTERVAL_HOURS: z.coerce.number().positive().max(168).default(24),
   SYNC_MAX_CHANNELS_PER_RUN: z.coerce.number().int().min(1).max(500).default(50),

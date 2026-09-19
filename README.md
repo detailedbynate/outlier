@@ -117,6 +117,19 @@ stopping the scraper changes no behaviour except quota use. Round size is
 `SCRAPER_BATCH` (20); on the server it runs as its own capped service — see
 `deploy/outlier-scraper.service`.
 
+### Ingestion without quota
+
+Channel ingestion reads the web pages too (`INNERTUBE_INGEST_ENABLED`), so a
+channel costs about **1 quota unit instead of 3-4**: the channel page, the Videos
+tab and the Shorts tab are scraped, and only the batched `videos.list` for exact
+stats is paid for. Each channel falls back to the API on its own if a scrape
+fails.
+
+Which lane a read uses is taken from the quota context the app already sets, so
+nothing had to be threaded through: a person clicking "track this channel" gets
+the interactive lane and an immediate API fallback, while jobs and the scraper
+queue behind the background rate.
+
 ### Search without quota
 
 `search.list` costs 100 quota units per call, which is why discovery and Niche
@@ -143,12 +156,11 @@ guessed. Set `INNERTUBE_SEARCH_ENABLED=false` to put everything back on the API.
 
 With search effectively free, `DISCOVERY_DAILY_LIMIT` and
 `NICHE_DAILY_YOUTUBE_REFRESHES` went from 10 and 15 to 250 each. They still exist,
-but they now guard the channel ingestion and storage a search triggers, not the
-search itself.
+but they now guard the channel ingestion a search triggers, not the search itself.
 
 ### Storage budget
 
-To stay well inside Supabase's free 500 MB, ingestion stops once the database reaches `STORAGE_BUDGET_MB` (default **250 MB**). Reads keep working and the dashboard shows usage. Growth is kept small by:
+Ingestion stops once the database reaches `STORAGE_BUDGET_MB` (default **150 GB**, inside the production box's 193 GB disk); reads keep working and the dashboard shows usage. The defaults were 250 MB of a 500 MB Supabase plan until the move to a self-hosted server, so storage is no longer what bounds the library. Growth is still kept tidy by:
 
 - snapshotting only videos newer than `SNAPSHOT_VIDEO_MAX_AGE_DAYS` (90)
 - capping stored descriptions at 1,000 characters
@@ -283,7 +295,7 @@ Search used to match niches by text ("cooking" = any title containing "cooking")
 - **Shorts Channels ranks creators by `underrated_score`** by default (a column on the `shorts_channels` view, 0-100): average Short views relative to subscribers (up to 500x), how often uploads beat the channel's median, real demand, still posting, and a size factor that gives 1M+ channels nothing. On the library at the time, the top 30 went from a median of 1.7M subscribers (sorted by average views) to 8K. Channels flagged as reuploads, compilations or spam are hidden.
 - **`library.grow`** (every 6h) first follows **featured channels**: creators list peers in their niche on their channel page, and `channelSections.list` costs 1 unit versus 100 for a search. It checks `LIBRARY_FEATURED_CHECKS_PER_RUN` confidently labeled channels under `LIBRARY_FEATURED_MAX_SUBSCRIBERS` and queues up to `LIBRARY_FEATURED_NEW_PER_RUN` creators we don't have. Then it runs Shorts discovery for the seed niches in `lib/niches/seeds.ts` (~240, mostly games) the library is thinnest on, skipping any searched in the last `LIBRARY_GROWTH_RESEED_DAYS`. It runs in the background quota lane, has its own daily cap (`LIBRARY_GROWTH_DAILY_SEARCHES`), and never uses up users' daily discovery searches.
 
-**Storage:** each channel with its uploads and stat history takes roughly 100-170 KB, so the free Supabase plan (with `STORAGE_BUDGET_MB=250`) holds about 2,000 channels before ingestion pauses. A library of tens of thousands of creators needs a paid database plan.
+**Storage:** each channel with its uploads and stat history takes roughly 100-170 KB, so the production budget (`STORAGE_BUDGET_MB=150000`) has room for over a million creators; the database was 281 MB at about 5,900 channels. What actually bounds growth is YouTube quota for ingestion and the scraper's rate, not disk.
 
 To teach the labeler a new game or topic, add it to `lib/niches/dictionary.ts` with the names people write for it.
 
