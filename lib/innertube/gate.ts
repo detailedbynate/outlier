@@ -18,6 +18,17 @@ import { createLogger, type Logger } from "@/lib/core/logger";
  * between, so a persistent block backs further off instead of poking YouTube.
  */
 
+/**
+ * The gate is busy and this read isn't willing to wait (a user is watching).
+ * Not a sign of trouble: the caller falls back to the official API.
+ */
+export class InnerTubeBusyError extends AppError {
+  constructor(waitMs: number) {
+    super("RATE_LIMITED", `InnerTube busy: next slot is ${Math.round(waitMs)}ms away`, { expose: false, retryable: true });
+    this.name = "InnerTubeBusyError";
+  }
+}
+
 /** YouTube answered with a bot check or a rate limit, or the breaker is open. Back off; don't retry now. */
 export class InnerTubeBlockedError extends AppError {
   readonly retryAt: Date;
@@ -30,8 +41,15 @@ export class InnerTubeBlockedError extends AppError {
 }
 
 export interface InnerTubeGateOptions {
-  /** Requests per minute across the whole process. */
+  /** Background requests per minute across the whole process (the scraper's pace). */
   requestsPerMinute: number;
+  /**
+   * Requests per minute for the "user" lane, on top of the background rate. A
+   * person waiting on a page must not queue behind bulk scraping, so interactive
+   * reads get their own allowance; everything else about them is shared, including
+   * the cache, the failure counters, and the circuit breaker.
+   */
+  userRequestsPerMinute: number;
   /** Requests in flight at once. */
   maxConcurrent: number;
   /** Retries per request after a transient failure. */
@@ -52,6 +70,7 @@ export interface InnerTubeGateOptions {
 
 export const INNERTUBE_GATE_DEFAULTS: InnerTubeGateOptions = {
   requestsPerMinute: 4,
+  userRequestsPerMinute: 12,
   maxConcurrent: 1,
   maxRetries: 2,
   minBackoffMs: 5_000,
@@ -73,6 +92,8 @@ export interface GateState {
   queued: number;
   running: number;
 }
+
+export type GateLane = "background" | "user";
 
 export interface GateStats {
   requests: number;
@@ -113,6 +134,14 @@ interface CacheEntry {
 export interface RunOptions {
   /** What this read is, for logs. */
   label: string;
+  /** "user" jumps the queue and uses the interactive allowance. Defaults to "background". */
+  lane?: GateLane;
+  /**
+   * Give up instead of waiting longer than this for a slot (throws
+   * InnerTubeBusyError). Interactive reads set it so a person never waits on the
+   * scraper's pace.
+   */
+  maxWaitMs?: number;
   /** Identical keys share one in-flight request and one cache entry. Omit to skip the cache. */
   cacheKey?: string;
   cacheTtlMs?: number;
@@ -130,7 +159,8 @@ export class InnerTubeGate {
 
   private readonly random: () => number;
 
-  private readonly queue: Waiter[] = [];
+  /** Two queues, one limiter: user reads are served before background ones. */
+  private readonly queues: Record<GateLane, Waiter[]> = { user: [], background: [] };
 
   private readonly cache = new Map<string, CacheEntry>();
 
@@ -138,7 +168,7 @@ export class InnerTubeGate {
 
   private running = 0;
 
-  private nextSlot = 0;
+  private readonly nextSlot: Record<GateLane, number> = { user: 0, background: 0 };
 
   private failuresInRow = 0;
 
@@ -163,7 +193,7 @@ export class InnerTubeGate {
       openUntil: open ? new Date(this.openUntil) : null,
       trips: this.trips,
       failuresInRow: this.failuresInRow,
-      queued: this.queue.length,
+      queued: this.queues.user.length + this.queues.background.length,
       running: this.running,
     };
   }
@@ -195,7 +225,9 @@ export class InnerTubeGate {
     const error = new InnerTubeBlockedError(reason, new Date(this.openUntil));
     this.log.warn("innertube paused", { reason, minutes: Math.round(pause / 60_000), trips: this.trips });
     // Anything still waiting would only run into the same wall.
-    for (const waiter of this.queue.splice(0)) waiter.reject(new InnerTubeBlockedError(reason, new Date(this.openUntil)));
+    for (const lane of ["user", "background"] as const) {
+      for (const waiter of this.queues[lane].splice(0)) waiter.reject(new InnerTubeBlockedError(reason, new Date(this.openUntil)));
+    }
     return error;
   }
 
@@ -244,7 +276,7 @@ export class InnerTubeGate {
   private async attempts<T>(options: RunOptions, fn: () => Promise<T>): Promise<T> {
     for (let attempt = 1; ; attempt += 1) {
       this.assertClosed(options.label);
-      await this.acquire();
+      await this.acquire(options.lane ?? "background", options.maxWaitMs);
       this.stats.requests += 1;
       let retryIn: number;
       try {
@@ -286,22 +318,28 @@ export class InnerTubeGate {
     return Math.round(base * (0.8 + this.random() * 0.4));
   }
 
-  /** Take a concurrency slot, then wait for this request's turn in the rate limit. */
-  private async acquire(): Promise<void> {
+  /** Take a concurrency slot, then wait for this request's turn in its lane's rate limit. */
+  private async acquire(lane: GateLane, maxWaitMs?: number): Promise<void> {
+    const gap = 60_000 / (lane === "user" ? this.options.userRequestsPerMinute : this.options.requestsPerMinute);
+    // Refuse before queueing if this read isn't willing to wait for its turn.
+    if (maxWaitMs !== undefined) {
+      const wait = Math.max(this.nextSlot[lane] - this.now(), 0);
+      if (wait > maxWaitMs) throw new InnerTubeBusyError(wait);
+    }
     if (this.running >= this.options.maxConcurrent) {
-      await new Promise<void>((resolve, reject) => this.queue.push({ resolve, reject }));
+      await new Promise<void>((resolve, reject) => this.queues[lane].push({ resolve, reject }));
     }
     this.running += 1;
-    const gap = 60_000 / this.options.requestsPerMinute;
     const now = this.now();
-    const slot = Math.max(now, this.nextSlot);
-    this.nextSlot = slot + gap;
+    const slot = Math.max(now, this.nextSlot[lane]);
+    this.nextSlot[lane] = slot + gap;
     if (slot > now) await this.sleep(slot - now);
   }
 
   private release(): void {
     this.running -= 1;
-    this.queue.shift()?.resolve();
+    // User reads first.
+    (this.queues.user.shift() ?? this.queues.background.shift())?.resolve();
   }
 }
 

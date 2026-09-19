@@ -2,7 +2,11 @@ import "server-only";
 import { env, requireEnv } from "@/lib/core/env";
 import { getAdminDatabase } from "@/lib/database/client";
 import { YouTubeCacheRepository, YouTubeQuotaRepository } from "@/lib/database/repositories/youtube-quota";
+// Imported directly (not via lib/innertube's index) so the modules stay acyclic.
+import { getGate } from "@/lib/innertube/config";
+import { InnerTubeSearch } from "@/lib/innertube/search";
 import { YouTubeClient } from "./client";
+import { SearchFirstYouTubeService } from "./search-first";
 import { QuotaManager, type QuotaConfig } from "./quota-manager";
 import { YouTubeService } from "./service";
 
@@ -59,7 +63,14 @@ export function getYouTubeService(): YouTubeService {
       quota: gated ? getQuotaManager() : undefined,
       cache: config.YOUTUBE_CACHE_ENABLED ? new YouTubeCacheRepository(getAdminDatabase()) : undefined,
     });
-    service = new YouTubeService(client);
+    if (config.INNERTUBE_SEARCH_ENABLED) {
+      // Search on YouTube's web endpoints (no quota); the API stays as the fallback.
+      const gate = getGate(config);
+      const scraped = new InnerTubeSearch(gate, { lang: config.OUTLIER_LANGUAGE.toLowerCase(), location: config.OUTLIER_REGION.toUpperCase() });
+      service = new SearchFirstYouTubeService(client, scraped, { maxWaitMs: config.INNERTUBE_USER_MAX_WAIT_MS });
+    } else {
+      service = new YouTubeService(client);
+    }
   }
   return service;
 }

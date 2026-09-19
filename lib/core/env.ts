@@ -66,6 +66,12 @@ const serverEnvSchema = z.object({
   INNERTUBE_CACHE_TTL_SECONDS: z.coerce.number().int().min(0).max(86_400).default(1_800),
   /** Uploads read per channel. */
   INNERTUBE_MAX_VIDEOS: z.coerce.number().int().min(5).max(50).default(30),
+  /** Interactive reads per minute, on top of the background rate: someone is waiting on these. */
+  INNERTUBE_USER_REQUESTS_PER_MINUTE: z.coerce.number().min(1).max(240).default(12),
+  /** How long an interactive read waits for a slot before falling back to the API. */
+  INNERTUBE_USER_MAX_WAIT_MS: z.coerce.number().int().min(0).max(30_000).default(2_000),
+  /** Run searches on YouTube's web endpoints (free) instead of search.list (100 units). */
+  INNERTUBE_SEARCH_ENABLED: z.preprocess((v) => (typeof v === "string" ? !["false", "0", "no", "off"].includes(v.toLowerCase()) : v), z.boolean()).default(true),
 
   JOB_WORKER_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(2_000),
   JOB_WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(32).default(2),
@@ -86,11 +92,11 @@ const serverEnvSchema = z.object({
   /** Channels per stats snapshot run (1 YouTube quota unit per 50). */
   STATS_SNAPSHOT_MAX_CHANNELS: z.coerce.number().int().min(50).max(50_000).default(5_000),
 
-  /** Research discovery searches per UTC day, all users combined (100 YouTube quota units each). */
-  DISCOVERY_DAILY_LIMIT: z.coerce.number().int().min(0).max(90).default(10),
+  /** Research discovery searches per UTC day, all users combined. Scraped search is free; the cap now only guards the channel ingestion each one triggers. */
+  DISCOVERY_DAILY_LIMIT: z.coerce.number().int().min(0).max(5_000).default(250),
   DISCOVERY_MAX_CHANNELS: z.coerce.number().int().min(1).max(50).default(25),
-  /** Niche Finder: topics refreshed from YouTube per UTC day, all users combined (~102 units each). Everything else is database-only. */
-  NICHE_DAILY_YOUTUBE_REFRESHES: z.coerce.number().int().min(0).max(80).default(15),
+  /** Niche Finder: topics refreshed from YouTube per UTC day, all users combined. Scraped search is free; the cap now only guards ingestion and storage. */
+  NICHE_DAILY_YOUTUBE_REFRESHES: z.coerce.number().int().min(0).max(5_000).default(250),
 
   /** Outlier quality rules (Trending Today and Discovery). */
   OUTLIER_LANGUAGE: z.string().regex(/^[a-z]{2}$/i).default("en"),

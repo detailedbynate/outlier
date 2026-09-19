@@ -117,6 +117,33 @@ stopping the scraper changes no behaviour except quota use. Round size is
 `SCRAPER_BATCH` (20); on the server it runs as its own capped service — see
 `deploy/outlier-scraper.service`.
 
+### Search without quota
+
+`search.list` costs 100 quota units per call, which is why discovery and Niche
+Finder had daily caps at all. Searches now go to YouTube's web endpoints first
+(`lib/youtube/search-first.ts`), which costs nothing, and only the result *ids*
+come from there: `searchVideos`/`searchChannels` still hydrate through
+`videos.list`/`channels.list` (1 unit per 50), so ranking and stored stats keep
+exact numbers. A discovery run went from ~101 units to ~1.
+
+Interactive reads use the gate's **user lane** — their own allowance
+(`INNERTUBE_USER_REQUESTS_PER_MINUTE`, 12/min) on top of the scraper's pace, served
+ahead of queued background reads, and refused after
+`INNERTUBE_USER_MAX_WAIT_MS` (2s) rather than making anyone wait. A refusal, a
+failure, an empty result, or an open breaker all fall back to the API in the same
+request.
+
+These stay on the API deliberately, because the web search can't express them
+faithfully: paging by token, searches inside one channel, playlist searches, the
+`date`/`title`/`videoCount` orders, and category filters. Shorts searches use
+YouTube's own `shorts` type, which also means the format is known rather than
+guessed. Set `INNERTUBE_SEARCH_ENABLED=false` to put everything back on the API.
+
+With search effectively free, `DISCOVERY_DAILY_LIMIT` and
+`NICHE_DAILY_YOUTUBE_REFRESHES` went from 10 and 15 to 250 each. They still exist,
+but they now guard the channel ingestion and storage a search triggers, not the
+search itself.
+
 ### Storage budget
 
 To stay well inside Supabase's free 500 MB, ingestion stops once the database reaches `STORAGE_BUDGET_MB` (default **250 MB**). Reads keep working and the dashboard shows usage. Growth is kept small by:

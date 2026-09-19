@@ -1,31 +1,16 @@
 import "server-only";
 import { env } from "@/lib/core/env";
 import { getYouTubeService } from "@/lib/youtube";
-import { getInnerTubeGate, type InnerTubeGate, type InnerTubeGateOptions } from "./gate";
+import { getGate } from "./config";
 import { HybridYouTubeSource } from "./hybrid";
 import { InnerTubeSource } from "./source";
 
-export { InnerTubeGate, InnerTubeBlockedError, looksLikeBlock, getInnerTubeGate, resetInnerTubeGate, INNERTUBE_GATE_DEFAULTS } from "./gate";
+export { InnerTubeGate, InnerTubeBlockedError, InnerTubeBusyError, looksLikeBlock, getInnerTubeGate, resetInnerTubeGate, INNERTUBE_GATE_DEFAULTS } from "./gate";
+export { gateOptionsFromEnv, getGate } from "./config";
 export type { GateState, GateStats, InnerTubeGateOptions } from "./gate";
 export { InnerTubeSource, parseCountText } from "./source";
+export { InnerTubeSearch, SCRAPEABLE_ORDERS, uploadDateBucket, durationFilter } from "./search";
 export { HybridYouTubeSource } from "./hybrid";
-
-export function gateOptionsFromEnv(config = env()): Partial<InnerTubeGateOptions> {
-  return {
-    requestsPerMinute: config.INNERTUBE_REQUESTS_PER_MINUTE,
-    maxConcurrent: config.INNERTUBE_MAX_CONCURRENT,
-    maxRetries: config.INNERTUBE_MAX_RETRIES,
-    failureThreshold: config.INNERTUBE_FAILURE_THRESHOLD,
-    breakerMs: config.INNERTUBE_BREAKER_MINUTES * 60_000,
-    maxBreakerMs: config.INNERTUBE_MAX_BREAKER_HOURS * 3_600_000,
-    cacheTtlMs: config.INNERTUBE_CACHE_TTL_SECONDS * 1_000,
-  };
-}
-
-/** The process-wide gate, configured from the environment. Every InnerTube read shares it. */
-export function getGate(): InnerTubeGate {
-  return getInnerTubeGate(gateOptionsFromEnv());
-}
 
 /**
  * Channel reads that prefer YouTube's web endpoints and fall back to the
