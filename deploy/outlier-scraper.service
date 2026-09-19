@@ -15,8 +15,10 @@ Description=Outlier InnerTube scraper
 After=network-online.target docker.service
 Wants=network-online.target
 # A crash loop should slow down, not hammer YouTube. (systemd only reads these in [Unit].)
-StartLimitIntervalSec=600
-StartLimitBurst=5
+# Generous, because `npm ci` during a deploy removes node_modules for a few
+# minutes: restarts in that window must not make systemd give up for good.
+StartLimitIntervalSec=3600
+StartLimitBurst=20
 
 [Service]
 Type=simple
