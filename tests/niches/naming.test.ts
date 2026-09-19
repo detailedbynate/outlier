@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canonicalNiche, displayNicheName, isUsefulNiche, readsLikeAName, titleCaseNiche } from "@/lib/niches/naming";
+import { canonicalNiche, displayNicheName, isUsefulNiche, nicheKey, readsLikeAName, titleCaseNiche } from "@/lib/niches/naming";
 import { tokenize, topicKey } from "@/lib/niches/analysis";
 
 /** Titles in the ordinary mixed-case style most channels use. */
@@ -80,6 +80,15 @@ describe("readsLikeAName", () => {
   it("doesn't judge channels that write everything in lower case", () => {
     // Capitalization can't mean anything here, so it isn't used as evidence.
     expect(readsLikeAName("kite", ["kite surfing session one", "kite surfing at dawn", "my best kite run", "kite tricks for beginners"])).toBe(true);
+  });
+});
+
+describe("nicheKey", () => {
+  it("treats spellings of the same niche as one", () => {
+    expect(nicheKey("entities")).toBe(nicheKey("entity"));
+    expect(nicheKey("arthurmorgan")).toBe(nicheKey("Arthur Morgan"));
+    expect(nicheKey("rdr2")).toBe(nicheKey("Red Dead Redemption 2"));
+    expect(nicheKey("kite surfing")).not.toBe(nicheKey("kite boarding"));
   });
 });
 

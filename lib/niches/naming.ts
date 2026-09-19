@@ -78,9 +78,21 @@ export function titleCaseNiche(term: string): string {
     .join(" ");
 }
 
-/** The spelling used to collapse "arthurmorgan" and "arthur morgan" into one niche. */
+/** Rough singular, for comparison only: "entities" and "entity" are one niche, not two. */
+function singular(word: string): string {
+  if (word.length > 4 && word.endsWith("ies")) return `${word.slice(0, -3)}y`;
+  if (word.length > 4 && (word.endsWith("ses") || word.endsWith("hes") || word.endsWith("xes"))) return word.slice(0, -2);
+  if (word.length > 3 && word.endsWith("s") && !word.endsWith("ss")) return word.slice(0, -1);
+  return word;
+}
+
+/**
+ * The spelling used to decide whether two mined terms are the same niche:
+ * "arthurmorgan" and "arthur morgan", "entity" and "entities".
+ */
 export function nicheKey(term: string): string {
-  return (canonicalNiche(term) ?? normalizeName(term)).replace(/ /g, "").toLowerCase();
+  const base = canonicalNiche(term) ?? normalizeName(term);
+  return normalizeName(base).split(" ").map(singular).join("").toLowerCase();
 }
 
 /** What a mined term should be called on screen. */
@@ -142,7 +154,9 @@ export const BROAD_TERMS = new Set(
     "process idea ideas thing things stuff part parts level levels mode modes collab collabs version episode series content creator creators " +
     // Words that fill gaming titles without naming anything: from real reports where they beat the actual niche.
     "lore playthrough walkthrough online offline fan fans secret secrets glitch boss fight battle win wins lose noob pro rank ranked " +
-    "getting hilarious funniest simulation indie gameplay stream streamer highlights run runs lets play plays playing"
+    "getting hilarious funniest simulation indie gameplay stream streamer highlights run runs lets play plays playing " +
+    // Words a game's own uploads repeat without naming a niche inside it.
+    "community event events chapter chapters season seasons patch patches character characters item items skin skins quest quests"
   ).split(/\s+/),
 );
 
