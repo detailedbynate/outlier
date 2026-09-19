@@ -53,6 +53,20 @@ const serverEnvSchema = z.object({
   /** Discord invite link shown on the landing page (e.g. https://discord.gg/abc123). */
   DISCORD_INVITE_URL: optionalString.pipe(z.url().optional()),
 
+  /** InnerTube (scraped web endpoints). One gate for the whole process: see lib/innertube/gate.ts. */
+  INNERTUBE_REQUESTS_PER_MINUTE: z.coerce.number().min(0.1).max(120).default(4),
+  INNERTUBE_MAX_CONCURRENT: z.coerce.number().int().min(1).max(8).default(1),
+  INNERTUBE_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(2),
+  /** Failed reads in a row that pause InnerTube. */
+  INNERTUBE_FAILURE_THRESHOLD: z.coerce.number().int().min(1).max(50).default(5),
+  /** First pause after a block or rate limit; doubles while blocks keep coming. */
+  INNERTUBE_BREAKER_MINUTES: z.coerce.number().min(1).max(1440).default(30),
+  INNERTUBE_MAX_BREAKER_HOURS: z.coerce.number().min(1).max(72).default(12),
+  /** How long a scraped page stays reusable in memory. */
+  INNERTUBE_CACHE_TTL_SECONDS: z.coerce.number().int().min(0).max(86_400).default(1_800),
+  /** Uploads read per channel. */
+  INNERTUBE_MAX_VIDEOS: z.coerce.number().int().min(5).max(50).default(30),
+
   JOB_WORKER_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(2_000),
   JOB_WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(32).default(2),
 

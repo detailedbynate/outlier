@@ -1,0 +1,53 @@
+; InnerTube scraper (npm run scraper). Keeps the channel library fresh without
+; spending YouTube API quota. Deliberately slow and capped: it must never crowd
+; out the web app or the job worker on the same box.
+;
+; Install:
+;   cp /opt/outlier/deploy/outlier-scraper.service /etc/systemd/system/
+;   systemctl daemon-reload && systemctl enable --now outlier-scraper
+;   journalctl -u outlier-scraper -f
+;
+; Speed lives in the Environment lines below; `systemctl stop outlier-scraper`
+; is always safe — the app and the worker keep using the official API.
+
+[Unit]
+Description=Outlier InnerTube scraper
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/outlier
+EnvironmentFile=/opt/outlier/.env.production
+Environment=NODE_ENV=production
+Environment=INNERTUBE_REQUESTS_PER_MINUTE=4
+Environment=INNERTUBE_MAX_CONCURRENT=1
+Environment=SCRAPER_BATCH=20
+ExecStart=/usr/bin/npm run scraper
+Restart=always
+RestartSec=60
+# A crash loop should slow down, not hammer YouTube.
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+# Resource caps: half a core, 512 MB, and last in line for CPU and disk.
+CPUQuota=50%
+MemoryMax=512M
+MemorySwapMax=0
+TasksMax=64
+Nice=10
+IOSchedulingClass=idle
+CPUSchedulingPolicy=batch
+
+# It only needs the network and its own directory.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/outlier
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

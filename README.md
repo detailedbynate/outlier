@@ -62,6 +62,48 @@ While running, the worker schedules:
 - `catalog.refresh` every `SYNC_INTERVAL_HOURS` (24): refreshes up to `SYNC_MAX_CHANNELS_PER_RUN` (50) of the stalest tracked channels
 - `maintenance.prune_snapshots` daily: keeps daily snapshots for 30 days, then weekly, and deletes them after 365 days
 
+### InnerTube scraper (optional)
+
+```bash
+npm run scraper                   # reads channel pages instead of the API; Ctrl+C to stop
+```
+
+A separate, deliberately slow process that refreshes channels from YouTube's own
+web endpoints (`youtubei.js`), so the daily API quota goes to users instead. It
+picks up channels shortly before the worker's `catalog.refresh` would, reads the
+channel page plus the Videos and Shorts tabs, and then spends one quota unit per
+50 videos on `videos.list` for exact view/like counts — listing pages only show
+rounded numbers.
+
+**One gate for the whole application** (`lib/innertube/gate.ts`). Every scraped
+read in the process goes through it, whatever the caller — the limit is not per
+user, per endpoint, or per scraper instance. In order, a read is:
+
+1. **cached** in memory (`INNERTUBE_CACHE_TTL_SECONDS`, 30 min), and identical
+   reads in flight at once share one request — which is why channel info plus
+   uploads costs one page load, not two;
+2. **refused** outright while the circuit breaker is open;
+3. **queued** — one FIFO queue, at most `INNERTUBE_MAX_CONCURRENT` (1) in flight,
+   spaced to `INNERTUBE_REQUESTS_PER_MINUTE` (4);
+4. **retried** on a transient failure, `INNERTUBE_MAX_RETRIES` (2) times, with
+   exponential backoff and ±20% jitter (the queue slot is freed while it waits);
+5. **paused** — a bot check, a 429, or `INNERTUBE_FAILURE_THRESHOLD` (5) failures
+   in a row trips the breaker for `INNERTUBE_BREAKER_MINUTES` (30), doubling up
+   to `INNERTUBE_MAX_BREAKER_HOURS` (12) while blocks keep coming, and resetting
+   after one good read. A definite answer (a channel that doesn't exist) is not a
+   failure and is never retried.
+
+The official Data API is only a **controlled fallback**, with its own separate
+tracker: every API call still goes through `QuotaManager` (daily units, lanes,
+per-user caps), so a fallback can be refused there and the scraper waits rather
+than digging into the users' reserve. Handle lookups, paging, per-format
+listings, and 50-channel batches stay on the API deliberately.
+
+While the breaker is open the worker's ordinary API refresh covers everything, so
+stopping the scraper changes no behaviour except quota use. Round size is
+`SCRAPER_BATCH` (20); on the server it runs as its own capped service — see
+`deploy/outlier-scraper.service`.
+
 ### Storage budget
 
 To stay well inside Supabase's free 500 MB, ingestion stops once the database reaches `STORAGE_BUDGET_MB` (default **250 MB**). Reads keep working and the dashboard shows usage. Growth is kept small by:
@@ -112,7 +154,10 @@ lib/
   mcp/              Transport-agnostic MCP tool definitions over services
 types/              Database, YouTube domain, and API types
 supabase/           config.toml + SQL migrations
+  innertube/        Scraped channel reads: global gate (queue, limiter, cache, breaker) + API fallback
 scripts/worker.ts   Job worker entrypoint
+scripts/scraper.ts  InnerTube scraper entrypoint
+deploy/             systemd units for the server
 tests/              Vitest suites
 ```
 

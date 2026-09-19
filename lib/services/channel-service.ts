@@ -18,6 +18,9 @@ export interface SyncChannelResult {
 /** Uploads sampled for channels found by research tools — enough for Shorts stats, light on storage. */
 export const LIGHT_SYNC_VIDEOS = 20;
 
+/** The YouTube reads ingestion needs; the scraper swaps in an InnerTube-first version. */
+export type ChannelYouTubeSource = Pick<YouTubeService, "getChannel" | "getChannels" | "getChannelVideos" | "getChannelPlaylists">;
+
 export interface ChannelServiceOptions {
   /** When set, ingestion refuses to write once the database is over budget. */
   storage?: Pick<StorageBudgetService, "assertCapacity">;
@@ -44,7 +47,7 @@ export class ChannelService {
   private readonly snapshotVideoMaxAgeMs: number;
 
   constructor(
-    private readonly youtube: YouTubeService,
+    private readonly youtube: ChannelYouTubeSource,
     private readonly channels: ChannelRepository,
     private readonly videos: VideoRepository,
     private readonly options: ChannelServiceOptions = {},
