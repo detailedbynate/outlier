@@ -1,12 +1,6 @@
-import type { EmailOtpType } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
-import { safeRedirectPath } from "@/lib/auth/access";
-import { createSessionClient } from "@/lib/auth/session";
+import { isLinkType } from "@/lib/auth/links";
 import { env } from "@/lib/core/env";
-import { logger } from "@/lib/core/logger";
-import { getServices } from "@/lib/services";
-
-const ALLOWED_TYPES = new Set<EmailOtpType>(["invite", "email", "magiclink", "recovery", "signup"]);
 
 /**
  * Where to send people afterwards. Behind the reverse proxy, request.url is the
@@ -20,32 +14,22 @@ function siteOrigin(request: NextRequest): string {
 }
 
 /**
- * GET /auth/confirm?token_hash=…&type=invite — verifies an emailed link and
- * signs the user in. Invites and password recovery continue to /set-password.
+ * GET /auth/confirm?token_hash=…&type=invite — the address in invite, sign-in
+ * and reset links. It doesn't use the one-time token: chat apps and email
+ * scanners open links to build previews, which would spend it before the
+ * person taps it. It forwards to /auth/continue, where a button press does.
  */
-export async function GET(request: NextRequest) {
+export function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const tokenHash = searchParams.get("token_hash");
-  const type = searchParams.get("type") as EmailOtpType | null;
+  const type = searchParams.get("type");
   const origin = siteOrigin(request);
-  const failure = new URL("/login?error=link", origin);
+  if (!tokenHash || !isLinkType(type)) return NextResponse.redirect(new URL("/login?error=link", origin));
 
-  if (!tokenHash || !type || !ALLOWED_TYPES.has(type)) return NextResponse.redirect(failure);
-
-  const supabase = await createSessionClient();
-  const { data, error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
-  if (error || !data.user) {
-    logger.warn("auth link verification failed", { type, reason: error?.message });
-    return NextResponse.redirect(failure);
-  }
-
-  if (data.user.email) {
-    const services = getServices();
-    await services.waitlist.markJoined(data.user.email).catch((e: unknown) => logger.warn("could not mark waitlist entry joined", { error: e }));
-    // Bonus credits for referred people and their referrers (no-op if already rewarded).
-    await services.referrals.onAccountCreated(data.user.id, data.user.email);
-  }
-
-  const next = type === "invite" || type === "recovery" ? "/set-password" : safeRedirectPath(searchParams.get("next"));
-  return NextResponse.redirect(new URL(next, origin));
+  const target = new URL("/auth/continue", origin);
+  target.searchParams.set("token_hash", tokenHash);
+  target.searchParams.set("type", type);
+  const next = searchParams.get("next");
+  if (next) target.searchParams.set("next", next);
+  return NextResponse.redirect(target);
 }
