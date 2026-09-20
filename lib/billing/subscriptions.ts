@@ -57,10 +57,10 @@ function customerId(subscription: Stripe.Subscription): string | null {
  * that Stripe customer — which is how cancellations and renewals find their way
  * home, since those events carry no metadata of ours.
  */
-export async function applySubscription(subscription: Stripe.Subscription): Promise<void> {
+export async function applySubscription(subscription: Stripe.Subscription, userIdHint?: string): Promise<void> {
   const services = getServices();
   const customer = customerId(subscription);
-  const userId = subscription.metadata?.userId || (customer ? await services.subscriptions.userIdForCustomer(customer) : null);
+  const userId = userIdHint || subscription.metadata?.userId || (customer ? await services.subscriptions.userIdForCustomer(customer) : null);
   if (!userId) {
     logger.error("stripe subscription has no user", { subscriptionId: subscription.id, customer });
     return;

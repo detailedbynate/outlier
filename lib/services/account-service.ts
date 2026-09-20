@@ -155,6 +155,26 @@ export class AccountService {
     return { account, link, existed };
   }
 
+  /**
+   * Give a paying subscriber an account, no actor required: the payment is the
+   * authorization. They get an emailed sign-in link and an ordinary member
+   * account, which is what marks them approved. Their credit allowance comes
+   * from the plan, so no override is set here.
+   */
+  async provisionSubscriber(email: string, redirectTo = "/"): Promise<{ userId: string; existed: boolean }> {
+    const clean = email.trim().toLowerCase();
+    if (!clean) throw new ValidationError("A subscriber needs an email address.");
+    const { userId, existed } = await this.deps.provisioner.provision(clean, redirectTo, "email");
+    const existing = await this.deps.repository.findByUserId(userId);
+    // Never demote someone who already has a role (owner, admin).
+    if (!existing) {
+      await this.deps.repository.upsert({ user_id: userId, email: clean, role: "member", disabled: false });
+    }
+    this.cache.delete(userId);
+    this.log.info("subscriber account provisioned", { userId, existed });
+    return { userId, existed };
+  }
+
   async update(userId: string, input: unknown, actor: Actor): Promise<AccountSettingsRow> {
     this.assertManager(actor);
     const parsed = updateAccountSchema.safeParse(input);

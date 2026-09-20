@@ -3,6 +3,7 @@ import { env } from "@/lib/core/env";
 import { logger } from "@/lib/core/logger";
 import { fulfillCheckout, getStripe } from "@/lib/billing/stripe";
 import { applySubscription } from "@/lib/billing/subscriptions";
+import { fulfillPublicSubscription } from "@/lib/billing/signup";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,8 @@ export async function POST(request: Request): Promise<Response> {
     // Card payments complete immediately; bank methods confirm later with async_payment_succeeded.
     if (event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded") {
       await fulfillCheckout(event.data.object);
+      // Subscribing from the pricing page: the payment creates the account.
+      await fulfillPublicSubscription(event.data.object);
     }
     // Every change to a subscription — bought, upgraded, cancelled, renewed, or
     // failing to pay — lands here, and the row is rewritten from what Stripe says.

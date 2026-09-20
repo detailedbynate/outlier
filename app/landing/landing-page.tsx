@@ -9,6 +9,10 @@ import { AnalyzeMock, GrowthMock, PicksMock, ResearchMock } from "./mock-visuals
 import { Reveal } from "./motion";
 import { ScrollLink } from "./scroll-link";
 import { WaitlistForm } from "./waitlist-form";
+import { formatPrice } from "@/lib/billing/packs";
+import { onSale, PLANS } from "@/lib/billing/plans";
+import { sellablePlans } from "@/lib/billing/subscriptions";
+import { startPublicSubscription } from "./checkout";
 
 /** Hide small numbers rather than advertising an empty waitlist. */
 const SHOW_WAITLIST_COUNT_FROM = 25;
@@ -79,11 +83,11 @@ const FAQ = [
   },
   {
     q: "When can I get in?",
-    a: "We're inviting people from the waitlist in small batches. Join with your email and we'll send your invite as soon as your spot opens.",
+    a: "Straight away. Subscribing creates your account: pick a plan, pay, and we email you a sign-in link within a minute. There's no password to make up.",
   },
   {
     q: "How much does it cost?",
-    a: "Outlier is a paid subscription. Waitlist members get first access and will hear about launch pricing before anyone else.",
+    a: "Pro is $10 a month and Expert is $30, both billed monthly and cancellable any time from your account. Pro is a launch price and goes to $15 in October. Every plan has every tool; the difference is how much research you can do each month.",
   },
   {
     q: "Do I need to connect my YouTube account?",
@@ -121,6 +125,74 @@ function DiscordIcon() {
   );
 }
 
+/** Plans, priced straight from the same definitions the app bills against. */
+function PricingSection() {
+  const sellable = sellablePlans();
+  if (sellable.length === 0) return null;
+  const now = new Date();
+  const shown = [PLANS[0]!, ...sellable];
+
+  return (
+    <section id="pricing" className="pricing-section">
+      <Reveal>
+        <span className="feature-eyebrow">Pricing</span>
+        <h2 className="feature-title">Pick a plan, start today</h2>
+        <p className="pricing-lede">
+          Every plan has every tool. What changes is how much research you can do each month — and you can top up any time.
+        </p>
+      </Reveal>
+      <div className="pricing-grid">
+        {shown.map((plan, i) => {
+          const sale = onSale(plan, now);
+          const paid = plan.priceCents > 0;
+          return (
+            <Reveal key={plan.id} delay={i * 80}>
+              <form action={startPublicSubscription} className="pricing-card" data-featured={Boolean(plan.badge)}>
+                <input type="hidden" name="planId" value={plan.id} />
+                <div className="pricing-card-head">
+                  <h3>{plan.name}</h3>
+                  {plan.badge ? <span className="pricing-badge">{plan.badge}</span> : null}
+                </div>
+                <p className="pricing-blurb">{plan.blurb}</p>
+                <div className="pricing-price">
+                  <strong>{paid ? formatPrice(plan.priceCents) : "Free"}</strong>
+                  {paid ? <span className="pricing-per">/month</span> : null}
+                  {sale ? <span className="pricing-was">{formatPrice(plan.listPriceCents!)}</span> : null}
+                </div>
+                <span className="pricing-terms">
+                  {sale ? `Launch price until 1 October, then ${formatPrice(plan.listPriceCents!)}` : paid ? "Cancel any time" : "No card needed"}
+                </span>
+                <div className="pricing-credits">
+                  <strong>{plan.monthlyCredits.toLocaleString("en-US")} credits a month</strong>
+                  <span>{plan.creditsNote}</span>
+                </div>
+                {paid ? (
+                  <button type="submit" className={`pill-button pill-button-lg ${plan.badge ? "pill-button-primary" : "pill-button-ghost"}`}>
+                    Subscribe now
+                  </button>
+                ) : (
+                  <ScrollLink to="waitlist" className="pill-button pill-button-ghost pill-button-lg">
+                    Join the free list
+                  </ScrollLink>
+                )}
+                <ul className="pricing-points">
+                  {plan.features.map((feature) => (
+                    <li key={feature}>
+                      <CheckIcon />
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+              </form>
+            </Reveal>
+          );
+        })}
+      </div>
+      <p className="pricing-foot">Payments are handled by Stripe. Subscribing creates your account — we email you a sign-in link straight after.</p>
+    </section>
+  );
+}
+
 export async function LandingPage({ referralCode = null }: { referralCode?: string | null } = {}) {
   const count = await waitlistCount();
   const discordUrl = env().DISCORD_INVITE_URL;
@@ -148,20 +220,23 @@ export async function LandingPage({ referralCode = null }: { referralCode?: stri
 
           <p className="landing-eyebrow">Outlier · YouTube intelligence</p>
           <h1 className="landing-title">
-            Join the waitlist for
+            Find your next outlier
             <br />
-            <span className="landing-title-accent">Outlier</span>
+            <span className="landing-title-accent">before everyone else</span>
           </h1>
           <p className="landing-subtitle">
-            Find the Shorts channels and videos blowing up before everyone else. We&apos;re letting people in in small batches.
+            Outlier finds the Shorts channels and videos outperforming their size, so you can spot a winning niche while it&apos;s still early.
           </p>
 
-          <div id="waitlist" className="landing-form-wrap">
-            <WaitlistForm referralCode={referralCode} />
-            {count >= SHOW_WAITLIST_COUNT_FROM ? (
-              <p className="landing-count">Join {count.toLocaleString()} creators already waiting</p>
-            ) : null}
+          <div className="landing-cta-row">
+            <ScrollLink to="pricing" className="pill-button pill-button-primary pill-button-lg">
+              Subscribe now
+            </ScrollLink>
+            <ScrollLink to="features" className="pill-button pill-button-ghost pill-button-lg">
+              See what it does
+            </ScrollLink>
           </div>
+          <p className="landing-count">From {formatPrice(PLANS[1]!.priceCents)} a month · cancel any time</p>
         </section>
 
         <div className="marquee" aria-hidden="true">
@@ -197,6 +272,21 @@ export async function LandingPage({ referralCode = null }: { referralCode?: stri
           ))}
         </div>
 
+        <PricingSection />
+
+        <section id="waitlist" className="landing-list-section">
+          <Reveal className="landing-list-inner">
+            <h2 className="feature-title">Not ready to subscribe?</h2>
+            <p className="pricing-lede">Leave your email and we&apos;ll tell you when something worth knowing about ships.</p>
+            <div className="landing-form-wrap">
+              <WaitlistForm referralCode={referralCode} />
+              {count >= SHOW_WAITLIST_COUNT_FROM ? (
+                <p className="landing-count">{count.toLocaleString()} creators already on the list</p>
+              ) : null}
+            </div>
+          </Reveal>
+        </section>
+
         <section id="faq" className="faq-section">
           <Reveal>
             <span className="feature-eyebrow">FAQ</span>
@@ -219,9 +309,9 @@ export async function LandingPage({ referralCode = null }: { referralCode?: stri
 
         <Reveal className="final-cta">
           <h2>Ready to find your next outlier?</h2>
-          <p>Get on the list now and be one of the first people inside.</p>
-          <ScrollLink to="waitlist" className="pill-button pill-button-primary pill-button-lg">
-            Join the waitlist
+          <p>Pick a plan and start researching today.</p>
+          <ScrollLink to="pricing" className="pill-button pill-button-primary pill-button-lg">
+            Subscribe now
           </ScrollLink>
         </Reveal>
       </main>

@@ -3767,6 +3767,222 @@ html:has(.landing-root) {
 }
 
 /* FAQ */
+/* Landing pricing: the page's one ask, so it gets the width and the air. */
+.pricing-section {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 40px clamp(16px, 4vw, 40px) 64px;
+  text-align: center;
+}
+
+.pricing-lede {
+  max-width: 620px;
+  margin: 14px auto 0;
+  font-size: 16px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.pricing-grid {
+  margin-top: 40px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  gap: 20px;
+  align-items: start;
+  text-align: left;
+}
+
+.pricing-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  height: 100%;
+  padding: 30px 26px 32px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition:
+    transform 0.25s var(--ease),
+    border-color 0.25s var(--ease);
+}
+
+.pricing-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.pricing-card[data-featured="true"] {
+  background: linear-gradient(180deg, rgba(139, 92, 246, 0.16), rgba(255, 255, 255, 0.03));
+  border-color: rgba(139, 92, 246, 0.42);
+}
+
+.pricing-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pricing-card-head h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.pricing-badge {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--accent-gradient);
+  color: #fff;
+}
+
+.pricing-blurb {
+  margin: -6px 0 0;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.pricing-price {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  margin-top: 6px;
+}
+
+.pricing-price strong {
+  font-size: 46px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.pricing-per {
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.pricing-was {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.4);
+  text-decoration: line-through;
+}
+
+.pricing-terms {
+  margin-top: -8px;
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.pricing-credits {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.pricing-credits strong {
+  font-size: 15px;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.pricing-card .pill-button {
+  width: 100%;
+  justify-content: center;
+}
+
+.pricing-points {
+  margin: 4px 0 0;
+  padding: 18px 0 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  list-style: none;
+  display: grid;
+  gap: 11px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.pricing-points li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.pricing-points svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--accent-2, #a78bfa);
+}
+
+.pricing-foot {
+  margin-top: 28px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+/* The hero's buttons, now that it asks for a subscription rather than an email. */
+.landing-cta-row {
+  margin-top: 34px;
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* The waitlist, kept as the softer option below the plans. */
+.landing-list-section {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 8px clamp(16px, 4vw, 40px) 56px;
+  text-align: center;
+}
+
+.landing-list-inner .landing-form-wrap {
+  margin-top: 26px;
+}
+
+/* Where Stripe sends a new subscriber. */
+.welcome-wrap {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 40px clamp(16px, 5vw, 40px);
+}
+
+.welcome-card {
+  max-width: 520px;
+  display: grid;
+  gap: 16px;
+  padding: 36px 32px;
+  text-align: center;
+}
+
+.welcome-card h1 {
+  margin: 0;
+  font-size: 30px;
+}
+
+.welcome-card p {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.welcome-card .pill-button {
+  justify-self: center;
+  margin-top: 6px;
+}
+
 .faq-section {
   max-width: 760px;
   margin: 0 auto;

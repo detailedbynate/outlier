@@ -32,7 +32,7 @@ export function LandingHeader() {
       { rootMargin: "-40% 0px -50% 0px", threshold: [0, 0.25, 0.5] },
     );
     sections.forEach((section) => observer.observe(section));
-    const hero = document.getElementById("waitlist");
+    const hero = document.getElementById("pricing") ?? document.getElementById("waitlist");
     const heroObserver = new IntersectionObserver(([entry]) => {
       if (entry?.isIntersecting) setActive(null);
     });
@@ -71,8 +71,8 @@ export function LandingHeader() {
           <Link href="/login" className="pill-button pill-button-ghost">
             Sign in
           </Link>
-          <ScrollLink to="waitlist" className="pill-button pill-button-primary">
-            Join waitlist
+          <ScrollLink to="pricing" className="pill-button pill-button-primary">
+            Subscribe now
           </ScrollLink>
         </div>
       </div>
