@@ -188,7 +188,10 @@ function PricingSection() {
           );
         })}
       </div>
-      <p className="pricing-foot">Payments are handled by Stripe. Subscribing creates your account — we email you a sign-in link straight after.</p>
+      <p className="pricing-foot">
+        Payments are handled by Stripe. Subscribing creates your account — we email you a sign-in link straight after. It renews
+        monthly until you cancel; see our <Link href="/terms">Terms</Link> and <Link href="/refunds">Refund Policy</Link>.
+      </p>
     </section>
   );
 }
@@ -322,6 +325,8 @@ export async function LandingPage({ referralCode = null }: { referralCode?: stri
           <Link href="/terms">Terms</Link>
           <span aria-hidden="true">·</span>
           <Link href="/privacy">Privacy</Link>
+          <span aria-hidden="true">·</span>
+          <Link href="/refunds">Refunds</Link>
           <span aria-hidden="true">·</span>
           <span>Not affiliated with YouTube or Google</span>
         </p>

@@ -5,7 +5,7 @@ import { E2E_COOKIE, isE2EBypass } from "./lib/auth/e2e";
 /** Reachable without signing in. Prefix match for entries ending in "/". */
 // /signup and /welcome are where a paying subscriber lands before they have an
 // account to sign in with, so they can't be behind the sign-in gate.
-const PUBLIC_PATHS = ["/", "/login", "/signup", "/welcome", "/privacy", "/terms", "/auth/", "/waitlist/"];
+const PUBLIC_PATHS = ["/", "/login", "/signup", "/welcome", "/privacy", "/terms", "/refunds", "/auth/", "/waitlist/"];
 
 function isPublic(pathname: string): boolean {
   return PUBLIC_PATHS.some((path) => (path.endsWith("/") && path !== "/" ? pathname.startsWith(path) : pathname === path));
