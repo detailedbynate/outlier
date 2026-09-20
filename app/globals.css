@@ -7931,6 +7931,80 @@ a.dash-row:hover {
   font-variant-numeric: tabular-nums;
 }
 
+/* Plans: three cards, the current one marked so nobody buys what they already have. */
+.billing-plans {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 14px;
+  margin-bottom: 28px;
+}
+
+.billing-plan {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.billing-plan[data-current="true"] {
+  border-color: var(--accent-track);
+  background: var(--accent-wash);
+}
+
+.billing-plan-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.billing-plan-head strong {
+  font-size: 17px;
+}
+
+.billing-plan-price {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.billing-plan-price strong {
+  font-size: 30px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.billing-plan-was {
+  font-size: 14px;
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.billing-plan-blurb {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.billing-plan-features {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 5px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.billing-plan-features li::before {
+  content: "¹3";
+  margin-right: 7px;
+  color: var(--accent-text);
+}
+
+.billing-plan button {
+  margin-top: 8px;
+}
+
 .billing-packs {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));

@@ -2,6 +2,7 @@ import type Stripe from "stripe";
 import { env } from "@/lib/core/env";
 import { logger } from "@/lib/core/logger";
 import { fulfillCheckout, getStripe } from "@/lib/billing/stripe";
+import { applySubscription } from "@/lib/billing/subscriptions";
 
 export const dynamic = "force-dynamic";
 
@@ -25,15 +26,24 @@ export async function POST(request: Request): Promise<Response> {
     return new Response("Bad signature.", { status: 400 });
   }
 
-  // Card payments complete immediately; bank methods confirm later with async_payment_succeeded.
-  if (event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded") {
-    try {
+  try {
+    // Card payments complete immediately; bank methods confirm later with async_payment_succeeded.
+    if (event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded") {
       await fulfillCheckout(event.data.object);
-    } catch (error) {
-      // A 500 makes Stripe retry, and fulfilling twice is harmless.
-      logger.error("stripe fulfillment failed", { eventId: event.id, error });
-      return new Response("Fulfillment failed.", { status: 500 });
     }
+    // Every change to a subscription — bought, upgraded, cancelled, renewed, or
+    // failing to pay — lands here, and the row is rewritten from what Stripe says.
+    if (
+      event.type === "customer.subscription.created" ||
+      event.type === "customer.subscription.updated" ||
+      event.type === "customer.subscription.deleted"
+    ) {
+      await applySubscription(event.data.object);
+    }
+  } catch (error) {
+    // A 500 makes Stripe retry, and applying the same event twice is harmless.
+    logger.error("stripe event handling failed", { eventId: event.id, type: event.type, error });
+    return new Response("Handling failed.", { status: 500 });
   }
   return Response.json({ received: true });
 }

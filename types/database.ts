@@ -312,6 +312,17 @@ export type CreditLedgerRow = {
   created_at: string;
 };
 
+/** A user's paid plan, mirrored from Stripe by the webhook. */
+export type SubscriptionRow = Timestamps & {
+  user_id: string;
+  plan: string;
+  status: string;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  current_period_end: string | null;
+  cancel_at_period_end: boolean;
+};
+
 export type UserPreferencesRow = Timestamps & {
   user_id: string;
   goals: string[];
@@ -536,6 +547,7 @@ export type Database = {
       referral_rewards: TableDef<ReferralRewardRow, "code" | "referred_user_id">;
       credit_grants: TableDef<CreditGrantRow, "user_id" | "amount" | "reason">;
       credit_ledger: TableDef<CreditLedgerRow, "user_id" | "amount" | "kind">;
+      subscriptions: TableDef<SubscriptionRow, "user_id">;
       moderation_actions: TableDef<ModerationActionRow, "target_email" | "action">;
       youtube_quota_usage: {
         Row: YouTubeQuotaUsageRow;

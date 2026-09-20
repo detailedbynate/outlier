@@ -119,8 +119,12 @@ const serverEnvSchema = z.object({
   /** Trending picks need at least this multiple of their channel's median Short views. */
   OUTLIER_MIN_MULTIPLIER: z.coerce.number().min(1).default(2),
 
-  /** Credits each user gets per UTC month (plus bonus credits, e.g. from referrals). Actions that spend YouTube quota cost credits. */
-  MONTHLY_CREDITS: z.coerce.number().int().min(0).max(1_000_000).default(400),
+  /**
+   * Credits a user on the free plan gets per UTC month (plus bonus credits, e.g.
+   * from referrals). Paid plans set their own allowance in lib/billing/plans.ts.
+   * Actions that spend YouTube quota cost credits.
+   */
+  MONTHLY_CREDITS: z.coerce.number().int().min(0).max(1_000_000).default(50),
   /** Referral rewards: bonus credits per friend who creates an account, and a welcome bonus for that friend. */
   REFERRAL_REFERRER_CREDITS: z.coerce.number().int().min(0).max(100_000).default(25),
   REFERRAL_REFERRED_CREDITS: z.coerce.number().int().min(0).max(100_000).default(50),
@@ -139,6 +143,12 @@ const serverEnvSchema = z.object({
   STRIPE_SECRET_KEY: optionalString,
   /** Signing secret of the Stripe webhook pointed at /api/stripe/webhook (whsec_…). */
   STRIPE_WEBHOOK_SECRET: optionalString,
+  /**
+   * Recurring Stripe Price ids for the paid plans (price_…). A plan without one
+   * isn't offered, so a half-configured Stripe can't sell something it can't bill.
+   */
+  STRIPE_PRICE_PRO: optionalString,
+  STRIPE_PRICE_EXPERT: optionalString,
 
   ANTHROPIC_API_KEY: optionalString,
   OPENAI_API_KEY: optionalString,

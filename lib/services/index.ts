@@ -4,6 +4,7 @@ import { SupabaseAccountProvisioner, SupabaseAuthModeration, SupabaseInviteSende
 import { ModerationRepository } from "@/lib/database/repositories/moderation";
 import { NicheRepository } from "@/lib/database/repositories/niches";
 import { ReferralRepository } from "@/lib/database/repositories/referrals";
+import { SubscriptionRepository } from "@/lib/database/repositories/subscriptions";
 import { CreditLedgerRepository } from "@/lib/database/repositories/credit-ledger";
 import { parseMilestones } from "@/lib/referrals/milestones";
 import { CompetitorRepository } from "@/lib/database/repositories/competitors";
@@ -41,6 +42,7 @@ import { CompetitorService } from "./competitor-service";
 import { ModerationService } from "./moderation-service";
 import { ChannelService } from "./channel-service";
 import { CreditsService } from "./credits-service";
+import { SubscriptionService } from "./subscription-service";
 import { DiscoveryService } from "./discovery-service";
 import { JobService } from "./job-service";
 import { MONITOR_CHANNELS_JOB_TYPE, MONITOR_VIDEOS_JOB_TYPE, MonitoringService } from "./monitoring-service";
@@ -53,11 +55,12 @@ import { TRENDING_JOB_TYPE, TRENDING_REFRESH_JOB_TYPE, TrendingService } from ".
 import { VideoService } from "./video-service";
 import { WaitlistService } from "./waitlist-service";
 
-export { ChannelService, CreditsService, DiscoveryService, JobService, ResearchService, StorageBudgetService, VideoService };
+export { ChannelService, CreditsService, SubscriptionService, DiscoveryService, JobService, ResearchService, StorageBudgetService, VideoService };
 
 export interface Services {
   channels: ChannelService;
   credits: CreditsService;
+  subscriptions: SubscriptionService;
   videos: VideoService;
   waitlist: WaitlistService;
   onboarding: OnboardingService;
@@ -97,6 +100,7 @@ export interface Services {
     niches: NicheRepository;
     referrals: ReferralRepository;
     creditLedger: CreditLedgerRepository;
+    subscriptions: SubscriptionRepository;
     competitors: CompetitorRepository;
     youtubeCache: YouTubeCacheRepository;
   };
@@ -142,6 +146,7 @@ export function getServices(): Services {
     moderation: lazy(() => new ModerationRepository(lazyDb())),
     referrals: lazy(() => new ReferralRepository(lazyDb())),
     creditLedger: lazy(() => new CreditLedgerRepository(lazyDb())),
+    subscriptions: lazy(() => new SubscriptionRepository(lazyDb())),
     niches: lazy(() => new NicheRepository(lazyDb())),
     competitors: lazy(() => new CompetitorRepository(lazyDb())),
     youtubeCache: lazy(() => new YouTubeCacheRepository(lazyDb())),
@@ -262,10 +267,13 @@ export function getServices(): Services {
     ...(config.LIBRARY_GROWTH_SEARCHES_PER_RUN > 0 || config.LIBRARY_FEATURED_CHECKS_PER_RUN > 0 ? [{ type: LIBRARY_GROWTH_JOB_TYPE, everyHours: 6 }] : []),
   ]);
 
+  const subscriptions = new SubscriptionService(repositories.subscriptions);
   const credits = new CreditsService(
     repositories.usage,
     config.MONTHLY_CREDITS,
-    async (userId) => (await accounts.limitsFor(userId)).monthlyCredits,
+    // An owner-set allowance wins; otherwise the user's plan decides. A banned or
+    // restricted account comes back as 0 here, and 0 is not null, so it stays 0.
+    async (userId) => (await accounts.limitsFor(userId)).monthlyCredits ?? (await subscriptions.monthlyCreditsFor(userId)),
     (userId, since) => repositories.referrals.bonusSince(userId, since),
     repositories.creditLedger,
   );
@@ -310,6 +318,7 @@ export function getServices(): Services {
       targetCountries: quality.countries,
     }),
     credits,
+    subscriptions,
     accounts,
     moderation: new ModerationService({
       moderation: repositories.moderation,
