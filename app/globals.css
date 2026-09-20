@@ -3767,6 +3767,33 @@ html:has(.landing-root) {
 }
 
 /* FAQ */
+/* Each plan carries its own colour, so the tiers are told apart at a glance
+   rather than by reading the prices. Free stays neutral on purpose: it should
+   not compete with the plans that pay for the servers. */
+.pricing-card,
+.billing-plan {
+  --plan: rgba(255, 255, 255, 0.5);
+  --plan-soft: rgba(255, 255, 255, 0.05);
+  --plan-edge: rgba(255, 255, 255, 0.1);
+  --plan-fill: linear-gradient(135deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.08));
+}
+
+.pricing-card[data-plan="pro"],
+.billing-plan[data-plan="pro"] {
+  --plan: #a78bfa;
+  --plan-soft: rgba(139, 92, 246, 0.14);
+  --plan-edge: rgba(139, 92, 246, 0.45);
+  --plan-fill: linear-gradient(135deg, #8b5cf6, #6366f1);
+}
+
+.pricing-card[data-plan="expert"],
+.billing-plan[data-plan="expert"] {
+  --plan: #22d3ee;
+  --plan-soft: rgba(34, 211, 238, 0.12);
+  --plan-edge: rgba(34, 211, 238, 0.42);
+  --plan-fill: linear-gradient(135deg, #22d3ee, #14b8a6);
+}
+
 /* Landing pricing: the page's one ask, so it gets the width and the air. */
 .pricing-section {
   max-width: 1120px;
@@ -3811,9 +3838,14 @@ html:has(.landing-root) {
   border-color: rgba(255, 255, 255, 0.16);
 }
 
-.pricing-card[data-featured="true"] {
-  background: linear-gradient(180deg, rgba(139, 92, 246, 0.16), rgba(255, 255, 255, 0.03));
-  border-color: rgba(139, 92, 246, 0.42);
+.pricing-card[data-plan="pro"],
+.pricing-card[data-plan="expert"] {
+  background: linear-gradient(180deg, var(--plan-soft), rgba(255, 255, 255, 0.025));
+  border-color: var(--plan-edge);
+}
+
+.pricing-card:hover {
+  border-color: var(--plan);
 }
 
 .pricing-card-head {
@@ -3838,8 +3870,8 @@ html:has(.landing-root) {
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  background: var(--accent-gradient);
-  color: #fff;
+  background: var(--plan-fill);
+  color: #0b0b10;
 }
 
 .pricing-blurb {
@@ -3885,15 +3917,15 @@ html:has(.landing-root) {
   gap: 4px;
   padding: 14px 16px;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: var(--plan-soft);
+  border: 1px solid var(--plan-edge);
   font-size: 13px;
   color: rgba(255, 255, 255, 0.62);
 }
 
 .pricing-credits strong {
   font-size: 15px;
-  color: #fff;
+  color: var(--plan);
   font-variant-numeric: tabular-nums;
 }
 
@@ -3922,7 +3954,21 @@ html:has(.landing-root) {
 .pricing-points svg {
   flex: none;
   margin-top: 2px;
-  color: var(--accent-2, #a78bfa);
+  color: var(--plan);
+}
+
+/* The paid plans get a filled button in their own colour; Free's stays quiet. */
+.pricing-cta {
+  background: var(--plan-fill);
+  border-color: transparent;
+  color: #0b0b10;
+  font-weight: 650;
+}
+
+.pricing-card[data-plan="free"] .pricing-cta {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #fff;
 }
 
 .pricing-foot {
@@ -8177,9 +8223,10 @@ a.dash-row:hover {
   background: var(--surface-2);
 }
 
-.billing-plan[data-featured="true"] {
-  border-color: var(--accent-track);
-  background: var(--accent-wash);
+.billing-plan[data-plan="pro"],
+.billing-plan[data-plan="expert"] {
+  border-color: var(--plan-edge);
+  background: linear-gradient(180deg, var(--plan-soft), transparent 70%);
 }
 
 .billing-plan[data-current="true"] {
@@ -8339,7 +8386,7 @@ a.dash-row:hover {
   content: "✓";
   flex: none;
   font-weight: 700;
-  color: var(--accent-text);
+  color: var(--plan);
 }
 
 .billing-packs {

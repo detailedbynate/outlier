@@ -147,7 +147,7 @@ function PricingSection() {
           const paid = plan.priceCents > 0;
           return (
             <Reveal key={plan.id} delay={i * 80}>
-              <form action={startPublicSubscription} className="pricing-card" data-featured={Boolean(plan.badge)}>
+              <form action={startPublicSubscription} className="pricing-card" data-plan={plan.id} data-featured={Boolean(plan.badge)}>
                 <input type="hidden" name="planId" value={plan.id} />
                 <div className="pricing-card-head">
                   <h3>{plan.name}</h3>
@@ -167,8 +167,8 @@ function PricingSection() {
                   <span>{plan.creditsNote}</span>
                 </div>
                 {paid ? (
-                  <button type="submit" className={`pill-button pill-button-lg ${plan.badge ? "pill-button-primary" : "pill-button-ghost"}`}>
-                    Subscribe now
+                  <button type="submit" className="pill-button pill-button-lg pricing-cta">
+                    Get {plan.name}
                   </button>
                 ) : (
                   <ScrollLink to="waitlist" className="pill-button pill-button-ghost pill-button-lg">

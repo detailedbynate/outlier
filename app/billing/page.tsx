@@ -111,6 +111,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Sear
                   key={plan.id}
                   action={isCurrent && paid ? openBillingPortal : startSubscription}
                   className="billing-plan"
+                  data-plan={plan.id}
                   data-current={isCurrent}
                   data-featured={Boolean(plan.badge)}
                 >
