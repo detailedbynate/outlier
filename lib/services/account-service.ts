@@ -163,9 +163,11 @@ export class AccountService {
    * No email goes out from here. Outlier sends its own signup link, which lets
    * them set a password rather than landing on a sign-in page they can't use.
    */
-  async provisionSubscriber(email: string, redirectTo = "/"): Promise<{ userId: string; existed: boolean }> {
+  async provisionSubscriber(email: string, redirectTo: string): Promise<{ userId: string; existed: boolean }> {
     const clean = email.trim().toLowerCase();
     if (!clean) throw new ValidationError("A subscriber needs an email address.");
+    // Supabase builds a real URL out of this, so a bare path can't work.
+    if (!/^https?:\/\//.test(redirectTo)) throw new ValidationError("A subscriber's redirect must be an absolute URL.");
     const { userId, existed } = await this.deps.provisioner.provision(clean, redirectTo, "link");
     const existing = await this.deps.repository.findByUserId(userId);
     // Never demote someone who already has a role (owner, admin).
