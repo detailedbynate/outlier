@@ -2,6 +2,7 @@ import "server-only";
 import type Stripe from "stripe";
 import { AppError } from "@/lib/core/errors";
 import { logger } from "@/lib/core/logger";
+import { getAdminDatabase } from "@/lib/database";
 import { getServices } from "@/lib/services";
 import { env } from "@/lib/core/env";
 import { INVITE_TTL_MS } from "@/lib/auth/signup-invites";
@@ -38,9 +39,7 @@ export async function fulfillPublicSubscription(session: Stripe.Checkout.Session
   const existingId = await services.repositories.accounts.userIdByEmail(email);
   // Only ask about an account once there's an id to ask about: "" is not a uuid.
   const account = existingId ? await services.repositories.accounts.findByUserId(existingId) : null;
-  const { userId, existed } = account
-    ? { userId: existingId!, existed: true }
-    : await services.accounts.provisionSubscriber(email, `${site}/`);
+  const { userId } = account ? { userId: existingId! } : await services.accounts.provisionSubscriber(email, `${site}/`);
   if (!userId) throw new AppError("UPSTREAM_ERROR", "Subscriber account could not be created.");
 
   const subscription = await getStripe().subscriptions.retrieve(subscriptionId);
@@ -51,10 +50,27 @@ export async function fulfillPublicSubscription(session: Stripe.Checkout.Session
   }
   await applySubscription(subscription, userId);
 
-  // Someone who already had an account signs in the way they always did.
-  if (!existed) await sendSignupInvite(userId, email, planOrFree(planForSubscription(subscription)).name);
-  logger.info("subscriber account ready", { userId, sessionId: session.id, existed });
+  // Whether the auth user is new says nothing about whether they can sign in: a
+  // half-finished signup leaves one with no password. Ask the only question that
+  // matters — has this person ever got in? — so nobody is left locked out of
+  // something they paid for.
+  const needsPassword = await hasNeverSignedIn(userId);
+  if (needsPassword) await sendSignupInvite(userId, email, planOrFree(planForSubscription(subscription)).name);
+  logger.info("subscriber account ready", { userId, sessionId: session.id, invited: needsPassword });
   return { email };
+}
+
+/** Has this account never been signed into? Then it has no password worth keeping. */
+async function hasNeverSignedIn(userId: string): Promise<boolean> {
+  try {
+    const { data, error } = await getAdminDatabase().auth.admin.getUserById(userId);
+    if (error || !data.user) return true;
+    return !data.user.last_sign_in_at;
+  } catch (error) {
+    // Unsure: send the link. A spare email beats a locked-out subscriber.
+    logger.warn("could not check sign-in history", { userId, error });
+    return true;
+  }
 }
 
 /**
