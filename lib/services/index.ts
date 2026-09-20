@@ -5,6 +5,7 @@ import { ModerationRepository } from "@/lib/database/repositories/moderation";
 import { NicheRepository } from "@/lib/database/repositories/niches";
 import { ReferralRepository } from "@/lib/database/repositories/referrals";
 import { SubscriptionRepository } from "@/lib/database/repositories/subscriptions";
+import { SignupInviteRepository } from "@/lib/auth/signup-invites";
 import { CreditLedgerRepository } from "@/lib/database/repositories/credit-ledger";
 import { parseMilestones } from "@/lib/referrals/milestones";
 import { CompetitorRepository } from "@/lib/database/repositories/competitors";
@@ -101,6 +102,7 @@ export interface Services {
     referrals: ReferralRepository;
     creditLedger: CreditLedgerRepository;
     subscriptions: SubscriptionRepository;
+    signupInvites: SignupInviteRepository;
     competitors: CompetitorRepository;
     youtubeCache: YouTubeCacheRepository;
   };
@@ -147,6 +149,7 @@ export function getServices(): Services {
     referrals: lazy(() => new ReferralRepository(lazyDb())),
     creditLedger: lazy(() => new CreditLedgerRepository(lazyDb())),
     subscriptions: lazy(() => new SubscriptionRepository(lazyDb())),
+    signupInvites: lazy(() => new SignupInviteRepository(lazyDb())),
     niches: lazy(() => new NicheRepository(lazyDb())),
     competitors: lazy(() => new CompetitorRepository(lazyDb())),
     youtubeCache: lazy(() => new YouTubeCacheRepository(lazyDb())),

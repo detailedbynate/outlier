@@ -312,6 +312,16 @@ export type CreditLedgerRow = {
   created_at: string;
 };
 
+/** A one-time signup link emailed to a new subscriber. */
+export type SignupInviteRow = {
+  token_hash: string;
+  user_id: string;
+  email: string;
+  expires_at: string;
+  used_at: string | null;
+  created_at: string;
+};
+
 /** Who follows which channel. One row per user per channel. */
 export type ChannelFollowRow = {
   user_id: string;
@@ -556,6 +566,7 @@ export type Database = {
       credit_ledger: TableDef<CreditLedgerRow, "user_id" | "amount" | "kind">;
       subscriptions: TableDef<SubscriptionRow, "user_id">;
       channel_follows: TableDef<ChannelFollowRow, "user_id" | "channel_id">;
+      signup_invites: TableDef<SignupInviteRow, "token_hash" | "user_id" | "email" | "expires_at">;
       moderation_actions: TableDef<ModerationActionRow, "target_email" | "action">;
       youtube_quota_usage: {
         Row: YouTubeQuotaUsageRow;

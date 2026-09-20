@@ -45,16 +45,16 @@ export default async function WelcomePage({ searchParams }: { searchParams: Sear
           ) : (
             <>
               <p>
-                Thanks for subscribing. We&apos;ve sent a sign-in link to {email ? <strong>{email}</strong> : "your email"} — open it and
-                you&apos;re straight in. No password to make up.
+                Thanks for subscribing. We&apos;ve emailed {email ? <strong>{email}</strong> : "you"} a link to finish setting up your
+                account — open it, pick a password, and you&apos;re in.
               </p>
               <p className="muted">
-                Can&apos;t find it? Check spam. The link works for a while, and you can always ask for a new one from the sign-in page.
+                Can&apos;t find it? Check your spam folder. The link works once and lasts a week.
               </p>
             </>
           )}
-          <Link href="/login" className="pill-button pill-button-primary pill-button-lg">
-            Go to sign in
+          <Link href="/login" className="pill-button pill-button-ghost pill-button-lg">
+            Already set a password? Sign in
           </Link>
         </section>
       </main>

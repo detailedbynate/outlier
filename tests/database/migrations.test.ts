@@ -13,6 +13,7 @@ const EXPECTED_TABLES = [
   "credit_ledger",
   "subscriptions",
   "channel_follows",
+  "signup_invites",
   "youtube_quota_usage",
   "youtube_api_cache",
   "workspaces",
@@ -112,6 +113,33 @@ describe("supabase migrations", () => {
     await db.query(`delete from public.channels where id = $1`, [channel]);
     const left = await db.query(`select 1 from public.channel_follows where channel_id = $1`, [channel]);
     expect(left.rows).toHaveLength(0);
+  });
+
+  it("spends a signup invite exactly once", async () => {
+    const { rows } = await db.query<{ id: string }>(`insert into auth.users (email) values ('paid@example.com') returning id`);
+    const userId = rows[0]!.id;
+    const hash = "a".repeat(64);
+    await db.query(
+      `insert into public.signup_invites (token_hash, user_id, email, expires_at) values ($1, $2, 'paid@example.com', now() + interval '7 days')`,
+      [hash, userId],
+    );
+
+    // The claim is a conditional update, so a second submission changes nothing.
+    const claim = () => db.query(`update public.signup_invites set used_at = now() where token_hash = $1 and used_at is null returning user_id`, [hash]);
+    expect((await claim()).rows).toHaveLength(1);
+    expect((await claim()).rows).toHaveLength(0);
+
+    // An expired invite is refused on the same condition.
+    const stale = "b".repeat(64);
+    await db.query(
+      `insert into public.signup_invites (token_hash, user_id, email, expires_at) values ($1, $2, 'paid@example.com', now() - interval '1 hour')`,
+      [stale, userId],
+    );
+    const claimFresh = await db.query(
+      `update public.signup_invites set used_at = now() where token_hash = $1 and used_at is null and expires_at > now() returning user_id`,
+      [stale],
+    );
+    expect(claimFresh.rows).toHaveLength(0);
   });
 
   it("cascades snapshots and videos when a channel is deleted", async () => {

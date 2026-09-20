@@ -157,14 +157,16 @@ export class AccountService {
 
   /**
    * Give a paying subscriber an account, no actor required: the payment is the
-   * authorization. They get an emailed sign-in link and an ordinary member
-   * account, which is what marks them approved. Their credit allowance comes
-   * from the plan, so no override is set here.
+   * authorization. They get an ordinary member account, which is what marks them
+   * approved; their credit allowance comes from the plan, so no override is set.
+   *
+   * No email goes out from here. Outlier sends its own signup link, which lets
+   * them set a password rather than landing on a sign-in page they can't use.
    */
   async provisionSubscriber(email: string, redirectTo = "/"): Promise<{ userId: string; existed: boolean }> {
     const clean = email.trim().toLowerCase();
     if (!clean) throw new ValidationError("A subscriber needs an email address.");
-    const { userId, existed } = await this.deps.provisioner.provision(clean, redirectTo, "email");
+    const { userId, existed } = await this.deps.provisioner.provision(clean, redirectTo, "link");
     const existing = await this.deps.repository.findByUserId(userId);
     // Never demote someone who already has a role (owner, admin).
     if (!existing) {

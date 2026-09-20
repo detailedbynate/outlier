@@ -150,6 +150,11 @@ const serverEnvSchema = z.object({
   STRIPE_PRICE_PRO: optionalString,
   STRIPE_PRICE_EXPERT: optionalString,
 
+  /** Resend API key, for the emails Outlier sends itself (the subscriber's signup link). */
+  RESEND_API_KEY: optionalString,
+  /** From address on those emails; must be on a domain verified with Resend. */
+  EMAIL_FROM: z.string().trim().default("Outlier <no-reply@useoutlier.online>"),
+
   ANTHROPIC_API_KEY: optionalString,
   OPENAI_API_KEY: optionalString,
 

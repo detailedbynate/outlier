@@ -3,7 +3,11 @@ import type Stripe from "stripe";
 import { AppError } from "@/lib/core/errors";
 import { logger } from "@/lib/core/logger";
 import { getServices } from "@/lib/services";
-import { applySubscription } from "./subscriptions";
+import { env } from "@/lib/core/env";
+import { INVITE_TTL_MS } from "@/lib/auth/signup-invites";
+import { emailEnabled, sendEmail, signupEmail } from "@/lib/email/send";
+import { planOrFree } from "./plans";
+import { applySubscription, planForSubscription } from "./subscriptions";
 import { getStripe } from "./stripe";
 
 /**
@@ -31,14 +35,11 @@ export async function fulfillPublicSubscription(session: Stripe.Checkout.Session
 
   const services = getServices();
   const existingId = await services.repositories.accounts.userIdByEmail(email);
-  const account = await services.repositories.accounts.findByUserId(existingId ?? "");
-  let userId = existingId;
-
-  if (!account) {
-    // Emails them a sign-in link, which is how they get in the first time.
-    const provisioned = await services.accounts.provisionSubscriber(email);
-    userId = provisioned.userId;
-  }
+  // Only ask about an account once there's an id to ask about: "" is not a uuid.
+  const account = existingId ? await services.repositories.accounts.findByUserId(existingId) : null;
+  const { userId, existed } = account
+    ? { userId: existingId!, existed: true }
+    : await services.accounts.provisionSubscriber(email);
   if (!userId) throw new AppError("UPSTREAM_ERROR", "Subscriber account could not be created.");
 
   const subscription = await getStripe().subscriptions.retrieve(subscriptionId);
@@ -48,6 +49,35 @@ export async function fulfillPublicSubscription(session: Stripe.Checkout.Session
     await getStripe().subscriptions.update(subscriptionId, { metadata: { ...subscription.metadata, userId } });
   }
   await applySubscription(subscription, userId);
-  logger.info("subscriber account ready", { userId, sessionId: session.id });
+
+  // Someone who already had an account signs in the way they always did.
+  if (!existed) await sendSignupInvite(userId, email, planOrFree(planForSubscription(subscription)).name);
+  logger.info("subscriber account ready", { userId, sessionId: session.id, existed });
   return { email };
+}
+
+/**
+ * Email the one-time link that lets a new subscriber set a password. A failure
+ * here must not fail the payment: the account exists either way, and they can
+ * ask for a new link from the sign-in page.
+ */
+export async function sendSignupInvite(userId: string, email: string, planName: string): Promise<boolean> {
+  if (!emailEnabled()) {
+    logger.error("no email provider configured, subscriber has no way in", { userId });
+    return false;
+  }
+  try {
+    const { token } = await getServices().repositories.signupInvites.create(userId, email);
+    const base = env().SITE_URL ?? "https://www.useoutlier.online";
+    const { subject, html, text } = signupEmail({
+      planName,
+      url: `${base}/signup?token=${encodeURIComponent(token)}`,
+      days: Math.round(INVITE_TTL_MS / 86_400_000),
+    });
+    await sendEmail({ to: email, subject, html, text });
+    return true;
+  } catch (error) {
+    logger.error("signup invite email failed", { userId, error });
+    return false;
+  }
 }
