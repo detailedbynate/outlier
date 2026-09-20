@@ -28,9 +28,15 @@ function newToken(): string {
 export class SignupInviteRepository {
   constructor(private readonly db: DatabaseClient) {}
 
-  /** Mint a link for this user. Any unused older ones are spent, so only the newest works. */
+  /**
+   * Mint a link for this user.
+   *
+   * Outstanding links are deliberately left alone. Fulfilment runs from both the
+   * webhook and the return page, and invalidating the older one meant the first
+   * email someone opened was already dead. Every unused link stays good until
+   * one of them is spent, which retires the rest.
+   */
   async create(userId: string, email: string, now: Date = new Date()): Promise<{ token: string; expiresAt: Date }> {
-    await this.db.from("signup_invites").update({ used_at: now.toISOString() }).eq("user_id", userId).is("used_at", null);
     const token = newToken();
     const expiresAt = new Date(now.getTime() + INVITE_TTL_MS);
     unwrap(
@@ -41,6 +47,21 @@ export class SignupInviteRepository {
       "signup_invites.create",
     );
     return { token, expiresAt };
+  }
+
+  /** Is there already a link in this person's inbox that still works? */
+  async hasActive(userId: string, now: Date = new Date()): Promise<boolean> {
+    const rows = unwrap(
+      await this.db
+        .from("signup_invites")
+        .select("token_hash")
+        .eq("user_id", userId)
+        .is("used_at", null)
+        .gt("expires_at", now.toISOString())
+        .limit(1),
+      "signup_invites.hasActive",
+    );
+    return rows.length > 0;
   }
 
   /** The invite this token stands for, or null when it's unknown, spent or expired. */
@@ -70,6 +91,12 @@ export class SignupInviteRepository {
         .select("*"),
       "signup_invites.consume",
     );
-    return rows[0] ?? null;
+    const invite = rows[0] ?? null;
+    // Signing up retires every other link they were sent, so a duplicate email
+    // can't be used to set the password a second time.
+    if (invite) {
+      await this.db.from("signup_invites").update({ used_at: now.toISOString() }).eq("user_id", invite.user_id).is("used_at", null);
+    }
+    return invite;
   }
 }

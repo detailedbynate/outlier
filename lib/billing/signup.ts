@@ -84,7 +84,14 @@ export async function sendSignupInvite(userId: string, email: string, planName: 
     return false;
   }
   try {
-    const { token } = await getServices().repositories.signupInvites.create(userId, email);
+    const invites = getServices().repositories.signupInvites;
+    // Fulfilment runs twice by design (webhook and return page). One email each
+    // time would be two emails and one confused subscriber.
+    if (await invites.hasActive(userId)) {
+      logger.info("signup link already sent, not sending another", { userId });
+      return true;
+    }
+    const { token } = await invites.create(userId, email);
     const { subject, html, text } = signupEmail({
       planName,
       url: `${env().SITE_URL ?? "https://www.useoutlier.online"}/signup?token=${encodeURIComponent(token)}`,
