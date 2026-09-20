@@ -7,7 +7,6 @@ import { CREDIT_PACKS, formatPrice } from "@/lib/billing/packs";
 import { billingEnabled, fulfillCheckout, getStripe } from "@/lib/billing/stripe";
 import { getServices } from "@/lib/services";
 import { FREE_PLAN, onSale, PLANS } from "@/lib/billing/plans";
-import { CREDIT_COSTS } from "@/lib/services/credits-service";
 import { ZapIcon } from "@/components/icons";
 import { sellablePlans, syncSubscription } from "@/lib/billing/subscriptions";
 import { openBillingPortal, startCheckout, startSubscription } from "./actions";
@@ -107,10 +106,6 @@ export default async function BillingPage({ searchParams }: { searchParams: Sear
               const isCurrent = subscription.plan.id === plan.id;
               const sale = onSale(plan, now);
               const paid = plan.priceCents > 0;
-              // Credits are abstract; what they buy isn't. Both numbers come from
-              // the real costs, so they can't drift away from what's charged.
-              const discoveries = Math.floor(plan.monthlyCredits / CREDIT_COSTS.discover_channels);
-              const reports = Math.floor(plan.monthlyCredits / CREDIT_COSTS.niche_research);
               return (
                 <form
                   key={plan.id}
@@ -138,12 +133,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Sear
                       <ZapIcon size={16} />
                       {plan.monthlyCredits.toLocaleString("en-US")} credits/mo.
                     </strong>
-                    <span>
-                      = <strong>{discoveries.toLocaleString("en-US")}</strong> channel discoveries
-                    </span>
-                    <span>
-                      or <strong>{reports.toLocaleString("en-US")}</strong> fresh niche reports
-                    </span>
+                    <span>{plan.creditsNote}</span>
                     <span className="billing-plan-topup">Top up any time from {formatPrice(cheapestPack.priceCents)} — bought credits never expire</span>
                   </div>
 

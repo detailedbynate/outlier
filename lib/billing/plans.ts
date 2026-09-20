@@ -16,6 +16,12 @@ export interface Plan {
   name: string;
   /** Monthly credit allowance. Resets on the 1st (UTC), like every allowance. */
   monthlyCredits: number;
+  /**
+   * What the allowance feels like to use, in plain words. Deliberately not a
+   * count of actions: an exact number invites arithmetic, and the small ones
+   * make a plan sound worse than it is.
+   */
+  creditsNote: string;
   /** What they pay each month, in US cents. Zero on the free plan. */
   priceCents: number;
   /**
@@ -40,6 +46,7 @@ export const PLANS: readonly Plan[] = [
     monthlyCredits: 50,
     priceCents: 0,
     blurb: "For trying Outlier on one channel",
+    creditsNote: "Enough to explore a niche and see what the tools find",
     features: ["Every research tool, nothing locked", "Shorts Channels, Niche Finder, competitor tracking", "Credits reset on the 1st"],
   },
   {
@@ -50,6 +57,7 @@ export const PLANS: readonly Plan[] = [
     listPriceCents: 1_500,
     badge: "Most popular",
     blurb: "For creators researching every week",
+    creditsNote: "Research most days without watching the meter",
     features: ["30× the credits of Free", "Enough to research every day of the month", "Top up any time — bought credits never expire", "Cancel any time"],
   },
   {
@@ -58,6 +66,7 @@ export const PLANS: readonly Plan[] = [
     monthlyCredits: 5_000,
     priceCents: 3_000,
     blurb: "For studios running several channels",
+    creditsNote: "A whole roster's research, every week of the month",
     features: ["Over 3× the credits of Pro", "Room for a whole roster of channels", "Deep discovery searches without rationing", "Cancel any time"],
   },
 ];
