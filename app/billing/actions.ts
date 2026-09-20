@@ -80,6 +80,9 @@ export async function startSubscription(formData: FormData): Promise<void> {
       // Stripe is the seller of record: it handles sales tax/VAT, fraud and disputes.
       managed_payments: { enabled: true },
       line_items: [{ price, quantity: 1 }],
+      // Launch offers and comped accounts are run as Stripe promotion codes, so
+      // the discount lives with the subscription instead of in our own pricing.
+      allow_promotion_codes: true,
       client_reference_id: current.user.id,
       ...(existing.stripeCustomerId ? { customer: existing.stripeCustomerId } : { customer_email: current.email || undefined }),
       metadata: { userId: current.user.id, planId: plan.id },
