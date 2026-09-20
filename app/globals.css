@@ -2375,7 +2375,7 @@ tr:last-child td {
   gap: 2px;
   padding: 11px 13px;
   border-radius: 11px;
-  background: var(--surface-1);
+  background: var(--surface-3);
   border: 1px solid var(--border);
 }
 
@@ -7931,82 +7931,204 @@ a.dash-row:hover {
   font-variant-numeric: tabular-nums;
 }
 
-/* Plans: three cards, the current one marked so nobody buys what they already have. */
+/* Plans: one card per tier, each reading top to bottom — what you get, what it
+   costs, the button, then the detail. Roomy on purpose: this is the page people
+   decide on, so nothing here is compressed to save space. */
+.billing-plans-section {
+  margin: 8px 0 36px;
+}
+
+.billing-plans-lede {
+  margin: 0 0 20px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
 .billing-plans {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-  gap: 14px;
-  margin-bottom: 28px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 18px;
+  align-items: start;
 }
 
 .billing-plan {
-  display: grid;
-  gap: 8px;
-  align-content: start;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 26px 24px 28px;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.billing-plan[data-featured="true"] {
+  border-color: var(--accent-track);
+  background: var(--accent-wash);
 }
 
 .billing-plan[data-current="true"] {
-  border-color: var(--accent-track);
-  background: var(--accent-wash);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-track);
 }
 
 .billing-plan-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
-.billing-plan-head strong {
+.billing-plan-head h3 {
+  margin: 0;
   font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.billing-plan-badge {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--accent);
+  color: var(--accent-contrast, #fff);
+}
+
+.billing-plan-badge[data-tone="current"] {
+  background: var(--surface-3, var(--surface-2));
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.billing-plan-blurb {
+  margin: -6px 0 0;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+}
+
+/* What the credits actually buy, boxed so it reads before the price does. */
+.billing-plan-credits {
+  display: grid;
+  gap: 6px;
+  padding: 15px 16px;
+  border-radius: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.billing-plan-credits > strong {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.billing-plan-credits > strong svg {
+  color: var(--warning);
+}
+
+.billing-plan-credits span strong {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.billing-plan-topup {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--grid);
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 .billing-plan-price {
   display: flex;
   align-items: baseline;
-  gap: 6px;
+  gap: 10px;
+  margin-top: 4px;
 }
 
 .billing-plan-price strong {
-  font-size: 30px;
+  font-size: 40px;
   font-weight: 700;
+  line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 
 .billing-plan-was {
-  font-size: 14px;
+  font-size: 16px;
   color: var(--text-muted);
   text-decoration: line-through;
 }
 
-.billing-plan-blurb {
-  margin: 0;
+.billing-plan-terms {
+  margin-top: -8px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.billing-plan-terms.is-centred {
+  margin-top: -6px;
+  text-align: center;
+}
+
+.billing-plan-cta {
+  width: 100%;
+  justify-content: center;
+  padding: 12px 16px;
+  font-size: 14.5px;
+  font-weight: 600;
+}
+
+.billing-plan[data-featured="true"] .billing-plan-cta:not(:disabled) {
+  background: var(--accent);
+  color: var(--accent-contrast, #fff);
+  border-color: transparent;
+}
+
+.billing-plan-cta.is-placeholder {
+  display: block;
+  padding: 12px 16px;
+  text-align: center;
   font-size: 13px;
-  color: var(--text-secondary);
+  color: var(--text-muted);
+  border: 1px dashed var(--border);
+  border-radius: 10px;
 }
 
 .billing-plan-features {
-  margin: 0;
-  padding: 0;
+  margin: 6px 0 0;
+  padding: 16px 0 0;
+  border-top: 1px solid var(--grid);
   list-style: none;
   display: grid;
-  gap: 5px;
-  font-size: 13px;
+  gap: 9px;
+  font-size: 13.5px;
   color: var(--text-secondary);
 }
 
-.billing-plan-features li::before {
-  content: "¹3";
-  margin-right: 7px;
-  color: var(--accent-text);
+.billing-plan-features li {
+  display: flex;
+  gap: 9px;
 }
 
-.billing-plan button {
-  margin-top: 8px;
+.billing-plan-features li::before {
+  content: "✓";
+  flex: none;
+  font-weight: 700;
+  color: var(--accent-text);
 }
 
 .billing-packs {
   display: grid;
+  margin-top: 14px;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 14px;
 }

@@ -6,7 +6,9 @@ import { logger } from "@/lib/core/logger";
 import { CREDIT_PACKS, formatPrice } from "@/lib/billing/packs";
 import { billingEnabled, fulfillCheckout, getStripe } from "@/lib/billing/stripe";
 import { getServices } from "@/lib/services";
-import { onSale, PLANS } from "@/lib/billing/plans";
+import { FREE_PLAN, onSale, PLANS } from "@/lib/billing/plans";
+import { CREDIT_COSTS } from "@/lib/services/credits-service";
+import { ZapIcon } from "@/components/icons";
 import { sellablePlans, syncSubscription } from "@/lib/billing/subscriptions";
 import { openBillingPortal, startCheckout, startSubscription } from "./actions";
 
@@ -16,6 +18,8 @@ export const metadata: Metadata = { title: "Credits · Outlier" };
 type SearchParams = Promise<{ status?: string; session_id?: string }>;
 
 const PLAN_ORDER = new Map(PLANS.map((plan, index) => [plan.id, index]));
+/** The cheapest top-up, quoted on every plan so the credit cap never looks like a wall. */
+const cheapestPack = [...CREDIT_PACKS].sort((a, b) => a.priceCents - b.priceCents)[0]!;
 
 export default async function BillingPage({ searchParams }: { searchParams: SearchParams }) {
   const current = await requireApprovedUser();
@@ -89,53 +93,90 @@ export default async function BillingPage({ searchParams }: { searchParams: Sear
       </section>
 
       {enabled && plans.length > 0 ? (
-        <section aria-label="Plans">
+        <section className="billing-plans-section" aria-label="Plans">
           <h2 className="section-title">Plans</h2>
-          <p className="stat-note">
+          <p className="billing-plans-lede">
             {subscription.plan.priceCents > 0
               ? subscription.cancelAtPeriodEnd
                 ? `Your ${subscription.plan.name} plan ends ${subscription.currentPeriodEnd ? new Date(subscription.currentPeriodEnd).toLocaleDateString("en-US", { dateStyle: "medium" }) : "at the end of this period"}.`
                 : `You're on ${subscription.plan.name}. Change or cancel any time.`
-              : "Pick a plan for more credits each month, or stay on Free."}
+              : "More credits each month, so research doesn't stop halfway through the week."}
           </p>
           <div className="billing-plans">
-            {plans.map((plan) => {
+            {[FREE_PLAN, ...plans].map((plan) => {
               const isCurrent = subscription.plan.id === plan.id;
               const sale = onSale(plan, now);
+              const paid = plan.priceCents > 0;
+              // Credits are abstract; what they buy isn't. Both numbers come from
+              // the real costs, so they can't drift away from what's charged.
+              const discoveries = Math.floor(plan.monthlyCredits / CREDIT_COSTS.discover_channels);
+              const reports = Math.floor(plan.monthlyCredits / CREDIT_COSTS.niche_research);
               return (
-                <form key={plan.id} action={isCurrent ? openBillingPortal : startSubscription} className="card glass billing-plan" data-current={isCurrent}>
+                <form
+                  key={plan.id}
+                  action={isCurrent && paid ? openBillingPortal : startSubscription}
+                  className="billing-plan"
+                  data-current={isCurrent}
+                  data-featured={Boolean(plan.badge)}
+                >
                   <input type="hidden" name="planId" value={plan.id} />
+
                   <div className="billing-plan-head">
-                    <strong>{plan.name}</strong>
-                    {isCurrent ? <span className="pill">Your plan</span> : plan.badge ? <span className="pill">{plan.badge}</span> : null}
+                    <h3>{plan.name}</h3>
+                    {isCurrent ? (
+                      <span className="billing-plan-badge" data-tone="current">
+                        Your plan
+                      </span>
+                    ) : plan.badge ? (
+                      <span className="billing-plan-badge">{plan.badge}</span>
+                    ) : null}
                   </div>
+                  <p className="billing-plan-blurb">{plan.blurb}</p>
+
+                  <div className="billing-plan-credits">
+                    <strong>
+                      <ZapIcon size={16} />
+                      {plan.monthlyCredits.toLocaleString("en-US")} credits/mo.
+                    </strong>
+                    <span>
+                      = <strong>{discoveries.toLocaleString("en-US")}</strong> channel discoveries
+                    </span>
+                    <span>
+                      or <strong>{reports.toLocaleString("en-US")}</strong> fresh niche reports
+                    </span>
+                    <span className="billing-plan-topup">Top up any time from {formatPrice(cheapestPack.priceCents)} — bought credits never expire</span>
+                  </div>
+
                   <div className="billing-plan-price">
-                    <strong>{formatPrice(plan.priceCents)}</strong>
-                    <span className="stat-note">/month</span>
+                    <strong>{paid ? formatPrice(plan.priceCents) : "Free"}</strong>
                     {sale ? <span className="billing-plan-was">{formatPrice(plan.listPriceCents!)}</span> : null}
                   </div>
-                  {sale ? <span className="stat-note">Launch price until 1 October, then {formatPrice(plan.listPriceCents!)}.</span> : null}
-                  <p className="billing-plan-blurb">{plan.blurb}</p>
+                  <span className="billing-plan-terms">
+                    {paid ? "per month, billed monthly" : "no card needed"}
+                    {sale ? ` · launch price until 1 October, then ${formatPrice(plan.listPriceCents!)}` : ""}
+                  </span>
+
+                  {paid || isCurrent ? (
+                    <button type="submit" className="billing-plan-cta" disabled={isCurrent && !paid}>
+                      {isCurrent ? (paid ? "Manage plan" : "Your plan") : PLAN_ORDER.get(plan.id)! < PLAN_ORDER.get(subscription.plan.id)! ? `Switch to ${plan.name}` : `Get ${plan.name}`}
+                    </button>
+                  ) : (
+                    <span className="billing-plan-cta is-placeholder">Included with every account</span>
+                  )}
+                  {paid ? <span className="billing-plan-terms is-centred">Cancel any time</span> : null}
+
                   <ul className="billing-plan-features">
-                    <li>
-                      <strong>{plan.monthlyCredits.toLocaleString("en-US")}</strong> credits a month
-                    </li>
                     {plan.features.map((feature) => (
                       <li key={feature}>{feature}</li>
                     ))}
                   </ul>
-                  <button type="submit" className={plan.badge && !isCurrent ? "button-brand" : undefined}>
-                    {isCurrent ? "Manage plan" : PLAN_ORDER.get(plan.id)! < PLAN_ORDER.get(subscription.plan.id)! ? "Switch" : "Upgrade"}
-                  </button>
                 </form>
               );
             })}
           </div>
           {subscription.hasBilling && subscription.plan.priceCents === 0 ? (
             <form action={openBillingPortal}>
-              <button type="submit">
-                Billing history and invoices
-              </button>
+              <button type="submit">Billing history and invoices</button>
             </form>
           ) : null}
         </section>

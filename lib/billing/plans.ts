@@ -39,8 +39,8 @@ export const PLANS: readonly Plan[] = [
     name: "Free",
     monthlyCredits: 50,
     priceCents: 0,
-    blurb: "Enough to try every tool and see whether Outlier finds you something.",
-    features: ["Every research tool", "Track channels and videos", "Credits reset monthly"],
+    blurb: "For trying Outlier on one channel",
+    features: ["Every research tool, nothing locked", "Shorts Channels, Niche Finder, competitor tracking", "Credits reset on the 1st"],
   },
   {
     id: "pro",
@@ -49,16 +49,16 @@ export const PLANS: readonly Plan[] = [
     priceCents: 1_000,
     listPriceCents: 1_500,
     badge: "Most popular",
-    blurb: "For one creator researching seriously, most days of the week.",
-    features: ["Everything in Free", "~150 channel discoveries a month", "Credits reset monthly", "Cancel any time"],
+    blurb: "For creators researching every week",
+    features: ["30× the credits of Free", "Enough to research every day of the month", "Top up any time — bought credits never expire", "Cancel any time"],
   },
   {
     id: "expert",
     name: "Expert",
     monthlyCredits: 5_000,
     priceCents: 3_000,
-    blurb: "For agencies and people running several channels at once.",
-    features: ["Everything in Pro", "~500 channel discoveries a month", "Room for a whole team's research", "Cancel any time"],
+    blurb: "For studios running several channels",
+    features: ["Over 3× the credits of Pro", "Room for a whole roster of channels", "Deep discovery searches without rationing", "Cancel any time"],
   },
 ];
 
