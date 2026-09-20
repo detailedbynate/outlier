@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ComponentType } from "react";
-import { BookmarkIcon, ChartIcon, CompassIcon, FlameIcon, GridIcon, ShortsIcon, SlidersIcon, UsersIcon } from "./icons";
+import { BookmarkIcon, ChartIcon, CoinsIcon, CompassIcon, FlameIcon, GridIcon, ShortsIcon, SlidersIcon, UsersIcon } from "./icons";
 
 interface NavItem {
   href: string;
@@ -33,6 +33,7 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
   {
     title: "Account",
     items: [
+      { href: "/billing", label: "Plans & credits", icon: CoinsIcon },
       { href: "/settings/preferences", label: "Preferences", icon: SlidersIcon },
       { href: "/referrals", label: "Refer friends", icon: UsersIcon, badge: "Earn" },
     ],
