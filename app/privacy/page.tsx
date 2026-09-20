@@ -117,9 +117,12 @@ export default function PrivacyPage() {
 
       <h2>Children</h2>
       <p>
-        Outlier is for people {MIN_AGE} and over, and isn&apos;t directed at children. We don&apos;t knowingly collect personal
-        information from anyone under {MIN_AGE}. If you believe a child has given us their information, email us and we&apos;ll
-        delete the account and its data.
+        Outlier is for people {MIN_AGE} and over — older where your country sets a higher age for consenting to online services
+        on your own — and it isn&apos;t directed at younger children. We don&apos;t knowingly collect personal information from
+        anyone under {MIN_AGE}, and we don&apos;t ask anyone for their age beyond their agreement to our{" "}
+        <Link href="/terms">Terms</Link>. If you&apos;re a parent or guardian and your child has given us their information
+        without your permission, email <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a> and we&apos;ll delete the account
+        and everything in it.
       </p>
 
       <h2>Security</h2>

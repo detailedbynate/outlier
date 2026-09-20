@@ -11,7 +11,13 @@ export const EFFECTIVE_DATE = "September 20, 2026";
 /** Where disputes are heard. Change this if the operator's province changes. */
 export const JURISDICTION = "Ontario, Canada";
 
-/** Minimum age to hold an account. Deliberately above COPPA's 13. */
-export const MIN_AGE = 16;
+/**
+ * Minimum age to hold an account: COPPA's floor, and the same age YouTube
+ * itself requires. Both legal pages qualify it out loud, because a flat number
+ * would be wrong in two ways — GDPR lets member states set digital consent
+ * anywhere up to 16, and someone this age can't agree to a paid subscription
+ * on their own.
+ */
+export const MIN_AGE = 13;
 
 export const CONTACT_EMAIL = "support@useoutlier.online";

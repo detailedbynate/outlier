@@ -16,10 +16,15 @@ export default function TermsPage() {
 
       <h2>1. Your account</h2>
       <p>
-        You must be at least {MIN_AGE} years old to use Outlier. One account is for one person or one business; keep your login
-        details private, because you&apos;re responsible for what happens on your account. Tell us right away if you think
-        someone else has got into it. If you&apos;re signing up for a company, you&apos;re confirming you&apos;re allowed to
-        agree to these terms on its behalf.
+        You must be at least {MIN_AGE} years old to use Outlier, or older if the country you live in sets a higher age for
+        agreeing to online services on your own. If you&apos;re under the age of majority where you live, you need a parent or
+        guardian&apos;s permission to subscribe, and they agree to these terms together with you and are responsible for the
+        payments on the account.
+      </p>
+      <p>
+        One account is for one person or one business; keep your login details private, because you&apos;re responsible for what
+        happens on your account. Tell us right away if you think someone else has got into it. If you&apos;re signing up for a
+        company, you&apos;re confirming you&apos;re allowed to agree to these terms on its behalf.
       </p>
 
       <h2>2. Plans, credits, and what you get</h2>
