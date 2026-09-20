@@ -12,10 +12,10 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 
 /** Bookmark: tracked channels refresh daily and show in Tracked Channels. No YouTube quota is used here. */
 export async function setChannelTracked(formData: FormData): Promise<void> {
-  await requireApprovedUser();
+  const current = await requireApprovedUser();
   const channelId = String(formData.get("channelId") ?? "");
   if (!UUID_PATTERN.test(channelId)) return;
-  await getServices().repositories.channels.setTracked(channelId, formData.get("tracked") === "true");
+  await getServices().repositories.channels.setFollowing(current.user.id, channelId, formData.get("tracked") === "true");
   revalidatePath("/research/shorts-channels");
   revalidatePath("/channels");
 }

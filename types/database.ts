@@ -312,6 +312,13 @@ export type CreditLedgerRow = {
   created_at: string;
 };
 
+/** Who follows which channel. One row per user per channel. */
+export type ChannelFollowRow = {
+  user_id: string;
+  channel_id: string;
+  created_at: string;
+};
+
 /** A user's paid plan, mirrored from Stripe by the webhook. */
 export type SubscriptionRow = Timestamps & {
   user_id: string;
@@ -548,6 +555,7 @@ export type Database = {
       credit_grants: TableDef<CreditGrantRow, "user_id" | "amount" | "reason">;
       credit_ledger: TableDef<CreditLedgerRow, "user_id" | "amount" | "kind">;
       subscriptions: TableDef<SubscriptionRow, "user_id">;
+      channel_follows: TableDef<ChannelFollowRow, "user_id" | "channel_id">;
       moderation_actions: TableDef<ModerationActionRow, "target_email" | "action">;
       youtube_quota_usage: {
         Row: YouTubeQuotaUsageRow;

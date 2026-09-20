@@ -10,6 +10,9 @@ const EXPECTED_TABLES = [
   "referral_codes",
   "referral_rewards",
   "credit_grants",
+  "credit_ledger",
+  "subscriptions",
+  "channel_follows",
   "youtube_quota_usage",
   "youtube_api_cache",
   "workspaces",
@@ -84,6 +87,31 @@ describe("supabase migrations", () => {
     await expect(
       db.query(`insert into public.channels (youtube_channel_id, title) values ($1, 'dupe')`, [CHANNEL_ID]),
     ).rejects.toThrow(/channels_youtube_channel_id_key/);
+  });
+
+  it("keeps one person's tracked channels out of everyone else's", async () => {
+    const user = async (email: string) =>
+      (await db.query<{ id: string }>(`insert into auth.users (email) values ($1) returning id`, [email])).rows[0]!.id;
+    const [alice, bob] = [await user("alice@example.com"), await user("bob@example.com")];
+    const channel = (
+      await db.query<{ id: string }>(`insert into public.channels (youtube_channel_id, title) values ($1, 'Shared') returning id`, [
+        "UCshared0000000000000000",
+      ])
+    ).rows[0]!.id;
+
+    await db.query(`insert into public.channel_follows (user_id, channel_id) values ($1, $2)`, [alice, channel]);
+    const forBob = await db.query(`select 1 from public.channel_follows where user_id = $1`, [bob]);
+    expect(forBob.rows).toHaveLength(0);
+
+    // Following twice is the same as following once.
+    await db.query(`insert into public.channel_follows (user_id, channel_id) values ($1, $2) on conflict do nothing`, [alice, channel]);
+    const forAlice = await db.query(`select 1 from public.channel_follows where user_id = $1`, [alice]);
+    expect(forAlice.rows).toHaveLength(1);
+
+    // A deleted channel takes the follows with it, rather than leaving orphans.
+    await db.query(`delete from public.channels where id = $1`, [channel]);
+    const left = await db.query(`select 1 from public.channel_follows where channel_id = $1`, [channel]);
+    expect(left.rows).toHaveLength(0);
   });
 
   it("cascades snapshots and videos when a channel is deleted", async () => {

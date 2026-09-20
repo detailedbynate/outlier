@@ -40,7 +40,7 @@ export class CompareService {
 
   constructor(
     private readonly deps: {
-      channels: Pick<ChannelRepository, "findByYouTubeId" | "findByHandle" | "listSnapshots" | "setTracked">;
+      channels: Pick<ChannelRepository, "findByYouTubeId" | "findByHandle" | "listSnapshots" | "markForDailyRefresh">;
       videos: Pick<VideoRepository, "recentVideos">;
       channelService: Pick<ChannelService, "refreshChannel">;
     },
@@ -87,16 +87,17 @@ export class CompareService {
     const stale = !channel?.last_synced_at || now.getTime() - Date.parse(channel.last_synced_at) > FRESH_MS;
     if (!channel || stale) {
       try {
-        // Tracking keeps daily snapshots coming, so subscriber growth builds up over time.
-        channel = (await this.deps.channelService.refreshChannel(channel?.youtube_channel_id ?? identifier, { track: true }, now)).channel;
+        // Daily snapshots keep subscriber growth building up over time. This is a
+        // refresh schedule, not a bookmark: it stays out of the user's tracked list.
+        channel = (await this.deps.channelService.refreshChannel(channel?.youtube_channel_id ?? identifier, { dailyRefresh: true }, now)).channel;
       } catch (error) {
         // Out of quota: compare with the data we already have, and let the daily refresh catch up.
         if (!channel || !isQuotaUnavailable(error)) throw error;
         this.log.info("compare using stored data (quota unavailable)", { identifier });
-        if (!channel.tracked) await this.deps.channels.setTracked(channel.id, true);
+        if (!channel.tracked) await this.deps.channels.markForDailyRefresh([channel.id]);
       }
     } else if (!channel.tracked) {
-      await this.deps.channels.setTracked(channel.id, true);
+      await this.deps.channels.markForDailyRefresh([channel.id]);
     }
 
     const [shorts, longs, snapshots] = await Promise.all([

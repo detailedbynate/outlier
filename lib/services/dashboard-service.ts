@@ -88,7 +88,7 @@ export class DashboardService {
 
   constructor(
     private readonly deps: {
-      channels: Pick<ChannelRepository, "count" | "list" | "findByIds" | "findByIdentifiers" | "snapshotsForChannels" | "findChannelIdsByKeywords" | "searchShortsChannels">;
+      channels: Pick<ChannelRepository, "count" | "list" | "listFollowed" | "countFollowed" | "findByIds" | "findByIdentifiers" | "snapshotsForChannels" | "findChannelIdsByKeywords" | "searchShortsChannels">;
       videos: Pick<VideoRepository, "fastMoving" | "feed">;
       usage: Pick<UsageRepository, "recentForUser" | "countForUserSince" | "record">;
       credits: Pick<CreditsService, "status">;
@@ -119,7 +119,7 @@ export class DashboardService {
 
   async overview(userId: string, lastVisitAt: string | null, now: Date = new Date()): Promise<Overview> {
     const [trackedChannels, researchThisWeek, credits] = await Promise.all([
-      this.deps.channels.count({ tracked: true }),
+      this.deps.channels.countFollowed(userId),
       this.deps.usage.countForUserSince(userId, RESEARCH_EVENTS, new Date(now.getTime() - 7 * 86_400_000)),
       this.deps.credits.status(userId, now),
     ]);
@@ -157,11 +157,11 @@ export class DashboardService {
     };
   }
 
-  async yourChannels(ownIdentifier: string | null, now: Date = new Date()): Promise<YourChannels> {
+  async yourChannels(userId: string, ownIdentifier: string | null, now: Date = new Date()): Promise<YourChannels> {
     const own = ownIdentifier ? splitIdentifiers([ownIdentifier]) : null;
     const [ownRows, tracked] = await Promise.all([
       own ? this.deps.channels.findByIdentifiers(own.ids, own.handles) : Promise.resolve([]),
-      this.deps.channels.list({ limit: 24, tracked: true }),
+      this.deps.channels.listFollowed(userId, { limit: 24 }),
     ]);
     const ownChannel = ownIdentifier ? (ownRows.find((c) => matches(c, ownIdentifier)) ?? null) : null;
     const ids = [...new Set([...(ownChannel ? [ownChannel.id] : []), ...tracked.map((c) => c.id)])];

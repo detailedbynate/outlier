@@ -146,8 +146,104 @@ export class ChannelRepository {
     return result.count ?? 0;
   }
 
-  async setTracked(id: string, tracked: boolean): Promise<void> {
-    assertOk(await this.db.from("channels").update({ tracked }).eq("id", id), "channels.setTracked");
+  /**
+   * Follow or unfollow a channel for one user.
+   *
+   * `channels.tracked` is kept in step as "somebody follows this", because that
+   * is what the refresh scheduler goes on: a channel nobody follows any more
+   * drops back to the slower discovered-channel cadence.
+   */
+  async setFollowing(userId: string, channelId: string, following: boolean): Promise<void> {
+    if (following) {
+      assertOk(
+        await this.db.from("channel_follows").upsert({ user_id: userId, channel_id: channelId }, { onConflict: "user_id,channel_id" }),
+        "channel_follows.follow",
+      );
+    } else {
+      assertOk(await this.db.from("channel_follows").delete().eq("user_id", userId).eq("channel_id", channelId), "channel_follows.unfollow");
+    }
+    await this.refreshTrackedFlag([channelId]);
+  }
+
+  async setFollowingMany(userId: string, channelIds: string[], following: boolean): Promise<void> {
+    if (channelIds.length === 0) return;
+    for (const chunk of inChunks(channelIds)) {
+      if (following) {
+        assertOk(
+          await this.db
+            .from("channel_follows")
+            .upsert(chunk.map((channel_id) => ({ user_id: userId, channel_id })), { onConflict: "user_id,channel_id" }),
+          "channel_follows.followMany",
+        );
+      } else {
+        assertOk(await this.db.from("channel_follows").delete().eq("user_id", userId).in("channel_id", chunk), "channel_follows.unfollowMany");
+      }
+    }
+    await this.refreshTrackedFlag(channelIds);
+  }
+
+  /**
+   * Mark channels for the daily refresh without anyone following them, so tools
+   * that need a growth history (competitor compare) keep getting snapshots.
+   * The flag is shared with following, so the last person to unfollow one of
+   * these puts it back on the slower cadence until the tool asks again.
+   */
+  async markForDailyRefresh(channelIds: string[]): Promise<void> {
+    if (channelIds.length === 0) return;
+    for (const chunk of inChunks(channelIds)) {
+      assertOk(await this.db.from("channels").update({ tracked: true }).in("id", chunk), "channels.markForDailyRefresh");
+    }
+  }
+
+  /** Point `channels.tracked` back at the truth: does anyone follow this channel? */
+  private async refreshTrackedFlag(channelIds: string[]): Promise<void> {
+    if (channelIds.length === 0) return;
+    for (const chunk of inChunks(channelIds)) {
+      const rows = unwrap(await this.db.from("channel_follows").select("channel_id").in("channel_id", chunk), "channel_follows.owners");
+      const followed = new Set(rows.map((row) => row.channel_id));
+      const on = chunk.filter((id) => followed.has(id));
+      const off = chunk.filter((id) => !followed.has(id));
+      if (on.length > 0) assertOk(await this.db.from("channels").update({ tracked: true }).in("id", on), "channels.markTracked");
+      if (off.length > 0) assertOk(await this.db.from("channels").update({ tracked: false }).in("id", off), "channels.markUntracked");
+    }
+  }
+
+  /** Which of these channels the user follows. Given no ids, all of them. */
+  async followedIds(userId: string, channelIds?: string[]): Promise<Set<string>> {
+    if (channelIds?.length === 0) return new Set();
+    const found = new Set<string>();
+    for (const chunk of channelIds ? inChunks(channelIds) : [null]) {
+      let query = this.db.from("channel_follows").select("channel_id").eq("user_id", userId);
+      if (chunk) query = query.in("channel_id", chunk);
+      for (const row of unwrap(await query, "channel_follows.followedIds")) found.add(row.channel_id);
+    }
+    return found;
+  }
+
+  /** One user's followed channels, newest follow first. */
+  async listFollowed(userId: string, options: { limit: number; offset?: number } = { limit: 200 }): Promise<ChannelRow[]> {
+    const offset = options.offset ?? 0;
+    const follows = unwrap(
+      await this.db
+        .from("channel_follows")
+        .select("channel_id")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .range(offset, offset + options.limit - 1),
+      "channel_follows.list",
+    );
+    const ids = follows.map((row) => row.channel_id);
+    if (ids.length === 0) return [];
+    const rows = unwrap(await this.db.from("channels").select("*").in("id", ids), "channels.byFollowedIds");
+    // Keep the order the follows came back in: most recently followed first.
+    const order = new Map(ids.map((id, index) => [id, index]));
+    return rows.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
+  }
+
+  async countFollowed(userId: string): Promise<number> {
+    const result = await this.db.from("channel_follows").select("channel_id", { count: "exact", head: true }).eq("user_id", userId);
+    assertOk(result, "channel_follows.count");
+    return result.count ?? 0;
   }
 
   /**
@@ -424,7 +520,13 @@ export class ChannelRepository {
     if (filters.createdAfter) query = query.gte("channel_created_at", filters.createdAfter.toISOString());
     if (filters.activeSince) query = query.gte("last_short_at", filters.activeSince.toISOString());
     if (filters.country) query = query.eq("country", filters.country);
-    if (filters.tracked !== undefined) query = query.eq("tracked", filters.tracked);
+    // "Tracked" is per-user, so it narrows to the channels this user follows
+    // rather than the shared flag, which only says somebody somewhere follows it.
+    if (filters.followedBy) {
+      const followed = await this.followedIds(filters.followedBy, filters.channelIds);
+      if (followed.size === 0) return [];
+      query = query.in("channel_id", [...followed]);
+    }
     // Their views come from other people's work, so they'd crowd out real creators.
     if (filters.excludeLowQuality !== false) query = query.not("quality_flags", "ov", "{reupload,compilation,spam_or_misleading}");
     if (filters.targetMarket) {
@@ -514,10 +616,6 @@ export class ChannelRepository {
     );
   }
 
-  async setTrackedMany(ids: string[], tracked: boolean): Promise<void> {
-    if (ids.length === 0) return;
-    for (const chunk of inChunks(ids)) assertOk(await this.db.from("channels").update({ tracked }).in("id", chunk), "channels.setTrackedMany");
-  }
 }
 
 export interface ShortsChannelFilters {
@@ -534,7 +632,8 @@ export interface ShortsChannelFilters {
   activeSince?: Date;
   /** ISO 3166 alpha-2. */
   country?: string;
-  tracked?: boolean;
+  /** Only channels this user follows. */
+  followedBy?: string;
   /** Only channels in the target language, from listed countries (or no country set). */
   targetMarket?: { countries: readonly string[] };
   /** Leave out channels flagged as reuploads, compilations or spam (default true). */

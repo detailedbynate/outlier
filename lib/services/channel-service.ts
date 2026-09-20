@@ -164,16 +164,20 @@ export class ChannelService {
   /**
    * Full refresh: channel stats + latest uploads + metrics.
    * `light` is for channels found by research tools: fewer uploads, no descriptions.
-   * `track` marks the channel for daily refreshes.
+   * `followedBy` adds it to that user's tracked channels; `dailyRefresh` only
+   * puts it on the daily refresh schedule, without it appearing in anyone's list.
    */
   async refreshChannel(
     identifier: string,
-    options: { light?: boolean; track?: boolean } = {},
+    options: { light?: boolean; followedBy?: string; dailyRefresh?: boolean } = {},
     now: Date = new Date(),
   ): Promise<SyncChannelResult & { videosSynced: number }> {
     const synced = await this.syncChannel(identifier, now);
-    if (options.track && !synced.channel.tracked) {
-      await this.channels.setTracked(synced.channel.id, true);
+    if (options.followedBy) {
+      await this.channels.setFollowing(options.followedBy, synced.channel.id, true);
+      synced.channel = { ...synced.channel, tracked: true };
+    } else if (options.dailyRefresh && !synced.channel.tracked) {
+      await this.channels.markForDailyRefresh([synced.channel.id]);
       synced.channel = { ...synced.channel, tracked: true };
     }
     const light = options.light && !synced.channel.tracked;

@@ -153,7 +153,7 @@ export function parseState(params: Record<string, string | string[] | undefined>
 }
 
 /** `targetCountries` come from the OUTLIER_COUNTRIES setting. */
-export function toFilters(state: ShortsPageState, targetCountries: readonly string[] = []): Omit<ShortsChannelFilters, "channelIds"> {
+export function toFilters(state: ShortsPageState, targetCountries: readonly string[] = [], userId?: string): Omit<ShortsChannelFilters, "channelIds"> {
   const find = <T extends Option>(options: readonly T[], key: string) => options.find((o) => o.key === key)!;
   const subs = find(SUBSCRIBERS, state.subs) as { min?: number; max?: number };
   const views = find(AVG_VIEWS, state.views) as { min?: number };
@@ -168,7 +168,7 @@ export function toFilters(state: ShortsPageState, targetCountries: readonly stri
     activeSince: active.days ? daysAgo(active.days) : undefined,
     minShortsShare: share.min,
     country: state.country === "any" ? undefined : state.country,
-    tracked: state.tracked === "yes" ? true : undefined,
+    followedBy: state.tracked === "yes" ? userId : undefined,
     // A specific country choice overrides the market filter's country list.
     targetMarket: state.market === "en" ? { countries: state.country === "any" ? targetCountries : [] } : undefined,
     orderBy: find(SORTS, state.sort).column,

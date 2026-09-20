@@ -293,8 +293,8 @@ function VideoRow({ video }: { video: VideoFeedRow }) {
   );
 }
 
-export async function YourChannelsSection({ ownChannel }: { ownChannel: string | null }) {
-  const data = await getServices().dashboard.yourChannels(ownChannel);
+export async function YourChannelsSection({ userId, ownChannel }: { userId: string; ownChannel: string | null }) {
+  const data = await getServices().dashboard.yourChannels(userId, ownChannel);
   const own = data.own;
 
   return (

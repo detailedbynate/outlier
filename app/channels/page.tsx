@@ -11,12 +11,12 @@ import { setChannelTracked } from "../research/shorts-channels/actions";
 export const dynamic = "force-dynamic";
 
 export default async function ChannelsPage() {
-  await requireApprovedUser();
-  const channels = await getServices().repositories.channels.list({ limit: 200, tracked: true });
+  const current = await requireApprovedUser();
+  const channels = await getServices().repositories.channels.listFollowed(current.user.id, { limit: 200 });
 
   return (
     <div className="stack">
-      <PageHeader icon={BookmarkIcon} title="Tracked Channels" subtitle="Channels you track are refreshed every day." />
+      <PageHeader icon={BookmarkIcon} title="Tracked Channels" subtitle="The channels you track, refreshed every day. Only you can see this list." />
 
       <section className="card">
         <h2>Track a channel</h2>

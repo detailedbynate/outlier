@@ -49,7 +49,7 @@ export async function DashboardView({ current }: { current: CurrentUser }) {
 
       <div className="dash-columns">
         <Suspense fallback={<PanelSkeleton rows={4} />}>
-          <YourChannelsSection ownChannel={preferences?.channel ?? null} />
+          <YourChannelsSection userId={userId} ownChannel={preferences?.channel ?? null} />
         </Suspense>
         <Suspense fallback={<PanelSkeleton rows={4} />}>
           <CompetitorWatchSection competitors={preferences?.competitors ?? []} />

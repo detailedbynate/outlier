@@ -23,7 +23,7 @@ export async function trackChannel(_prev: TrackChannelState, formData: FormData)
   const services = getServices();
   try {
     await services.credits.assertAvailable(user.id, "track_channel");
-    const { channel } = await asUser(user.id, "action:track_channel", () => services.channels.refreshChannel(identifier, { track: true }));
+    const { channel } = await asUser(user.id, "action:track_channel", () => services.channels.refreshChannel(identifier, { followedBy: user.id }));
     await services.credits.charge(user.id, "track_channel", channel.youtube_channel_id);
     youtubeChannelId = channel.youtube_channel_id;
   } catch (error) {

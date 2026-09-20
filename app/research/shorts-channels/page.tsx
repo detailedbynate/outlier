@@ -42,7 +42,7 @@ export const maxDuration = 60;
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 export default async function ShortsChannelsPage({ searchParams }: { searchParams: SearchParams }) {
-  const { isAdmin } = await requireApprovedUser();
+  const { isAdmin, user } = await requireApprovedUser();
   const state = parseState(await searchParams);
   const showVideos = state.videos !== "hide";
 
@@ -51,14 +51,17 @@ export default async function ShortsChannelsPage({ searchParams }: { searchParam
   // Trending picks show on the default view, before the user searches or filters.
   const isDefaultView = !state.q && advancedCount === 0 && !quick;
 
-  const { research, trending } = getServices();
+  const { research, trending, repositories } = getServices();
   const targetCountries = qualityConfigFrom(env()).countries;
   const [{ channels, terms }, popular, searchesLeft, picks] = await Promise.all([
-    research.browseShortsChannels(state.q, toFilters(state, targetCountries), showVideos ? 8 : 0),
+    research.browseShortsChannels(state.q, toFilters(state, targetCountries, user.id), showVideos ? 8 : 0),
     research.popularKeywords(10),
     research.discoverySearchesLeftToday(),
     isDefaultView ? trending.currentPicks() : Promise.resolve([]),
   ]);
+  // Tracking is per-user, so the bookmark state comes from this user's follows
+  // rather than the shared flag on the row.
+  const followed = await repositories.channels.followedIds(user.id, channels.map((c) => c.channel_id));
   const picksUpdatedAt = picks.map((p) => p.stats_updated_at ?? p.created_at).sort().at(-1);
   const canLoadMore = channels.length === Number(state.limit) && Number(state.limit) < MAX_LIMIT;
   // Filters ride along with the search so typing a new query keeps them.
@@ -270,7 +273,7 @@ export default async function ShortsChannelsPage({ searchParams }: { searchParam
       ) : (
         <div className="channel-list">
           {channels.map((channel) => (
-            <ChannelCard key={channel.channel_id} channel={channel} showVideos={showVideos} highlightGrowth={isRealtimeSort(state.sort)} />
+            <ChannelCard key={channel.channel_id} channel={{ ...channel, tracked: followed.has(channel.channel_id) }} showVideos={showVideos} highlightGrowth={isRealtimeSort(state.sort)} />
           ))}
         </div>
       )}
