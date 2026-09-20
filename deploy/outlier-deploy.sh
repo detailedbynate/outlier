@@ -5,14 +5,28 @@
 set -euo pipefail
 cd /opt/outlier
 echo "== fetching =="
+before=$(git rev-parse HEAD)
 git fetch --quiet origin main
 git reset --quiet --hard origin/main
 git log --oneline -1
-echo "== installing =="
-npm ci --no-audit --no-fund --silent
+
+# npm ci deletes node_modules and reinstalls everything, which is minutes of
+# work. Dependencies only change when the lockfile does, so most deploys — a
+# tweak to a page or a stylesheet — can skip it entirely.
+if [ ! -d node_modules ] || ! git diff --quiet "$before" HEAD -- package-lock.json package.json; then
+  echo "== installing (lockfile changed) =="
+  npm ci --no-audit --no-fund --silent
+  chown -R outlier:outlier node_modules
+else
+  echo "== installing == skipped, dependencies unchanged"
+fi
+
 echo "== building =="
 npm run build 2>&1 | tail -5
-chown -R outlier:outlier /opt/outlier
+# Everything but node_modules, which is already owned correctly and is by far
+# the biggest thing here.
+find /opt/outlier -maxdepth 1 -mindepth 1 ! -name node_modules -exec chown -R outlier:outlier {} +
+
 echo "== restarting =="
 systemctl restart outlier
 # The scraper runs the same checkout, so it needs restarting too or it keeps
