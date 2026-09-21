@@ -69,7 +69,7 @@ async function main(): Promise<void> {
   const { getServices, ChannelService } = await import("@/lib/services");
   const { runWithQuotaContext } = await import("@/lib/youtube");
   const { createHybridSource, getGate, InnerTubeBlockedError } = await import("@/lib/innertube");
-  const { clampState, decide, FileRampStore, initialState, parseSteps } = await import("@/lib/innertube/ramp");
+  const { clampState, decide, DEFAULT_THAW_HOURS, FileRampStore, initialState, parseSteps } = await import("@/lib/innertube/ramp");
 
   const config = env();
   getAdminDatabase();
@@ -98,13 +98,14 @@ async function main(): Promise<void> {
   // The ladder search survives restarts, so a deploy doesn't forget what YouTube already refused.
   const steps = parseSteps(process.env.INNERTUBE_RAMP_STEPS, [config.INNERTUBE_REQUESTS_PER_MINUTE]);
   const cleanHours = numberSetting("INNERTUBE_RAMP_CLEAN_HOURS", 24, 1, 168);
+  const thawHours = numberSetting("INNERTUBE_RAMP_THAW_HOURS", DEFAULT_THAW_HOURS, 1, 720);
   const rampStore = new FileRampStore();
   const stored = await rampStore.read();
   let ramp = clampState(stored ?? initialState(new Date()), steps, new Date());
   // Save it now, so restarts don't keep resetting the clock on the current step.
   if (!stored) await rampStore.write(ramp);
   gate.setRequestsPerMinute(steps[ramp.step]!);
-  logger.info("scraper started", { batch, perMinute: gate.requestsPerMinute, steps, cleanHours, ceiling: ramp.ceiling });
+  logger.info("scraper started", { batch, perMinute: gate.requestsPerMinute, steps, cleanHours, thawHours, ceiling: ramp.ceiling, frozen: ramp.frozen });
 
   const skipUntil = new Map<string, number>();
 
@@ -154,7 +155,7 @@ async function main(): Promise<void> {
     logger.info("scraper round", { due: due.length, refreshed, reads: source.takeCounts(), gate: stats });
 
     // Step up after a clean stretch, step down the moment YouTube pushes back.
-    const decision = decide(ramp, { blocks: stats.blocks, now: new Date(), steps, cleanHours });
+    const decision = decide(ramp, { blocks: stats.blocks, now: new Date(), steps, cleanHours, thawHours });
     if (decision.change) {
       gate.setRequestsPerMinute(decision.rate);
       await rampStore.write(decision.state);

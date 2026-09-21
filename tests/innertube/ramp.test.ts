@@ -60,11 +60,36 @@ describe("ramp", () => {
     expect(decision.reason).toContain("9/min");
   });
 
-  it("stays frozen below the ceiling, however long it stays clean", () => {
+  it("holds below the ceiling while the freeze is fresh", () => {
     const blocked = run(state({ step: 2 }), 1, later(30)).state;
-    const decision = run(blocked, 0, later(30 + 24 * 7));
+    const decision = run(blocked, 0, later(30 + 12));
     expect(decision).toMatchObject({ rate: 6, change: null, reason: "holding below the ceiling" });
-    expect(decision.state.step).toBe(1);
+    expect(decision.state).toMatchObject({ step: 1, frozen: true });
+  });
+
+  it("thaws after a long clean stretch, but won't climb back into the ceiling", () => {
+    const blocked = run(state({ step: 2 }), 1, later(30)).state;
+    const thawed = run(blocked, 0, later(30 + 24 * 7));
+    expect(thawed).toMatchObject({ rate: 6, change: null });
+    expect(thawed.reason).toContain("thawed");
+    expect(thawed.state).toMatchObject({ step: 1, frozen: false, ceiling: 9 });
+
+    // Clean for another full step, but 9/min is the rate that was refused.
+    const next = run(thawed.state, 0, later(30 + 24 * 8));
+    expect(next).toMatchObject({ rate: 6, change: null, reason: "next step would reach the 9/min ceiling" });
+  });
+
+  it("treats a block at the bottom rung as unproven and climbs again once thawed", () => {
+    // Nothing is slower than the first rung, so the refused rate was never
+    // actually backed away from — the ladder must not be pinned there for good.
+    const blocked = run(state({ step: 0 }), 1, later(2)).state;
+    expect(blocked).toMatchObject({ step: 0, ceiling: 4, frozen: true });
+
+    const thawed = run(blocked, 0, later(2 + 24 * 4)).state;
+    expect(thawed.frozen).toBe(false);
+
+    const next = run(thawed, 0, later(2 + 24 * 5));
+    expect(next).toMatchObject({ rate: 6, change: "up" });
   });
 
   it("keeps stepping down if the lower rate is blocked too", () => {
