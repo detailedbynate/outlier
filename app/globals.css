@@ -8429,3 +8429,62 @@ a.dash-row:hover {
     grid-template-columns: 1fr;
   }
 }
+
+/* "Dig into X": one sub-niche opened in full, above the topic's other niches. */
+.niche-focus {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid var(--border-soft);
+  border-radius: 18px;
+  background: var(--surface-2);
+}
+
+.niche-focus-back {
+  align-self: flex-start;
+  font-size: 13px;
+}
+
+.niche-focus-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.niche-focus-head h2 {
+  margin: 4px 0 6px;
+  font-size: 26px;
+  text-transform: capitalize;
+  color: var(--accent-text);
+}
+
+.niche-focus-head .dash-row-sub {
+  max-width: 52ch;
+}
+
+.niche-focus-examples {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (max-width: 900px) {
+  .niche-focus-examples {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .niche-focus {
+    padding: 14px;
+  }
+
+  .niche-focus-head h2 {
+    font-size: 21px;
+  }
+
+  .niche-focus-examples {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

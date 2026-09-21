@@ -6,7 +6,7 @@ import { CompassIcon, FlameIcon, SearchIcon, UsersIcon } from "@/components/icon
 import { requireApprovedUser } from "@/lib/auth/session";
 import { isAppError } from "@/lib/core/errors";
 import { formatCompact, formatPercent, timeAgo } from "@/lib/format";
-import type { Level, NicheMetrics } from "@/lib/niches/analysis";
+import { topicKey, type Level, type NicheMetrics, type SubNiche } from "@/lib/niches/analysis";
 import { getServices } from "@/lib/services";
 import { parseNicheQuery } from "@/lib/niches/query";
 import type { NicheCreator, NicheExample } from "@/lib/niches/examples";
@@ -22,11 +22,17 @@ const EXAMPLES = ["good niches around fitness", "underrated niches right now", "
 const LEVEL_LABEL: Record<Level, string> = { low: "Low", medium: "Medium", high: "High" };
 const FORMAT_LABEL = { shorts: "Shorts", long_form: "Long-form", both: "Both work", unknown: "Not enough data" } as const;
 
-type SearchParams = Promise<{ topic?: string }>;
+type SearchParams = Promise<{ topic?: string; sub?: string }>;
 
 export default async function NicheFinderPage({ searchParams }: { searchParams: SearchParams }) {
   const { user } = await requireApprovedUser();
-  const asked = ((await searchParams).topic ?? "").trim().slice(0, 120);
+  const params = await searchParams;
+  const asked = (params.topic ?? "").trim().slice(0, 120);
+  // "Dig into X" drills into one sub-niche of the topic already researched. It
+  // is never researched on its own: "escape" inside "steal a brainrot" means
+  // nothing away from its topic, and looking it up alone returns a different
+  // subject entirely.
+  const drill = (params.sub ?? "").trim().slice(0, 120);
   // "good niches around fitness" and "fitness" both work; "top niches" browses.
   const { intent, topic } = parseNicheQuery(asked);
   const services = getServices();
@@ -81,7 +87,7 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
       </header>
 
       {error ? <div className="dash-empty">{error}</div> : null}
-      {result ? <Report result={result} /> : null}
+      {result ? <Report result={result} drill={drill} /> : null}
       {related.length > 0 ? <IdeaBoard ideas={related} title={`Niches next to ${result!.topic}`} sub="Other researched topics that overlap with this one" /> : null}
       {topNiches.length > 0 && (related.length === 0 || thin) ? (
         <IdeaBoard
@@ -106,11 +112,12 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
   );
 }
 
-function Report({ result }: { result: NicheResult }) {
+function Report({ result, drill }: { result: NicheResult; drill: string }) {
   const { report } = result;
   const overall = report.overall;
   const sourceLabel = result.source === "youtube" ? "Fresh from YouTube" : result.source === "cache" ? "Saved report" : "From Outlier data";
   const top = report.subNiches.slice(0, 3);
+  const focus = drill ? (report.subNiches.find((sub) => topicKey(sub.term) === topicKey(drill)) ?? null) : null;
 
   return (
     <>
@@ -135,10 +142,16 @@ function Report({ result }: { result: NicheResult }) {
           </Link>
         </div>
       ) : (
-        <section className="niche-answer" aria-label={`Top niches in ${result.topic}`}>
+        <section className="niche-answer" aria-label={focus ? `${focus.term} in ${result.topic}` : `Top niches in ${result.topic}`}>
+          {focus ? <SubNicheReport sub={focus} topic={result.topic} /> : null}
+          {drill && !focus ? (
+            <p className="dash-row-sub">
+              &ldquo;{drill}&rdquo; isn&apos;t one of {result.topic}&apos;s niches any more — the report has been rebuilt since that link was made.
+            </p>
+          ) : null}
           <header className="niche-answer-head">
             <h2>
-              {top.length > 0 ? `Top ${top.length} niche${top.length === 1 ? "" : "s"} in ` : ""}
+              {focus ? "Other niches in " : top.length > 0 ? `Top ${top.length} niche${top.length === 1 ? "" : "s"} in ` : ""}
               <span>{result.topic}</span>
             </h2>
             <span className="niche-score" data-band={band(overall.opportunity)} title="Opportunity for the topic as a whole">
@@ -153,11 +166,12 @@ function Report({ result }: { result: NicheResult }) {
             </div>
           ) : (
             <div className="niche-cards">
-              {top.map((sub, i) => (
+              {(focus ? report.subNiches.filter((sub) => sub.term !== focus.term).slice(0, 3) : top).map((sub, i) => (
                 <NicheCard
                   key={sub.term}
                   rank={i + 1}
                   name={sub.term}
+                  href={`/research/niche-finder?topic=${encodeURIComponent(result.topic)}&sub=${encodeURIComponent(sub.term)}`}
                   score={sub.metrics.opportunity}
                   reason={reasonFor(sub.metrics)}
                   metrics={sub.metrics}
@@ -182,6 +196,82 @@ function Report({ result }: { result: NicheResult }) {
         </section>
       )}
     </>
+  );
+}
+
+/**
+ * One sub-niche, opened in full.
+ *
+ * This is what "Dig into X" shows. It reads out of the parent topic's report
+ * rather than researching the term, because a sub-niche's name is only a label
+ * for a slice of those videos — "escape" inside "steal a brainrot" is a group
+ * of uploads, not a subject you can look up on its own.
+ */
+function SubNicheReport({ sub, topic }: { sub: SubNiche; topic: string }) {
+  const metrics = sub.metrics;
+  const examples = sub.examples ?? breakoutExamples(metrics);
+  const creators = sub.creators ?? [];
+
+  return (
+    <section className="niche-focus" aria-label={`${sub.term} in ${topic}`}>
+      <Link href={`/research/niche-finder?topic=${encodeURIComponent(topic)}`} className="dash-link niche-focus-back">
+        ← All niches in {topic}
+      </Link>
+
+      <header className="niche-focus-head">
+        <div>
+          <span className="dash-eyebrow">Inside {topic}</span>
+          <h2>{sub.term}</h2>
+          <p className="dash-row-sub">
+            {reasonFor(metrics)} · {LEVEL_LABEL[metrics.confidence]} confidence
+          </p>
+        </div>
+        <ScoreRing score={metrics.opportunity} label="Opportunity" />
+      </header>
+
+      <MetricGrid metrics={metrics} />
+
+      <h3 className="dash-subhead">
+        <FlameIcon size={14} /> Uploads in this niche
+      </h3>
+      {examples.length === 0 ? (
+        <p className="dash-row-sub">No example videos stored yet. They appear once this topic is refreshed from YouTube.</p>
+      ) : (
+        <div className="niche-examples niche-focus-examples">
+          {examples.slice(0, 12).map((example) => (
+            <ExampleVideo key={example.youtubeVideoId} example={example} />
+          ))}
+        </div>
+      )}
+
+      {creators.length > 0 ? (
+        <div className="niche-creators">
+          <span className="niche-creators-label">Small creators winning here</span>
+          <div className="niche-creator-list">
+            {creators.map((creator) => (
+              <a
+                key={creator.youtubeChannelId}
+                href={`https://www.youtube.com/channel/${creator.youtubeChannelId}`}
+                target="_blank"
+                rel="noreferrer"
+                className="niche-creator"
+              >
+                {creator.thumbnailUrl ? <img src={creator.thumbnailUrl} alt="" loading="lazy" /> : <span className="niche-creator-blank" />}
+                <span>
+                  <strong>{creator.title}</strong>
+                  <em>
+                    {creator.subscribers !== null ? `${formatCompact(creator.subscribers)} subs · ` : ""}
+                    {formatCompact(creator.avgViews)} avg views
+                  </em>
+                </span>
+              </a>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      <Lists metrics={metrics} />
+    </section>
   );
 }
 
@@ -213,6 +303,7 @@ function IdeaBoard({ ideas, title, sub, featured = 0 }: { ideas: NicheIdea[]; ti
               key={idea.topicKey}
               rank={i + 1}
               name={idea.topic}
+              href={`/research/niche-finder?topic=${encodeURIComponent(idea.topic)}`}
               score={idea.opportunity}
               reason={idea.reason}
               tags={{ demand: idea.demand, competition: idea.competition, format: idea.format, smallShare: idea.smallChannelShare }}
@@ -273,6 +364,7 @@ function IdeaTags({ demand, competition, format, smallShare }: TagValues) {
 function NicheCard({
   rank,
   name,
+  href,
   score,
   reason,
   examples,
@@ -282,6 +374,8 @@ function NicheCard({
 }: {
   rank: number;
   name: string;
+  /** Where "Dig into" goes. A sub-niche drills into its parent's report; a topic researches itself. */
+  href: string;
   score: number;
   reason: string;
   examples: NicheExample[];
@@ -349,7 +443,7 @@ function NicheCard({
             </div>
           ) : null}
           {metrics ? <MetricGrid metrics={metrics} compact /> : null}
-          <Link href={`/research/niche-finder?topic=${encodeURIComponent(name)}`} className="dash-link">
+          <Link href={href} className="dash-link">
             Dig into {name} →
           </Link>
         </div>
