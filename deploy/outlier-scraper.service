@@ -63,7 +63,9 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/opt/outlier
+# ProtectSystem=strict makes everything else read-only, so the shared gate file
+# has to be named here or claiming a slot fails and each process paces alone.
+ReadWritePaths=/opt/outlier /var/lib/outlier-innertube
 ProtectKernelTunables=true
 ProtectControlGroups=true
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX

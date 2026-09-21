@@ -80,6 +80,15 @@ export class FileGateState {
     writeFileSync(this.path, JSON.stringify(state), { mode: 0o664 });
   }
 
+  /** Warned once, not per request: a read-only path would otherwise fill the log. */
+  private warned = false;
+
+  private warn(error: unknown): void {
+    if (this.warned) return;
+    this.warned = true;
+    this.hooks.onError?.(error);
+  }
+
   private async lock(): Promise<boolean> {
     for (let attempt = 0; attempt < LOCK_ATTEMPTS; attempt += 1) {
       try {
@@ -119,7 +128,10 @@ export class FileGateState {
    * null when the file can't be claimed, meaning the caller should pace itself.
    */
   async claim(lane: GateLane, gapMs: number): Promise<number | null> {
-    if (!(await this.lock())) return null;
+    if (!(await this.lock())) {
+      this.warn(new Error(`could not claim ${this.path}: every process is pacing itself`));
+      return null;
+    }
     try {
       const state = this.read();
       const now = this.now();
@@ -128,7 +140,7 @@ export class FileGateState {
       this.write(state);
       return slot;
     } catch (error) {
-      this.hooks.onError?.(error);
+      this.warn(error);
       return null;
     } finally {
       this.unlock();

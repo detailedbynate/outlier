@@ -64,9 +64,9 @@ const serverEnvSchema = z.object({
   INNERTUBE_MAX_BREAKER_HOURS: z.coerce.number().min(1).max(72).default(12),
   /** How long a scraped page stays reusable in memory. */
   INNERTUBE_CACHE_TTL_SECONDS: z.coerce.number().int().min(0).max(86_400).default(1_800),
-  /** Uploads read per channel. */
   /** File the scrape budget and circuit breaker are shared through, so every process on the box paces as one. Unset keeps each process pacing itself. */
   INNERTUBE_SHARED_STATE_PATH: z.string().min(1).optional(),
+  /** Uploads read per channel. */
   INNERTUBE_MAX_VIDEOS: z.coerce.number().int().min(5).max(50).default(30),
   /**
    * Interactive reads per minute, on top of the background rate: someone is waiting
