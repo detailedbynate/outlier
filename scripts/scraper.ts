@@ -13,6 +13,10 @@
  * (INNERTUBE_* settings, see .env.example); this script decides which channels
  * to read, when to wait, and how fast to go.
  *
+ * Channels that posted in the last couple of weeks are re-read roughly daily;
+ * everything else waits out the longer interval. A dormant channel has nothing
+ * new to find, and reads spent on it are reads not spent on one that uploads.
+ *
  * Speed ramps itself: one clean day at a rate earns the next step up the ladder
  * (INNERTUBE_RAMP_STEPS), and a bot check gives the step back and settles one
  * rung below what YouTube refused. INNERTUBE_RAMP_STEPS=4 alone pins the rate.
@@ -33,6 +37,10 @@ const HOUR = 60 * MINUTE;
 /** Matches the worker's refresh ages, minus a margin so the scraper gets there first. */
 const TRACKED_AHEAD = 0.8;
 const DISCOVERED_REFRESH_DAYS = 6;
+/** A channel counts as active if it has posted inside this window. */
+const ACTIVE_WITHIN_DAYS = 14;
+/** How often an active channel is re-read. Short, because it keeps producing new uploads. */
+const ACTIVE_REFRESH_HOURS = 20;
 /** Nothing due: look again in a while. */
 const IDLE_WAIT = 15 * MINUTE;
 /** A channel that failed is left to the worker for this long. */
@@ -113,6 +121,7 @@ async function main(): Promise<void> {
       new Date(now - config.SYNC_INTERVAL_HOURS * TRACKED_AHEAD * HOUR),
       new Date(now - DISCOVERED_REFRESH_DAYS * 24 * HOUR),
       batch + skipUntil.size,
+      { since: new Date(now - ACTIVE_WITHIN_DAYS * 24 * HOUR), before: new Date(now - ACTIVE_REFRESH_HOURS * HOUR) },
     ).then((rows) => rows.filter((row) => (skipUntil.get(row.youtube_channel_id) ?? 0) < now).slice(0, batch));
     for (const [id, until] of skipUntil) if (until < now) skipUntil.delete(id);
     if (due.length === 0) {

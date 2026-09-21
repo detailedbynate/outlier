@@ -589,6 +589,26 @@ describe("supabase migrations", () => {
     expect(rows[0]).toMatchObject({ niche_labels: [], quality_flags: [] });
   });
 
+  it("keeps a channel's last_video_at at its newest upload", async () => {
+    const { rows: made } = await db.query<{ id: string }>(
+      `insert into public.channels (youtube_channel_id, title) values ('UClastvideoatxxxxxxxxxxx', 'Poster') returning id`,
+    );
+    const channel = made[0]!.id;
+    const upload = (videoId: string, publishedAt: string) =>
+      db.query(
+        `insert into public.videos (youtube_video_id, channel_id, title, published_at) values ($1, $2, 'Upload', $3)`,
+        [videoId, channel, publishedAt],
+      );
+
+    await upload("vidold00001", "2026-01-05T00:00:00Z");
+    await upload("vidnew00001", "2026-03-09T00:00:00Z");
+    // An older upload arriving late must not drag the channel backwards.
+    await upload("vidold00002", "2025-12-01T00:00:00Z");
+
+    const { rows } = await db.query<{ last_video_at: Date }>(`select last_video_at from public.channels where id = $1`, [channel]);
+    expect(rows[0]!.last_video_at.toISOString()).toBe("2026-03-09T00:00:00.000Z");
+  });
+
   it("defaults new channels to untracked", async () => {
     const { rows } = await db.query<{ tracked: boolean }>(
       `insert into public.channels (youtube_channel_id, title) values ('UCnnnnnnnnnnnnnnnnnnnnnn', 'New') returning tracked`,

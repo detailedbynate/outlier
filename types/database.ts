@@ -79,6 +79,8 @@ export type ChannelRow = Timestamps & {
   keywords: string[];
   niche_id: string | null;
   last_synced_at: string | null;
+  /** Newest upload we've stored for this channel. Maintained by a trigger; drives how often it's refreshed. */
+  last_video_at: string | null;
   /** Tracked channels refresh daily; channels found by research tools refresh weekly. */
   tracked: boolean;
   /** Detected from recent uploads: 'en', 'other', or null when unknown. */

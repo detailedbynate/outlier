@@ -247,21 +247,56 @@ export class ChannelRepository {
   }
 
   /**
-   * Channels due for a scheduled refresh, stalest first: tracked channels synced
-   * before `trackedBefore`, discovered channels synced before `discoveredBefore`.
+   * Channels due for a scheduled refresh, stalest first.
+   *
+   * Three queues, in the order they're worth the read: tracked channels somebody
+   * follows, then channels that have posted recently, then everything else. The
+   * middle one is the point — a channel uploading this week has new videos to
+   * find, and waiting out the dormant interval to reach it means the newest
+   * uploads sit unseen for days while reads go to channels that stopped posting
+   * in 2023. `activeSince` says how recent an upload has to be to count.
    */
-  async listDueForRefresh(trackedBefore: Date, discoveredBefore: Date, limit: number): Promise<ChannelRow[]> {
+  async listDueForRefresh(
+    trackedBefore: Date,
+    discoveredBefore: Date,
+    limit: number,
+    active?: { since: Date; before: Date },
+  ): Promise<ChannelRow[]> {
+    const stale = (before: Date) => `last_synced_at.is.null,last_synced_at.lt.${before.toISOString()}`;
     const due = (tracked: boolean, before: Date) =>
       this.db
         .from("channels")
         .select("*")
         .eq("tracked", tracked)
-        .or(`last_synced_at.is.null,last_synced_at.lt.${before.toISOString()}`)
+        .or(stale(before))
         .order("last_synced_at", { ascending: true, nullsFirst: true })
         .limit(limit);
-    const [tracked, discovered] = await Promise.all([due(true, trackedBefore), due(false, discoveredBefore)]);
-    // Tracked channels take priority for the per-run budget.
-    return [...unwrap(tracked, "channels.dueTracked"), ...unwrap(discovered, "channels.dueDiscovered")].slice(0, limit);
+
+    const activeDue = active
+      ? this.db
+          .from("channels")
+          .select("*")
+          .eq("tracked", false)
+          .gte("last_video_at", active.since.toISOString())
+          .or(stale(active.before))
+          .order("last_synced_at", { ascending: true, nullsFirst: true })
+          .limit(limit)
+      : null;
+
+    const [tracked, fresh, discovered] = await Promise.all([
+      due(true, trackedBefore),
+      activeDue ?? Promise.resolve(null),
+      due(false, discoveredBefore),
+    ]);
+
+    const rows = [
+      ...unwrap(tracked, "channels.dueTracked"),
+      ...(fresh ? unwrap(fresh, "channels.dueActive") : []),
+      ...unwrap(discovered, "channels.dueDiscovered"),
+    ];
+    // The active queue overlaps the discovered one; first mention wins the slot.
+    const seen = new Set<string>();
+    return rows.filter((row) => !seen.has(row.id) && seen.add(row.id)).slice(0, limit);
   }
 
   /** YouTube ids from `ids` that were synced after `since` (used to skip re-ingesting fresh channels). */
