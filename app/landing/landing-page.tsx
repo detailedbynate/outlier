@@ -221,7 +221,6 @@ export async function LandingPage({ referralCode = null }: { referralCode?: stri
             </span>
           </div>
 
-          <p className="landing-eyebrow">Outlier · YouTube intelligence</p>
           <h1 className="landing-title">
             Find your next outlier
             <br />
