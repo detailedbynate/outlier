@@ -110,6 +110,19 @@ export interface GateHooks {
   sleep?: (ms: number) => Promise<void>;
   random?: () => number;
   logger?: Logger;
+  /**
+   * Rate budget and breaker shared with the other processes on this machine.
+   * Without one the gate paces only itself, which understates what YouTube
+   * actually sees when the scraper and the web app both scrape.
+   */
+  shared?: SharedGateState;
+}
+
+/** The slice of {@link FileGateState} the gate needs. */
+export interface SharedGateState {
+  claim(lane: GateLane, gapMs: number): Promise<number | null>;
+  breaker(): { openUntil: number; trips: number };
+  trip(openUntil: number, trips: number): Promise<void>;
 }
 
 /** Errors that mean YouTube is pushing back rather than something being broken. */
@@ -159,6 +172,8 @@ export class InnerTubeGate {
 
   private readonly random: () => number;
 
+  private readonly shared?: SharedGateState;
+
   /** Two queues, one limiter: user reads are served before background ones. */
   private readonly queues: Record<GateLane, Waiter[]> = { user: [], background: [] };
 
@@ -184,13 +199,24 @@ export class InnerTubeGate {
     this.now = hooks.now ?? Date.now;
     this.sleep = hooks.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
     this.random = hooks.random ?? Math.random;
+    this.shared = hooks.shared;
+  }
+
+  /** The later of this process's pause and any other process's. */
+  private pausedUntil(): number {
+    if (!this.shared) return this.openUntil;
+    try {
+      return Math.max(this.openUntil, this.shared.breaker().openUntil);
+    } catch {
+      return this.openUntil;
+    }
   }
 
   state(): GateState {
-    const open = this.openUntil > this.now();
+    const open = this.pausedUntil() > this.now();
     return {
       open,
-      openUntil: open ? new Date(this.openUntil) : null,
+      openUntil: open ? new Date(this.pausedUntil()) : null,
       trips: this.trips,
       failuresInRow: this.failuresInRow,
       queued: this.queues.user.length + this.queues.background.length,
@@ -222,6 +248,7 @@ export class InnerTubeGate {
     this.stats.blocks += 1;
     const pause = Math.min(this.options.breakerMs * 2 ** (this.trips - 1), this.options.maxBreakerMs);
     this.openUntil = this.now() + pause;
+    void this.shared?.trip(this.openUntil, this.trips);
     const error = new InnerTubeBlockedError(reason, new Date(this.openUntil));
     this.log.warn("innertube paused", { reason, minutes: Math.round(pause / 60_000), trips: this.trips });
     // Anything still waiting would only run into the same wall.
@@ -308,9 +335,12 @@ export class InnerTubeGate {
   }
 
   private assertClosed(label: string): void {
-    if (this.openUntil <= this.now()) return;
+    // A block another process saw counts: the IP is what YouTube refused, not
+    // the process.
+    const until = this.pausedUntil();
+    if (until <= this.now()) return;
     this.stats.refused += 1;
-    throw new InnerTubeBlockedError(`paused until ${new Date(this.openUntil).toISOString()} (${label})`, new Date(this.openUntil));
+    throw new InnerTubeBlockedError(`paused until ${new Date(until).toISOString()} (${label})`, new Date(until));
   }
 
   private backoff(attempt: number): number {
@@ -331,9 +361,14 @@ export class InnerTubeGate {
     }
     this.running += 1;
     const now = this.now();
-    const slot = Math.max(now, this.nextSlot[lane]);
-    this.nextSlot[lane] = slot + gap;
-    if (slot > now) await this.sleep(slot - now);
+    // The shared clock is the real one when every process shares an IP; the
+    // local one still advances so maxWaitMs has something to judge, and so a
+    // file that can't be claimed falls back to pacing this process alone.
+    const shared = this.shared ? await this.shared.claim(lane, gap) : null;
+    const slot = shared ?? Math.max(now, this.nextSlot[lane]);
+    this.nextSlot[lane] = Math.max(slot, this.nextSlot[lane]) + gap;
+    const waitUntil = this.now();
+    if (slot > waitUntil) await this.sleep(slot - waitUntil);
   }
 
   private release(): void {
@@ -346,8 +381,8 @@ export class InnerTubeGate {
 let gate: InnerTubeGate | null = null;
 
 /** The process-wide gate. Every InnerTube read shares it. */
-export function getInnerTubeGate(options?: Partial<InnerTubeGateOptions>): InnerTubeGate {
-  gate ??= new InnerTubeGate(options);
+export function getInnerTubeGate(options?: Partial<InnerTubeGateOptions>, shared?: SharedGateState): InnerTubeGate {
+  gate ??= new InnerTubeGate(options, { shared });
   return gate;
 }
 

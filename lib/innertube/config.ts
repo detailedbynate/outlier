@@ -1,5 +1,7 @@
 import { env } from "@/lib/core/env";
+import { createLogger } from "@/lib/core/logger";
 import { getInnerTubeGate, type InnerTubeGate, type InnerTubeGateOptions } from "./gate";
+import { FileGateState } from "./shared-state";
 
 /**
  * Gate settings from the environment, in their own module so both the YouTube
@@ -18,7 +20,18 @@ export function gateOptionsFromEnv(config = env()): Partial<InnerTubeGateOptions
   };
 }
 
-/** The process-wide gate, configured from the environment. Every InnerTube read shares it. */
+/**
+ * The process-wide gate, configured from the environment.
+ *
+ * With INNERTUBE_SHARED_STATE_PATH set, the rate budget and the breaker are
+ * shared with every other process pointed at the same file — the scraper, the
+ * web app's discovery jobs and its live searches all leave from one IP, so
+ * pacing them separately only tells YouTube how many processes we run.
+ */
 export function getGate(config = env()): InnerTubeGate {
-  return getInnerTubeGate(gateOptionsFromEnv(config));
+  const path = config.INNERTUBE_SHARED_STATE_PATH;
+  const shared = path
+    ? new FileGateState(path, { onError: (error) => createLogger({ module: "innertube.shared" }).warn("shared gate state unavailable", { error }) })
+    : undefined;
+  return getInnerTubeGate(gateOptionsFromEnv(config), shared);
 }
