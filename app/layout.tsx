@@ -72,7 +72,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             <Brand />
             <MobileMenuToggle />
             <div id="app-sidebar-menu" className="sidebar-menu">
-            <SidebarNav isAdmin={current.isAdmin} />
+            <SidebarNav isAdmin={current.isAdmin} isOwner={current.isOwner} />
             <div className="sidebar-foot">
               <CreditsMeter status={credits} />
               <form action={signOut} className="sidebar-account">
