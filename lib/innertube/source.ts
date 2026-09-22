@@ -71,6 +71,11 @@ export class InnerTubeSource {
       : { lane: "background" };
   }
 
+  /** The shared client, for readers that live outside this class (transcripts). */
+  innertube(): Promise<Innertube> {
+    return this.yt();
+  }
+
   private async yt(): Promise<Innertube> {
     this.client ??= Innertube.create({ retrieve_player: false, generate_session_locally: true, lang: "en", location: "US" });
     return this.client;
