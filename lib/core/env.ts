@@ -178,13 +178,6 @@ const serverEnvSchema = z.object({
   NICHE_LABEL_BATCH_SIZE: z.coerce.number().int().min(1).max(50).default(20),
   /** Channels labeled per hourly run. */
   NICHE_LABEL_MAX_PER_RUN: z.coerce.number().int().min(0).max(5_000).default(200),
-  /**
-   * Transcripts read per hourly run, and how far back to look for Shorts worth
-   * reading. Each read is a scrape slot, not API quota, so the ceiling is the
-   * shared InnerTube gate — 60 an hour is well inside it. 0 turns backfill off.
-   */
-  TRANSCRIPT_BACKFILL_PER_RUN: z.coerce.number().int().min(0).max(500).default(60),
-  TRANSCRIPT_BACKFILL_DAYS: z.coerce.number().int().min(1).max(365).default(60),
   /** Library growth: discovery searches per run (runs every 6h) and per UTC day. 0 turns growth off. */
   LIBRARY_GROWTH_SEARCHES_PER_RUN: z.coerce.number().int().min(0).max(50).default(3),
   LIBRARY_GROWTH_DAILY_SEARCHES: z.coerce.number().int().min(0).max(500).default(12),

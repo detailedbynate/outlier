@@ -29,7 +29,7 @@ import { JobScheduler } from "@/lib/jobs/scheduler";
 import { labelingProvider } from "@/lib/ai/select";
 import { TranscriptRepository } from "@/lib/database/repositories/transcripts";
 import { ScriptService } from "./script-service";
-import { TRANSCRIPT_BACKFILL_JOB_TYPE, TranscriptService } from "./transcript-service";
+import { TranscriptService } from "./transcript-service";
 import { getAIProviders } from "@/lib/ai/registry";
 import { LIBRARY_SEEDS } from "@/lib/niches/seeds";
 import { LibraryGrowthService } from "./library-growth-service";
@@ -72,6 +72,8 @@ export interface Services {
   dashboard: DashboardService;
   niches: NicheService;
   scripts: ScriptService;
+  /** Transcript backfill. Driven by the scraper process, which owns the scrape budget. */
+  transcripts: TranscriptService;
   referrals: ReferralService;
   competitors: CompetitorService;
   moderation: ModerationService;
@@ -240,7 +242,6 @@ export function getServices(): Services {
     monitoring,
     nicheLabeling,
     libraryGrowth,
-    transcripts,
     youtubeHousekeeping: {
       pruneCache: () => repositories.youtubeCache.pruneExpired(),
       // Keep ~90 days of quota history for reporting.
@@ -263,8 +264,6 @@ export function getServices(): Services {
       monitorMaxVideosPerRun: config.MONITOR_MAX_VIDEOS_PER_RUN,
       monitorMaxChannelsPerRun: config.MONITOR_MAX_CHANNELS_PER_RUN,
       nicheLabelMaxPerRun: config.NICHE_LABEL_MAX_PER_RUN,
-      transcriptBackfillPerRun: config.TRANSCRIPT_BACKFILL_PER_RUN,
-      transcriptBackfillDays: config.TRANSCRIPT_BACKFILL_DAYS,
     },
   });
   const queue = new JobQueue(repositories.jobs, jobRegistry);
@@ -280,7 +279,6 @@ export function getServices(): Services {
     { type: MONITOR_VIDEOS_JOB_TYPE, everyHours: 1 },
     { type: MONITOR_CHANNELS_JOB_TYPE, everyHours: 1 },
     { type: NICHE_LABEL_JOB_TYPE, everyHours: 1 },
-    ...(transcriptReader && config.TRANSCRIPT_BACKFILL_PER_RUN > 0 ? [{ type: TRANSCRIPT_BACKFILL_JOB_TYPE, everyHours: 1 }] : []),
     ...(config.LIBRARY_GROWTH_SEARCHES_PER_RUN > 0 || config.LIBRARY_FEATURED_CHECKS_PER_RUN > 0 ? [{ type: LIBRARY_GROWTH_JOB_TYPE, everyHours: 6 }] : []),
   ]);
 
@@ -325,6 +323,7 @@ export function getServices(): Services {
       },
       { dailyYoutubeRefreshes: config.NICHE_DAILY_YOUTUBE_REFRESHES, language: quality.language, regionCode },
     ),
+    transcripts,
     scripts: new ScriptService({
       ai: text,
       transcripts: repositories.transcripts,

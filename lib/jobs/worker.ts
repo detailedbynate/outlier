@@ -94,18 +94,24 @@ export class JobWorker {
    */
   async drain(options: { deadline: number; maxJobs: number }): Promise<{ processed: number; stoppedBy: "empty" | "deadline" | "max_jobs" }> {
     let processed = 0;
+    // The deadline has to reach the handler, not just sit between jobs: a single
+    // gate-paced job can run for minutes, and a caller that only checks between
+    // them blows its own budget and every job behind it waits for the next tick.
+    const timer = AbortSignal.timeout(Math.max(options.deadline - Date.now(), 1));
+    const signal = AbortSignal.any([this.abort.signal, timer]);
     while (processed < options.maxJobs) {
-      if (Date.now() >= options.deadline) return { processed, stoppedBy: "deadline" };
+      // Both: a timeout signal fires on a later tick, so an expired deadline needs the clock.
+      if (signal.aborted || Date.now() >= options.deadline) return { processed, stoppedBy: "deadline" };
       const [job] = await this.repository.claim(this.workerId, 1, this.registry.types());
       if (!job) return { processed, stoppedBy: "empty" };
-      await this.run(job);
+      await this.run(job, signal);
       processed += 1;
     }
     return { processed, stoppedBy: "max_jobs" };
   }
 
   /** Execute one claimed job and record the outcome. Never throws. */
-  async run(job: JobRow): Promise<void> {
+  async run(job: JobRow, signal: AbortSignal = this.abort.signal): Promise<void> {
     const log = this.log.child({ jobId: job.id, jobType: job.type, attempt: job.attempts });
     const startedAt = Date.now();
 
@@ -115,7 +121,7 @@ export class JobWorker {
       log.info("job started");
       // Every YouTube request inside a job is background work, attributed to the job type.
       const output = await runWithQuotaContext({ lane: "background", operation: `job:${job.type}`, fresh: definition.freshData }, () =>
-        definition.handler(payload, { job, attempt: job.attempts, logger: log, signal: this.abort.signal }),
+        definition.handler(payload, { job, attempt: job.attempts, logger: log, signal }),
       );
       if (output !== undefined) await this.repository.addResult(job.id, output);
       await this.repository.markSucceeded(job.id, this.workerId);

@@ -17,6 +17,11 @@
  * everything else waits out the longer interval. A dormant channel has nothing
  * new to find, and reads spent on it are reads not spent on one that uploads.
  *
+ * Each round ends by reading a few transcripts for the library's best Shorts
+ * (SCRAPER_TRANSCRIPTS_PER_ROUND). They live here rather than in a scheduled job
+ * because a transcript is a scrape slot: paced by the same gate, it would blow
+ * through the cron tick's time budget and starve every other job behind it.
+ *
  * Speed ramps itself: one clean day at a rate earns the next step up the ladder
  * (INNERTUBE_RAMP_STEPS), and a bot check gives the step back and settles one
  * rung below what YouTube refused. INNERTUBE_RAMP_STEPS=4 alone pins the rate.
@@ -45,6 +50,8 @@ const ACTIVE_REFRESH_HOURS = 20;
 const IDLE_WAIT = 15 * MINUTE;
 /** A channel that failed is left to the worker for this long. */
 const SKIP_FAILED_FOR = 24 * HOUR;
+/** How far back to look for Shorts whose script is still unread. */
+const TRANSCRIPT_DAYS = 60;
 
 const numberSetting = (name: string, fallback: number, min: number, max: number) => {
   const value = Number(process.env[name]);
@@ -78,6 +85,7 @@ async function main(): Promise<void> {
   const channelsRepo = services.repositories.channels;
 
   const batch = numberSetting("SCRAPER_BATCH", 20, 1, 200);
+  const transcriptsPerRound = numberSetting("SCRAPER_TRANSCRIPTS_PER_ROUND", 10, 0, 200);
   const gate = getGate();
   // A refresh the scraper can't get from YouTube's pages is worth one API read:
   // the quota manager still decides whether that read happens.
@@ -105,7 +113,7 @@ async function main(): Promise<void> {
   // Save it now, so restarts don't keep resetting the clock on the current step.
   if (!stored) await rampStore.write(ramp);
   gate.setRequestsPerMinute(steps[ramp.step]!);
-  logger.info("scraper started", { batch, perMinute: gate.requestsPerMinute, steps, cleanHours, thawHours, ceiling: ramp.ceiling, frozen: ramp.frozen });
+  logger.info("scraper started", { batch, transcriptsPerRound, perMinute: gate.requestsPerMinute, steps, cleanHours, thawHours, ceiling: ramp.ceiling, frozen: ramp.frozen });
 
   const skipUntil = new Map<string, number>();
 
@@ -147,6 +155,20 @@ async function main(): Promise<void> {
         }
         if (isAppError(error) && error.code === "NOT_FOUND") continue;
         logger.warn("scraper refresh failed", { channelId: channel.youtube_channel_id, error });
+      }
+    }
+
+    // Reading what the best Shorts say costs no API quota and makes the script
+    // writer's sources real. Bounded per round so refreshes stay the priority.
+    if (transcriptsPerRound > 0 && !controller.signal.aborted) {
+      try {
+        const read = await runWithQuotaContext({ lane: "background", operation: "scraper:transcripts" }, () =>
+          services.transcripts.backfillOnce({ limit: transcriptsPerRound, days: TRANSCRIPT_DAYS, signal: controller.signal }),
+        );
+        if (read.stored > 0 || read.failed > 0) logger.info("scraper transcripts", { ...read });
+      } catch (error) {
+        // Transcripts are a bonus; a round that refreshed channels still succeeded.
+        logger.warn("scraper transcript pass failed", { error });
       }
     }
 

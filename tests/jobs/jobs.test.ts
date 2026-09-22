@@ -155,6 +155,32 @@ describe("JobWorker.drain", () => {
     expect(repo.markSucceeded).toHaveBeenCalledTimes(2);
   });
 
+  it("tells a running job the deadline passed, instead of waiting for it", async () => {
+    // The live bug this covers: one gate-paced job ran for minutes, so the cron
+    // tick never answered and every job behind it waited for the next tick.
+    const repo = fakeRepository();
+    repo.claim.mockResolvedValueOnce([job({ id: "slow" })]).mockResolvedValue([]);
+    let sawAbort = false;
+    const registry = new JobRegistry().register(
+      defineJob({
+        type: "test.echo",
+        description: "echo",
+        payloadSchema: z.object({ message: z.string() }),
+        handler: async (_payload, { signal }) => {
+          await new Promise<void>((resolve) =>
+            signal.aborted ? resolve() : signal.addEventListener("abort", () => resolve(), { once: true }),
+          );
+          sawAbort = signal.aborted;
+          return null as never;
+        },
+      }),
+    );
+    const worker = new JobWorker(repo as unknown as JobRepository, registry, { workerId: "w1", logger: silent });
+    const result = await worker.drain({ deadline: Date.now() + 50, maxJobs: 5 });
+    expect(sawAbort).toBe(true);
+    expect(result.processed).toBe(1);
+  });
+
   it("stops at maxJobs and at the deadline", async () => {
     const repo = fakeRepository();
     repo.claim.mockResolvedValue([job()]);
