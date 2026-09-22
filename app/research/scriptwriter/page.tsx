@@ -40,7 +40,7 @@ export default async function ScriptwriterPage() {
 
       {current.isOwner ? (
         <>
-          <ScriptForm cost={cost} />
+          <ScriptForm cost={cost} limited={!current.isOwner} />
           <StyleSamples samples={styles} />
           <SavedScripts scripts={saved} />
         </>

@@ -79,6 +79,7 @@ describe("writeScript access", () => {
     expect(state.result).not.toBeNull();
     expect(state.charged).toBe(8);
     expect(write).toHaveBeenCalledWith(expect.objectContaining({ topic: "minecraft", targetSeconds: 30, tone: "energetic" }), "owner-1");
-    expect(enforce).toHaveBeenCalledWith("scriptUser", "owner-1");
+    // No three hour wait for the owner: they're the one testing it, and paying for it.
+    expect(enforce).not.toHaveBeenCalled();
   });
 });

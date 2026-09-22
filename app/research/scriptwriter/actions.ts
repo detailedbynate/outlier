@@ -48,8 +48,9 @@ export async function writeScript(_previous: ScriptState, formData: FormData): P
     // charged again only on success — a failed generation costs nothing.
     await services.credits.assertAvailable(current.user.id, "write_script");
     // One every three hours: each is a paid model call, and a script is meant to
-    // be worked with rather than rerolled until something sticks.
-    await services.rateLimits.enforce("scriptUser", current.user.id);
+    // be worked with rather than rerolled until something sticks. The owner is
+    // exempt — they're the one testing the thing, and they pay for it.
+    if (!current.isOwner) await services.rateLimits.enforce("scriptUser", current.user.id);
     const result = await asUser(current.user.id, "action:write_script", () =>
       services.scripts.write(
         { topic: sent.topic, idea: sent.idea, angle: sent.angle || undefined, targetSeconds: sent.seconds, tone: sent.tone },

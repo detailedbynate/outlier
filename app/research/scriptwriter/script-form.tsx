@@ -19,7 +19,7 @@ const LONGEST = DURATIONS[DURATIONS.length - 1]!;
 const STEP = DURATIONS.length > 1 ? DURATIONS[1]! - DURATIONS[0] : 5;
 
 /** The writer: what they want, then what it wrote. */
-export function ScriptForm({ cost }: { cost: number }) {
+export function ScriptForm({ cost, limited }: { cost: number; limited: boolean }) {
   const [state, submit, pending] = useActionState(writeScript, emptyScriptState);
   // Held in React so the readout and the filled part of the track can follow it.
   const [seconds, setSeconds] = useState<number>(state.sent.seconds);
@@ -94,7 +94,9 @@ export function ScriptForm({ cost }: { cost: number }) {
           <button type="submit" className="btn btn-primary sw-write" disabled={pending}>
             <PenIcon size={15} /> {pending ? "Writing…" : "Write the script"}
           </button>
-          <small>{cost} credits · one script every 3 hours</small>
+          <small>
+            {cost} credits{limited ? " · one script every 3 hours" : ""}
+          </small>
         </div>
       </form>
 
