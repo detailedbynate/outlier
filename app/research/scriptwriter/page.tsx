@@ -85,48 +85,24 @@ function LockedPreview({ cost }: { cost: number }) {
       </div>
 
       <div className="sw-result">
-        <div className="sw-hook">
-          <div className="sw-hook-head">
-            <span className="dash-eyebrow">The hook</span>
-          </div>
-          <p className="sw-hook-line">&ldquo;The redstone trick nobody uses.&rdquo;</p>
-          <p className="sw-hook-why">Opens on the thing itself instead of explaining what the video will be about.</p>
-        </div>
-        <ol className="sw-beats">
-          {[
-            { seconds: 2.3, say: "The redstone trick nobody uses.", onScreen: "nobody uses this", visual: "Close on a torch going on the side of a stone block." },
-            { seconds: 9.1, say: "Put a torch on the side of any block, then stack a block straight on top of it.", onScreen: "", visual: "Hands place the torch, then the block above it." },
-            { seconds: 5.9, say: "That gives you a constant signal with no repeaters at all.", onScreen: "no repeaters", visual: "Dust runs from the block to a lamp that stays lit." },
-          ].map((beat, i) => (
-            <li key={i}>
-              <span className="sw-beat-time">{beat.seconds}s</span>
-              <div className="sw-beat-body">
-                <p className="sw-beat-say">{beat.say}</p>
-                {beat.onScreen ? (
-                  <p className="sw-beat-meta">
-                    <strong>On screen</strong> {beat.onScreen}
-                  </p>
-                ) : null}
-                <p className="sw-beat-meta">
-                  <strong>Shot</strong> {beat.visual}
-                </p>
-              </div>
-            </li>
-          ))}
-        </ol>
-        <div className="sw-panels">
-          <section className="sw-panel">
-            <h3>Titles</h3>
-            <ul className="sw-titles">
-              <li>The redstone trick nobody uses</li>
-              <li>Why does nobody build it this way?</li>
-            </ul>
-          </section>
-          <section className="sw-panel">
-            <h3>Why this should work</h3>
-            <p>Every outlier it studied opened on a claim instead of a greeting, and kept one question open to the last second.</p>
-          </section>
-        </div>
+        <section className="sw-script">
+          <header className="sw-script-head">
+            <span className="dash-eyebrow">Your script</span>
+          </header>
+          <p className="sw-line sw-line-hook">Your redstone doesn&apos;t need a single repeater, and most builds are full of them.</p>
+          <p className="sw-line">People stack repeaters because that&apos;s what every tutorial shows, not because the circuit needs one.</p>
+          <p className="sw-line">Put a torch on the side of a block, then put another block straight on top of the torch.</p>
+          <p className="sw-line">That block is now powered, permanently, and it&apos;ll drive anything touching it.</p>
+          <p className="sw-line">Hide it inside a wall and your door opens with nothing visible anywhere.</p>
+          <p className="sw-line">Same circuit, half the parts, and nobody can see how it works.</p>
+        </section>
+        <section className="sw-panel">
+          <h3>Titles</h3>
+          <ul className="sw-titles">
+            <li>The redstone trick nobody uses</li>
+            <li>Stop putting repeaters in everything</li>
+          </ul>
+        </section>
       </div>
     </>
   );

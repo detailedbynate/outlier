@@ -1,9 +1,8 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { PenIcon, ExternalIcon, FlameIcon } from "@/components/icons";
-import { formatCompact } from "@/lib/format";
-import { DURATIONS, TONES, type ScriptResult } from "@/lib/scripts/schema";
+import { PenIcon } from "@/components/icons";
+import { DURATIONS, TONES, WORDS_PER_SECOND, type ScriptResult } from "@/lib/scripts/schema";
 import { writeScript } from "./actions";
 import { emptyScriptState } from "./state";
 
@@ -99,113 +98,38 @@ function Copyable({ text, label }: { text: string; label: string }) {
   );
 }
 
-/** The whole script as plain text, for pasting into a notes app or a teleprompter. */
-function asPlainText(result: ScriptResult): string {
-  const lines = [`HOOK: ${result.script.hook}`, ""];
-  result.script.beats.forEach((beat, i) => {
-    lines.push(`${i + 1}. (${beat.seconds}s) ${beat.say}`);
-    if (beat.onScreen) lines.push(`   on screen: ${beat.onScreen}`);
-    lines.push(`   visual: ${beat.visual}`);
-  });
-  lines.push("", `ENDING: ${result.script.ending}`, "", `TITLES: ${result.script.titles.join(" / ")}`);
-  if (result.script.caption) lines.push("", `CAPTION: ${result.script.caption}`);
-  return lines.join("\n");
-}
-
+/** The script, and the titles to put on it. Nothing else — it's made to be read out. */
 function ScriptView({ result, charged }: { result: ScriptResult; charged: number }) {
-  const { script } = result;
-  const withOpenings = result.sources.filter((source) => source.opening).length;
+  const lines = result.script.script.split("\n").map((line) => line.trim()).filter(Boolean);
+  const seconds = Math.round(result.words / WORDS_PER_SECOND);
 
   return (
     <div className="sw-result">
-      <div className="sw-hook">
-        <div className="sw-hook-head">
-          <span className="dash-eyebrow">The hook</span>
-          <Copyable text={asPlainText(result)} label="Copy script" />
-        </div>
-        <p className="sw-hook-line">&ldquo;{script.hook}&rdquo;</p>
-        <p className="sw-hook-why">{script.hookReason}</p>
-      </div>
-
-      <ol className="sw-beats">
-        {script.beats.map((beat, i) => (
-          <li key={i}>
-            <span className="sw-beat-time">{beat.seconds}s</span>
-            <div className="sw-beat-body">
-              <p className="sw-beat-say">{beat.say}</p>
-              {beat.onScreen ? (
-                <p className="sw-beat-meta">
-                  <strong>On screen</strong> {beat.onScreen}
-                </p>
-              ) : null}
-              <p className="sw-beat-meta">
-                <strong>Shot</strong> {beat.visual}
-              </p>
-            </div>
-          </li>
-        ))}
-      </ol>
-
-      <div className="sw-panels">
-        <section className="sw-panel">
-          <h3>Ending</h3>
-          <p>{script.ending}</p>
-        </section>
-        <section className="sw-panel">
-          <h3>Titles</h3>
-          <ul className="sw-titles">
-            {script.titles.map((title) => (
-              <li key={title}>
-                {title} <Copyable text={title} label="Copy" />
-              </li>
-            ))}
-          </ul>
-        </section>
-        {script.caption ? (
-          <section className="sw-panel">
-            <h3>Caption</h3>
-            <p>{script.caption}</p>
-            <Copyable text={script.caption} label="Copy caption" />
-          </section>
-        ) : null}
-        <section className="sw-panel">
-          <h3>Why this should work</h3>
-          <p>{script.whyItWorks}</p>
-        </section>
-      </div>
-
-      {result.sources.length > 0 ? (
-        <section className="sw-sources">
-          <h3>
-            <FlameIcon size={14} /> Built from these outliers
-          </h3>
-          <p className="dash-row-sub">
-            Real videos from this niche that beat their own channel
-            {withOpenings > 0 ? `, ${withOpenings} with their opening words read` : ""}.
+      <section className="sw-script">
+        <header className="sw-script-head">
+          <span className="dash-eyebrow">Your script</span>
+          <Copyable text={lines.join("\n")} label="Copy script" />
+        </header>
+        {lines.map((line, i) => (
+          <p key={i} className={i === 0 ? "sw-line sw-line-hook" : "sw-line"}>
+            {line}
           </p>
-          <ul className="dash-list">
-            {result.sources.map((source) => (
-              <li key={source.youtubeVideoId}>
-                <a href={`https://www.youtube.com/shorts/${source.youtubeVideoId}`} target="_blank" rel="noreferrer">
-                  <strong>{source.title}</strong>
-                  <span className="dash-row-sub">
-                    {source.channelTitle} · {formatCompact(source.views)} views · {source.multiplier}× its usual
-                  </span>
-                  {source.opening ? <span className="sw-source-opening">Opens: &ldquo;{source.opening}&rdquo;</span> : null}
-                </a>
-                <ExternalIcon size={13} />
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : (
-        <p className="dash-row-sub">
-          No outliers stored for that niche yet, so this was written from principles alone. Research it in the Niche Finder first for a sharper script.
-        </p>
-      )}
+        ))}
+      </section>
+
+      <section className="sw-panel">
+        <h3>Titles</h3>
+        <ul className="sw-titles">
+          {result.script.titles.map((title) => (
+            <li key={title}>
+              {title} <Copyable text={title} label="Copy" />
+            </li>
+          ))}
+        </ul>
+      </section>
 
       <p className="sw-footnote">
-        {result.seconds}s of speech across {script.beats.length} beats · {charged} credits · written by {result.model}
+        {result.words} spoken words · about {seconds}s out loud · {charged} credits · written by {result.model}
       </p>
     </div>
   );

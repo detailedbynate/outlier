@@ -165,6 +165,12 @@ const serverEnvSchema = z.object({
   GEMINI_MODEL: z.string().trim().min(1).default("gemini-3.6-flash"),
   /** OpenRouter key: its free models take over when Gemini's free tier is rate-limited. */
   OPENROUTER_API_KEY: optionalString,
+  /**
+   * A paid OpenRouter model for Shorts scripts, e.g. "anthropic/claude-sonnet-5".
+   * Blank writes them on the free chain, which knows niches much less well.
+   * Needs credit on the OpenRouter account; without it the free chain takes over.
+   */
+  SCRIPT_MODEL: optionalString,
   /** Comma-separated OpenRouter models, tried in order. Blank uses a built-in list of free ones. */
   OPENROUTER_MODELS: optionalString,
   /**

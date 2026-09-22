@@ -26,7 +26,7 @@ import { createJobRegistry, LIBRARY_GROWTH_JOB_TYPE, NICHE_LABEL_JOB_TYPE } from
 import { JobQueue } from "@/lib/jobs/queue";
 import type { JobRegistry } from "@/lib/jobs/registry";
 import { JobScheduler } from "@/lib/jobs/scheduler";
-import { labelingProvider } from "@/lib/ai/select";
+import { labelingProvider, scriptProvider } from "@/lib/ai/select";
 import { TranscriptRepository } from "@/lib/database/repositories/transcripts";
 import { ScriptService } from "./script-service";
 import { TranscriptService } from "./transcript-service";
@@ -324,12 +324,8 @@ export function getServices(): Services {
       { dailyYoutubeRefreshes: config.NICHE_DAILY_YOUTUBE_REFRESHES, language: quality.language, regionCode },
     ),
     transcripts,
-    scripts: new ScriptService({
-      ai: text,
-      transcripts: repositories.transcripts,
-      videos: repositories.videos,
-      metricsFor: async (topic) => (await services!.niches.research(topic)).report.overall,
-    }),
+    // Its own provider: scripts are worth a paid model where labeling isn't.
+    scripts: new ScriptService({ ai: scriptProvider(config) }),
     dashboard: new DashboardService({
       channels: repositories.channels,
       videos: repositories.videos,

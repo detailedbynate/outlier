@@ -33,28 +33,13 @@ async function main(): Promise<void> {
     }),
   );
 
-  const { script, sources, seconds: total, model } = result;
+  const { script, words, model } = result;
   console.log(`
-=== ${model} · ${total}s planned · ${sources.length} sources (${sources.filter((s) => s.opening).length} with transcripts) ===
+=== ${model} · ${words} words ===
 `);
-  console.log(`HOOK: ${script.hook}`);
-  console.log(`  why: ${script.hookReason}
-`);
-  script.beats.forEach((beat, i) => {
-    console.log(`${i + 1}. [${beat.seconds}s] ${beat.say}`);
-    if (beat.onScreen) console.log(`   on screen: ${beat.onScreen}`);
-    console.log(`   visual:    ${beat.visual}`);
-  });
+  console.log(script.script);
   console.log(`
-ENDING: ${script.ending}`);
-  console.log(`TITLES: ${script.titles.join(" | ")}`);
-  if (script.caption) console.log(`CAPTION: ${script.caption}`);
-  console.log(`
-WHY IT WORKS: ${script.whyItWorks}`);
-  console.log(`
-SOURCES:`);
-  for (const source of sources) console.log(`  ${source.multiplier.toFixed(1)}x  ${source.title}${source.opening ? `
-        opens: "${source.opening}"` : ""}`);
+TITLES: ${script.titles.join(" | ")}`);
 }
 
 main().catch((error: unknown) => {

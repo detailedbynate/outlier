@@ -45,3 +45,42 @@ export function labelingProvider(config: {
     }
   }
 }
+
+/**
+ * The writer behind the Shorts script tool.
+ *
+ * Scripts are the one thing worth paying for: they cost eight credits, people
+ * judge the product on them, and the free models' weak knowledge of a niche is
+ * exactly what made the early ones read as invented. SCRIPT_MODEL names a paid
+ * OpenRouter model to write them.
+ *
+ * The free chain stays behind it, so an unfunded account, a spending cap or an
+ * outage degrades to a worse script instead of no script.
+ */
+export function scriptProvider(config: {
+  SCRIPT_MODEL?: string | undefined;
+  GEMINI_API_KEY?: string | undefined;
+  GEMINI_MODEL: string;
+  OPENROUTER_API_KEY?: string | undefined;
+  OPENROUTER_MODELS?: string | undefined;
+}): TextProvider | null {
+  const chain: TextProvider[] = [];
+  const paid = config.SCRIPT_MODEL?.trim();
+  if (paid && config.OPENROUTER_API_KEY) {
+    chain.push(new OpenRouterTextProvider({ apiKey: config.OPENROUTER_API_KEY, models: [paid] }));
+  }
+  if (config.GEMINI_API_KEY) chain.push(new GeminiTextProvider({ apiKey: config.GEMINI_API_KEY, model: config.GEMINI_MODEL }));
+  if (config.OPENROUTER_API_KEY) {
+    chain.push(
+      new OpenRouterTextProvider({
+        apiKey: config.OPENROUTER_API_KEY,
+        models: (config.OPENROUTER_MODELS ?? "")
+          .split(",")
+          .map((m) => m.trim())
+          .filter(Boolean),
+      }),
+    );
+  }
+  if (chain.length === 0) return null;
+  return chain.length === 1 ? chain[0]! : new FallbackTextProvider(chain);
+}
