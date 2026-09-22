@@ -27,6 +27,12 @@ export interface TextGenerationRequest {
   effort?: "low" | "medium" | "high";
   /** Provider-specific model id; falls back to the provider default. */
   model?: string;
+  /**
+   * Mark the system prompt cacheable (default true). Writing the cache costs
+   * more than a plain read, so a call that won't repeat within minutes — one
+   * person writing one script — is cheaper without it.
+   */
+  cacheSystem?: boolean;
   signal?: AbortSignal;
 }
 

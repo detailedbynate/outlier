@@ -25,11 +25,11 @@ import { WORDS_PER_SECOND, type ScriptRequest } from "./schema";
  */
 const LAYOUT = `Every Short you write follows this shape. Do not label the parts in your output — they should only be audible in how it flows.
 
-1. HOOK (first line, under 3 seconds)
+1. HOOK (the opening sentence, under 3 seconds)
    One sentence. The most surprising, specific, concrete thing you have.
    It states something, it does not promise something. No greeting, no "in this video", no "let me tell you".
 
-2. TURN (next line)
+2. TURN (the next sentence or two)
    Immediately complicate it: why it is strange, why it is wrong, why nobody does it.
    This is what stops the viewer leaving after the hook lands.
 
@@ -38,11 +38,11 @@ const LAYOUT = `Every Short you write follows this shape. Do not label the parts
    Concrete and specific throughout. Names, amounts, steps, what happened.
    One idea only. A Short that teaches two things teaches neither.
 
-4. PAYOFF (second to last line)
+4. PAYOFF (near the end)
    The resolution, the result, or the point. The thing they stayed for.
 
-5. LANDING (last line)
-   One short line that either loops back to the hook or gives them the obvious next move.
+5. LANDING (the final sentence)
+   One short sentence that either loops back to the hook or gives them the obvious next move.
    Never "like and subscribe". Never a question you haven't earned.`;
 
 const RULES = `How to write the words:
@@ -50,14 +50,14 @@ const RULES = `How to write the words:
 - Spoken English. Short sentences. One clause each. Read it aloud in your head; if you run out of breath, cut it.
 - Write what a person says, not what a document says. Contractions. No "furthermore", no "additionally", no "in conclusion".
 - Be specific. "A lot of players" is weak; "most people playing on hard" is strong. Specificity is what makes it sound like you know the subject.
-- Every line earns the next one. If a line could be deleted without losing anything, delete it.
+- Every sentence earns the next one. If a sentence could be deleted without losing anything, delete it.
 - No hashtags, no emoji, no stage directions, no camera notes, no on-screen text markers. Only the words that get spoken.
 - Write the script as continuous prose — sentences running on from each other, the way someone talks. Do not put each sentence on its own line, and do not number, bullet or label anything.
 
 What you must not do:
 
 - Do not invent facts, statistics, studies, prices, dates, version numbers, place names or quotes. This is the single most damaging thing you can do, because it is confidently wrong and the creator will not catch it.
-- Never invent the creator's own life. No amounts they paid, dates they did something, or results they got, unless they told you. A first person line they cannot honestly say out loud is worse than a dull one: they would be lying to their audience on camera. If you need a specific and do not have it, write the line so the viewer supplies their own ("whatever your rent actually is") or make it plainly general.
+- Never invent the creator's own life. No amounts they paid, dates they did something, or results they got, unless they told you. A first person sentence they cannot honestly say out loud is worse than a dull one: they would be lying to their audience on camera. If you need a specific and do not have it, write the sentence so the viewer supplies their own ("whatever your rent actually is") or make it plainly general.
 - If you do not know something specific enough about this topic to be concrete, write about the part you do know well rather than inventing detail. A narrower true script beats a broad invented one.
 - Do not describe the topic from the outside ("Minecraft is a game where..."). Write for people already in this niche who know the basics.`;
 
@@ -69,32 +69,21 @@ What you must not do:
  */
 const EXAMPLES = `Two examples of the shape done well.
 
-Example — niche: home coffee, 30 seconds:
-"Your coffee is bitter because you're grinding too fine, not because the beans are cheap.
-Everyone blames the beans first, and then buys more expensive ones that taste exactly the same.
-Bitterness is over-extraction. Water sat in the grounds too long and pulled out everything, including what you don't want.
-Go one step coarser on the grinder. Just one.
-Your shot should run about twenty-five seconds, not forty.
-Same beans, same machine, and it stops tasting burnt.
-You didn't need better coffee. You needed bigger pieces of it."
+Example — niche: home coffee, 25 seconds:
+"Your coffee is bitter because you're grinding too fine, not because the beans are cheap. Everyone blames the beans first, then buys expensive ones that taste exactly the same. Bitterness is over-extraction: the water sat in the grounds too long and pulled out everything, including what you don't want. Go one step coarser on the grinder. Just one. Same beans, same machine, and it stops tasting burnt. You didn't need better coffee. You needed bigger pieces of it."
 
-Example — niche: long distance running, 45 seconds:
-"I ran my fastest marathon on the least training I've ever done.
-Eighteen months earlier I'd done double the mileage and run twelve minutes slower.
-The difference was that I stopped running every run hard.
-I'd been doing what most people do — going out at a pace that felt productive, every single time.
-So every run was too fast to recover from and too slow to actually make me faster.
-I cut it to two hard sessions a week. Everything else went slow enough to hold a conversation.
-It felt like cheating for about a month.
-Then the hard sessions started getting easier, because I was arriving at them fresh.
-Most people aren't undertrained. They're just never recovered."`;
+Example — niche: long distance running, 30 seconds:
+"Most runners aren't undertrained. They're never recovered. The usual week is every run at a pace that feels productive, and that pace is the problem. It's too fast to recover from and too slow to make you faster, so you get the fatigue without the fitness. Keep two hard sessions a week. Run everything else slow enough to hold a conversation. It feels like cheating for about a month, and then the hard days get easier, because you finally show up to them fresh."`;
 
 /** Enough samples to show a voice rather than one person's off day. */
 const MIN_SAMPLES = 2;
 /** Beyond this the samples crowd out the instructions and cost real money per call. */
 const MAX_SAMPLES = 3;
-/** A very long sample is usually a pasted long-form transcript, not a Short. */
-const MAX_SAMPLE_CHARS = 2_000;
+/**
+ * A 30 second Short is about 85 words, under 600 characters. Past this a sample
+ * is usually a long-form transcript, and the voice is in the first few lines anyway.
+ */
+const MAX_SAMPLE_CHARS = 1_200;
 
 /**
  * Their own scripts, shown as the voice to write in.
@@ -152,7 +141,7 @@ export function scriptUserPrompt(request: ScriptRequest): string {
   parts.push(
     ``,
     `Length: ${seconds} seconds. That is ${words} spoken words, and ${Math.round(words * 1.1)} is the hard maximum.`,
-    `Count the words in your draft before you answer. If it is over, cut whole lines — not adjectives — until it fits. A ${seconds} second slot with ${Math.round(words * 1.5)} words in it gets read too fast to follow, and going long is the most common way these fail.`,
+    `Count the words in your draft before you answer. If it is over, cut whole sentences — not adjectives — until it fits. A ${seconds} second slot with ${Math.round(words * 1.5)} words in it gets read too fast to follow, and going long is the most common way these fail.`,
     ``,
     `Use what you actually know about ${oneLine(request.topic)}. Be concrete and correct. If your knowledge of this exact idea is thin, narrow the script to the part you are sure of rather than inventing specifics.`,
     ``,

@@ -66,7 +66,7 @@ describe("script prompt", () => {
     const prompt = scriptUserPrompt({ topic: "fishing", idea: "an idea", targetSeconds: 30 });
     expect(prompt).toContain("84 spoken words");
     expect(prompt).toContain("92 is the hard maximum");
-    expect(prompt).toMatch(/cut whole lines/);
+    expect(prompt).toMatch(/cut whole sentences/);
   });
 
   it("tells it to build on the creator's own material when there is some", () => {
@@ -90,6 +90,17 @@ describe("script prompt", () => {
 });
 
 describe("honesty rules", () => {
+  it("shows its examples as prose, since a model copies an example's layout over a rule", () => {
+    // Each example is one quoted paragraph on the line after its heading.
+    const examples = [...scriptSystemPrompt().matchAll(/^Example — .*\n"([^\n]*)/gm)].map((m) => m[1]!);
+    expect(examples).toHaveLength(2);
+    for (const example of examples) expect(example).toMatch(/"$/);
+  });
+
+  it("doesn't model an invented first-person claim in its own examples", () => {
+    expect(scriptSystemPrompt()).not.toMatch(/"I ran my/);
+  });
+
   it("forbids inventing the creator's own life, not just facts in general", () => {
     // nemotron wrote "My emergency fund was $500" for someone who never said that.
     const system = scriptSystemPrompt();

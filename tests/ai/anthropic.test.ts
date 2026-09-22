@@ -48,6 +48,19 @@ describe("AnthropicTextProvider", () => {
     expect(params).not.toHaveProperty("temperature");
   });
 
+  it("skips the cache write when a call won't be repeated", async () => {
+    const { client, create } = fakeClient({ content: [{ type: "text", text: '{"channels":[]}' }] });
+    await new AnthropicTextProvider({ client }).generateObject({
+      system: "Write a script.",
+      messages: [{ role: "user", content: "x" }],
+      schema,
+      schemaName: "labels",
+      cacheSystem: false,
+    });
+    // Writing the cache costs extra, and nothing would read it back.
+    expect(create.mock.calls[0]![0].system).toEqual([{ type: "text", text: "Write a script." }]);
+  });
+
   it("leaves out settings a cheaper model would reject", async () => {
     const { client, create } = fakeClient({ content: [{ type: "text", text: '{"channels":[]}' }] });
     await new AnthropicTextProvider({ client, model: "claude-haiku-4-5" }).generateObject({

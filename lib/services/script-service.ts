@@ -55,7 +55,7 @@ export class ScriptService {
       }
     }
 
-    const { object, model } = await this.deps.ai.generateObject({
+    const { object, model, usage } = await this.deps.ai.generateObject({
       system: scriptSystemPrompt(samples),
       messages: [{ role: "user", content: scriptUserPrompt({ ...request, topic, idea }) }],
       schema: SCRIPT,
@@ -66,10 +66,12 @@ export class ScriptService {
       // script is worth nothing, so the budget goes to the words.
       effort: "low",
       maxOutputTokens: 4_000,
+      // One person, one script: the cache would expire before anyone read it back.
+      cacheSystem: false,
     });
 
     const words = object.script.split(/\s+/).filter(Boolean).length;
-    this.log.info("script written", { topic, words, model, styleSamples: samples.length });
+    this.log.info("script written", { topic, words, model, styleSamples: samples.length, inputTokens: usage?.inputTokens, outputTokens: usage?.outputTokens });
 
     let id: string | null = null;
     if (userId) {
@@ -121,7 +123,7 @@ export class ScriptService {
       }
     }
 
-    const { object, model } = await this.deps.ai.generateObject({
+    const { object, model, usage } = await this.deps.ai.generateObject({
       system: ideaSystemPrompt(),
       messages: [{ role: "user", content: ideaUserPrompt({ topic: niche, alreadyMade, samples, count: IDEA_COUNT }) }],
       schema: IDEAS,
@@ -129,9 +131,10 @@ export class ScriptService {
       temperature: 0.9,
       effort: "low",
       maxOutputTokens: 2_000,
+      cacheSystem: false,
     });
 
-    this.log.info("ideas found", { topic: niche, ideas: object.ideas.length, knownTitles: alreadyMade.length, model });
+    this.log.info("ideas found", { topic: niche, ideas: object.ideas.length, knownTitles: alreadyMade.length, model, inputTokens: usage?.inputTokens, outputTokens: usage?.outputTokens });
     return { ideas: object.ideas, model };
   }
 

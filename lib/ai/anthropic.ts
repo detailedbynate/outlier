@@ -62,7 +62,17 @@ export class AnthropicTextProvider implements TextProvider {
         model,
         max_tokens: request.maxOutputTokens ?? 16_000,
         ...(FALLBACK_MODELS.has(model) ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
-        ...(request.system ? { system: [{ type: "text" as const, text: request.system, cache_control: { type: "ephemeral" as const } }] } : {}),
+        ...(request.system
+          ? {
+              system: [
+                {
+                  type: "text" as const,
+                  text: request.system,
+                  ...(request.cacheSystem === false ? {} : { cache_control: { type: "ephemeral" as const } }),
+                },
+              ],
+            }
+          : {}),
         messages: request.messages.map((m) => ({ role: m.role, content: m.content })),
         output_config: {
           ...(effort ? { effort } : {}),
@@ -89,5 +99,7 @@ function textOf(response: BetaMessage): string {
 }
 
 function usageOf(response: BetaMessage): TokenUsage {
-  return { inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens };
+  // Cached tokens are billed separately from input_tokens; count them so the logged total is the real one.
+  const cached = (response.usage.cache_creation_input_tokens ?? 0) + (response.usage.cache_read_input_tokens ?? 0);
+  return { inputTokens: response.usage.input_tokens + cached, outputTokens: response.usage.output_tokens };
 }
