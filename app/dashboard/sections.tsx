@@ -7,6 +7,8 @@ import {
   CompassIcon,
   EyeIcon,
   FlameIcon,
+  LockIcon,
+  PenIcon,
   PlayCircleIcon,
   SearchIcon,
   ShortsIcon,
@@ -501,30 +503,38 @@ export async function CompetitorWatchSection({ competitors }: { competitors: str
    5. Research shortcuts
 --------------------------------------------------------------------------- */
 
-const SHORTCUTS: { href: string; label: string; note: string; icon: IconType; tone: string }[] = [
+const SHORTCUTS: { href: string; label: string; note: string; icon: IconType; tone: string; ownerOnly?: boolean }[] = [
   { href: "/research/shorts-channels", label: "Search Channels", note: "Find Shorts channels by niche", icon: SearchIcon, tone: "violet" },
   { href: "/viral", label: "Viral Videos", note: "Videos beating their channel", icon: FlameIcon, tone: "pink" },
   { href: "/analyze", label: "Analyze Video", note: "Why did it take off?", icon: ChartIcon, tone: "blue" },
   { href: "/research/niche-finder", label: "Find Ideas", note: "Research niches and sub-niches", icon: CompassIcon, tone: "amber" },
+  // Still owner-only. Everyone else sees it here and lands on the locked preview.
+  { href: "/research/scriptwriter", label: "Script Writer", note: "Write a Short from the niche's outliers", icon: PenIcon, tone: "green", ownerOnly: true },
 ];
 
-export function ResearchShortcuts() {
+export function ResearchShortcuts({ isOwner = false }: { isOwner?: boolean }) {
   return (
     <div className="dash-shortcuts">
-      {SHORTCUTS.map((s, i) => (
-        <Link key={s.href} href={s.href} className="dash-shortcut" style={{ "--i": i } as React.CSSProperties}>
-          <span className="dash-icon" data-tone={s.tone}>
-            <s.icon size={18} />
-          </span>
-          <span className="dash-shortcut-text">
-            <strong>{s.label}</strong>
-            <span>{s.note}</span>
-          </span>
-          <span className="dash-shortcut-arrow" aria-hidden="true">
-            →
-          </span>
-        </Link>
-      ))}
+      {SHORTCUTS.map((s, i) => {
+        const locked = s.ownerOnly === true && !isOwner;
+        return (
+          <Link key={s.href} href={s.href} className="dash-shortcut" data-locked={locked ? "" : undefined} style={{ "--i": i } as React.CSSProperties}>
+            <span className="dash-icon" data-tone={s.tone}>
+              <s.icon size={18} />
+            </span>
+            <span className="dash-shortcut-text">
+              <strong>
+                {s.label}
+                {locked ? <span className="dash-soon">Coming soon</span> : null}
+              </strong>
+              <span>{s.note}</span>
+            </span>
+            <span className="dash-shortcut-arrow" aria-hidden="true">
+              {locked ? <LockIcon size={14} /> : "→"}
+            </span>
+          </Link>
+        );
+      })}
     </div>
   );
 }

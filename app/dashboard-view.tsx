@@ -64,7 +64,7 @@ export async function DashboardView({ current }: { current: CurrentUser }) {
               <p>Jump straight into a tool</p>
             </div>
           </header>
-          <ResearchShortcuts />
+          <ResearchShortcuts isOwner={current.isOwner} />
         </section>
         <Suspense fallback={<PanelSkeleton rows={3} />}>
           <RecentActivitySection userId={userId} />
