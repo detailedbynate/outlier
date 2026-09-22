@@ -8615,14 +8615,6 @@ a.dash-row:hover {
   margin-bottom: 0;
 }
 
-.sw-line-hook {
-  font-size: 1.3rem;
-  font-weight: 620;
-  line-height: 1.4;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border);
-}
-
 .sw-copy {
   flex: none;
   padding: 5px 10px;
@@ -9154,10 +9146,6 @@ a.dash-row:hover {
 .sw-saved-body .sw-line {
   font-size: 1rem;
   animation: none;
-}
-
-.sw-saved-body .sw-line-hook {
-  font-size: 1.08rem;
 }
 
 .sw-saved-actions {

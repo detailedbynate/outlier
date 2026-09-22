@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type CSSProperties } from "react";
-import { scriptLines, WORDS_PER_SECOND } from "@/lib/scripts/schema";
+import { scriptText, WORDS_PER_SECOND } from "@/lib/scripts/schema";
 import type { SavedScriptRow } from "@/types/database";
 import { deleteSavedScript } from "./actions";
 import { Copyable } from "./script-form";
@@ -39,8 +39,9 @@ export function SavedScripts({ scripts }: { scripts: SavedScriptRow[] }) {
 
 function SavedScript({ row, index }: { row: SavedScriptRow; index: number }) {
   const [open, setOpen] = useState(false);
-  const lines = scriptLines(row.script);
-  const hook = lines[0] ?? row.idea;
+  const text = scriptText(row.script);
+  // The opening sentence is how you recognise a script in a list.
+  const hook = /^.*?[.!?](?=\s|$)/.exec(text)?.[0] ?? row.idea;
   const seconds = Math.round(row.words / WORDS_PER_SECOND);
 
   return (
@@ -57,11 +58,7 @@ function SavedScript({ row, index }: { row: SavedScriptRow; index: number }) {
 
       {open ? (
         <div className="sw-saved-body">
-          {lines.map((line, i) => (
-            <p key={i} className={i === 0 ? "sw-line sw-line-hook" : "sw-line"}>
-              {line}
-            </p>
-          ))}
+          <p className="sw-line">{text}</p>
           {row.titles.length > 0 ? (
             <ul className="sw-titles">
               {row.titles.map((title) => (
@@ -72,7 +69,7 @@ function SavedScript({ row, index }: { row: SavedScriptRow; index: number }) {
             </ul>
           ) : null}
           <div className="sw-saved-actions">
-            <Copyable text={lines.join("\n")} label="Copy script" />
+            <Copyable text={text} label="Copy script" />
             <form action={deleteSavedScript}>
               <input type="hidden" name="id" value={row.id} />
               <button type="submit" className="sw-delete">

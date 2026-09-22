@@ -52,6 +52,7 @@ const RULES = `How to write the words:
 - Be specific. "A lot of players" is weak; "most people playing on hard" is strong. Specificity is what makes it sound like you know the subject.
 - Every line earns the next one. If a line could be deleted without losing anything, delete it.
 - No hashtags, no emoji, no stage directions, no camera notes, no on-screen text markers. Only the words that get spoken.
+- Write the script as continuous prose — sentences running on from each other, the way someone talks. Do not put each sentence on its own line, and do not number, bullet or label anything.
 
 What you must not do:
 
@@ -155,7 +156,8 @@ export function scriptUserPrompt(request: ScriptRequest): string {
     ``,
     `Use what you actually know about ${oneLine(request.topic)}. Be concrete and correct. If your knowledge of this exact idea is thin, narrow the script to the part you are sure of rather than inventing specifics.`,
     ``,
-    `Return the script as plain spoken lines separated by newlines, and two or three title options.`,
+    `Return the script as one continuous block of spoken words, and two or three title options.`,
+    `Titles: six words at most, under 50 characters, and no colons or subtitles. "Why your piston door breaks" is a title; "The Redstone Bug Everyone Blames On The Door And How To Fix It" is a sentence.`,
   );
   return parts.join("\n");
 }

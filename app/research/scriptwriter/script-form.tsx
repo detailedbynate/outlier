@@ -2,7 +2,7 @@
 
 import { useActionState, useState, type CSSProperties } from "react";
 import { PenIcon } from "@/components/icons";
-import { DURATIONS, TONES, WORDS_PER_SECOND, scriptLines, type ScriptResult } from "@/lib/scripts/schema";
+import { DURATIONS, TONES, WORDS_PER_SECOND, scriptText, type ScriptResult } from "@/lib/scripts/schema";
 import { writeScript } from "./actions";
 import { emptyScriptState } from "./state";
 
@@ -145,7 +145,7 @@ export function Copyable({ text, label }: { text: string; label: string }) {
 
 /** The script, and the titles to put on it. Nothing else — it's made to be read out. */
 function ScriptView({ result, charged }: { result: ScriptResult; charged: number }) {
-  const lines = scriptLines(result.script.script);
+  const text = scriptText(result.script.script);
   const seconds = Math.round(result.words / WORDS_PER_SECOND);
 
   return (
@@ -153,13 +153,9 @@ function ScriptView({ result, charged }: { result: ScriptResult; charged: number
       <section className="sw-script">
         <header className="sw-script-head">
           <span className="dash-eyebrow">Your script</span>
-          <Copyable text={lines.join("\n")} label="Copy script" />
+          <Copyable text={text} label="Copy script" />
         </header>
-        {lines.map((line, i) => (
-          <p key={i} className={i === 0 ? "sw-line sw-line-hook" : "sw-line"} style={{ "--i": i } as CSSProperties}>
-            {line}
-          </p>
-        ))}
+        <p className="sw-line">{text}</p>
       </section>
 
       <section className="sw-panel sw-titles-panel">

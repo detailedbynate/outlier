@@ -12,14 +12,19 @@ import { z } from "zod";
 
 export const SCRIPT = z.object({
   /**
-   * The whole thing, as it would be spoken, one line per breath.
+   * The whole thing, as one block of spoken words.
    *
-   * Plain text rather than structure: it goes straight into a teleprompter or a
-   * notes app, and any shape it needs is shape the words already have.
+   * Plain prose rather than structure: it goes straight into a teleprompter or a
+   * notes app, and it should read like someone talking, not like a checklist.
    */
   script: z.string().min(1).max(2_000),
-  /** Title options, strongest first. */
-  titles: z.array(z.string().min(1).max(100)).min(2).max(3),
+  /**
+   * Title options, strongest first.
+   *
+   * Capped hard, not politely: a Short's title is truncated in the feed long
+   * before 100 characters, and asked for a title a model writes a sentence.
+   */
+  titles: z.array(z.string().min(1).max(55)).min(2).max(3),
 });
 
 export type Script = z.infer<typeof SCRIPT>;
@@ -65,18 +70,19 @@ export interface ScriptRequest {
 }
 
 /**
- * One spoken line per element, however the model formatted it.
+ * The script as one flowing block, however the model formatted it.
  *
- * Asked for newline-separated lines, the free models often return one run-on
- * block, and sometimes without the space after a full stop ("a piston.Doors
- * aren't blocks"). Splitting on sentence ends recovers the shape either way,
- * which matters because a script is read off a screen a line at a time.
+ * It used to come out a line per sentence, which reads like a list of
+ * instructions rather than something a person says. A script is prose you read
+ * aloud, so the line breaks go and the sentences run together.
+ *
+ * The models still sometimes weld sentences with no space after the stop ("a
+ * piston.Doors aren't blocks"), so that gets repaired on the way through.
  */
-export function scriptLines(script: string): string[] {
+export function scriptText(script: string): string {
   return script
-    // A sentence end followed straight by a capital is a missing break, not an abbreviation.
-    .replace(/([.!?])\s*(?=["'“]?[A-Z])/g, "$1\n")
-    .split(/\n+/)
-    .map((line) => line.trim())
-    .filter(Boolean);
+    // A sentence end followed straight by a capital is a missing space, not an abbreviation.
+    .replace(/([.!?])(?=["'“]?[A-Z])/g, "$1 ")
+    .replace(/\s+/g, " ")
+    .trim();
 }

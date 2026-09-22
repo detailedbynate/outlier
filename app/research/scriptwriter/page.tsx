@@ -101,12 +101,13 @@ function LockedPreview({ cost }: { cost: number }) {
           <header className="sw-script-head">
             <span className="dash-eyebrow">Your script</span>
           </header>
-          <p className="sw-line sw-line-hook">Your redstone doesn&apos;t need a single repeater, and most builds are full of them.</p>
-          <p className="sw-line">People stack repeaters because that&apos;s what every tutorial shows, not because the circuit needs one.</p>
-          <p className="sw-line">Put a torch on the side of a block, then put another block straight on top of the torch.</p>
-          <p className="sw-line">That block is now powered, permanently, and it&apos;ll drive anything touching it.</p>
-          <p className="sw-line">Hide it inside a wall and your door opens with nothing visible anywhere.</p>
-          <p className="sw-line">Same circuit, half the parts, and nobody can see how it works.</p>
+          <p className="sw-line">
+            Your redstone doesn&apos;t need a single repeater, and most builds are full of them. People stack them because
+            that&apos;s what every tutorial shows, not because the circuit needs one. Put a torch on the side of a block, then put
+            another block straight on top of the torch. That block is now powered, permanently, and it&apos;ll drive anything
+            touching it. Hide it inside a wall and your door opens with nothing visible anywhere. Same circuit, half the parts,
+            and nobody can see how it works.
+          </p>
         </section>
         <section className="sw-panel">
           <h3>Titles</h3>
