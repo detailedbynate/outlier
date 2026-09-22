@@ -71,6 +71,8 @@ export interface SubNiche {
 const DAY = 86_400_000;
 const VIRAL_MULTIPLIER = 3;
 const SMALL_CHANNEL_SUBS = 100_000;
+/** Breakouts kept in a report. Wide enough that filtering by topic and format still leaves a pattern. */
+const BREAKOUT_POOL = 24;
 
 const STOPWORDS = new Set(
   (
@@ -290,9 +292,11 @@ export function computeNicheMetrics(videos: readonly NicheVideo[], channels: Rea
       const c = channels.get(id);
       return c ? [{ youtube_channel_id: c.youtube_channel_id, title: c.title, thumbnail_url: c.thumbnail_url, subscriber_count: c.subscriber_count, videos: e.videos, views: e.views }] : [];
     }),
+    // A pool, not a display list: the Shorts writer filters these down to the
+    // ones actually about the topic, and pages that show breakouts slice their own.
     breakouts: [...viral]
       .sort((a, b) => b.m - a.m)
-      .slice(0, 5)
+      .slice(0, BREAKOUT_POOL)
       .map(({ v, m }) => ({
         youtube_video_id: v.youtube_video_id,
         title: v.title,

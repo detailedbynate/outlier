@@ -8,6 +8,7 @@ import type { LibraryGrowthService } from "@/lib/services/library-growth-service
 import { MONITOR_CHANNELS_JOB_TYPE, MONITOR_VIDEOS_JOB_TYPE, type MonitoringService } from "@/lib/services/monitoring-service";
 import type { NicheLabelingService } from "@/lib/services/niche-labeling-service";
 import type { StorageBudgetService } from "@/lib/services/storage-budget-service";
+import { TRANSCRIPT_BACKFILL_JOB_TYPE, type TranscriptService } from "@/lib/services/transcript-service";
 import { TRENDING_JOB_TYPE, TRENDING_REFRESH_JOB_TYPE, type TrendingService } from "@/lib/services/trending-service";
 import type { VideoService } from "@/lib/services/video-service";
 import { CHANNEL_ID_PATTERN } from "@/lib/youtube/parse";
@@ -23,6 +24,7 @@ export interface JobDependencies {
   monitoring: MonitoringService;
   nicheLabeling: NicheLabelingService;
   libraryGrowth: LibraryGrowthService;
+  transcripts: TranscriptService;
   /** Housekeeping for the YouTube response cache and quota ledger. */
   youtubeHousekeeping: { pruneCache: () => Promise<void>; pruneQuotaHistory: () => Promise<void> };
   channelRepository: ChannelRepository;
@@ -39,6 +41,8 @@ export interface JobDependencies {
     monitorMaxVideosPerRun: number;
     monitorMaxChannelsPerRun: number;
     nicheLabelMaxPerRun: number;
+    transcriptBackfillPerRun: number;
+    transcriptBackfillDays: number;
   };
 }
 
@@ -254,6 +258,21 @@ export function createJobRegistry(deps: JobDependencies): JobRegistry {
         payloadSchema: emptyPayload,
         maxAttempts: 1,
         handler: async (_payload, { signal }) => ({ ...(await deps.nicheLabeling.labelPending({ maxChannels: deps.config.nicheLabelMaxPerRun, signal })) }),
+      }),
+    )
+    .register(
+      defineJob({
+        type: TRANSCRIPT_BACKFILL_JOB_TYPE,
+        description: "Scheduled: read what the library's best Shorts say, so the script writer has real openings to learn from (no API quota).",
+        payloadSchema: emptyPayload,
+        maxAttempts: 1,
+        handler: async (_payload, { signal }) => ({
+          ...(await deps.transcripts.backfillOnce({
+            limit: deps.config.transcriptBackfillPerRun,
+            days: deps.config.transcriptBackfillDays,
+            signal,
+          })),
+        }),
       }),
     )
     .register(

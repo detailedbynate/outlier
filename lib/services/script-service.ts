@@ -7,6 +7,7 @@ import type { VideoRepository } from "@/lib/database/repositories/videos";
 import type { NicheMetrics } from "@/lib/niches/analysis";
 import { scriptSystemPrompt, scriptUserPrompt } from "@/lib/scripts/prompt";
 import { SCRIPT, type ScriptRequest, type ScriptResult, type ScriptSource } from "@/lib/scripts/schema";
+import { pickScriptSources } from "@/lib/scripts/sources";
 import type { Transcript, TranscriptProvider } from "@/lib/youtube/transcripts";
 
 /**
@@ -53,7 +54,7 @@ export class ScriptService {
     if (!idea) throw new ValidationError("Say what the Short should be about.");
     if (!this.deps.ai) throw new AppError("CONFIG_ERROR", "Script writing isn't available right now.", { expose: true });
 
-    const sources = await this.sourcesFor(topic);
+    const sources = await this.sourcesFor(topic, idea);
     const { object, model } = await this.deps.ai.generateObject({
       system: scriptSystemPrompt(),
       messages: [{ role: "user", content: scriptUserPrompt({ ...request, topic, idea }, sources) }],
@@ -71,13 +72,15 @@ export class ScriptService {
   }
 
   /** The niche's outliers, with their opening words where we can get them. */
-  private async sourcesFor(topic: string): Promise<ScriptSource[]> {
+  private async sourcesFor(topic: string, idea: string): Promise<ScriptSource[]> {
     const metrics = await this.deps.metricsFor(topic).catch((error: unknown) => {
       // A script from principles alone beats no script at all.
       this.log.warn("script sources unavailable", { topic, error });
       return null;
     });
-    const breakouts = (metrics?.breakouts ?? []).slice(0, MAX_SOURCES);
+    // The report's pool is gathered per channel, so it contains videos about
+    // other things entirely. Only the ones about this topic teach anything.
+    const breakouts = pickScriptSources(metrics?.breakouts ?? [], { topic, idea, format: "short", limit: MAX_SOURCES });
     if (breakouts.length === 0) return [];
 
     const openings = await this.openingsFor(breakouts.map((b) => b.youtube_video_id)).catch((error: unknown) => {

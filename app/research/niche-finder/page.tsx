@@ -275,9 +275,12 @@ function SubNicheReport({ sub, topic }: { sub: SubNiche; topic: string }) {
   );
 }
 
+/** The report carries a wider pool so the script writer can filter it; a page shows the top few. */
+const BREAKOUTS_SHOWN = 5;
+
 /** Older cached reports have breakouts but no examples. */
 function breakoutExamples(metrics: NicheMetrics): NicheExample[] {
-  return metrics.breakouts.map((b) => ({
+  return metrics.breakouts.slice(0, BREAKOUTS_SHOWN).map((b) => ({
     youtubeVideoId: b.youtube_video_id,
     title: b.title,
     channelTitle: b.channel_title,
@@ -572,7 +575,7 @@ function Lists({ metrics }: { metrics: NicheMetrics }) {
           <p className="dash-row-sub">No 3×+ breakouts in this sample yet.</p>
         ) : (
           <ul className="dash-list">
-            {metrics.breakouts.map((v) => (
+            {metrics.breakouts.slice(0, BREAKOUTS_SHOWN).map((v) => (
               <li key={v.youtube_video_id}>
                 <a
                   href={v.format === "short" ? `https://www.youtube.com/shorts/${v.youtube_video_id}` : `https://www.youtube.com/watch?v=${v.youtube_video_id}`}
