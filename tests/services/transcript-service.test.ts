@@ -9,17 +9,19 @@ function transcript(text: string): Transcript {
 
 function deps(over: { feed?: unknown[]; missing?: string[]; get?: (id: string) => Promise<Transcript> } = {}) {
   const save = vi.fn(async () => {});
+  const markUnavailable = vi.fn(async () => {});
   const feed = vi.fn(async () => over.feed ?? []);
   const missing = vi.fn(async () => over.missing ?? []);
   const getTranscript = vi.fn(over.get ?? (async () => transcript("watch this")));
   return {
     save,
+    markUnavailable,
     feed,
     missing,
     getTranscript,
     service: new TranscriptService({
       videos: { feed } as never,
-      transcripts: { missing, save } as never,
+      transcripts: { missing, save, markUnavailable } as never,
       reader: { getTranscript } as never,
       logger: createLogger({ level: "silent" }),
     }),
@@ -43,6 +45,21 @@ describe("TranscriptService.backfillOnce", () => {
     const result = await d.service.backfillOnce({ limit: 1, days: 60 });
     expect(d.save).toHaveBeenCalledTimes(1);
     expect(result).toMatchObject({ missing: 3, stored: 1 });
+  });
+
+  it("writes down a video with no captions, so the next run moves past it", async () => {
+    const { NotFoundError } = await import("@/lib/core/errors");
+    const d = deps({
+      feed: [row("a"), row("b")],
+      missing: ["a", "b"],
+      get: async (id) => {
+        if (id === "yta") throw new NotFoundError("transcript", id);
+        return transcript("ok");
+      },
+    });
+    const result = await d.service.backfillOnce({ limit: 10, days: 60 });
+    expect(d.markUnavailable).toHaveBeenCalledWith("a");
+    expect(result).toMatchObject({ stored: 1, unavailable: 1, failed: 0 });
   });
 
   it("counts a video with no captions instead of failing the run", async () => {

@@ -38,6 +38,28 @@ export class TranscriptRepository {
     return videoIds.filter((id) => !have.has(id));
   }
 
+  /**
+   * Record that a video has no transcript to read.
+   *
+   * Without this the same captionless videos come back from `missing` every run
+   * and the backfill spends its whole budget re-reading them — and most Shorts
+   * carry no caption track at all, so that is the common case, not the rare one.
+   * An empty row means "asked, nothing there"; word_count 0 tells them apart
+   * from a real transcript.
+   */
+  async markUnavailable(videoId: string): Promise<void> {
+    unwrap(
+      await this.db
+        .from("video_transcripts")
+        .upsert(
+          { video_id: videoId, language: "", source: "captions", segments: [], full_text: "", word_count: 0, fetched_at: new Date().toISOString() },
+          { onConflict: "video_id" },
+        )
+        .select("video_id"),
+      "video_transcripts.markUnavailable",
+    );
+  }
+
   async save(videoId: string, transcript: Transcript, openingSeconds = 3): Promise<void> {
     const fullText = transcriptToText(transcript);
     unwrap(

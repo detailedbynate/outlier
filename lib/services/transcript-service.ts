@@ -1,5 +1,5 @@
 import { createLogger, type Logger } from "@/lib/core/logger";
-import { serializeError } from "@/lib/core/errors";
+import { isAppError, serializeError } from "@/lib/core/errors";
 import type { TranscriptRepository } from "@/lib/database/repositories/transcripts";
 import type { VideoRepository } from "@/lib/database/repositories/videos";
 import type { TranscriptProvider } from "@/lib/youtube/transcripts";
@@ -25,13 +25,15 @@ export interface TranscriptBackfillResult {
   candidates: number;
   missing: number;
   stored: number;
-  /** No captions, or the gate turned us away. Neither is worth retrying soon. */
+  /** Asked and there was nothing to read. Recorded, so the next run moves on. */
+  unavailable: number;
+  /** The gate turned us away, or something broke. Left for another run. */
   failed: number;
 }
 
 export interface TranscriptServiceDeps {
   videos: Pick<VideoRepository, "feed">;
-  transcripts: Pick<TranscriptRepository, "missing" | "save">;
+  transcripts: Pick<TranscriptRepository, "missing" | "save" | "markUnavailable">;
   /** Null wherever scraping is off — the Data API can't see transcripts at all. */
   reader: TranscriptProvider | null;
   logger?: Logger;
@@ -45,7 +47,7 @@ export class TranscriptService {
   }
 
   async backfillOnce(options: { limit: number; days: number; signal?: AbortSignal }): Promise<TranscriptBackfillResult> {
-    const empty: TranscriptBackfillResult = { candidates: 0, missing: 0, stored: 0, failed: 0 };
+    const empty: TranscriptBackfillResult = { candidates: 0, missing: 0, stored: 0, unavailable: 0, failed: 0 };
     const reader = this.deps.reader;
     if (!reader || options.limit <= 0) return empty;
 
@@ -63,6 +65,7 @@ export class TranscriptService {
     const batch = missing.slice(0, options.limit);
 
     let stored = 0;
+    let unavailable = 0;
     let failed = 0;
     // Sequential on purpose: the shared gate paces these, and a run that gives up
     // early leaves the rest for the next one instead of queueing behind itself.
@@ -74,12 +77,22 @@ export class TranscriptService {
         await this.deps.transcripts.save(videoId, await reader.getTranscript(youtubeId));
         stored++;
       } catch (error) {
+        // "Nothing to read" is an answer: write it down so the next run moves past it.
+        if (isAppError(error) && error.code === "NOT_FOUND") {
+          unavailable++;
+          try {
+            await this.deps.transcripts.markUnavailable(videoId);
+          } catch (markError) {
+            this.log.warn("could not record a missing transcript", { youtubeId, error: serializeError(markError) });
+          }
+          continue;
+        }
         failed++;
-        this.log.debug("transcript unavailable", { youtubeId, error: serializeError(error) });
+        this.log.debug("transcript read failed", { youtubeId, error: serializeError(error) });
       }
     }
 
-    const result = { candidates: candidates.length, missing: missing.length, stored, failed };
+    const result = { candidates: candidates.length, missing: missing.length, stored, unavailable, failed };
     this.log.info("transcripts backfilled", result);
     return result;
   }
