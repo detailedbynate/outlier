@@ -27,6 +27,8 @@ import { JobQueue } from "@/lib/jobs/queue";
 import type { JobRegistry } from "@/lib/jobs/registry";
 import { JobScheduler } from "@/lib/jobs/scheduler";
 import { labelingProvider } from "@/lib/ai/select";
+import { TranscriptRepository } from "@/lib/database/repositories/transcripts";
+import { ScriptService } from "./script-service";
 import { getAIProviders } from "@/lib/ai/registry";
 import { LIBRARY_SEEDS } from "@/lib/niches/seeds";
 import { LibraryGrowthService } from "./library-growth-service";
@@ -34,7 +36,7 @@ import { NicheLabelingService } from "./niche-labeling-service";
 import { qualityConfigFrom } from "@/lib/research/quality";
 import { YouTubeCacheRepository, YouTubeQuotaRepository } from "@/lib/database/repositories/youtube-quota";
 import { getQuotaManager, getYouTubeService, quotaDay, setQuotaUserLimits, type QuotaManager } from "@/lib/youtube";
-import { createHybridSource } from "@/lib/innertube";
+import { createHybridSource, createTranscriptReader } from "@/lib/innertube";
 import { AccountService } from "./account-service";
 import { DashboardService } from "./dashboard-service";
 import { NicheService } from "./niche-service";
@@ -68,6 +70,7 @@ export interface Services {
   accounts: AccountService;
   dashboard: DashboardService;
   niches: NicheService;
+  scripts: ScriptService;
   referrals: ReferralService;
   competitors: CompetitorService;
   moderation: ModerationService;
@@ -103,6 +106,7 @@ export interface Services {
     creditLedger: CreditLedgerRepository;
     subscriptions: SubscriptionRepository;
     signupInvites: SignupInviteRepository;
+    transcripts: TranscriptRepository;
     competitors: CompetitorRepository;
     youtubeCache: YouTubeCacheRepository;
   };
@@ -150,6 +154,7 @@ export function getServices(): Services {
     creditLedger: lazy(() => new CreditLedgerRepository(lazyDb())),
     subscriptions: lazy(() => new SubscriptionRepository(lazyDb())),
     signupInvites: lazy(() => new SignupInviteRepository(lazyDb())),
+    transcripts: lazy(() => new TranscriptRepository(lazyDb())),
     niches: lazy(() => new NicheRepository(lazyDb())),
     competitors: lazy(() => new CompetitorRepository(lazyDb())),
     youtubeCache: lazy(() => new YouTubeCacheRepository(lazyDb())),
@@ -311,6 +316,14 @@ export function getServices(): Services {
       },
       { dailyYoutubeRefreshes: config.NICHE_DAILY_YOUTUBE_REFRESHES, language: quality.language, regionCode },
     ),
+    scripts: new ScriptService({
+      ai: text,
+      transcripts: repositories.transcripts,
+      videos: repositories.videos,
+      // Transcripts only exist on the scraped path; the Data API can't see them.
+      reader: config.INNERTUBE_INGEST_ENABLED ? lazy(() => createTranscriptReader()) : null,
+      metricsFor: async (topic) => (await services!.niches.research(topic)).report.overall,
+    }),
     dashboard: new DashboardService({
       channels: repositories.channels,
       videos: repositories.videos,

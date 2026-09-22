@@ -75,6 +75,16 @@ export class VideoRepository {
     );
   }
 
+  /** Internal ids for these YouTube ids, keyed by YouTube id. Ones we don't store are absent. */
+  async idsByYouTubeIds(youtubeVideoIds: readonly string[]): Promise<Map<string, string>> {
+    if (youtubeVideoIds.length === 0) return new Map();
+    const rows = unwrap(
+      await this.db.from("videos").select("id, youtube_video_id").in("youtube_video_id", [...youtubeVideoIds]),
+      "videos.idsByYouTubeIds",
+    );
+    return new Map(rows.map((row) => [row.youtube_video_id, row.id]));
+  }
+
   async upsertMany(rows: TablesInsert<"videos">[]): Promise<VideoRow[]> {
     if (rows.length === 0) return [];
     return unwrap(

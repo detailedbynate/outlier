@@ -22,6 +22,12 @@ export const CREDIT_COSTS = {
   analyze_video: 2,
   /** Niche Finder fresh research: one search + batched stats (only charged when YouTube is called). */
   niche_research: 5,
+  /**
+   * A Short script: the niche's outliers, a few transcripts read from YouTube,
+   * and a long generation. The most expensive thing a person can ask for, and
+   * the only one that spends an AI request rather than API quota.
+   */
+  write_script: 8,
 } as const;
 
 export type CreditAction = keyof typeof CREDIT_COSTS;

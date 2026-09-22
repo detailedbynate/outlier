@@ -224,6 +224,19 @@ export type FolderRow = Timestamps & {
   color: string | null;
 };
 
+export type VideoTranscriptRow = {
+  video_id: string;
+  language: string;
+  source: "captions" | "asr" | "provider";
+  segments: { startSeconds: number; durationSeconds: number; text: string }[];
+  full_text: string;
+  /** The first few seconds: where a Short's hook lives. */
+  opening: string;
+  word_count: number;
+  fetched_at: string;
+  created_at: string;
+};
+
 export type FolderChannelRow = {
   id: string;
   folder_id: string;
@@ -551,6 +564,7 @@ export type Database = {
       job_results: TableDef<JobResultRow, "job_id">;
       folders: TableDef<FolderRow, "workspace_id" | "name">;
       folder_channels: TableDef<FolderChannelRow, "folder_id" | "channel_id">;
+      video_transcripts: TableDef<VideoTranscriptRow, "video_id" | "language" | "segments" | "full_text">;
       usage_events: TableDef<UsageEventRow, "event_type">;
       credits: TableDef<CreditRow, "workspace_id" | "delta" | "source">;
       waitlist_entries: TableDef<WaitlistEntryRow, "email">;
