@@ -59,6 +59,14 @@ describe("script prompt", () => {
     expect(scriptUserPrompt({ topic: "fishing", idea: "an idea", targetSeconds: 60 })).toContain("132 spoken words");
   });
 
+  it("gives a hard ceiling, because the target alone got overrun by half", () => {
+    // Claude wrote 96 words for a 30 second slot when only told the target.
+    const prompt = scriptUserPrompt({ topic: "fishing", idea: "an idea", targetSeconds: 30 });
+    expect(prompt).toContain("66 spoken words");
+    expect(prompt).toContain("73 is the hard maximum");
+    expect(prompt).toMatch(/cut whole lines/);
+  });
+
   it("tells it to build on the creator's own material when there is some", () => {
     const withAngle = scriptUserPrompt({ topic: "fishing", idea: "an idea", angle: "I fish the same river every week" });
     expect(withAngle).toContain("I fish the same river every week");

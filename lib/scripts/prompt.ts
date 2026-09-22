@@ -120,7 +120,8 @@ export function scriptUserPrompt(request: ScriptRequest): string {
   if (request.tone) parts.push(`Tone: ${request.tone}`);
   parts.push(
     ``,
-    `Length: ${seconds} seconds, which is about ${words} spoken words. Going long is the most common way these fail — count them.`,
+    `Length: ${seconds} seconds. That is ${words} spoken words, and ${Math.round(words * 1.1)} is the hard maximum.`,
+    `Count the words in your draft before you answer. If it is over, cut whole lines — not adjectives — until it fits. A ${seconds} second slot with ${Math.round(words * 1.5)} words in it gets read too fast to follow, and going long is the most common way these fail.`,
     ``,
     `Use what you actually know about ${oneLine(request.topic)}. Be concrete and correct. If your knowledge of this exact idea is thin, narrow the script to the part you are sure of rather than inventing specifics.`,
     ``,
