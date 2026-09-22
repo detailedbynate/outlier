@@ -255,7 +255,9 @@ export class ResearchService {
     const toQueue = [...newIds, ...stale.filter((id) => !fresh.has(id))].slice(0, this.config.discoveryMaxChannels);
     const day = now.toISOString().slice(0, 10);
     for (const channelId of toQueue) {
-      await this.deps.enqueue("channel.refresh", { channelId, light: true }, { idempotencyKey: `channel.refresh:${channelId}:${day}`, priority: 5 });
+      // A person searching is waiting on these; growth runs aren't.
+      const requestedBy = !growth && userId ? { requestedBy: userId } : {};
+      await this.deps.enqueue("channel.refresh", { channelId, light: true, ...requestedBy }, { idempotencyKey: `channel.refresh:${channelId}:${day}`, priority: 5 });
     }
 
     this.log.info("shorts discovery", { keyword: q, found: ranked.length, new: newIds.length, rejected, rejectedBy, offTopic, queued: toQueue.length, passes });

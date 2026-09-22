@@ -11,6 +11,7 @@ import type { StorageBudgetService } from "@/lib/services/storage-budget-service
 import { TRENDING_JOB_TYPE, TRENDING_REFRESH_JOB_TYPE, type TrendingService } from "@/lib/services/trending-service";
 import type { VideoService } from "@/lib/services/video-service";
 import { CHANNEL_ID_PATTERN } from "@/lib/youtube/parse";
+import { runWithQuotaContext } from "@/lib/youtube/quota-context";
 import type { EnqueueOptions } from "./queue";
 import { JobRegistry } from "./registry";
 import { defineJob } from "./types";
@@ -58,6 +59,12 @@ export const channelRefreshPayload = z.object({
   channelId: z.string().regex(CHANNEL_ID_PATTERN, "Expected a YouTube channel id (UC...)"),
   /** Discovered channels: fewer uploads, no descriptions. Ignored for tracked channels. */
   light: z.boolean().default(false),
+  /**
+   * Someone is waiting on this one (they just ran a search). It reads in the
+   * interactive lane: a full background lane falls through to the API rather
+   * than queueing behind the scraper at a few requests a minute.
+   */
+  requestedBy: z.uuid().optional(),
 });
 
 export const videoAnalyzePayload = z.object({ video: z.string().trim().min(1).max(500) });
@@ -106,9 +113,12 @@ export function createJobRegistry(deps: JobDependencies): JobRegistry {
         type: "channel.refresh",
         description: "Refresh a tracked channel: stats snapshot, latest uploads, performance metrics.",
         payloadSchema: channelRefreshPayload,
-        handler: ({ channelId, light }) =>
+        handler: ({ channelId, light, requestedBy }) =>
           skipIfOverBudget(async () => {
-            const { channel, videosSynced } = await deps.channels.refreshChannel(channelId, { light });
+            const refresh = () => deps.channels.refreshChannel(channelId, { light });
+            const { channel, videosSynced } = requestedBy
+              ? await runWithQuotaContext({ lane: "user", userId: requestedBy, operation: "job:channel.refresh" }, refresh)
+              : await refresh();
             return { youtubeChannelId: channel.youtube_channel_id, videosSynced };
           }),
       }),

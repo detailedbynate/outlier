@@ -56,10 +56,11 @@ describe("ResearchService.discoverShortsChannels", () => {
     expect(search).toHaveBeenCalledWith(
       expect.objectContaining({ q: "cooking hacks", videoDuration: "short", order: "viewCount", relevanceLanguage: "en", regionCode: "US" }),
     );
+    // The searcher is waiting, so these read in the interactive lane.
     expect(enqueue.mock.calls.map((c) => (c as unknown[])[1])).toEqual([
-      { channelId: B, light: true },
-      { channelId: A, light: true },
-      { channelId: C, light: true },
+      { channelId: B, light: true, requestedBy: "user-1" },
+      { channelId: A, light: true, requestedBy: "user-1" },
+      { channelId: C, light: true, requestedBy: "user-1" },
     ]);
     expect(record).toHaveBeenCalledWith(expect.objectContaining({ event_type: "research.shorts_discovery", user_id: "user-1" }));
     expect(result).toEqual({
