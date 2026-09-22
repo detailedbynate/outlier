@@ -47,27 +47,40 @@ export function labelingProvider(config: {
 }
 
 /**
+ * Claude writes scripts well and isn't priced like Opus. Overridden by SCRIPT_MODEL.
+ */
+export const DEFAULT_SCRIPT_MODEL = "claude-sonnet-5";
+
+/**
  * The writer behind the Shorts script tool.
  *
- * Scripts are the one thing worth paying for: they cost eight credits, people
- * judge the product on them, and the free models' weak knowledge of a niche is
- * exactly what made the early ones read as invented. SCRIPT_MODEL names a paid
- * OpenRouter model to write them.
+ * Scripts are the one thing here worth paying for: they cost eight credits,
+ * people judge the product on them, and the free models' thin knowledge of a
+ * niche is exactly what had them inventing details to fill the gap.
  *
- * The free chain stays behind it, so an unfunded account, a spending cap or an
- * outage degrades to a worse script instead of no script.
+ * Order is deliberate. Claude first when there's a key, because it follows the
+ * layout and the honesty rules far better than anything free. Then a paid
+ * OpenRouter model if one is named. Then the free chain, so a spent balance or
+ * an outage degrades to a worse script rather than no script at all.
  */
 export function scriptProvider(config: {
   SCRIPT_MODEL?: string | undefined;
+  ANTHROPIC_API_KEY?: string | undefined;
   GEMINI_API_KEY?: string | undefined;
   GEMINI_MODEL: string;
   OPENROUTER_API_KEY?: string | undefined;
   OPENROUTER_MODELS?: string | undefined;
 }): TextProvider | null {
   const chain: TextProvider[] = [];
-  const paid = config.SCRIPT_MODEL?.trim();
-  if (paid && config.OPENROUTER_API_KEY) {
-    chain.push(new OpenRouterTextProvider({ apiKey: config.OPENROUTER_API_KEY, models: [paid] }));
+  const named = config.SCRIPT_MODEL?.trim();
+
+  if (config.ANTHROPIC_API_KEY) {
+    // A Claude id in SCRIPT_MODEL picks the model; anything else is meant for OpenRouter.
+    const model = named?.startsWith("claude-") ? named : DEFAULT_SCRIPT_MODEL;
+    chain.push(new AnthropicTextProvider({ apiKey: config.ANTHROPIC_API_KEY, model }));
+  }
+  if (named && !named.startsWith("claude-") && config.OPENROUTER_API_KEY) {
+    chain.push(new OpenRouterTextProvider({ apiKey: config.OPENROUTER_API_KEY, models: [named] }));
   }
   if (config.GEMINI_API_KEY) chain.push(new GeminiTextProvider({ apiKey: config.GEMINI_API_KEY, model: config.GEMINI_MODEL }));
   if (config.OPENROUTER_API_KEY) {

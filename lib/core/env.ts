@@ -166,9 +166,10 @@ const serverEnvSchema = z.object({
   /** OpenRouter key: its free models take over when Gemini's free tier is rate-limited. */
   OPENROUTER_API_KEY: optionalString,
   /**
-   * A paid OpenRouter model for Shorts scripts, e.g. "anthropic/claude-sonnet-5".
-   * Blank writes them on the free chain, which knows niches much less well.
-   * Needs credit on the OpenRouter account; without it the free chain takes over.
+   * Which model writes Shorts scripts. A "claude-" id goes to Anthropic directly
+   * (needs ANTHROPIC_API_KEY); anything else is an OpenRouter slug. Blank uses
+   * Claude when there's a key, otherwise the free chain, which knows niches much
+   * less well and invents detail to cover it.
    */
   SCRIPT_MODEL: optionalString,
   /** Comma-separated OpenRouter models, tried in order. Blank uses a built-in list of free ones. */
