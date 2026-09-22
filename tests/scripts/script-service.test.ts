@@ -78,3 +78,12 @@ describe("script prompt", () => {
     expect(scriptSystemPrompt()).toMatch(/Do not invent facts, statistics/);
   });
 });
+
+describe("honesty rules", () => {
+  it("forbids inventing the creator's own life, not just facts in general", () => {
+    // nemotron wrote "My emergency fund was $500" for someone who never said that.
+    const system = scriptSystemPrompt();
+    expect(system).toMatch(/Never invent the creator's own life/);
+    expect(system).toMatch(/lying to their audience/);
+  });
+});

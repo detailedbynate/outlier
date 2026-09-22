@@ -56,6 +56,7 @@ const RULES = `How to write the words:
 What you must not do:
 
 - Do not invent facts, statistics, studies, prices, dates, version numbers, place names or quotes. This is the single most damaging thing you can do, because it is confidently wrong and the creator will not catch it.
+- Never invent the creator's own life. No amounts they paid, dates they did something, or results they got, unless they told you. A first person line they cannot honestly say out loud is worse than a dull one: they would be lying to their audience on camera. If you need a specific and do not have it, write the line so the viewer supplies their own ("whatever your rent actually is") or make it plainly general.
 - If you do not know something specific enough about this topic to be concrete, write about the part you do know well rather than inventing detail. A narrower true script beats a broad invented one.
 - Do not describe the topic from the outside ("Minecraft is a game where..."). Write for people already in this niche who know the basics.`;
 
