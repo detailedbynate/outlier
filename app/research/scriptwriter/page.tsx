@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { PenIcon } from "@/components/icons";
 import { requireApprovedUser } from "@/lib/auth/session";
 import { CREDIT_COSTS } from "@/lib/services/credits-service";
@@ -24,13 +23,8 @@ export default async function ScriptwriterPage() {
           </span>
           <h1>Shorts Script Writer</h1>
           <p>
-            Give it your niche and an idea. It studies the videos in that niche that beat their own channel — including how they
-            open — and writes a Short from what they actually do: hook, beats, shots, titles.{" "}
-            <Link href="/research/niche-finder" className="dash-link">
-              Research a niche first
-            </Link>{" "}
-            for the sharpest results.
-          </p>
+            Give it your niche and an idea and it writes the words — hook, turn, payoff — ready to read out. Tell it what
+            you know that nobody else does and it builds the script around that instead of guessing.</p>
         </div>
       </header>
 

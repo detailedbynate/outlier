@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isAboutTopic, pickScriptSources, type Breakout } from "@/lib/scripts/sources";
+import { scriptLines } from "@/lib/scripts/schema";
 
 function breakout(over: Partial<Breakout> & { title: string }): Breakout {
   return {
@@ -96,5 +97,21 @@ describe("pickScriptSources", () => {
 
   it("returns nothing when the niche has no breakouts", () => {
     expect(pickScriptSources([], options)).toEqual([]);
+  });
+});
+
+describe("scriptLines", () => {
+  it("keeps the lines the model gave us", () => {
+    expect(scriptLines("First line.\nSecond line.")).toEqual(["First line.", "Second line."]);
+  });
+
+  it("recovers lines from a run-on block, spaces or not", () => {
+    // What nemotron actually returned: sentences welded together, no space after the stop.
+    const blob = "Your door breaks because you push it with a piston.Doors aren't pushable.Use a block instead.";
+    expect(scriptLines(blob)).toEqual(["Your door breaks because you push it with a piston.", "Doors aren't pushable.", "Use a block instead."]);
+  });
+
+  it("leaves a mid-sentence full stop alone", () => {
+    expect(scriptLines("It cost £4.50 and took ten minutes.")).toEqual(["It cost £4.50 and took ten minutes."]);
   });
 });

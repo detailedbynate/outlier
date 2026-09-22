@@ -50,3 +50,20 @@ export interface ScriptRequest {
   targetSeconds?: Duration;
   tone?: Tone;
 }
+
+/**
+ * One spoken line per element, however the model formatted it.
+ *
+ * Asked for newline-separated lines, the free models often return one run-on
+ * block, and sometimes without the space after a full stop ("a piston.Doors
+ * aren't blocks"). Splitting on sentence ends recovers the shape either way,
+ * which matters because a script is read off a screen a line at a time.
+ */
+export function scriptLines(script: string): string[] {
+  return script
+    // A sentence end followed straight by a capital is a missing break, not an abbreviation.
+    .replace(/([.!?])\s*(?=["'“]?[A-Z])/g, "$1\n")
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+}

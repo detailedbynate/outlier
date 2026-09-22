@@ -37,7 +37,8 @@ async function main(): Promise<void> {
   console.log(`
 === ${model} · ${words} words ===
 `);
-  console.log(script.script);
+  const { scriptLines } = await import("@/lib/scripts/schema");
+  console.log(scriptLines(script.script).join(String.fromCharCode(10)));
   console.log(`
 TITLES: ${script.titles.join(" | ")}`);
 }

@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { PenIcon } from "@/components/icons";
-import { DURATIONS, TONES, WORDS_PER_SECOND, type ScriptResult } from "@/lib/scripts/schema";
+import { DURATIONS, TONES, WORDS_PER_SECOND, scriptLines, type ScriptResult } from "@/lib/scripts/schema";
 import { writeScript } from "./actions";
 import { emptyScriptState } from "./state";
 
@@ -25,7 +25,7 @@ export function ScriptForm({ cost }: { cost: number }) {
           <label className="sw-field">
             <span>Niche</span>
             <input name="topic" defaultValue={state.sent.topic} placeholder="minecraft" maxLength={80} required autoComplete="off" />
-            <small>The niche to study. Its outliers are what the script learns from.</small>
+            <small>Who it&apos;s for. The script is written for people already in this niche.</small>
           </label>
           <label className="sw-field">
             <span>Video idea or title</span>
@@ -73,7 +73,7 @@ export function ScriptForm({ cost }: { cost: number }) {
       </form>
 
       {state.error ? <div className="dash-empty">{state.error}</div> : null}
-      {pending ? <p className="sw-waiting">Reading the niche&apos;s outliers, then writing. This takes a few seconds.</p> : null}
+      {pending ? <p className="sw-waiting">Writing. This takes a few seconds.</p> : null}
       {state.result && !pending ? <ScriptView result={state.result} charged={state.charged} /> : null}
     </>
   );
@@ -100,7 +100,7 @@ function Copyable({ text, label }: { text: string; label: string }) {
 
 /** The script, and the titles to put on it. Nothing else — it's made to be read out. */
 function ScriptView({ result, charged }: { result: ScriptResult; charged: number }) {
-  const lines = result.script.script.split("\n").map((line) => line.trim()).filter(Boolean);
+  const lines = scriptLines(result.script.script);
   const seconds = Math.round(result.words / WORDS_PER_SECOND);
 
   return (
