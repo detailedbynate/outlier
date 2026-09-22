@@ -122,6 +122,18 @@ ${RULES}
 ${sampleBlock(samples)}`;
 }
 
+/**
+ * Ideas about something new: an update, a patch, a season. The model's
+ * knowledge stops at its training date, so for these it can only guess at the
+ * contents — asked for "the new Blizzard Island update" both models invented
+ * one. Words, not dates, because the idea box is all there is to go on.
+ */
+const RECENT = /\b(new|update[sd]?|patch(es)?|season|release[sd]?|just (dropped|came out|added)|leak(s|ed)?|event|rework(ed)?|nerf(s|ed)?|buff(s|ed)?|20\d\d)\b/i;
+
+export function soundsRecent(idea: string): boolean {
+  return RECENT.test(idea);
+}
+
 export function scriptUserPrompt(request: ScriptRequest): string {
   const seconds = request.targetSeconds ?? 30;
   const words = Math.round(seconds * WORDS_PER_SECOND);
@@ -135,6 +147,14 @@ export function scriptUserPrompt(request: ScriptRequest): string {
     parts.push(
       `What the creator brings to it: ${oneLine(request.angle)}`,
       `Build the script around this. It is the true, specific material you have, and it is what stops this being a script anyone could have written.`,
+    );
+  }
+  if (soundsRecent(request.idea)) {
+    parts.push(
+      ``,
+      request.angle?.trim()
+        ? `This may be about something newer than your knowledge. Treat what the creator told you above as the only source for what is new; do not add features, changes, names or numbers of your own.`
+        : `This may be about something newer than your knowledge, and the creator hasn't said what is in it. Do not guess at its contents: no invented features, changes, names or numbers. Write about what is true either way — what to check first, what usually matters in this kind of change, how to judge it — and keep every claim about the new thing itself general.`,
     );
   }
   if (request.tone) parts.push(`Tone: ${request.tone}`);

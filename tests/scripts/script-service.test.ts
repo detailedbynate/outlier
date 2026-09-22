@@ -21,6 +21,16 @@ function serviceWith(deps: Record<string, unknown> = {}) {
 }
 
 describe("ScriptService", () => {
+  it("uses the premium writer only when asked, and the standard one otherwise", async () => {
+    const premium = vi.fn().mockResolvedValue({ object: script, model: "premium-model", usage: {} });
+    const { service, generateObject } = serviceWith({ premiumAi: { name: "premium", generateText: vi.fn(), generateObject: premium } });
+
+    expect((await service.write({ topic: "fishing", idea: "an idea" }, undefined, { premium: true })).model).toBe("premium-model");
+    expect((await service.write({ topic: "fishing", idea: "an idea" })).model).toBe("test-model");
+    expect(premium).toHaveBeenCalledTimes(1);
+    expect(generateObject).toHaveBeenCalledTimes(1);
+  });
+
   it("returns the script and counts its spoken words", async () => {
     const { service } = serviceWith();
     const result = await service.write({ topic: "car detailing", idea: "an idea" });
@@ -90,6 +100,21 @@ describe("script prompt", () => {
 });
 
 describe("honesty rules", () => {
+  it("won't let it guess what's in an update it can't know about", () => {
+    const prompt = scriptUserPrompt({ topic: "My Singing Monsters", idea: "The new Blizzard Island update" });
+    expect(prompt).toMatch(/newer than your knowledge/);
+    expect(prompt).toMatch(/Do not guess at its contents/);
+  });
+
+  it("treats what they said about an update as the only source", () => {
+    const prompt = scriptUserPrompt({ topic: "My Singing Monsters", idea: "The new Blizzard Island update", angle: "it adds three ice monsters" });
+    expect(prompt).toMatch(/only source for what is new/);
+  });
+
+  it("leaves evergreen ideas alone", () => {
+    expect(scriptUserPrompt({ topic: "fishing", idea: "why your knots slip" })).not.toMatch(/newer than your knowledge/);
+  });
+
   it("shows its examples as prose, since a model copies an example's layout over a rule", () => {
     // Each example is one quoted paragraph on the line after its heading.
     const examples = [...scriptSystemPrompt().matchAll(/^Example — .*\n"([^\n]*)/gm)].map((m) => m[1]!);

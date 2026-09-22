@@ -47,9 +47,13 @@ export function labelingProvider(config: {
 }
 
 /**
- * Claude writes scripts well and isn't priced like Opus. Overridden by SCRIPT_MODEL.
+ * The writer members get. Side by side on the live prompt, Haiku held length
+ * and a creator's voice better than Sonnet at about a third of the price;
+ * Sonnet knew a niche a little more deeply. Overridden by SCRIPT_MODEL.
  */
-export const DEFAULT_SCRIPT_MODEL = "claude-sonnet-5";
+export const DEFAULT_SCRIPT_MODEL = "claude-haiku-4-5";
+/** The deeper writer, kept for the owner. */
+export const PREMIUM_SCRIPT_MODEL = "claude-sonnet-5";
 
 /**
  * The writer behind the Shorts script tool.
@@ -70,13 +74,13 @@ export function scriptProvider(config: {
   GEMINI_MODEL: string;
   OPENROUTER_API_KEY?: string | undefined;
   OPENROUTER_MODELS?: string | undefined;
-}): TextProvider | null {
+}, options: { premium?: boolean } = {}): TextProvider | null {
   const chain: TextProvider[] = [];
   const named = config.SCRIPT_MODEL?.trim();
 
   if (config.ANTHROPIC_API_KEY) {
-    // A Claude id in SCRIPT_MODEL picks the model; anything else is meant for OpenRouter.
-    const model = named?.startsWith("claude-") ? named : DEFAULT_SCRIPT_MODEL;
+    // A Claude id in SCRIPT_MODEL picks the standard model; anything else is meant for OpenRouter.
+    const model = options.premium ? PREMIUM_SCRIPT_MODEL : named?.startsWith("claude-") ? named : DEFAULT_SCRIPT_MODEL;
     chain.push(new AnthropicTextProvider({ apiKey: config.ANTHROPIC_API_KEY, model }));
   }
   if (named && !named.startsWith("claude-") && config.OPENROUTER_API_KEY) {

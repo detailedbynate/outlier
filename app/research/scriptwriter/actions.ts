@@ -55,6 +55,8 @@ export async function writeScript(_previous: ScriptState, formData: FormData): P
       services.scripts.write(
         { topic: sent.topic, idea: sent.idea, angle: sent.angle || undefined, targetSeconds: sent.seconds, tone: sent.tone },
         current.user.id,
+        // The owner gets the deeper writer; everyone else the cheaper one that holds length and voice better.
+        { premium: current.isOwner },
       ),
     );
     const { charged } = await services.credits.charge(current.user.id, "write_script");
@@ -117,7 +119,7 @@ export async function findIdeas(_previous: IdeaState, formData: FormData): Promi
   try {
     await services.credits.assertAvailable(current.user.id, "find_ideas");
     if (!current.isOwner) await services.rateLimits.enforce("scriptUser", current.user.id);
-    const result = await asUser(current.user.id, "action:find_ideas", () => services.scripts.ideas(topic, current.user.id));
+    const result = await asUser(current.user.id, "action:find_ideas", () => services.scripts.ideas(topic, current.user.id, { premium: current.isOwner }));
     const { charged } = await services.credits.charge(current.user.id, "find_ideas");
     revalidatePath("/", "layout");
     return { ideas: result.ideas, error: null, charged, topic };

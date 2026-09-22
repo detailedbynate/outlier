@@ -23,6 +23,8 @@ export const SCRIPT_EVENT = "script.write";
 
 export interface ScriptDeps {
   ai: TextProvider | null;
+  /** A deeper, pricier writer for the owner. Falls back to `ai` when absent. */
+  premiumAi?: TextProvider | null;
   /** Every script is kept; there's no save button to forget. Also what ideas avoid repeating. */
   saved: Pick<SavedScriptRepository, "save" | "listForUser" | "delete">;
   /** Their own scripts, which the writer copies the voice of. */
@@ -37,12 +39,17 @@ export class ScriptService {
     this.log = deps.logger ?? createLogger({ module: "services.scripts" });
   }
 
-  async write(request: ScriptRequest, userId?: string): Promise<ScriptResult> {
+  private writer(premium = false): TextProvider | null {
+    return (premium && this.deps.premiumAi) || this.deps.ai;
+  }
+
+  async write(request: ScriptRequest, userId?: string, options: { premium?: boolean } = {}): Promise<ScriptResult> {
     const topic = request.topic.trim();
     const idea = request.idea.trim();
     if (!topic) throw new ValidationError("Pick a niche to write for.");
     if (!idea) throw new ValidationError("Say what the Short should be about.");
-    if (!this.deps.ai) throw new AppError("CONFIG_ERROR", "Script writing isn't available right now.", { expose: true });
+    const ai = this.writer(options.premium);
+    if (!ai) throw new AppError("CONFIG_ERROR", "Script writing isn't available right now.", { expose: true });
 
     // Their own scripts are the examples, when they've given us any.
     let samples: string[] = [];
@@ -55,7 +62,7 @@ export class ScriptService {
       }
     }
 
-    const { object, model, usage } = await this.deps.ai.generateObject({
+    const { object, model, usage } = await ai.generateObject({
       system: scriptSystemPrompt(samples),
       messages: [{ role: "user", content: scriptUserPrompt({ ...request, topic, idea }) }],
       schema: SCRIPT,
@@ -104,10 +111,11 @@ export class ScriptService {
    * into a chatbot is memory — it can see every script they've made and is told
    * not to suggest any of them again.
    */
-  async ideas(topic: string, userId?: string): Promise<IdeaResult> {
+  async ideas(topic: string, userId?: string, options: { premium?: boolean } = {}): Promise<IdeaResult> {
     const niche = topic.trim();
     if (!niche) throw new ValidationError("Pick a niche to find ideas for.");
-    if (!this.deps.ai) throw new AppError("CONFIG_ERROR", "Idea finding isn't available right now.", { expose: true });
+    const ai = this.writer(options.premium);
+    if (!ai) throw new AppError("CONFIG_ERROR", "Idea finding isn't available right now.", { expose: true });
 
     let alreadyMade: string[] = [];
     let samples: string[] = [];
@@ -123,7 +131,7 @@ export class ScriptService {
       }
     }
 
-    const { object, model, usage } = await this.deps.ai.generateObject({
+    const { object, model, usage } = await ai.generateObject({
       system: ideaSystemPrompt(),
       messages: [{ role: "user", content: ideaUserPrompt({ topic: niche, alreadyMade, samples, count: IDEA_COUNT }) }],
       schema: IDEAS,

@@ -331,7 +331,7 @@ export function getServices(): Services {
     ),
     transcripts,
     // Its own provider: scripts are worth a paid model where labeling isn't.
-    scripts: new ScriptService({ ai: scriptProvider(config), saved: repositories.savedScripts, styles: repositories.styleSamples }),
+    scripts: new ScriptService({ ai: scriptProvider(config), premiumAi: scriptProvider(config, { premium: true }), saved: repositories.savedScripts, styles: repositories.styleSamples }),
     dashboard: new DashboardService({
       channels: repositories.channels,
       videos: repositories.videos,

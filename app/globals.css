@@ -9589,3 +9589,8 @@ a.dash-row:hover {
   color: var(--text-secondary);
   text-decoration: underline;
 }
+
+/* The angle box asking for what's actually in a new update. */
+.sw-ask {
+  color: var(--warning);
+}

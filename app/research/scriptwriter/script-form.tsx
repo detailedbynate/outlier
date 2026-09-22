@@ -3,6 +3,7 @@
 import { useActionState, useState, type CSSProperties } from "react";
 import { PenIcon } from "@/components/icons";
 import { DURATIONS, TONES, WORDS_PER_SECOND, scriptText, type ScriptResult } from "@/lib/scripts/schema";
+import { soundsRecent } from "@/lib/scripts/prompt";
 import { writeScript } from "./actions";
 import { emptyScriptState } from "./state";
 
@@ -33,6 +34,10 @@ export function ScriptForm({
   // Held in React so the readout and the filled part of the track can follow it.
   const [seconds, setSeconds] = useState<number>(state.sent.seconds);
   const [tone, setTone] = useState<string>(state.sent.tone);
+  // Watched only to ask for details when the idea is about something newer than the model.
+  const [idea, setIdea] = useState<string>(seed?.idea || state.sent.idea);
+  const [angle, setAngle] = useState<string>(state.sent.angle);
+  const askForDetails = soundsRecent(idea) && !angle.trim();
   const filled = (seconds - SHORTEST) / (LONGEST - SHORTEST);
 
   return (
@@ -46,7 +51,7 @@ export function ScriptForm({
           </label>
           <label className="sw-field">
             <span>Video idea or title</span>
-            <input name="idea" defaultValue={seed?.idea || state.sent.idea} placeholder="why your redstone door keeps breaking" maxLength={200} required autoComplete="off" />
+            <input name="idea" defaultValue={seed?.idea || state.sent.idea} placeholder="why your redstone door keeps breaking" maxLength={200} required autoComplete="off" onChange={(e) => setIdea(e.target.value)} />
             <small>What this Short is about. A working title is enough.</small>
           </label>
         </div>
@@ -55,8 +60,14 @@ export function ScriptForm({
           <span>
             Your angle <em>optional, but it&apos;s what stops it being generic</em>
           </span>
-          <textarea name="angle" defaultValue={state.sent.angle} placeholder="I've played on the same survival world for 4 years" maxLength={300} rows={2} />
-          <small>Anything true and specific you know. It gets built in rather than guessed at.</small>
+          <textarea name="angle" defaultValue={state.sent.angle} placeholder="I've played on the same survival world for 4 years" maxLength={300} rows={2} onChange={(e) => setAngle(e.target.value)} />
+          {askForDetails ? (
+            <small className="sw-ask" role="status">
+              Sounds new. The writer doesn&apos;t know what&apos;s in recent updates, so say what actually changed or it&apos;ll keep it general.
+            </small>
+          ) : (
+            <small>Anything true and specific you know. It gets built in rather than guessed at.</small>
+          )}
         </label>
 
         <div className="sw-controls">

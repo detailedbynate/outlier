@@ -22,6 +22,12 @@ describe("scriptProvider", () => {
     expect(names(provider)).toEqual(["anthropic", "gemini", "openrouter"]);
   });
 
+  it("gives members Haiku and keeps Sonnet for the premium writer", () => {
+    const model = (provider: ReturnType<typeof scriptProvider>) => (provider as unknown as { model: string }).model;
+    expect(model(scriptProvider({ ...base, ANTHROPIC_API_KEY: "k" }))).toBe("claude-haiku-4-5");
+    expect(model(scriptProvider({ ...base, ANTHROPIC_API_KEY: "k" }, { premium: true }))).toBe("claude-sonnet-5");
+  });
+
   it("falls back to free models when there's no Claude key", () => {
     const provider = scriptProvider({ ...base, GEMINI_API_KEY: "g", OPENROUTER_API_KEY: "o" });
     expect(names(provider)).toEqual(["gemini", "openrouter"]);
