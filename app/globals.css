@@ -9261,3 +9261,140 @@ a.dash-row:hover {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* --- style samples: the scripts it learns a voice from --- */
+
+.sw-styles {
+  margin-top: 34px;
+  padding: 20px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--glass-bg);
+}
+
+.sw-style-state {
+  margin-left: auto;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.sw-style-state[data-on] {
+  border-color: rgba(52, 211, 153, 0.45);
+  background: rgba(52, 211, 153, 0.12);
+  color: var(--good-text);
+}
+
+.sw-style-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sw-style-item {
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  overflow: hidden;
+  animation: sw-rise 0.4s var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 40ms);
+}
+
+.sw-style-item[data-open] {
+  border-color: rgba(139, 92, 246, 0.45);
+}
+
+.sw-style-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 11px 14px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sw-style-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.sw-style-tag {
+  flex: none;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+.sw-style-body {
+  padding: 0 14px 14px;
+  animation: sw-open 0.24s var(--ease) both;
+}
+
+.sw-style-text {
+  margin: 0 0 12px;
+  white-space: pre-wrap;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.sw-style-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 16px;
+  animation: sw-open 0.28s var(--ease) both;
+}
+
+.sw-style-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sw-add {
+  margin-top: 14px;
+  padding: 9px 16px;
+  border-radius: 10px;
+  border: 1px dashed var(--border-strong);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+  cursor: pointer;
+  transition:
+    border-color 0.18s var(--ease),
+    color 0.18s var(--ease);
+}
+
+.sw-add:hover {
+  border-color: var(--accent);
+  border-style: solid;
+  color: var(--text-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sw-style-item,
+  .sw-style-body,
+  .sw-style-form {
+    animation: none;
+  }
+}

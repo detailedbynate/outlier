@@ -2,6 +2,7 @@ import { AppError, ValidationError } from "@/lib/core/errors";
 import { createLogger, type Logger } from "@/lib/core/logger";
 import type { TextProvider } from "@/lib/ai/types";
 import type { SavedScriptRepository } from "@/lib/database/repositories/saved-scripts";
+import type { StyleSampleRepository } from "@/lib/database/repositories/style-samples";
 import { scriptSystemPrompt, scriptUserPrompt } from "@/lib/scripts/prompt";
 import { SCRIPT, type ScriptRequest, type ScriptResult } from "@/lib/scripts/schema";
 
@@ -23,6 +24,8 @@ export interface ScriptDeps {
   ai: TextProvider | null;
   /** Every script is kept; there's no save button to forget. */
   saved: Pick<SavedScriptRepository, "save" | "listForUser" | "delete">;
+  /** Their own scripts, which the writer copies the voice of. */
+  styles: Pick<StyleSampleRepository, "listForUser">;
   logger?: Logger;
 }
 
@@ -40,8 +43,19 @@ export class ScriptService {
     if (!idea) throw new ValidationError("Say what the Short should be about.");
     if (!this.deps.ai) throw new AppError("CONFIG_ERROR", "Script writing isn't available right now.", { expose: true });
 
+    // Their own scripts are the examples, when they've given us any.
+    let samples: string[] = [];
+    if (userId) {
+      try {
+        samples = (await this.deps.styles.listForUser(userId)).map((row) => row.body);
+      } catch (error) {
+        // Without them it writes from the built-in examples, which is the old behaviour.
+        this.log.warn("style samples unavailable", { error });
+      }
+    }
+
     const { object, model } = await this.deps.ai.generateObject({
-      system: scriptSystemPrompt(),
+      system: scriptSystemPrompt(samples),
       messages: [{ role: "user", content: scriptUserPrompt({ ...request, topic, idea }) }],
       schema: SCRIPT,
       schemaName: "short_script",
@@ -54,7 +68,7 @@ export class ScriptService {
     });
 
     const words = object.script.split(/\s+/).filter(Boolean).length;
-    this.log.info("script written", { topic, words, model });
+    this.log.info("script written", { topic, words, model, styleSamples: samples.length });
 
     let id: string | null = null;
     if (userId) {

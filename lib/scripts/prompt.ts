@@ -88,18 +88,48 @@ It felt like cheating for about a month.
 Then the hard sessions started getting easier, because I was arriving at them fresh.
 Most people aren't undertrained. They're just never recovered."`;
 
-const SYSTEM = `You write scripts for YouTube Shorts. You write one script, and nothing else — no preamble, no commentary, no explanation of your choices.
+/** Enough samples to show a voice rather than one person's off day. */
+const MIN_SAMPLES = 2;
+/** Beyond this the samples crowd out the instructions and cost real money per call. */
+const MAX_SAMPLES = 3;
+/** A very long sample is usually a pasted long-form transcript, not a Short. */
+const MAX_SAMPLE_CHARS = 2_000;
+
+/**
+ * Their own scripts, shown as the voice to write in.
+ *
+ * These replace the built-in pair rather than joining them: two invented
+ * examples sitting beside someone's real writing is a second voice in the room,
+ * and the model splits the difference.
+ */
+function sampleBlock(samples: readonly string[]): string {
+  const usable = samples
+    .map((sample) => sample.trim())
+    .filter((sample) => sample.length >= 40)
+    .slice(0, MAX_SAMPLES)
+    .map((sample) => (sample.length > MAX_SAMPLE_CHARS ? `${sample.slice(0, MAX_SAMPLE_CHARS)}…` : sample));
+  if (usable.length < MIN_SAMPLES) return EXAMPLES;
+
+  const blocks = usable.map((sample, i) => `Their script ${i + 1}:\n"${sample}"`).join("\n\n");
+  return `These are scripts this creator has written. This is the voice to write in — their rhythm, their sentence length, how blunt or warm they are, the kind of thing they say out loud.
+
+${blocks}
+
+Match how they write. Do not copy their sentences, reuse their specific examples, or write about what these scripts were about. If their style conflicts with a rule above, their style wins, except on inventing facts, which is never allowed.`;
+}
+
+const SYSTEM_HEAD = `You write scripts for YouTube Shorts. You write one script, and nothing else — no preamble, no commentary, no explanation of your choices.`;
+
+const oneLine = (value: string) => value.replace(/[\r\n]+/g, " ").trim();
+
+export function scriptSystemPrompt(samples: readonly string[] = []): string {
+  return `${SYSTEM_HEAD}
 
 ${LAYOUT}
 
 ${RULES}
 
-${EXAMPLES}`;
-
-const oneLine = (value: string) => value.replace(/[\r\n]+/g, " ").trim();
-
-export function scriptSystemPrompt(): string {
-  return SYSTEM;
+${sampleBlock(samples)}`;
 }
 
 export function scriptUserPrompt(request: ScriptRequest): string {

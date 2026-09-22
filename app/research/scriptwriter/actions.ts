@@ -79,3 +79,24 @@ export async function deleteSavedScript(formData: FormData): Promise<void> {
   await getServices().repositories.savedScripts.delete(current.user.id, id);
   revalidatePath("/research/scriptwriter");
 }
+
+/** Paste in a script to teach the writer a voice. Owner-only, like writing one. */
+export async function addStyleSample(formData: FormData): Promise<void> {
+  const current = await requireApprovedUser();
+  if (!current.isOwner) return;
+  const body = text(formData.get("body"), 6_000);
+  // Matches the column's check constraint, so a short paste fails here rather than in Postgres.
+  if (body.length < 40) return;
+  await getServices().repositories.styleSamples.add(current.user.id, body, text(formData.get("label"), 120) || null);
+  revalidatePath("/research/scriptwriter");
+}
+
+/** Remove a style sample. Scoped to the owner inside the repository. */
+export async function deleteStyleSample(formData: FormData): Promise<void> {
+  const current = await requireApprovedUser();
+  if (!current.isOwner) return;
+  const id = text(formData.get("id"), 40);
+  if (!id) return;
+  await getServices().repositories.styleSamples.delete(current.user.id, id);
+  revalidatePath("/research/scriptwriter");
+}

@@ -13,6 +13,7 @@ function serviceWith(deps: Record<string, unknown> = {}) {
   const service = new ScriptService({
     ai: { name: "test", generateText: vi.fn(), generateObject } as never,
     saved: { save: vi.fn().mockResolvedValue({ id: "saved-1" }), listForUser: vi.fn(), delete: vi.fn() } as never,
+    styles: { listForUser: vi.fn().mockResolvedValue([]) } as never,
     logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as never,
     ...deps,
   });
@@ -94,5 +95,45 @@ describe("honesty rules", () => {
     const system = scriptSystemPrompt();
     expect(system).toMatch(/Never invent the creator's own life/);
     expect(system).toMatch(/lying to their audience/);
+  });
+});
+
+describe("learning a voice from their own scripts", () => {
+  const sample = (word: string) => `${word} `.repeat(20).trim();
+
+  it("keeps the built-in examples until there are enough samples", () => {
+    expect(scriptSystemPrompt([])).toContain("niche: home coffee");
+    // One script is as likely to be an off day as a style.
+    expect(scriptSystemPrompt([sample("alpha")])).toContain("niche: home coffee");
+  });
+
+  it("replaces the built-in examples once there are two", () => {
+    const system = scriptSystemPrompt([sample("alpha"), sample("beta")]);
+    expect(system).toContain("This is the voice to write in");
+    expect(system).toContain("alpha");
+    // Both voices in one prompt makes the model split the difference.
+    expect(system).not.toContain("niche: home coffee");
+  });
+
+  it("uses at most three, so samples can't crowd out the instructions", () => {
+    const system = scriptSystemPrompt([sample("one"), sample("two"), sample("three"), sample("four")]);
+    expect(system).toContain("Their script 3:");
+    expect(system).not.toContain("Their script 4:");
+    expect(system).not.toContain("four");
+  });
+
+  it("ignores a scrap too short to show a style", () => {
+    expect(scriptSystemPrompt([sample("alpha"), "too short"])).toContain("niche: home coffee");
+  });
+
+  it("trims a pasted long-form transcript rather than sending the whole thing", () => {
+    const system = scriptSystemPrompt([sample("alpha"), "x".repeat(5000)]);
+    expect(system).toContain("…");
+    expect(system).not.toContain("x".repeat(2100));
+  });
+
+  it("still forbids inventing facts even when copying their style", () => {
+    const system = scriptSystemPrompt([sample("alpha"), sample("beta")]);
+    expect(system).toMatch(/except on inventing facts, which is never allowed/);
   });
 });

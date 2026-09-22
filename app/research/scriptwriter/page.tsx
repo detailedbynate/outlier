@@ -5,6 +5,7 @@ import { CREDIT_COSTS } from "@/lib/services/credits-service";
 import { getServices } from "@/lib/services";
 import { ComingSoonLock } from "./coming-soon";
 import { SavedScripts } from "./saved-scripts";
+import { StyleSamples } from "./style-samples";
 import { ScriptForm } from "./script-form";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +17,12 @@ export default async function ScriptwriterPage() {
   const current = await requireApprovedUser();
   const cost = CREDIT_COSTS.write_script;
   // Only the owner can write one, so only the owner has any to show.
-  const saved = current.isOwner ? await getServices().repositories.savedScripts.listForUser(current.user.id) : [];
+  const [saved, styles] = current.isOwner
+    ? await Promise.all([
+        getServices().repositories.savedScripts.listForUser(current.user.id),
+        getServices().repositories.styleSamples.listForUser(current.user.id),
+      ])
+    : [[], []];
 
   return (
     <div className="dash sw">
@@ -35,6 +41,7 @@ export default async function ScriptwriterPage() {
       {current.isOwner ? (
         <>
           <ScriptForm cost={cost} />
+          <StyleSamples samples={styles} />
           <SavedScripts scripts={saved} />
         </>
       ) : (
