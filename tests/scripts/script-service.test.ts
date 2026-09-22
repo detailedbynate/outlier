@@ -74,33 +74,33 @@ describe("ScriptService", () => {
     await expect(service.write({ topic: "x", idea: "y" })).resolves.toMatchObject({ sources: [] });
   });
 
-  it("reads a transcript once and keeps it for the next person", async () => {
-    const save = vi.fn().mockResolvedValue(undefined);
-    const getTranscript = vi.fn().mockResolvedValue({
-      videoId: "vid00000001",
-      language: "English",
-      source: "captions",
-      segments: [{ startSeconds: 0, durationSeconds: 2, text: "watch what happens" }],
-    });
+  it("uses an opening the scraper already stored", async () => {
     const { service, generateObject } = serviceWith({
       videos: { idsByYouTubeIds: async () => new Map([["vid00000001", "internal-1"]]) },
-      transcripts: { forVideos: async () => new Map(), get: async () => null, save, missing: async () => [] },
-      reader: { name: "test", getTranscript },
+      transcripts: {
+        forVideos: async () => new Map([["internal-1", { video_id: "internal-1", opening: "watch what happens" }]]),
+        get: async () => null,
+        save: vi.fn(),
+        missing: async () => [],
+      },
     });
 
     await service.write({ topic: "car detailing", idea: "an idea" });
-    expect(save).toHaveBeenCalledWith("internal-1", expect.objectContaining({ videoId: "vid00000001" }));
     expect(generateObject.mock.calls[0]![0].messages[0].content).toContain("watch what happens");
   });
 
-  it("carries on when a video has no captions", async () => {
+  it("never fetches a transcript itself, however long the writer waits", async () => {
+    // Reading one costs a scrape slot and takes longer than everything else in
+    // the request put together; the scraper fills the table in the background.
+    const save = vi.fn();
     const { service } = serviceWith({
       videos: { idsByYouTubeIds: async () => new Map([["vid00000001", "internal-1"]]) },
-      transcripts: { forVideos: async () => new Map(), get: async () => null, save: vi.fn().mockResolvedValue(undefined), missing: async () => [] },
-      reader: { name: "test", getTranscript: async () => { throw new Error("no transcript"); } },
+      transcripts: { forVideos: async () => new Map(), get: async () => null, save, missing: async () => [] },
     });
+
     const result = await service.write({ topic: "car detailing", idea: "an idea" });
     expect(result.sources[0]!.opening).toBeNull();
+    expect(save).not.toHaveBeenCalled();
   });
 
   it("asks for a niche and an idea", async () => {

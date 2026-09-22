@@ -2,13 +2,11 @@ import { AppError, ValidationError } from "@/lib/core/errors";
 import { createLogger, type Logger } from "@/lib/core/logger";
 import type { TextProvider } from "@/lib/ai/types";
 import type { TranscriptRepository } from "@/lib/database/repositories/transcripts";
-import { openingLine } from "@/lib/innertube/transcripts";
 import type { VideoRepository } from "@/lib/database/repositories/videos";
 import type { NicheMetrics } from "@/lib/niches/analysis";
 import { scriptSystemPrompt, scriptUserPrompt } from "@/lib/scripts/prompt";
 import { SCRIPT, type ScriptRequest, type ScriptResult, type ScriptSource } from "@/lib/scripts/schema";
 import { pickScriptSources } from "@/lib/scripts/sources";
-import type { Transcript, TranscriptProvider } from "@/lib/youtube/transcripts";
 
 /**
  * Writes a Short script from the niche's own outliers.
@@ -18,23 +16,22 @@ import type { Transcript, TranscriptProvider } from "@/lib/youtube/transcripts";
  * report is cached for everyone, and a transcript is read once and kept — so
  * the per-request cost is one generation and nothing else.
  *
- * Transcripts are best-effort. A niche where nobody captions their Shorts still
- * produces a script, just one working from titles alone, and the sources say so.
+ * Transcripts are read here only if they're already stored. Fetching one costs a
+ * scrape slot and takes about as long as the whole rest of the request, and
+ * measured on the library's top Shorts, none of the first twenty carried a
+ * caption track — so reading on demand spent a minute or two per script to
+ * learn nothing. The scraper fills the table in the background instead, and a
+ * niche that does have captions gets the benefit without anyone waiting for it.
  */
 
 export const SCRIPT_EVENT = "script.write";
 
 /** Outliers shown to the writer. Enough to see a pattern, few enough to stay in a small context. */
 const MAX_SOURCES = 6;
-/** Transcripts read per request. Each is a scrape slot, and the shared gate is the real budget. */
-const MAX_NEW_TRANSCRIPTS = 4;
-
 export interface ScriptDeps {
   ai: TextProvider | null;
   transcripts: TranscriptRepository;
   videos: VideoRepository;
-  /** Reads what a video says. Omitted in tests and wherever scraping is off. */
-  reader?: TranscriptProvider | null;
   /** The niche report, already cached by NicheService. */
   metricsFor: (topic: string) => Promise<NicheMetrics | null>;
   logger?: Logger;
@@ -101,7 +98,7 @@ export class ScriptService {
     }));
   }
 
-  /** Stored openings, plus a few freshly read ones, keyed by YouTube id. */
+  /** Openings the scraper has already stored, keyed by YouTube id. */
   private async openingsFor(youtubeVideoIds: readonly string[]): Promise<Map<string, string>> {
     const ids = await this.deps.videos.idsByYouTubeIds(youtubeVideoIds);
     if (ids.size === 0) return new Map();
@@ -111,35 +108,9 @@ export class ScriptService {
     const openings = new Map<string, string>();
     for (const [internalId, row] of stored) {
       const youtubeId = byInternal.get(internalId);
+      // An empty row means the scraper asked and there was nothing to read.
       if (youtubeId && row.opening) openings.set(youtubeId, row.opening);
     }
-
-    const reader = this.deps.reader;
-    if (!reader) return openings;
-
-    // Read a few of the ones we haven't, so a niche warms up over its first
-    // handful of scripts instead of all at once.
-    const missing = [...byInternal.entries()].filter(([, youtubeId]) => !openings.has(youtubeId)).slice(0, MAX_NEW_TRANSCRIPTS);
-    await Promise.all(
-      missing.map(async ([internalId, youtubeId]) => {
-        let transcript: Transcript;
-        try {
-          transcript = await reader.getTranscript(youtubeId);
-        } catch {
-          // No captions, or scraping is paused. Neither is worth failing over.
-          return;
-        }
-        // Use what was just read; storing it is for the next person to ask.
-        const opening = openingLine(transcript);
-        if (opening) openings.set(youtubeId, opening);
-        try {
-          await this.deps.transcripts.save(internalId, transcript);
-        } catch (error) {
-          // Failing to keep it costs the next request a read, nothing more.
-          this.log.warn("transcript not stored", { youtubeId, error });
-        }
-      }),
-    );
     return openings;
   }
 }

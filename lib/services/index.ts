@@ -328,7 +328,6 @@ export function getServices(): Services {
       ai: text,
       transcripts: repositories.transcripts,
       videos: repositories.videos,
-      reader: transcriptReader,
       metricsFor: async (topic) => (await services!.niches.research(topic)).report.overall,
     }),
     dashboard: new DashboardService({
