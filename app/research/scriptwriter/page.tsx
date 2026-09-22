@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { PenIcon } from "@/components/icons";
 import { requireApprovedUser } from "@/lib/auth/session";
 import { CREDIT_COSTS } from "@/lib/services/credits-service";
+import { getServices } from "@/lib/services";
 import { ComingSoonLock } from "./coming-soon";
+import { SavedScripts } from "./saved-scripts";
 import { ScriptForm } from "./script-form";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +15,8 @@ export const metadata: Metadata = { title: "Script Writer · Outlier" };
 export default async function ScriptwriterPage() {
   const current = await requireApprovedUser();
   const cost = CREDIT_COSTS.write_script;
+  // Only the owner can write one, so only the owner has any to show.
+  const saved = current.isOwner ? await getServices().repositories.savedScripts.listForUser(current.user.id) : [];
 
   return (
     <div className="dash sw">
@@ -28,7 +32,14 @@ export default async function ScriptwriterPage() {
         </div>
       </header>
 
-      {current.isOwner ? <ScriptForm cost={cost} /> : <ComingSoonLock>{<LockedPreview cost={cost} />}</ComingSoonLock>}
+      {current.isOwner ? (
+        <>
+          <ScriptForm cost={cost} />
+          <SavedScripts scripts={saved} />
+        </>
+      ) : (
+        <ComingSoonLock>{<LockedPreview cost={cost} />}</ComingSoonLock>
+      )}
     </div>
   );
 }

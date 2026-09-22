@@ -47,8 +47,14 @@ export async function writeScript(_previous: ScriptState, formData: FormData): P
     // Charged up front so a script can't be generated on an empty balance, and
     // charged again only on success — a failed generation costs nothing.
     await services.credits.assertAvailable(current.user.id, "write_script");
+    // One every three hours: each is a paid model call, and a script is meant to
+    // be worked with rather than rerolled until something sticks.
+    await services.rateLimits.enforce("scriptUser", current.user.id);
     const result = await asUser(current.user.id, "action:write_script", () =>
-      services.scripts.write({ topic: sent.topic, idea: sent.idea, angle: sent.angle || undefined, targetSeconds: sent.seconds, tone: sent.tone }),
+      services.scripts.write(
+        { topic: sent.topic, idea: sent.idea, angle: sent.angle || undefined, targetSeconds: sent.seconds, tone: sent.tone },
+        current.user.id,
+      ),
     );
     const { charged } = await services.credits.charge(current.user.id, "write_script");
     // Refreshes the sidebar credits meter.
@@ -59,7 +65,17 @@ export async function writeScript(_previous: ScriptState, formData: FormData): P
     return {
       ...emptyScriptState,
       sent,
-      error: isAppError(error) && error.expose ? error.message : "Couldn't write that one. Try again in a moment.",
+      error: isAppError(error) && (error.expose || error.code === "RATE_LIMITED") ? error.message : "Couldn't write that one. Try again in a moment.",
     };
   }
+}
+
+/** Remove a saved script. Scoped to the owner inside the repository. */
+export async function deleteSavedScript(formData: FormData): Promise<void> {
+  const current = await requireApprovedUser();
+  if (!current.isOwner) return;
+  const id = text(formData.get("id"), 40);
+  if (!id) return;
+  await getServices().repositories.savedScripts.delete(current.user.id, id);
+  revalidatePath("/research/scriptwriter");
 }

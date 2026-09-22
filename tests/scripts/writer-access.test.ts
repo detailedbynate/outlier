@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const write = vi.fn();
 const assertAvailable = vi.fn();
+const enforce = vi.fn();
 const charge = vi.fn();
 let currentUser: { user: { id: string }; isOwner: boolean };
 
@@ -19,7 +20,7 @@ vi.mock("@/lib/auth/session", () => ({ requireApprovedUser: async () => currentU
 vi.mock("@/lib/core/logger", () => ({ logger: { warn: vi.fn(), info: vi.fn(), error: vi.fn(), debug: vi.fn() } }));
 vi.mock("@/lib/youtube/quota-context", () => ({ asUser: async (_id: string, _op: string, run: () => unknown) => run() }));
 vi.mock("@/lib/services", () => ({
-  getServices: () => ({ scripts: { write }, credits: { assertAvailable, charge } }),
+  getServices: () => ({ scripts: { write }, credits: { assertAvailable, charge }, rateLimits: { enforce } }),
 }));
 
 const form = (fields: Record<string, string>) => {
@@ -35,6 +36,7 @@ describe("writeScript access", () => {
     vi.clearAllMocks();
     charge.mockResolvedValue({ charged: 8 });
     assertAvailable.mockResolvedValue(undefined);
+    enforce.mockResolvedValue(undefined);
     write.mockResolvedValue({ script: { beats: [] }, sources: [], seconds: 30, model: "test" });
   });
 
@@ -51,6 +53,8 @@ describe("writeScript access", () => {
     expect(write).not.toHaveBeenCalled();
     expect(assertAvailable).not.toHaveBeenCalled();
     expect(charge).not.toHaveBeenCalled();
+    // Refused before the limiter, so a member can't burn the owner's window either.
+    expect(enforce).not.toHaveBeenCalled();
   });
 
   it("refuses before it even checks the input, so nothing leaks through a validation path", async () => {
@@ -74,6 +78,7 @@ describe("writeScript access", () => {
     expect(state.error).toBeNull();
     expect(state.result).not.toBeNull();
     expect(state.charged).toBe(8);
-    expect(write).toHaveBeenCalledWith(expect.objectContaining({ topic: "minecraft", targetSeconds: 30, tone: "energetic" }));
+    expect(write).toHaveBeenCalledWith(expect.objectContaining({ topic: "minecraft", targetSeconds: 30, tone: "energetic" }), "owner-1");
+    expect(enforce).toHaveBeenCalledWith("scriptUser", "owner-1");
   });
 });

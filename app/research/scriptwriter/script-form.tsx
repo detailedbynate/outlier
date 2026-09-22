@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, type CSSProperties } from "react";
 import { PenIcon } from "@/components/icons";
 import { DURATIONS, TONES, WORDS_PER_SECOND, scriptLines, type ScriptResult } from "@/lib/scripts/schema";
 import { writeScript } from "./actions";
@@ -14,9 +14,17 @@ const TONE_LABEL: Record<(typeof TONES)[number], string> = {
   story: "Story",
 };
 
+const SHORTEST = DURATIONS[0];
+const LONGEST = DURATIONS[DURATIONS.length - 1]!;
+const STEP = DURATIONS.length > 1 ? DURATIONS[1]! - DURATIONS[0] : 5;
+
 /** The writer: what they want, then what it wrote. */
 export function ScriptForm({ cost }: { cost: number }) {
   const [state, submit, pending] = useActionState(writeScript, emptyScriptState);
+  // Held in React so the readout and the filled part of the track can follow it.
+  const [seconds, setSeconds] = useState<number>(state.sent.seconds);
+  const [tone, setTone] = useState<string>(state.sent.tone);
+  const filled = (seconds - SHORTEST) / (LONGEST - SHORTEST);
 
   return (
     <>
@@ -29,62 +37,97 @@ export function ScriptForm({ cost }: { cost: number }) {
           </label>
           <label className="sw-field">
             <span>Video idea or title</span>
-            <input name="idea" defaultValue={state.sent.idea} placeholder="the redstone trick nobody uses" maxLength={200} required autoComplete="off" />
+            <input name="idea" defaultValue={state.sent.idea} placeholder="why your redstone door keeps breaking" maxLength={200} required autoComplete="off" />
             <small>What this Short is about. A working title is enough.</small>
           </label>
         </div>
 
         <label className="sw-field">
           <span>
-            Your angle <em>optional</em>
+            Your angle <em>optional, but it&apos;s what stops it being generic</em>
           </span>
           <textarea name="angle" defaultValue={state.sent.angle} placeholder="I've played on the same survival world for 4 years" maxLength={300} rows={2} />
-          <small>What you have that nobody else does. This is what stops a script coming out generic.</small>
+          <small>Anything true and specific you know. It gets built in rather than guessed at.</small>
         </label>
 
-        <div className="sw-row">
-          <label className="sw-field">
-            <span>Length</span>
-            <select name="seconds" defaultValue={state.sent.seconds}>
-              {DURATIONS.map((seconds) => (
-                <option key={seconds} value={seconds}>
-                  {seconds} seconds
-                </option>
+        <div className="sw-controls">
+          <div className="sw-field sw-slider-field">
+            <span>
+              Length <output className="sw-seconds">{seconds}s</output>
+            </span>
+            <input
+              className="sw-slider"
+              type="range"
+              name="seconds"
+              min={SHORTEST}
+              max={LONGEST}
+              step={STEP}
+              value={seconds}
+              onChange={(event) => setSeconds(Number(event.target.value))}
+              style={{ "--filled": filled } as CSSProperties}
+              aria-label="Script length in seconds"
+            />
+            <div className="sw-ticks">
+              {DURATIONS.map((value) => (
+                <button key={value} type="button" className="sw-tick" data-on={value === seconds ? "" : undefined} onClick={() => setSeconds(value)}>
+                  {value}s
+                </button>
               ))}
-            </select>
-          </label>
-          <label className="sw-field">
-            <span>Tone</span>
-            <select name="tone" defaultValue={state.sent.tone}>
-              {TONES.map((name) => (
-                <option key={name} value={name}>
-                  {TONE_LABEL[name]}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="sw-submit">
-            <button type="submit" className="btn btn-primary" disabled={pending}>
-              <PenIcon size={15} /> {pending ? "Writing…" : "Write the script"}
-            </button>
-            <small>{cost} credits</small>
+            </div>
+            <small>About {Math.round(seconds * WORDS_PER_SECOND)} spoken words.</small>
           </div>
+
+          <div className="sw-field">
+            <span>Tone</span>
+            <input type="hidden" name="tone" value={tone} />
+            <div className="sw-tones">
+              {TONES.map((name) => (
+                <button key={name} type="button" className="sw-tone" data-on={tone === name ? "" : undefined} onClick={() => setTone(name)}>
+                  {TONE_LABEL[name]}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="sw-submit">
+          <button type="submit" className="btn btn-primary sw-write" disabled={pending}>
+            <PenIcon size={15} /> {pending ? "Writing…" : "Write the script"}
+          </button>
+          <small>{cost} credits · one script every 3 hours</small>
         </div>
       </form>
 
-      {state.error ? <div className="dash-empty">{state.error}</div> : null}
-      {pending ? <p className="sw-waiting">Writing. This takes a few seconds.</p> : null}
+      {state.error ? <div className="dash-empty sw-error">{state.error}</div> : null}
+      {pending ? <PendingScript /> : null}
       {state.result && !pending ? <ScriptView result={state.result} charged={state.charged} /> : null}
     </>
   );
 }
 
-function Copyable({ text, label }: { text: string; label: string }) {
+/** Something to watch while the model writes, shaped like the answer it will replace. */
+function PendingScript() {
+  return (
+    <div className="sw-result" aria-live="polite">
+      <section className="sw-script sw-pending">
+        <header className="sw-script-head">
+          <span className="dash-eyebrow">Writing…</span>
+        </header>
+        {[0, 1, 2, 3, 4].map((i) => (
+          <span key={i} className="sw-ghost" style={{ "--i": i } as CSSProperties} />
+        ))}
+      </section>
+    </div>
+  );
+}
+
+export function Copyable({ text, label }: { text: string; label: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <button
       type="button"
       className="sw-copy"
+      data-copied={copied ? "" : undefined}
       onClick={() => {
         void navigator.clipboard
           .writeText(text)
@@ -111,13 +154,13 @@ function ScriptView({ result, charged }: { result: ScriptResult; charged: number
           <Copyable text={lines.join("\n")} label="Copy script" />
         </header>
         {lines.map((line, i) => (
-          <p key={i} className={i === 0 ? "sw-line sw-line-hook" : "sw-line"}>
+          <p key={i} className={i === 0 ? "sw-line sw-line-hook" : "sw-line"} style={{ "--i": i } as CSSProperties}>
             {line}
           </p>
         ))}
       </section>
 
-      <section className="sw-panel">
+      <section className="sw-panel sw-titles-panel">
         <h3>Titles</h3>
         <ul className="sw-titles">
           {result.script.titles.map((title) => (
@@ -129,7 +172,8 @@ function ScriptView({ result, charged }: { result: ScriptResult; charged: number
       </section>
 
       <p className="sw-footnote">
-        {result.words} spoken words · about {seconds}s out loud · {charged} credits · written by {result.model}
+        {result.words} spoken words · about {seconds}s out loud · {charged} credits · {result.model}
+        {result.id ? " · saved below" : ""}
       </p>
     </div>
   );

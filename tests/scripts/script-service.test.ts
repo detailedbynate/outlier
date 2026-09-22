@@ -12,6 +12,7 @@ function serviceWith(deps: Record<string, unknown> = {}) {
   const generateObject = vi.fn().mockResolvedValue({ object: script, model: "test-model", usage: { inputTokens: 0, outputTokens: 0 } });
   const service = new ScriptService({
     ai: { name: "test", generateText: vi.fn(), generateObject } as never,
+    saved: { save: vi.fn().mockResolvedValue({ id: "saved-1" }), listForUser: vi.fn(), delete: vi.fn() } as never,
     logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as never,
     ...deps,
   });
@@ -56,7 +57,7 @@ describe("ScriptService", () => {
 describe("script prompt", () => {
   it("scales the word budget to the requested length", () => {
     expect(scriptUserPrompt({ topic: "fishing", idea: "an idea", targetSeconds: 15 })).toContain("42 spoken words");
-    expect(scriptUserPrompt({ topic: "fishing", idea: "an idea", targetSeconds: 60 })).toContain("168 spoken words");
+    expect(scriptUserPrompt({ topic: "fishing", idea: "an idea", targetSeconds: 25 })).toContain("70 spoken words");
   });
 
   it("gives a hard ceiling, because the target alone got overrun by half", () => {

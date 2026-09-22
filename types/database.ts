@@ -237,6 +237,21 @@ export type VideoTranscriptRow = {
   created_at: string;
 };
 
+export type SavedScriptRow = {
+  id: string;
+  user_id: string;
+  topic: string;
+  idea: string;
+  angle: string | null;
+  seconds: number;
+  tone: string;
+  script: string;
+  titles: string[];
+  words: number;
+  model: string;
+  created_at: string;
+};
+
 export type FolderChannelRow = {
   id: string;
   folder_id: string;
@@ -565,6 +580,7 @@ export type Database = {
       folders: TableDef<FolderRow, "workspace_id" | "name">;
       folder_channels: TableDef<FolderChannelRow, "folder_id" | "channel_id">;
       video_transcripts: TableDef<VideoTranscriptRow, "video_id" | "language" | "segments" | "full_text">;
+      saved_scripts: TableDef<SavedScriptRow, "user_id" | "topic" | "idea" | "seconds" | "tone" | "script">;
       usage_events: TableDef<UsageEventRow, "event_type">;
       credits: TableDef<CreditRow, "workspace_id" | "delta" | "source">;
       waitlist_entries: TableDef<WaitlistEntryRow, "email">;

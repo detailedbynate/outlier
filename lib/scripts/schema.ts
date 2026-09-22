@@ -25,13 +25,19 @@ export const SCRIPT = z.object({
 export type Script = z.infer<typeof SCRIPT>;
 
 export interface ScriptResult {
+  /** Row id once it's been kept; null when saving failed or there was no user. */
+  id: string | null;
   script: Script;
   /** Spoken words, so the UI can show whether it really fits the length. */
   words: number;
   model: string;
 }
 
-export const DURATIONS = [15, 30, 45, 60] as const;
+/**
+ * Lengths on offer, in seconds. Capped at 30: the writer is tuned for a single
+ * idea delivered fast, and a minute of it turns into padding.
+ */
+export const DURATIONS = [15, 20, 25, 30] as const;
 export type Duration = (typeof DURATIONS)[number];
 
 export const TONES = ["energetic", "calm", "funny", "serious", "story"] as const;

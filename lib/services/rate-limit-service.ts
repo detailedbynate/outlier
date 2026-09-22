@@ -16,6 +16,8 @@ export const RATE_LIMITS = {
   checkoutIp: { windowSeconds: 3600, maxHits: 10 },
   /** Niche Finder searches per user. */
   nicheUser: { windowSeconds: 3600, maxHits: 40 },
+  /** Shorts scripts per user: one every three hours. Each is a paid model call. */
+  scriptUser: { windowSeconds: 10_800, maxHits: 1 },
 } as const;
 
 export type RateLimitPolicy = keyof typeof RATE_LIMITS;
@@ -62,8 +64,13 @@ export class RateLimitService {
     }
     if (!result.allowed) {
       const minutes = Math.max(1, Math.ceil((Date.parse(result.resetsAt) - Date.now()) / 60_000));
+      // "try again in 180 minutes" is a worse sentence than "in 3 hours".
+      const wait =
+        minutes >= 120
+          ? `${Math.round(minutes / 60)} hours`
+          : `${minutes} minute${minutes === 1 ? "" : "s"}`;
       this.log.warn("rate limited", { policy, hits: result.hits });
-      throw new AppError("RATE_LIMITED", `Too many attempts. Please try again in ${minutes} minute${minutes === 1 ? "" : "s"}.`, {
+      throw new AppError("RATE_LIMITED", `Too many attempts. Please try again in ${wait}.`, {
         details: { policy, resetsAt: result.resetsAt },
       });
     }

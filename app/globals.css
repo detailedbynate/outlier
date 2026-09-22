@@ -8833,3 +8833,431 @@ a.dash-row:hover {
     align-self: stretch;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Script writer: controls, motion, saved scripts
+--------------------------------------------------------------------------- */
+
+.sw-form {
+  position: relative;
+  overflow: hidden;
+  animation: sw-rise 0.45s var(--ease) both;
+}
+
+/* A slow sheen across the top edge, so the panel doesn't read as a dead box. */
+.sw-form::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.7), transparent);
+  animation: sw-sweep 6s var(--ease) infinite;
+}
+
+.sw-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+/* --- length slider --- */
+
+.sw-seconds {
+  float: right;
+  min-width: 42px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--accent-wash);
+  border: 1px solid rgba(139, 92, 246, 0.4);
+  color: var(--accent-text);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  text-align: center;
+}
+
+.sw-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.sw-slider::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+  /* --filled is 0..1, set from React as the value moves. */
+  background: linear-gradient(
+    90deg,
+    var(--accent) 0%,
+    var(--accent-2) calc(var(--filled, 0) * 100%),
+    var(--surface-3) calc(var(--filled, 0) * 100%),
+    var(--surface-3) 100%
+  );
+}
+
+.sw-slider::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--surface-3);
+}
+
+.sw-slider::-moz-range-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+.sw-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  margin-top: -7px;
+  border-radius: 50%;
+  border: 2px solid var(--on-accent);
+  background: var(--accent);
+  box-shadow: 0 2px 10px rgba(139, 92, 246, 0.6);
+  transition: transform 0.15s var(--ease);
+}
+
+.sw-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--on-accent);
+  background: var(--accent);
+}
+
+.sw-slider:hover::-webkit-slider-thumb,
+.sw-slider:focus-visible::-webkit-slider-thumb {
+  transform: scale(1.15);
+}
+
+.sw-ticks {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.sw-tick {
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: color 0.15s var(--ease);
+}
+
+.sw-tick:hover {
+  color: var(--text-secondary);
+}
+
+.sw-tick[data-on] {
+  color: var(--accent-text);
+  font-weight: 700;
+}
+
+/* --- tone chips --- */
+
+.sw-tones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sw-tone {
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--control-bg);
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+  cursor: pointer;
+  transition:
+    border-color 0.18s var(--ease),
+    color 0.18s var(--ease),
+    transform 0.18s var(--ease);
+}
+
+.sw-tone:hover {
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.sw-tone[data-on] {
+  border-color: transparent;
+  background: var(--accent-gradient);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+.sw-write {
+  position: relative;
+  overflow: hidden;
+}
+
+.sw-write:disabled {
+  opacity: 0.85;
+  cursor: progress;
+}
+
+/* Light travelling across the button while the model writes. */
+.sw-write:disabled::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28), transparent);
+  animation: sw-shimmer 1.2s linear infinite;
+}
+
+.sw-error {
+  animation: sw-shake 0.4s var(--ease) both;
+}
+
+/* --- the script appearing --- */
+
+.sw-line {
+  animation: sw-rise 0.5s var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+
+.sw-titles-panel {
+  animation: sw-rise 0.5s var(--ease) both;
+  animation-delay: 0.25s;
+}
+
+.sw-pending .sw-ghost {
+  display: block;
+  height: 14px;
+  margin-bottom: 14px;
+  border-radius: 7px;
+  background: linear-gradient(90deg, var(--surface-2), var(--surface-3), var(--surface-2));
+  background-size: 200% 100%;
+  animation: sw-pulse 1.4s var(--ease) infinite;
+  animation-delay: calc(var(--i, 0) * 120ms);
+}
+
+/* Ragged, like written lines rather than a loading bar. */
+.sw-pending .sw-ghost:nth-child(2) { width: 92%; }
+.sw-pending .sw-ghost:nth-child(3) { width: 78%; }
+.sw-pending .sw-ghost:nth-child(4) { width: 85%; }
+.sw-pending .sw-ghost:nth-child(5) { width: 64%; }
+.sw-pending .sw-ghost:nth-child(6) { width: 71%; }
+
+.sw-copy[data-copied] {
+  border-color: var(--good);
+  color: var(--good-text);
+}
+
+/* --- saved scripts --- */
+
+.sw-saved {
+  margin-top: 34px;
+}
+
+.sw-saved-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+  font-size: 1.05rem;
+}
+
+.sw-count {
+  padding: 1px 9px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.sw-saved-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sw-saved-item {
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--glass-bg);
+  overflow: hidden;
+  animation: sw-rise 0.45s var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 45ms);
+  transition: border-color 0.2s var(--ease);
+}
+
+.sw-saved-item:hover,
+.sw-saved-item[data-open] {
+  border-color: rgba(139, 92, 246, 0.45);
+}
+
+.sw-saved-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 14px;
+  width: 100%;
+  padding: 14px 16px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sw-saved-hook {
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sw-saved-meta {
+  grid-column: 1;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.sw-chevron {
+  grid-row: 1 / span 2;
+  align-self: center;
+  font-size: 1.3rem;
+  color: var(--text-muted);
+  transition: transform 0.22s var(--ease);
+}
+
+.sw-saved-item[data-open] .sw-chevron {
+  transform: rotate(90deg);
+}
+
+.sw-saved-body {
+  padding: 4px 16px 16px;
+  border-top: 1px solid var(--border);
+  animation: sw-open 0.28s var(--ease) both;
+}
+
+.sw-saved-body .sw-line {
+  font-size: 1rem;
+  animation: none;
+}
+
+.sw-saved-body .sw-line-hook {
+  font-size: 1.08rem;
+}
+
+.sw-saved-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.sw-delete {
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+
+.sw-delete:hover {
+  border-color: var(--critical);
+  color: var(--critical);
+}
+
+@keyframes sw-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+@keyframes sw-open {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes sw-sweep {
+  0%,
+  100% {
+    opacity: 0;
+    transform: translateX(-60%);
+  }
+  50% {
+    opacity: 1;
+    transform: translateX(60%);
+  }
+}
+
+@keyframes sw-shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes sw-pulse {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes sw-shake {
+  25% {
+    transform: translateX(-5px);
+  }
+  75% {
+    transform: translateX(5px);
+  }
+}
+
+/* Motion here is decoration; none of it carries meaning on its own. */
+@media (prefers-reduced-motion: reduce) {
+  .sw-form,
+  .sw-form::before,
+  .sw-line,
+  .sw-titles-panel,
+  .sw-saved-item,
+  .sw-saved-body,
+  .sw-error,
+  .sw-pending .sw-ghost,
+  .sw-write:disabled::after {
+    animation: none;
+  }
+
+  .sw-tone:hover,
+  .sw-chevron {
+    transform: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .sw-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

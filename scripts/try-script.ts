@@ -22,6 +22,7 @@ if (!topic || !idea) {
 // isn't allowed. Same shape as scripts/scraper.ts.
 async function main(): Promise<void> {
   const { getServices } = await import("@/lib/services");
+  const { DURATIONS: _DURATIONS } = await import("@/lib/scripts/schema");
   const { runWithQuotaContext } = await import("@/lib/youtube");
 
   const result = await runWithQuotaContext({ lane: "background", operation: "cli:try-script" }, () =>
@@ -29,7 +30,7 @@ async function main(): Promise<void> {
       topic: topic!,
       idea: idea!,
       angle: angle || undefined,
-      targetSeconds: seconds ? (Number(seconds) as 15 | 30 | 45 | 60) : undefined,
+      targetSeconds: seconds ? (Number(seconds) as (typeof _DURATIONS)[number]) : undefined,
     }),
   );
 

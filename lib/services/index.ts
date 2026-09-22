@@ -27,6 +27,7 @@ import { JobQueue } from "@/lib/jobs/queue";
 import type { JobRegistry } from "@/lib/jobs/registry";
 import { JobScheduler } from "@/lib/jobs/scheduler";
 import { labelingProvider, scriptProvider } from "@/lib/ai/select";
+import { SavedScriptRepository } from "@/lib/database/repositories/saved-scripts";
 import { TranscriptRepository } from "@/lib/database/repositories/transcripts";
 import { ScriptService } from "./script-service";
 import { TranscriptService } from "./transcript-service";
@@ -110,6 +111,7 @@ export interface Services {
     subscriptions: SubscriptionRepository;
     signupInvites: SignupInviteRepository;
     transcripts: TranscriptRepository;
+    savedScripts: SavedScriptRepository;
     competitors: CompetitorRepository;
     youtubeCache: YouTubeCacheRepository;
   };
@@ -158,6 +160,7 @@ export function getServices(): Services {
     subscriptions: lazy(() => new SubscriptionRepository(lazyDb())),
     signupInvites: lazy(() => new SignupInviteRepository(lazyDb())),
     transcripts: lazy(() => new TranscriptRepository(lazyDb())),
+    savedScripts: lazy(() => new SavedScriptRepository(lazyDb())),
     niches: lazy(() => new NicheRepository(lazyDb())),
     competitors: lazy(() => new CompetitorRepository(lazyDb())),
     youtubeCache: lazy(() => new YouTubeCacheRepository(lazyDb())),
@@ -325,7 +328,7 @@ export function getServices(): Services {
     ),
     transcripts,
     // Its own provider: scripts are worth a paid model where labeling isn't.
-    scripts: new ScriptService({ ai: scriptProvider(config) }),
+    scripts: new ScriptService({ ai: scriptProvider(config), saved: repositories.savedScripts }),
     dashboard: new DashboardService({
       channels: repositories.channels,
       videos: repositories.videos,
