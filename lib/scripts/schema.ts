@@ -37,8 +37,15 @@ export type Duration = (typeof DURATIONS)[number];
 export const TONES = ["energetic", "calm", "funny", "serious", "story"] as const;
 export type Tone = (typeof TONES)[number];
 
-/** Spoken words per second. Shorts are read fast; this is what the length maths uses. */
-export const WORDS_PER_SECOND = 2.2;
+/**
+ * Spoken words per second, used for every length calculation here.
+ *
+ * 2.8 is about 170 words a minute. Conversation runs near 150, and Shorts
+ * narration is deliberately faster than conversation — the pace is part of why
+ * they hold. The earlier 2.2 was closer to an audiobook, and it made every
+ * script look 40% too long when it was actually fine.
+ */
+export const WORDS_PER_SECOND = 2.8;
 
 export interface ScriptRequest {
   /** The niche to write for, e.g. "minecraft" or "personal finance". */
