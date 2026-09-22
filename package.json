@@ -20,7 +20,8 @@
     "worker": "tsx --conditions=react-server scripts/worker.ts",
     "backfill": "tsx --conditions=react-server scripts/backfill.ts",
     "scraper": "tsx --conditions=react-server scripts/scraper.ts",
-    "db:types": "supabase gen types typescript --local > types/database.generated.ts"
+    "db:types": "supabase gen types typescript --local > types/database.generated.ts",
+    "try-script": "tsx --conditions=react-server scripts/try-script.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.126.0",
