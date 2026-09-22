@@ -3,8 +3,19 @@ import { AppError } from "@/lib/core/errors";
 import { jsonSchemaFor } from "./gemini";
 import type { TextGenerationRequest, TextGenerationResult, TextProvider, TokenUsage } from "./types";
 
-/** Free models with structured output. OpenRouter tries them in order when one is busy or gone. */
-export const DEFAULT_OPENROUTER_MODELS = ["deepseek/deepseek-v4-flash-0731:free", "qwen/qwen3.8-27b:free", "nvidia/nemotron-3-super-120b-a12b:free"];
+/**
+ * OpenRouter takes the whole list in one request and routes down it, so this is
+ * its hard limit, not a preference: more than three is a 400 and no answer.
+ */
+export const MAX_OPENROUTER_MODELS = 3;
+
+/**
+ * Free models with structured output. OpenRouter tries them in order when one is busy or gone.
+ *
+ * Checked 2026-09-22: deepseek-v4-flash is no longer free (404 pointing at the
+ * paid slug), so it used to burn the first slot on a model that could never answer.
+ */
+export const DEFAULT_OPENROUTER_MODELS = ["nvidia/nemotron-3-super-120b-a12b:free", "nex-agi/nex-n2.5-pro:free", "qwen/qwen3.8-27b:free"];
 
 const ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
 
@@ -50,7 +61,9 @@ export class OpenRouterTextProvider implements TextProvider {
 
   constructor(options: { apiKey: string; models?: string[]; fetch?: typeof fetch }) {
     this.apiKey = options.apiKey;
-    this.models = options.models?.length ? options.models : DEFAULT_OPENROUTER_MODELS;
+    // Trimmed rather than rejected: a fourth model in config shouldn't be the
+    // reason nothing gets written.
+    this.models = (options.models?.length ? options.models : DEFAULT_OPENROUTER_MODELS).slice(0, MAX_OPENROUTER_MODELS);
     this.fetchImpl = options.fetch ?? fetch;
   }
 

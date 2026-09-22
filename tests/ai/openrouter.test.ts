@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { FallbackTextProvider } from "@/lib/ai/fallback";
-import { OpenRouterTextProvider, OpenRouterUnavailableError } from "@/lib/ai/openrouter";
+import { MAX_OPENROUTER_MODELS, OpenRouterTextProvider, OpenRouterUnavailableError } from "@/lib/ai/openrouter";
 import type { TextProvider } from "@/lib/ai/types";
 import { isAppError } from "@/lib/core/errors";
 
@@ -13,6 +13,26 @@ function reply(status: number, body: unknown) {
 }
 
 describe("OpenRouterTextProvider", () => {
+
+  it("sends at most three models, because OpenRouter 400s on a longer list", async () => {
+    const seen: string[][] = [];
+    const fetchImpl = vi.fn(async (_url: string, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as { model: string; models?: string[] };
+      seen.push(body.models ?? [body.model]);
+      return new Response(JSON.stringify({ model: body.model, choices: [{ message: { content: "hi" } }] }), { status: 200 });
+    });
+    const provider = new OpenRouterTextProvider({
+      apiKey: "k",
+      models: ["a:free", "b:free", "c:free", "d:free", "e:free"],
+      fetch: fetchImpl as unknown as typeof fetch,
+    });
+
+    await provider.generateText({ messages: [{ role: "user", content: "hello" }] });
+
+    // The routing array is what OpenRouter counts, and "d"/"e" must not reach it.
+    expect(seen[0]).toEqual(["a:free", "b:free", "c:free"]);
+    expect(seen[0]!.length).toBeLessThanOrEqual(MAX_OPENROUTER_MODELS);
+  });
   it("sends the schema and model fallbacks, and validates the answer", async () => {
     const fetch = reply(200, { model: "qwen/qwen3.8-27b:free", choices: [{ message: { content: '{"queries":["stoic philosophy"]}' }, finish_reason: "stop" }], usage: { prompt_tokens: 12, completion_tokens: 8 } });
     const provider = new OpenRouterTextProvider({ apiKey: "k", models: ["a:free", "b:free"], fetch });
