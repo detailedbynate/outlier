@@ -62,8 +62,11 @@ export class ScriptService {
       schemaName: "short_script",
       // Scripts want some room to be surprising; the structure is held by the schema.
       temperature: 0.8,
-      effort: "medium",
-      maxOutputTokens: 2_000,
+      // The free models reason against max_tokens, and a script that stops
+      // halfway is worth nothing, so the budget goes to the answer rather than
+      // to thinking about it: "Minecraft" at medium effort ran out mid-script.
+      effort: "low",
+      maxOutputTokens: 4_000,
     });
 
     const seconds = object.beats.reduce((total, beat) => total + beat.seconds, 0);
