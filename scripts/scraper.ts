@@ -18,8 +18,9 @@
  * new to find, and reads spent on it are reads not spent on one that uploads.
  *
  * Each round ends by reading a few transcripts for the library's best Shorts
- * (SCRAPER_TRANSCRIPTS_PER_ROUND). They live here rather than in a scheduled job
- * because a transcript is a scrape slot: paced by the same gate, it would blow
+ * (SCRAPER_TRANSCRIPTS_PER_ROUND), idle rounds included — an idle round has the
+ * most budget to spare. They live here rather than in a scheduled job because a
+ * transcript is a scrape slot: paced by the same gate, bulk reading would blow
  * through the cron tick's time budget and starve every other job behind it.
  *
  * Speed ramps itself: one clean day at a rate earns the next step up the ladder
@@ -117,6 +118,26 @@ async function main(): Promise<void> {
 
   const skipUntil = new Map<string, number>();
 
+  /**
+   * Read what a few of the library's best Shorts say, so the script writer works
+   * from real openings instead of titles. Costs scrape slots, not API quota.
+   *
+   * Runs whether or not channels were due: an idle round is the one with the
+   * most budget to spare, and skipping it there was why nothing got read.
+   */
+  const readTranscripts = async (): Promise<void> => {
+    if (transcriptsPerRound <= 0 || controller.signal.aborted) return;
+    try {
+      const read = await runWithQuotaContext({ lane: "background", operation: "scraper:transcripts" }, () =>
+        services.transcripts.backfillOnce({ limit: transcriptsPerRound, days: TRANSCRIPT_DAYS, signal: controller.signal }),
+      );
+      if (read.stored > 0 || read.failed > 0) logger.info("scraper transcripts", { ...read });
+    } catch (error) {
+      // Transcripts are a bonus; a round that refreshed channels still succeeded.
+      logger.warn("scraper transcript pass failed", { error });
+    }
+  };
+
   while (!controller.signal.aborted) {
     const storage = await services.storage.getStatus({ fresh: true });
     if (storage.level === "over_budget") {
@@ -134,6 +155,7 @@ async function main(): Promise<void> {
     ).then((rows) => rows.filter((row) => (skipUntil.get(row.youtube_channel_id) ?? 0) < now).slice(0, batch));
     for (const [id, until] of skipUntil) if (until < now) skipUntil.delete(id);
     if (due.length === 0) {
+      await readTranscripts();
       await sleep(IDLE_WAIT, controller.signal);
       continue;
     }
@@ -158,19 +180,7 @@ async function main(): Promise<void> {
       }
     }
 
-    // Reading what the best Shorts say costs no API quota and makes the script
-    // writer's sources real. Bounded per round so refreshes stay the priority.
-    if (transcriptsPerRound > 0 && !controller.signal.aborted) {
-      try {
-        const read = await runWithQuotaContext({ lane: "background", operation: "scraper:transcripts" }, () =>
-          services.transcripts.backfillOnce({ limit: transcriptsPerRound, days: TRANSCRIPT_DAYS, signal: controller.signal }),
-        );
-        if (read.stored > 0 || read.failed > 0) logger.info("scraper transcripts", { ...read });
-      } catch (error) {
-        // Transcripts are a bonus; a round that refreshed channels still succeeded.
-        logger.warn("scraper transcript pass failed", { error });
-      }
-    }
+    await readTranscripts();
 
     const state = gate.state();
     const stats = gate.takeStats();
