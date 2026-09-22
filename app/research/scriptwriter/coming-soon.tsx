@@ -11,7 +11,10 @@ import { LockIcon } from "@/components/icons";
  * the real gate is in the server action, which refuses anyone but the owner.
  */
 export function ComingSoonLock({ children }: { children: ReactNode }) {
-  const [open, setOpen] = useState(false);
+  // Open on arrival: clicking the locked nav item is the click that asks for it,
+  // so the answer shouldn't need a second one. Dismissing leaves the blurred
+  // preview and the badge, and the badge opens it again.
+  const [open, setOpen] = useState(true);
   const closeRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {

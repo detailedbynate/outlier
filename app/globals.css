@@ -423,6 +423,15 @@ h2 {
   color: #fff;
 }
 
+/* Locked, not new: amber so it reads as "you can't have this yet", not "look at this". */
+.nav-badge[data-variant="soon"] {
+  background: rgba(251, 191, 36, 0.14);
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  color: var(--warning);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .sidebar-foot {
   display: flex;
   flex-direction: column;
@@ -593,6 +602,13 @@ h2 {
   .nav-section-title,
   .nav-badge {
     display: none;
+  }
+
+  /* Except the locked one: it's the difference between "open" and "not yet". */
+  .nav-badge[data-variant="soon"] {
+    display: inline;
+    font-size: 9px;
+    padding: 1px 5px;
   }
 
   .nav-link {

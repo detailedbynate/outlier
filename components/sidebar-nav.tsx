@@ -66,14 +66,20 @@ export function SidebarNav({ isAdmin = false, isOwner = false }: { isAdmin?: boo
           {section.items.map((item) => {
             const active = isActive(pathname, item.href);
             const Icon = item.icon;
-            const badge = item.ownerOnly === true && !isOwner ? "Soon" : item.badge;
+            // Locked items say so in their own colour: this is about access, not novelty.
+            const locked = item.ownerOnly === true && !isOwner;
+            const badge = locked ? "Coming soon" : item.badge;
             return (
               <Link key={item.href} href={item.href} className="nav-link" aria-current={active ? "page" : undefined}>
                 <span className="nav-icon">
                   <Icon size={17} />
                 </span>
                 <span className="nav-label">{item.label}</span>
-                {badge ? <span className="nav-badge">{badge}</span> : null}
+                {badge ? (
+                  <span className="nav-badge" data-variant={locked ? "soon" : undefined}>
+                    {badge}
+                  </span>
+                ) : null}
               </Link>
             );
           })}
