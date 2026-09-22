@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { NotFoundError } from "@/lib/core/errors";
-import { getInnerTubeGate, InnerTubeBlockedError, InnerTubeGate, looksLikeBlock, resetInnerTubeGate } from "@/lib/innertube/gate";
+import { getInnerTubeGate, InnerTubeBlockedError, InnerTubeBusyError, InnerTubeGate, looksLikeBlock, resetInnerTubeGate } from "@/lib/innertube/gate";
 
 /**
  * A fake clock: `sleep` jumps time forward instead of waiting, so rate limits,
@@ -199,6 +199,42 @@ describe("InnerTubeGate", () => {
     const second = read(g, "b", async () => "page");
     await expect(first).rejects.toThrow(InnerTubeBlockedError);
     await expect(second).rejects.toThrow(InnerTubeBlockedError);
+  });
+
+  it("gives up on a held slot instead of queueing a waiting reader forever", async () => {
+    vi.useFakeTimers();
+    try {
+      const { gate: g } = gate({ requestsPerMinute: 6_000, userRequestsPerMinute: 6_000, maxConcurrent: 1 });
+      // A background read holds the only slot and doesn't let go.
+      let finish!: () => void;
+      const held = g.run({ label: "background" }, () => new Promise<number>((resolve) => (finish = () => resolve(1))));
+      await Promise.resolve();
+
+      const waiting = g.run({ label: "user", lane: "user", maxWaitMs: 2_000 }, async () => 2);
+      const settled = expect(waiting).rejects.toThrow(InnerTubeBusyError);
+      await vi.advanceTimersByTimeAsync(2_000);
+      await settled;
+
+      finish();
+      await expect(held).resolves.toBe(1);
+      // The slot still works for whoever comes next.
+      await expect(g.run({ label: "next" }, async () => 3)).resolves.toBe(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("refuses a reader with a deadline when another process has claimed far ahead", async () => {
+    const shared = { claim: vi.fn().mockResolvedValue(1_000_000 + 60_000), state: vi.fn(), trip: vi.fn() };
+    const c = clock();
+    const g = new InnerTubeGate(
+      { requestsPerMinute: 60, userRequestsPerMinute: 60, maxConcurrent: 1 },
+      { now: c.now, sleep: c.sleep, random: () => 0.5, logger: quiet, shared: shared as never },
+    );
+    await expect(g.run({ label: "user", lane: "user", maxWaitMs: 2_000 }, async () => 1)).rejects.toThrow(InnerTubeBusyError);
+    // Released, so the next read isn't stuck behind the refused one.
+    shared.claim.mockResolvedValue(1_000_000);
+    await expect(g.run({ label: "next" }, async () => 2)).resolves.toBe(2);
   });
 
   it("hands every caller the same process-wide gate", () => {

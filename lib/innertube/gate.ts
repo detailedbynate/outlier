@@ -357,7 +357,26 @@ export class InnerTubeGate {
       if (wait > maxWaitMs) throw new InnerTubeBusyError(wait);
     }
     if (this.running >= this.options.maxConcurrent) {
-      await new Promise<void>((resolve, reject) => this.queues[lane].push({ resolve, reject }));
+      const turn = new Promise<void>((resolve, reject) => this.queues[lane].push({ resolve, reject }));
+      if (maxWaitMs === undefined) {
+        await turn;
+      } else {
+        // The slot can be held by a background read that is itself sleeping for
+        // its rate limit, so a reader with a deadline can't queue behind it forever.
+        const waiter = this.queues[lane][this.queues[lane].length - 1]!;
+        const timer = setTimeout(() => {
+          const at = this.queues[lane].indexOf(waiter);
+          if (at >= 0) {
+            this.queues[lane].splice(at, 1);
+            waiter.reject(new InnerTubeBusyError(maxWaitMs));
+          }
+        }, maxWaitMs);
+        try {
+          await turn;
+        } finally {
+          clearTimeout(timer);
+        }
+      }
     }
     this.running += 1;
     const now = this.now();
@@ -368,6 +387,11 @@ export class InnerTubeGate {
     const slot = shared ?? Math.max(now, this.nextSlot[lane]);
     this.nextSlot[lane] = Math.max(slot, this.nextSlot[lane]) + gap;
     const waitUntil = this.now();
+    // Another process may have claimed ahead of us; the local check above couldn't see that.
+    if (maxWaitMs !== undefined && slot - waitUntil > maxWaitMs) {
+      this.release();
+      throw new InnerTubeBusyError(slot - waitUntil);
+    }
     if (slot > waitUntil) await this.sleep(slot - waitUntil);
   }
 
