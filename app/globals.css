@@ -9386,3 +9386,145 @@ a.dash-row:hover {
     animation: none;
   }
 }
+
+/* --- idea finder --- */
+
+.sw-ideas {
+  margin-bottom: 26px;
+  padding: 20px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--glass-bg);
+  animation: sw-rise 0.45s var(--ease) both;
+}
+
+.sw-ideas-head h2 {
+  margin-bottom: 4px;
+}
+
+.sw-ideas-form {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.sw-ideas-form input {
+  flex: 1;
+  min-width: 200px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border-strong);
+  background: var(--control-bg);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.sw-ideas-form input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.sw-ideas-form small {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+}
+
+.sw-idea-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sw-idea {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 15px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  animation: sw-rise 0.45s var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+  transition:
+    border-color 0.2s var(--ease),
+    transform 0.2s var(--ease);
+}
+
+.sw-idea:hover {
+  border-color: rgba(139, 92, 246, 0.45);
+  transform: translateY(-2px);
+}
+
+.sw-idea h3 {
+  margin: 0;
+  font-size: 0.98rem;
+  line-height: 1.35;
+  color: var(--text-primary);
+}
+
+.sw-idea-hook {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  font-style: italic;
+  color: var(--accent-text);
+}
+
+.sw-idea-why {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.sw-idea-use {
+  align-self: flex-start;
+  margin-top: 3px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition:
+    border-color 0.18s var(--ease),
+    color 0.18s var(--ease);
+}
+
+.sw-idea-use:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+/* Placeholders while it thinks, sized like the cards they become. */
+.sw-idea-ghost {
+  min-height: 132px;
+  border-style: dashed;
+  background: linear-gradient(90deg, var(--surface-2), var(--surface-3), var(--surface-2));
+  background-size: 200% 100%;
+  animation: sw-pulse 1.4s var(--ease) infinite;
+  animation-delay: calc(var(--i, 0) * 100ms);
+}
+
+.sw-idea-ghost:hover {
+  transform: none;
+  border-color: var(--border);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sw-ideas,
+  .sw-idea,
+  .sw-idea-ghost {
+    animation: none;
+  }
+
+  .sw-idea:hover {
+    transform: none;
+  }
+}

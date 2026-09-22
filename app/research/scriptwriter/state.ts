@@ -1,3 +1,4 @@
+import type { Idea } from "@/lib/scripts/ideas";
 import type { Duration, ScriptResult, Tone } from "@/lib/scripts/schema";
 
 /**
@@ -25,3 +26,13 @@ export const emptyScriptState: ScriptState = {
   charged: 0,
   sent: { topic: "", idea: "", angle: "", seconds: DEFAULT_SECONDS, tone: DEFAULT_TONE },
 };
+
+export interface IdeaState {
+  ideas: Idea[];
+  error: string | null;
+  charged: number;
+  /** Echoed back so the box keeps the niche after a submit. */
+  topic: string;
+}
+
+export const emptyIdeaState: IdeaState = { ideas: [], error: null, charged: 0, topic: "" };

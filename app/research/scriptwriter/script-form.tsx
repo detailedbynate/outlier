@@ -19,7 +19,16 @@ const LONGEST = DURATIONS[DURATIONS.length - 1]!;
 const STEP = DURATIONS.length > 1 ? DURATIONS[1]! - DURATIONS[0] : 5;
 
 /** The writer: what they want, then what it wrote. */
-export function ScriptForm({ cost, limited }: { cost: number; limited: boolean }) {
+export function ScriptForm({
+  cost,
+  limited,
+  seed,
+}: {
+  cost: number;
+  limited: boolean;
+  /** An idea picked from the finder above, which wins over whatever was last submitted. */
+  seed?: { topic: string; idea: string } | null;
+}) {
   const [state, submit, pending] = useActionState(writeScript, emptyScriptState);
   // Held in React so the readout and the filled part of the track can follow it.
   const [seconds, setSeconds] = useState<number>(state.sent.seconds);
@@ -32,12 +41,12 @@ export function ScriptForm({ cost, limited }: { cost: number; limited: boolean }
         <div className="sw-row">
           <label className="sw-field">
             <span>Niche</span>
-            <input name="topic" defaultValue={state.sent.topic} placeholder="minecraft" maxLength={80} required autoComplete="off" />
+            <input name="topic" defaultValue={seed?.topic || state.sent.topic} placeholder="minecraft" maxLength={80} required autoComplete="off" />
             <small>Who it&apos;s for. The script is written for people already in this niche.</small>
           </label>
           <label className="sw-field">
             <span>Video idea or title</span>
-            <input name="idea" defaultValue={state.sent.idea} placeholder="why your redstone door keeps breaking" maxLength={200} required autoComplete="off" />
+            <input name="idea" defaultValue={seed?.idea || state.sent.idea} placeholder="why your redstone door keeps breaking" maxLength={200} required autoComplete="off" />
             <small>What this Short is about. A working title is enough.</small>
           </label>
         </div>

@@ -7,7 +7,7 @@ import { logger } from "@/lib/core/logger";
 import { DURATIONS, TONES, type Duration, type Tone } from "@/lib/scripts/schema";
 import { getServices } from "@/lib/services";
 import { asUser } from "@/lib/youtube/quota-context";
-import { DEFAULT_SECONDS, DEFAULT_TONE, emptyScriptState, type ScriptState } from "./state";
+import { DEFAULT_SECONDS, DEFAULT_TONE, emptyIdeaState, emptyScriptState, type IdeaState, type ScriptState } from "./state";
 
 const text = (value: FormDataEntryValue | null, max: number): string => String(value ?? "").trim().slice(0, max);
 
@@ -100,4 +100,33 @@ export async function deleteStyleSample(formData: FormData): Promise<void> {
   if (!id) return;
   await getServices().repositories.styleSamples.delete(current.user.id, id);
   revalidatePath("/research/scriptwriter");
+}
+
+/**
+ * Find ideas for a niche. Owner-only like the writer, and rate limited for
+ * everyone else, because it is a paid model call too — just a cheaper one.
+ */
+export async function findIdeas(_previous: IdeaState, formData: FormData): Promise<IdeaState> {
+  const current = await requireApprovedUser();
+  const topic = text(formData.get("topic"), 80);
+
+  if (!current.isOwner) return { ...emptyIdeaState, topic, error: "The script writer isn't open yet." };
+  if (!topic) return { ...emptyIdeaState, topic, error: "Type a niche to find ideas for." };
+
+  const services = getServices();
+  try {
+    await services.credits.assertAvailable(current.user.id, "find_ideas");
+    if (!current.isOwner) await services.rateLimits.enforce("scriptUser", current.user.id);
+    const result = await asUser(current.user.id, "action:find_ideas", () => services.scripts.ideas(topic, current.user.id));
+    const { charged } = await services.credits.charge(current.user.id, "find_ideas");
+    revalidatePath("/", "layout");
+    return { ideas: result.ideas, error: null, charged, topic };
+  } catch (error) {
+    logger.warn("idea finding failed", { topic, error });
+    return {
+      ...emptyIdeaState,
+      topic,
+      error: isAppError(error) && (error.expose || error.code === "RATE_LIMITED") ? error.message : "Couldn't find ideas just then. Try again in a moment.",
+    };
+  }
 }

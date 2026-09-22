@@ -28,6 +28,8 @@ export const CREDIT_COSTS = {
    * the only one that spends an AI request rather than API quota.
    */
   write_script: 8,
+  /** Six ideas for a niche: one model call, and much less output than a script. */
+  find_ideas: 3,
 } as const;
 
 export type CreditAction = keyof typeof CREDIT_COSTS;

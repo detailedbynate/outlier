@@ -3,6 +3,7 @@ import { createLogger, type Logger } from "@/lib/core/logger";
 import type { TextProvider } from "@/lib/ai/types";
 import type { SavedScriptRepository } from "@/lib/database/repositories/saved-scripts";
 import type { StyleSampleRepository } from "@/lib/database/repositories/style-samples";
+import { IDEAS, IDEA_COUNT, ideaSystemPrompt, ideaUserPrompt, type IdeaResult } from "@/lib/scripts/ideas";
 import { scriptSystemPrompt, scriptUserPrompt } from "@/lib/scripts/prompt";
 import { SCRIPT, type ScriptRequest, type ScriptResult } from "@/lib/scripts/schema";
 
@@ -22,7 +23,7 @@ export const SCRIPT_EVENT = "script.write";
 
 export interface ScriptDeps {
   ai: TextProvider | null;
-  /** Every script is kept; there's no save button to forget. */
+  /** Every script is kept; there's no save button to forget. Also what ideas avoid repeating. */
   saved: Pick<SavedScriptRepository, "save" | "listForUser" | "delete">;
   /** Their own scripts, which the writer copies the voice of. */
   styles: Pick<StyleSampleRepository, "listForUser">;
@@ -93,4 +94,45 @@ export class ScriptService {
     }
     return { id, script: object, words, model };
   }
+  /**
+   * Ideas for a niche.
+   *
+   * Cheaper than a script and deliberately so: this is the step people take
+   * several times before writing anything. What it has over pasting a niche
+   * into a chatbot is memory — it can see every script they've made and is told
+   * not to suggest any of them again.
+   */
+  async ideas(topic: string, userId?: string): Promise<IdeaResult> {
+    const niche = topic.trim();
+    if (!niche) throw new ValidationError("Pick a niche to find ideas for.");
+    if (!this.deps.ai) throw new AppError("CONFIG_ERROR", "Idea finding isn't available right now.", { expose: true });
+
+    let alreadyMade: string[] = [];
+    let samples: string[] = [];
+    if (userId) {
+      try {
+        const [made, styles] = await Promise.all([this.deps.saved.listForUser(userId), this.deps.styles.listForUser(userId)]);
+        // Titles rather than whole scripts: enough to recognise a repeat, cheap to send.
+        alreadyMade = made.flatMap((row) => [row.idea, ...row.titles]);
+        samples = styles.map((row) => row.body);
+      } catch (error) {
+        // Ideas without the history are still ideas; they just might repeat one.
+        this.log.warn("idea history unavailable", { error });
+      }
+    }
+
+    const { object, model } = await this.deps.ai.generateObject({
+      system: ideaSystemPrompt(),
+      messages: [{ role: "user", content: ideaUserPrompt({ topic: niche, alreadyMade, samples, count: IDEA_COUNT }) }],
+      schema: IDEAS,
+      schemaName: "short_ideas",
+      temperature: 0.9,
+      effort: "low",
+      maxOutputTokens: 2_000,
+    });
+
+    this.log.info("ideas found", { topic: niche, ideas: object.ideas.length, knownTitles: alreadyMade.length, model });
+    return { ideas: object.ideas, model };
+  }
+
 }

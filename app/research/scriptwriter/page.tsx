@@ -6,7 +6,7 @@ import { getServices } from "@/lib/services";
 import { ComingSoonLock } from "./coming-soon";
 import { SavedScripts } from "./saved-scripts";
 import { StyleSamples } from "./style-samples";
-import { ScriptForm } from "./script-form";
+import { Writer } from "./writer";
 
 export const dynamic = "force-dynamic";
 // Reading the niche and generating a script both take time; a Short script is the slowest thing here.
@@ -40,7 +40,7 @@ export default async function ScriptwriterPage() {
 
       {current.isOwner ? (
         <>
-          <ScriptForm cost={cost} limited={!current.isOwner} />
+          <Writer cost={cost} ideaCost={CREDIT_COSTS.find_ideas} limited={!current.isOwner} />
           <StyleSamples samples={styles} />
           <SavedScripts scripts={saved} />
         </>
@@ -63,7 +63,7 @@ function LockedPreview({ cost }: { cost: number }) {
           <label className="sw-field">
             <span>Niche</span>
             <input defaultValue="minecraft" readOnly tabIndex={-1} />
-            <small>The niche to study. Its outliers are what the script learns from.</small>
+            <small>Who it&apos;s for. The script is written for people already in this niche.</small>
           </label>
           <label className="sw-field">
             <span>Video idea or title</span>
