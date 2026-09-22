@@ -16,6 +16,11 @@ export const metadata: Metadata = { title: "Script Writer · Outlier" };
 export default async function ScriptwriterPage() {
   const current = await requireApprovedUser();
   const cost = CREDIT_COSTS.write_script;
+  // Free sees an upgrade; a paid plan sees "not yet", because there's nothing
+  // for them to buy — the writer just isn't open to anyone but the owner.
+  const plan = current.isOwner ? null : await getServices().subscriptions.stateFor(current.user.id).catch(() => null);
+  const onFreePlan = !current.isOwner && (plan?.plan.id ?? "free") === "free";
+
   // Only the owner can write one, so only the owner has any to show.
   const [saved, styles] = current.isOwner
     ? await Promise.all([
@@ -45,7 +50,7 @@ export default async function ScriptwriterPage() {
           <SavedScripts scripts={saved} />
         </>
       ) : (
-        <ComingSoonLock>{<LockedPreview cost={cost} />}</ComingSoonLock>
+        <ComingSoonLock mode={onFreePlan ? "upgrade" : "soon"}>{<LockedPreview cost={cost} />}</ComingSoonLock>
       )}
     </div>
   );

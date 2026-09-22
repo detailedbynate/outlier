@@ -1,8 +1,12 @@
 /**
- * Subscription plans. A plan is one thing only: how many credits the user gets
- * each month. Everything else — which features they can reach, how much YouTube
- * data they can pull — stays the same on every plan, because credits already
+ * Subscription plans. Mostly a plan is one thing: how many credits the user gets
+ * each month. Every research tool is on every plan, because credits already
  * price the expensive work.
+ *
+ * The Shorts Script Writer is the exception, and it is one on purpose: it is the
+ * only thing here that costs real money per use on top of credits, so it sits on
+ * Pro and above. Anything else gated later belongs in this comment too, because
+ * the Terms say out loud which features are plan-specific.
  *
  * Prices are in US cents and Stripe is the seller of record. The price a plan
  * charges lives here, but the Stripe Price it charges against comes from the
@@ -47,7 +51,7 @@ export const PLANS: readonly Plan[] = [
     priceCents: 0,
     blurb: "For trying Outlier on one channel",
     creditsNote: "Enough to explore a niche and see what the tools find",
-    features: ["Every research tool, nothing locked", "Shorts Channels, Niche Finder, competitor tracking", "Credits reset on the 1st"],
+    features: ["Every research tool", "Shorts Channels, Niche Finder, competitor tracking", "Credits reset on the 1st"],
   },
   {
     id: "pro",
@@ -58,7 +62,12 @@ export const PLANS: readonly Plan[] = [
     badge: "Most popular",
     blurb: "For creators researching every week",
     creditsNote: "Research most days without watching the meter",
-    features: ["30× the credits of Free", "Enough to research every day of the month", "Top up any time — bought credits never expire", "Cancel any time"],
+    features: [
+      "Everything on Free, plus the Shorts Script Writer",
+      "30× the credits of Free",
+      "Top up any time — bought credits never expire",
+      "Cancel any time",
+    ],
   },
   {
     id: "expert",
@@ -67,7 +76,7 @@ export const PLANS: readonly Plan[] = [
     priceCents: 3_000,
     blurb: "For studios running several channels",
     creditsNote: "A whole roster's research, every week of the month",
-    features: ["Over 3× the credits of Pro", "Room for a whole roster of channels", "Deep discovery searches without rationing", "Cancel any time"],
+    features: ["Everything on Pro", "Over 3× the credits of Pro", "Room for a whole roster of channels", "Cancel any time"],
   },
 ];
 

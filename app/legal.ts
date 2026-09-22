@@ -6,7 +6,7 @@
  * a way that affects what someone agreed to.
  */
 
-export const EFFECTIVE_DATE = "September 20, 2026";
+export const EFFECTIVE_DATE = "September 22, 2026";
 
 /** Where disputes are heard. Change this if the operator's province changes. */
 export const JURISDICTION = "Ontario, Canada";

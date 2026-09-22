@@ -8,6 +8,7 @@ import { isAppError } from "@/lib/core/errors";
 import { logger } from "@/lib/core/logger";
 import type { BulkState } from "@/components/bulk-panel";
 import { getServices } from "@/lib/services";
+import { findPlan, type PlanId } from "@/lib/billing/plans";
 
 export interface AccountFormState {
   status: "idle" | "ok" | "error";
@@ -141,5 +142,47 @@ export async function adjustCredits(_prev: AccountFormState, formData: FormData)
   } catch (error) {
     logger.warn("adjust credits failed", { userId, error });
     return { status: "error", message: isAppError(error) && error.expose ? error.message : "Couldn't change credits.", link: null };
+  }
+}
+
+/**
+ * Put an account on a plan by hand.
+ *
+ * For comps, support fixes and testing — nothing here talks to Stripe, so this
+ * is an override, not a purchase: if Stripe later sends a webhook for this user
+ * it wins, because it reflects what they're actually being charged. Moving
+ * someone to Free clears the entitlement rather than recording a cancellation
+ * date, since there's no billing period to run out.
+ */
+export async function setAccountPlan(_prev: AccountFormState, formData: FormData): Promise<AccountFormState> {
+  const current = await requireAdmin();
+  const userId = text(formData, "userId");
+  const plan = findPlan(text(formData, "plan"));
+  if (!UUID_PATTERN.test(userId)) return { status: "error", message: "Invalid account.", link: null };
+  if (!plan) return { status: "error", message: "Unknown plan.", link: null };
+  if (!current.isOwner) return { status: "error", message: "Only the owner can change plans.", link: null };
+
+  try {
+    const services = getServices();
+    const existing = await services.subscriptions.stateFor(userId);
+    await services.subscriptions.apply({
+      userId,
+      plan: plan.id as PlanId,
+      // "canceled" is what the rest of the app reads as "no entitlement".
+      status: plan.id === "free" ? "canceled" : "active",
+      // Keep any Stripe ids we already had: losing them would orphan a real
+      // subscription from the customer it belongs to.
+      stripeCustomerId: existing.stripeCustomerId,
+      stripeSubscriptionId: null,
+      currentPeriodEnd: null,
+      cancelAtPeriodEnd: false,
+    });
+    logger.info("plan set by admin", { userId, plan: plan.id, actor: current.user.id });
+    revalidatePath("/admin/accounts");
+    revalidatePath("/", "layout");
+    return { status: "ok", message: `Now on ${plan.name}.`, link: null };
+  } catch (error) {
+    logger.warn("set plan failed", { userId, error });
+    return { status: "error", message: isAppError(error) && error.expose ? error.message : "Couldn't change the plan.", link: null };
   }
 }

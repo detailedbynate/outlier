@@ -2,7 +2,8 @@
 
 import { useActionState, useState } from "react";
 import type { AccountRole } from "@/types/database";
-import { adjustCredits, createAccount, newSignInLink, updateAccount, type AccountFormState } from "./actions";
+import { PLANS } from "@/lib/billing/plans";
+import { adjustCredits, createAccount, newSignInLink, setAccountPlan, updateAccount, type AccountFormState } from "./actions";
 
 const initial: AccountFormState = { status: "idle", message: null, link: null };
 
@@ -139,6 +140,35 @@ export function AdjustCreditsForm({ userId, extra }: { userId: string; extra: nu
       <input name="note" placeholder="Reason (optional)" aria-label="Reason" maxLength={200} />
       <button type="submit" className="button-ghost button-small" disabled={pending}>
         {pending ? "Saving…" : "Add / remove"}
+      </button>
+      <Status state={state} />
+    </form>
+  );
+}
+
+/**
+ * Move an account between plans by hand.
+ *
+ * Owner-only, and an override rather than a purchase: nothing here charges
+ * anyone, and a later Stripe webhook for this user takes precedence.
+ */
+export function PlanForm({ userId, plan }: { userId: string; plan: string }) {
+  const [state, action, pending] = useActionState(setAccountPlan, initial);
+  return (
+    <form action={action} className="account-edit plan-set">
+      <input type="hidden" name="userId" value={userId} />
+      <label className="sr-only" htmlFor={`plan-${userId}`}>
+        Plan
+      </label>
+      <select id={`plan-${userId}`} name="plan" defaultValue={plan}>
+        {PLANS.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.name}
+          </option>
+        ))}
+      </select>
+      <button type="submit" className="button-ghost button-small" disabled={pending}>
+        {pending ? "Saving…" : "Set plan"}
       </button>
       <Status state={state} />
     </form>

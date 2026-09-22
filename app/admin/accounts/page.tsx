@@ -10,7 +10,7 @@ import { formatNumber, timeAgo } from "@/lib/format";
 import { DURATIONS, moderationState, type AccountStatus } from "@/lib/moderation/status";
 import { getServices } from "@/lib/services";
 import type { AccountRole } from "@/types/database";
-import { AdjustCreditsForm, CreateAccountForm, EditAccountForm, NewSignInLinkForm } from "./account-forms";
+import { AdjustCreditsForm, CreateAccountForm, EditAccountForm, NewSignInLinkForm, PlanForm } from "./account-forms";
 import { moderateAccounts } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -88,6 +88,10 @@ export default async function AccountsPage({ searchParams }: { searchParams: Sea
     return true;
   });
   const usage = await Promise.all(visible.map((r) => (r.role === "owner" ? null : services.credits.status(r.id).catch(() => null))));
+  // The owner is unlimited by role, so their plan is beside the point.
+  const plans = await Promise.all(
+    visible.map((r) => (r.role === "owner" ? null : services.subscriptions.stateFor(r.id).catch(() => null))),
+  );
   const emailById = new Map(users.map((u) => [u.id, u.email]));
 
   return (
@@ -174,6 +178,12 @@ export default async function AccountsPage({ searchParams }: { searchParams: Sea
                           {row.role === "owner" ? "Unlimited" : status ? `${formatNumber(status.used)} / ${formatNumber(status.monthly)}` : "—"}
                           {status && status.extra > 0 ? <div className="stat-note">+{formatNumber(status.extra)} extra</div> : null}
                           {current.isOwner && row.role !== "owner" ? <AdjustCreditsForm userId={row.id} extra={status?.extra ?? 0} /> : null}
+                          {row.role === "owner" ? null : (
+                            <div className="plan-cell">
+                              <span className={`badge plan-${plans[i]?.plan.id ?? "free"}`}>{plans[i]?.plan.name ?? "Free"}</span>
+                              {current.isOwner ? <PlanForm userId={row.id} plan={plans[i]?.plan.id ?? "free"} /> : null}
+                            </div>
+                          )}
                         </td>
                         <td>
                           <EditAccountForm

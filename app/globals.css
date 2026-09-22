@@ -9528,3 +9528,64 @@ a.dash-row:hover {
     transform: none;
   }
 }
+
+/* --- plans in the admin table --- */
+
+.plan-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+  margin-top: 8px;
+}
+
+.badge.plan-free {
+  background: var(--surface-3);
+  color: var(--text-secondary);
+}
+
+.badge.plan-pro {
+  background: var(--accent-wash);
+  border: 1px solid rgba(139, 92, 246, 0.45);
+  color: var(--accent-text);
+}
+
+.badge.plan-expert {
+  background: rgba(52, 211, 153, 0.12);
+  border: 1px solid rgba(52, 211, 153, 0.45);
+  color: var(--good-text);
+}
+
+.plan-set {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.plan-set select {
+  padding: 5px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: var(--control-bg);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.82rem;
+}
+
+/* A second, quieter way out of the upgrade dialog. */
+.sw-modal-dismiss {
+  display: block;
+  margin: 10px auto 0;
+  padding: 6px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  cursor: pointer;
+}
+
+.sw-modal-dismiss:hover {
+  color: var(--text-secondary);
+  text-decoration: underline;
+}
