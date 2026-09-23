@@ -115,7 +115,17 @@ export class OpenRouterTextProvider implements TextProvider {
   }
 
   private async send(request: TextGenerationRequest, jsonSchema?: { name: string; schema: unknown }) {
-    const [model = this.models[0]!, ...fallbacks] = request.model ? [request.model] : this.models;
+    const models = request.model ? [request.model] : this.models;
+    // A free model sometimes answers with nothing at all; OpenRouter counts that as
+    // a success, so try the rest of the list before giving up on the batch.
+    for (let i = 0; ; i++) {
+      const result = await this.sendOnce(request, models.slice(i), jsonSchema);
+      if (result.text.trim() || i >= models.length - 1) return result;
+    }
+  }
+
+  private async sendOnce(request: TextGenerationRequest, models: string[], jsonSchema?: { name: string; schema: unknown }) {
+    const [model = this.models[0]!, ...fallbacks] = models;
     const messages = [
       ...(request.system ? [{ role: "system", content: request.system }] : []),
       ...request.messages.map((m) => ({ role: m.role, content: m.content })),

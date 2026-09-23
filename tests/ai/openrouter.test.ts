@@ -52,6 +52,15 @@ describe("OpenRouterTextProvider", () => {
     expect((init.headers as Record<string, string>).Authorization).toBe("Bearer k");
   });
 
+  it("tries the next model when one answers with nothing", async () => {
+    const empty = { model: "a:free", choices: [{ message: { content: "" }, finish_reason: "stop" }] };
+    const good = { model: "b:free", choices: [{ message: { content: '{"queries":["x"]}' }, finish_reason: "stop" }] };
+    const fetch = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify(empty))).mockResolvedValueOnce(new Response(JSON.stringify(good)));
+    const provider = new OpenRouterTextProvider({ apiKey: "k", models: ["a:free", "b:free"], fetch: fetch as unknown as typeof globalThis.fetch });
+    await expect(provider.generateObject(request)).resolves.toMatchObject({ object: { queries: ["x"] }, model: "b:free" });
+    expect(JSON.parse(fetch.mock.calls[1]![1]!.body as string).model).toBe("b:free");
+  });
+
   it("accepts JSON wrapped in a code fence", async () => {
     const fence = "`".repeat(3);
     const fetch = reply(200, { choices: [{ message: { content: `${fence}json\n{"queries":["x"]}\n${fence}` }, finish_reason: "stop" }] });
