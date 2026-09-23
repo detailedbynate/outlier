@@ -76,13 +76,6 @@ function LockedPreview({ cost }: { cost: number }) {
             <small>What this Short is about. A working title is enough.</small>
           </label>
         </div>
-        <label className="sw-field">
-          <span>
-            Your angle <em>optional</em>
-          </span>
-          <textarea defaultValue="I've played on the same survival world for 4 years" readOnly tabIndex={-1} rows={2} />
-          <small>What you have that nobody else does. This is what stops a script coming out generic.</small>
-        </label>
         <div className="sw-row">
           <label className="sw-field">
             <span>Length</span>

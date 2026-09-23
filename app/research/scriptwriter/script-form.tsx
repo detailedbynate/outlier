@@ -17,7 +17,8 @@ const TONE_LABEL: Record<(typeof TONES)[number], string> = {
 
 const SHORTEST = DURATIONS[0];
 const LONGEST = DURATIONS[DURATIONS.length - 1]!;
-const STEP = DURATIONS.length > 1 ? DURATIONS[1]! - DURATIONS[0] : 5;
+/** The allowed length nearest a point on the track. */
+const snap = (value: number): number => DURATIONS.reduce<number>((best, d) => (Math.abs(d - value) < Math.abs(best - value) ? d : best), DURATIONS[0]);
 
 /** The writer: what they want, then what it wrote. */
 export function ScriptForm({
@@ -32,13 +33,15 @@ export function ScriptForm({
 }) {
   const [state, submit, pending] = useActionState(writeScript, emptyScriptState);
   // Held in React so the readout and the filled part of the track can follow it.
-  const [seconds, setSeconds] = useState<number>(state.sent.seconds);
+  // The thumb glides with the pointer; the length snaps to 15/20/25/30 when it's let go.
+  const [position, setPosition] = useState<number>(state.sent.seconds);
+  const seconds = snap(position);
+  const settle = () => setPosition(seconds);
   const [tone, setTone] = useState<string>(state.sent.tone);
   // Watched only to ask for details when the idea is about something newer than the model.
   const [idea, setIdea] = useState<string>(seed?.idea || state.sent.idea);
-  const [angle, setAngle] = useState<string>(state.sent.angle);
-  const askForDetails = soundsRecent(idea) && !angle.trim();
-  const filled = (seconds - SHORTEST) / (LONGEST - SHORTEST);
+  const askForDetails = soundsRecent(idea);
+  const filled = (position - SHORTEST) / (LONGEST - SHORTEST);
 
   return (
     <>
@@ -51,24 +54,16 @@ export function ScriptForm({
           </label>
           <label className="sw-field">
             <span>Video idea or title</span>
-            <input name="idea" defaultValue={seed?.idea || state.sent.idea} placeholder="why your redstone door keeps breaking" maxLength={200} required autoComplete="off" onChange={(e) => setIdea(e.target.value)} />
-            <small>What this Short is about. A working title is enough.</small>
+            <input name="idea" defaultValue={seed?.idea || state.sent.idea} placeholder="why your redstone door keeps breaking" maxLength={400} required autoComplete="off" onChange={(e) => setIdea(e.target.value)} />
+            {askForDetails ? (
+              <small className="sw-ask" role="status">
+                Sounds new. The writer doesn&apos;t know what&apos;s in recent updates, so add what changed here or it&apos;ll keep it general.
+              </small>
+            ) : (
+              <small>What this Short is about. A working title is enough.</small>
+            )}
           </label>
         </div>
-
-        <label className="sw-field">
-          <span>
-            Your angle <em>optional, but it&apos;s what stops it being generic</em>
-          </span>
-          <textarea name="angle" defaultValue={state.sent.angle} placeholder="I've played on the same survival world for 4 years" maxLength={300} rows={2} onChange={(e) => setAngle(e.target.value)} />
-          {askForDetails ? (
-            <small className="sw-ask" role="status">
-              Sounds new. The writer doesn&apos;t know what&apos;s in recent updates, so say what actually changed or it&apos;ll keep it general.
-            </small>
-          ) : (
-            <small>Anything true and specific you know. It gets built in rather than guessed at.</small>
-          )}
-        </label>
 
         <div className="sw-controls">
           <div className="sw-field sw-slider-field">
@@ -78,18 +73,22 @@ export function ScriptForm({
             <input
               className="sw-slider"
               type="range"
-              name="seconds"
               min={SHORTEST}
               max={LONGEST}
-              step={STEP}
-              value={seconds}
-              onChange={(event) => setSeconds(Number(event.target.value))}
+              step={0.1}
+              value={position}
+              onChange={(event) => setPosition(Number(event.target.value))}
+              onPointerUp={settle}
+              onKeyUp={settle}
+              onBlur={settle}
               style={{ "--filled": filled } as CSSProperties}
               aria-label="Script length in seconds"
+              aria-valuetext={`${seconds} seconds`}
             />
+            <input type="hidden" name="seconds" value={seconds} />
             <div className="sw-ticks">
               {DURATIONS.map((value) => (
-                <button key={value} type="button" className="sw-tick" data-on={value === seconds ? "" : undefined} onClick={() => setSeconds(value)}>
+                <button key={value} type="button" className="sw-tick" data-on={value === seconds ? "" : undefined} onClick={() => setPosition(value)}>
                   {value}s
                 </button>
               ))}

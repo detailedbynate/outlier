@@ -32,7 +32,7 @@ export async function writeScript(_previous: ScriptState, formData: FormData): P
   const current = await requireApprovedUser();
   const sent = {
     topic: text(formData.get("topic"), 80),
-    idea: text(formData.get("idea"), 200),
+    idea: text(formData.get("idea"), 400),
     angle: text(formData.get("angle"), 300),
     seconds: duration(formData.get("seconds")),
     tone: tone(formData.get("tone")),
