@@ -537,6 +537,8 @@ h2 {
   padding: 32px 36px 72px;
   max-width: 1320px;
   width: 100%;
+  /* Centred in the space beside the sidebar; left-aligned it left a gap on wide screens. */
+  margin-inline: auto;
   min-width: 0;
 }
 
