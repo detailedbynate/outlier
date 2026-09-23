@@ -9799,3 +9799,134 @@ a.dash-row:hover {
     transform: none;
   }
 }
+
+/* --- Billing page: one centred column, top-ups dressed like the plans --- */
+
+.billing-page {
+  width: 100%;
+  max-width: 1180px;
+  margin-inline: auto;
+}
+
+.billing-plans-section > .section-title,
+.billing-packs-section > .section-title,
+.billing-plans-lede {
+  text-align: center;
+}
+
+.billing-page .billing-balance {
+  text-align: center;
+}
+
+.billing-plans {
+  justify-content: center;
+}
+
+.billing-packs-section {
+  margin: 8px 0 24px;
+}
+
+.billing-packs {
+  margin-top: 0;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 18px;
+}
+
+.billing-pack {
+  --pack: var(--text-secondary);
+  --pack-edge: var(--border);
+  position: relative;
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  text-align: center;
+  padding: 26px 22px 24px;
+  border-radius: 18px;
+  border: 1px solid var(--pack-edge);
+  background: var(--surface-2);
+  transition:
+    transform 0.25s var(--ease),
+    box-shadow 0.35s var(--ease);
+}
+
+.billing-pack[data-pack="medium"] {
+  --pack: #a78bfa;
+  --pack-edge: rgba(139, 92, 246, 0.45);
+  --pack-glow: rgba(139, 92, 246, 0.35);
+  --pack-button: linear-gradient(180deg, #9b6dff, #7c4dff);
+  --pack-button-text: #fff;
+  background: linear-gradient(180deg, rgba(109, 72, 230, 0.34), rgba(20, 12, 40, 0.6) 80%);
+}
+
+.billing-pack[data-pack="large"] {
+  --pack: #22d3ee;
+  --pack-edge: rgba(34, 211, 238, 0.42);
+  --pack-glow: rgba(34, 211, 238, 0.3);
+  --pack-button: linear-gradient(180deg, #3ee0f5, #14b8a6);
+  --pack-button-text: #03151a;
+  background: linear-gradient(180deg, rgba(20, 170, 190, 0.3), rgba(4, 26, 32, 0.6) 80%);
+}
+
+.billing-pack[data-pack="medium"],
+.billing-pack[data-pack="large"] {
+  box-shadow:
+    0 18px 50px -18px var(--pack-glow),
+    0 0 40px -12px var(--pack-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.billing-pack[data-pack="medium"]:hover,
+.billing-pack[data-pack="large"]:hover {
+  box-shadow:
+    0 0 0 1px var(--pack),
+    0 24px 60px -16px var(--pack-glow),
+    0 0 56px -10px var(--pack-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.billing-pack .billing-pack-label {
+  color: var(--pack);
+}
+
+.billing-pack-cta {
+  width: 100%;
+  margin-top: 10px;
+  padding: 11px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border-strong);
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-primary);
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+  transition:
+    filter 0.2s var(--ease),
+    transform 0.2s var(--ease);
+}
+
+.billing-pack[data-pack="medium"] .billing-pack-cta,
+.billing-pack[data-pack="large"] .billing-pack-cta {
+  background: var(--pack-button);
+  color: var(--pack-button-text);
+  border-color: transparent;
+  box-shadow: 0 8px 26px -8px var(--pack-glow), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.billing-pack-cta:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.billing-page > .stat-note:last-child {
+  text-align: center;
+}
+
+/* The page header: icon, title and subtitle centred as one block. */
+.billing-page > .spread {
+  justify-content: center;
+}
+
+.billing-page > .spread .page-header {
+  flex-direction: column;
+  text-align: center;
+}

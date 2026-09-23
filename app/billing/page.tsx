@@ -55,7 +55,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Sear
   const now = new Date();
 
   return (
-    <div className="research-page">
+    <div className="research-page billing-page">
       <PageHeader icon={CoinsIcon} title="Credits" subtitle="Your monthly credits reset on the 1st. Bought credits never expire and are used once the monthly ones run out." />
 
       {status === "subscribed" ? (
@@ -174,20 +174,23 @@ export default async function BillingPage({ searchParams }: { searchParams: Sear
       ) : null}
 
       {enabled ? (
-        <section className="billing-packs" aria-label="Credit packs">
+        <section className="billing-packs-section" aria-label="Credit packs">
           <h2 className="section-title">Top up</h2>
-          {CREDIT_PACKS.map((pack) => (
-            <form key={pack.id} action={startCheckout} className="card glass billing-pack">
-              <input type="hidden" name="packId" value={pack.id} />
-              <span className="billing-pack-label">{pack.label}</span>
-              <strong className="billing-pack-credits">{pack.credits.toLocaleString("en-US")} credits</strong>
-              <span className="billing-pack-price">{formatPrice(pack.priceCents)}</span>
-              <span className="stat-note">{formatPrice(Math.round((pack.priceCents / pack.credits) * 100))} per 100 credits</span>
-              <button type="submit" className={pack.id === "medium" ? "button-brand" : undefined}>
-                Buy
-              </button>
-            </form>
-          ))}
+          <p className="billing-plans-lede">One-off credits on top of your plan. They never expire.</p>
+          <div className="billing-packs">
+            {CREDIT_PACKS.map((pack) => (
+              <form key={pack.id} action={startCheckout} className="billing-pack" data-pack={pack.id}>
+                <input type="hidden" name="packId" value={pack.id} />
+                <span className="billing-pack-label">{pack.label}</span>
+                <strong className="billing-pack-credits">{pack.credits.toLocaleString("en-US")} credits</strong>
+                <span className="billing-pack-price">{formatPrice(pack.priceCents)}</span>
+                <span className="stat-note">{formatPrice(Math.round((pack.priceCents / pack.credits) * 100))} per 100 credits</span>
+                <button type="submit" className="billing-pack-cta">
+                  Buy
+                </button>
+              </form>
+            ))}
+          </div>
         </section>
       ) : (
         <div className="empty">Buying credits isn&apos;t available yet.</div>
