@@ -10048,3 +10048,58 @@ a.dash-row:hover {
   .intel-glance-item, .intel-card, .intel-table tbody tr, .intel .dash-list > li, .intel-opps > li { animation: none; }
   .intel-glance-item:hover { transform: none; }
 }
+
+/* Competitors: roomier sizing so the tabs fill the page instead of floating in it. */
+.intel {
+  gap: 18px;
+}
+.intel-glance-item {
+  padding: 18px 20px;
+  gap: 6px;
+  min-height: 112px;
+}
+.intel-glance-value {
+  font-size: 22px;
+}
+.intel-glance-note {
+  font-size: 13px;
+}
+.intel-card {
+  padding: 20px 22px;
+  gap: 16px;
+}
+.intel-card-head h2 {
+  font-size: 18px;
+}
+.intel-table {
+  font-size: 14.5px;
+}
+.intel-table th {
+  font-size: 12.5px;
+  padding-block: 12px;
+}
+.intel-table td {
+  padding-block: 16px;
+}
+.intel-table .intel-channel {
+  gap: 12px;
+  max-width: 280px;
+}
+.intel-table .dash-avatar {
+  width: 42px;
+  height: 42px;
+}
+.intel-table .dash-row-title {
+  font-size: 15px;
+}
+.intel-table .intel-trend {
+  font-size: 12.5px;
+  padding: 3px 11px;
+}
+.intel-table .num {
+  font-size: 15px;
+  font-weight: 600;
+}
+.intel .dash-row {
+  padding-block: 12px;
+}
