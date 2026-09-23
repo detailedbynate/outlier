@@ -9980,11 +9980,51 @@ a.dash-row:hover {
 .intel-table tbody tr:nth-child(4), .intel .dash-list > li:nth-child(4), .intel-opps > li:nth-child(4) { animation-delay: 120ms; }
 .intel-table tbody tr:nth-child(n + 5), .intel .dash-list > li:nth-child(n + 5), .intel-opps > li:nth-child(n + 5) { animation-delay: 160ms; }
 
+/* One flat tint per cell: a gradient restarts in every cell and leaves seams. */
 .intel-table tr[data-you="true"] td {
-  background: linear-gradient(90deg, rgba(139, 92, 246, 0.2), rgba(139, 92, 246, 0.04));
+  background: rgba(167, 139, 250, 0.16);
+  border-top: 1px solid rgba(167, 139, 250, 0.35);
+  border-bottom: 1px solid rgba(167, 139, 250, 0.35);
 }
 .intel-table tr[data-you="true"] td:first-child {
-  box-shadow: inset 3px 0 0 #a78bfa;
+  box-shadow: inset 3px 0 0 #c4b5fd;
+}
+.intel-table tr[data-you="true"] .niche-badge {
+  background: #a78bfa;
+  color: #140b2e;
+}
+
+/* Extra Channels columns, shown by the More stats chip. */
+.intel-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.intel-extra {
+  display: none;
+}
+.intel-card:has(.intel-more-toggle input:checked) .intel-extra {
+  display: table-cell;
+  animation: intel-rise 0.3s var(--ease) both;
+}
+.intel-more-toggle {
+  cursor: pointer;
+  user-select: none;
+}
+.intel-more-toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.intel-more-toggle:has(input:checked) {
+  border-color: rgba(167, 139, 250, 0.6);
+  background: rgba(167, 139, 250, 0.18);
+  color: var(--text-primary);
+}
+.intel-more-toggle:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .intel .dash-list > li[data-you="true"] .dash-row {
   background: linear-gradient(90deg, rgba(139, 92, 246, 0.16), transparent);

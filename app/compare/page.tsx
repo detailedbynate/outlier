@@ -274,8 +274,13 @@ function OverviewTab({ ws, sort, href }: { ws: CompetitorWorkspace; sort: SortKe
   return (
     <Card
       title="Channels"
-      subtitle="Tap a channel for its full profile. Everything else is in the tabs."
+      subtitle="Tap a channel for its full profile"
       action={
+        <div className="intel-card-actions">
+        <label className="intel-more-toggle intel-chip">
+          <input type="checkbox" />
+          <span>More stats</span>
+        </label>
         <label className="intel-sort">
           <span className="intel-muted">Sort</span>
           <span className="intel-sort-links">
@@ -286,6 +291,7 @@ function OverviewTab({ ws, sort, href }: { ws: CompetitorWorkspace; sort: SortKe
             ))}
           </span>
         </label>
+        </div>
       }
     >
       <div className="table-wrap">
@@ -296,6 +302,9 @@ function OverviewTab({ ws, sort, href }: { ws: CompetitorWorkspace; sort: SortKe
               <th>Trend</th>
               <th className="num">Subs 7d</th>
               <th className="num">Avg views</th>
+              <th className="num intel-extra">Views 7d</th>
+              <th className="num intel-extra">Uploads/wk</th>
+              <th className="num intel-extra">Outlier rate</th>
               <th className="num">Best recent</th>
             </tr>
           </thead>
@@ -313,6 +322,9 @@ function OverviewTab({ ws, sort, href }: { ws: CompetitorWorkspace; sort: SortKe
                   <Delta value={p.growth.d7.subs} />
                 </td>
                 <td className="num">{formatCompact(p.avgViews)}</td>
+                <td className="num intel-extra">{formatCompact(p.recentViews)}</td>
+                <td className="num intel-extra">{p.uploadsPerWeek.toFixed(1)}</td>
+                <td className="num intel-extra">{formatPercent(p.outlierRate, 0)}</td>
                 <td className="num">
                   {p.bestRecent ? (
                     <a href={`https://www.youtube.com/watch?v=${p.bestRecent.youtube_video_id}`} target="_blank" rel="noreferrer" title={p.bestRecent.title}>
