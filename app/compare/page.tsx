@@ -194,6 +194,22 @@ export default async function CompetitorsPage({ searchParams }: { searchParams: 
   );
 }
 
+/** The first few items, with the rest folded away so a tab doesn't open as a wall. */
+function ShowMore<T>({ items, first, noun, render }: { items: T[]; first: number; noun: string; render: (items: T[]) => ReactNode }) {
+  if (items.length <= first) return <>{render(items)}</>;
+  return (
+    <>
+      {render(items.slice(0, first))}
+      <details className="intel-more">
+        <summary>
+          Show {items.length - first} more {noun}
+        </summary>
+        {render(items.slice(first))}
+      </details>
+    </>
+  );
+}
+
 type Href = (o: { view?: TabKey; sort?: SortKey }) => string;
 const profileHref = (youtubeId: string) => `/compare/${youtubeId}`;
 
@@ -251,7 +267,7 @@ function OverviewTab({ ws, sort, href }: { ws: CompetitorWorkspace; sort: SortKe
     <>
       <Card
         title="Channels"
-        subtitle="Tap a channel for its full profile"
+        subtitle="Tap a channel for its full profile. Everything else is in the tabs."
         action={
           <label className="intel-sort">
             <span className="intel-muted">Sort</span>
@@ -272,11 +288,8 @@ function OverviewTab({ ws, sort, href }: { ws: CompetitorWorkspace; sort: SortKe
                 <th>Channel</th>
                 <th>Trend</th>
                 <th className="num">Subs 7d</th>
-                <th className="num">Views 7d</th>
                 <th className="num">Avg views</th>
-                <th className="num">Uploads/wk</th>
-                <th className="num">Outlier rate</th>
-                <th>Best recent</th>
+                <th className="num">Best recent</th>
               </tr>
             </thead>
             <tbody>
@@ -292,14 +305,11 @@ function OverviewTab({ ws, sort, href }: { ws: CompetitorWorkspace; sort: SortKe
                   <td className="num">
                     <Delta value={p.growth.d7.subs} />
                   </td>
-                  <td className="num">{formatCompact(p.recentViews)}</td>
                   <td className="num">{formatCompact(p.avgViews)}</td>
-                  <td className="num">{p.uploadsPerWeek.toFixed(1)}</td>
-                  <td className="num">{formatPercent(p.outlierRate, 0)}</td>
-                  <td className="intel-best">
+                  <td className="num">
                     {p.bestRecent ? (
                       <a href={`https://www.youtube.com/watch?v=${p.bestRecent.youtube_video_id}`} target="_blank" rel="noreferrer" title={p.bestRecent.title}>
-                        <Multiplier value={p.bestRecent.multiplier} /> <span>{p.bestRecent.title}</span>
+                        <Multiplier value={p.bestRecent.multiplier} />
                       </a>
                     ) : (
                       <span className="intel-muted">—</span>
@@ -381,12 +391,9 @@ function GrowthTab({ ws }: { ws: CompetitorWorkspace }) {
             <tr>
               <th>Channel</th>
               <th>Trend</th>
-              <th className="num">Subs 24h</th>
               <th className="num">Subs 7d</th>
               <th className="num">Subs 30d</th>
-              <th className="num">Views 24h</th>
               <th className="num">Views 7d</th>
-              <th className="num">Views/day</th>
             </tr>
           </thead>
           <tbody>
@@ -396,16 +403,14 @@ function GrowthTab({ ws }: { ws: CompetitorWorkspace }) {
                   <ChannelCell channel={p.channel} href={profileHref(p.channel.youtube_channel_id)} />
                 </td>
                 <td>
-                  <TrendBadge label={p.growth.trend.label} />
+                  <TrendBadge
+                    label={p.growth.trend.label}
+                    title={p.growth.trend.recentDailyViews !== null ? `${formatCompact(p.growth.trend.recentDailyViews)} views/day, was ${formatCompact(p.growth.trend.priorDailyViews)}` : undefined}
+                  />
                 </td>
-                <td className="num"><Delta value={p.growth.h24.subs} /></td>
                 <td className="num"><Delta value={p.growth.d7.subs} pct={p.growth.d7.subsPct} /></td>
                 <td className="num">{p.growth.d30 ? <Delta value={p.growth.d30.subs} /> : <span className="intel-muted">—</span>}</td>
-                <td className="num"><Delta value={p.growth.h24.views} /></td>
                 <td className="num"><Delta value={p.growth.d7.views} /></td>
-                <td className="num intel-muted">
-                  {p.growth.trend.recentDailyViews !== null ? `${formatCompact(p.growth.trend.recentDailyViews)} ← ${formatCompact(p.growth.trend.priorDailyViews)}` : "—"}
-                </td>
               </tr>
             ))}
           </tbody>
@@ -425,8 +430,9 @@ function ContentTab({ ws }: { ws: CompetitorWorkspace }) {
         {ws.breakouts.length === 0 ? (
           <p className="intel-muted">No breakouts in the last 14 days.</p>
         ) : (
+          <ShowMore items={ws.breakouts} first={5} noun="breakouts" render={(items) => (
           <ul className="dash-list">
-            {ws.breakouts.map((v) => (
+            {items.map((v) => (
               <li key={v.id}>
                 <a href={v.format === "short" ? `https://www.youtube.com/shorts/${v.youtube_video_id}` : `https://www.youtube.com/watch?v=${v.youtube_video_id}`} target="_blank" rel="noreferrer" className="dash-row">
                   <Multiplier value={v.multiplier} />
@@ -440,10 +446,11 @@ function ContentTab({ ws }: { ws: CompetitorWorkspace }) {
               </li>
             ))}
           </ul>
+          )} />
         )}
       </Card>
       <Card title="Latest uploads" subtitle="Highlighted rows are 3× or more their channel's normal views">
-        <VideoTable videos={ws.latestUploads} showChannel />
+        <ShowMore items={ws.latestUploads} first={8} noun="uploads" render={(items) => <VideoTable videos={items} showChannel />} />
       </Card>
     </>
   );
@@ -456,14 +463,16 @@ function InsightsTab({ ws }: { ws: CompetitorWorkspace }) {
         {ws.opportunities.length === 0 ? (
           <p className="intel-muted">{ws.you ? "No clear gaps yet. These appear when competitors get strong, repeated results you're not matching." : "Add your channel to find topic, format, and posting gaps."}</p>
         ) : (
-          <ul className="intel-opps">
-            {ws.opportunities.map((o) => (
-              <li key={o.title}>
-                <strong>{o.title}</strong>
-                <span>{o.detail}</span>
-              </li>
-            ))}
-          </ul>
+          <ShowMore items={ws.opportunities} first={3} noun="opportunities" render={(items) => (
+            <ul className="intel-opps">
+              {items.map((o) => (
+                <li key={o.title}>
+                  <strong>{o.title}</strong>
+                  <span>{o.detail}</span>
+                </li>
+              ))}
+            </ul>
+          )} />
         )}
       </Card>
       <Card title="What's working" subtitle={`${ws.working.sampleVideos} competitor uploads from the last 60 days · lift = performance vs their uploads overall`}>
@@ -530,7 +539,7 @@ function PatternList({ title, items }: { title: string; items: PatternStat[] }) 
         <p className="intel-muted">Not enough data</p>
       ) : (
         <ul className="intel-patterns">
-          {items.slice(0, 5).map((p) => (
+          {items.slice(0, 3).map((p) => (
             <li key={p.label}>
               <span className="intel-pattern-label">{p.label}</span>
               <span className="intel-muted">
