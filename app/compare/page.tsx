@@ -210,6 +210,14 @@ function ShowMore<T>({ items, first, noun, render }: { items: T[]; first: number
   );
 }
 
+/** The sorts worth a chip; the rest would crowd the header. */
+const QUICK_SORTS: SortKey[] = ["growth", "avg_views", "subscribers"];
+
+/** Your channel first, then competitors, so every table shows where you stand. */
+function withYou(ws: CompetitorWorkspace) {
+  return [...(ws.you ? [{ p: ws.you, isYou: true }] : []), ...ws.competitors.map((p) => ({ p, isYou: false }))];
+}
+
 type Href = (o: { view?: TabKey; sort?: SortKey }) => string;
 const profileHref = (youtubeId: string) => `/compare/${youtubeId}`;
 
@@ -262,66 +270,150 @@ function Glance({ ws, href }: { ws: CompetitorWorkspace; href: Href }) {
 }
 
 function OverviewTab({ ws, sort, href }: { ws: CompetitorWorkspace; sort: SortKey; href: Href }) {
-  const rows = [...(ws.you ? [{ p: ws.you, isYou: true }] : []), ...ws.competitors.map((p) => ({ p, isYou: false }))];
+  const rows = withYou(ws);
+  return (
+    <Card
+      title="Channels"
+      subtitle="Tap a channel for its full profile. Everything else is in the tabs."
+      action={
+        <label className="intel-sort">
+          <span className="intel-muted">Sort</span>
+          <span className="intel-sort-links">
+            {SORT_OPTIONS.filter((o) => QUICK_SORTS.includes(o.key) || o.key === sort).map((o) => (
+              <Link key={o.key} href={href({ sort: o.key })} className="intel-chip" aria-current={o.key === sort} scroll={false}>
+                {o.label}
+              </Link>
+            ))}
+          </span>
+        </label>
+      }
+    >
+      <div className="table-wrap">
+        <table className="intel-table">
+          <thead>
+            <tr>
+              <th>Channel</th>
+              <th>Trend</th>
+              <th className="num">Subs 7d</th>
+              <th className="num">Avg views</th>
+              <th className="num">Best recent</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(({ p, isYou }) => (
+              <tr key={p.channel.id} data-you={isYou}>
+                <td>
+                  <ChannelCell channel={p.channel} href={profileHref(p.channel.youtube_channel_id)} />
+                  {isYou ? <span className="niche-badge">You</span> : null}
+                </td>
+                <td>
+                  <TrendBadge label={p.growth.trend.label} />
+                </td>
+                <td className="num">
+                  <Delta value={p.growth.d7.subs} />
+                </td>
+                <td className="num">{formatCompact(p.avgViews)}</td>
+                <td className="num">
+                  {p.bestRecent ? (
+                    <a href={`https://www.youtube.com/watch?v=${p.bestRecent.youtube_video_id}`} target="_blank" rel="noreferrer" title={p.bestRecent.title}>
+                      <Multiplier value={p.bestRecent.multiplier} />
+                    </a>
+                  ) : (
+                    <span className="intel-muted">—</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  );
+}
+
+function GrowthTab({ ws }: { ws: CompetitorWorkspace }) {
+  return (
+    <Card title="Growth" subtitle="From saved snapshots. Trend compares the last 3 days of views with the 4 days before.">
+      <div className="table-wrap">
+        <table className="intel-table">
+          <thead>
+            <tr>
+              <th>Channel</th>
+              <th>Trend</th>
+              <th className="num">Subs 7d</th>
+              <th className="num">Subs 30d</th>
+              <th className="num">Views 7d</th>
+            </tr>
+          </thead>
+          <tbody>
+            {withYou(ws).map(({ p, isYou }) => (
+              <tr key={p.channel.id} data-you={isYou} data-highlight={p.growth.trend.label === "accelerating"}>
+                <td>
+                  <ChannelCell channel={p.channel} href={profileHref(p.channel.youtube_channel_id)} />
+                  {isYou ? <span className="niche-badge">You</span> : null}
+                </td>
+                <td>
+                  <TrendBadge
+                    label={p.growth.trend.label}
+                    title={p.growth.trend.recentDailyViews !== null ? `${formatCompact(p.growth.trend.recentDailyViews)} views/day, was ${formatCompact(p.growth.trend.priorDailyViews)}` : undefined}
+                  />
+                </td>
+                <td className="num"><Delta value={p.growth.d7.subs} pct={p.growth.d7.subsPct} /></td>
+                <td className="num">{p.growth.d30 ? <Delta value={p.growth.d30.subs} /> : <span className="intel-muted">—</span>}</td>
+                <td className="num"><Delta value={p.growth.d7.views} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {ws.competitors.every((p) => p.growth.trend.label === "insufficient") ? (
+        <p className="intel-muted">Growth trends appear after about a week of daily snapshots.</p>
+      ) : null}
+    </Card>
+  );
+}
+
+function ContentTab({ ws }: { ws: CompetitorWorkspace }) {
+  // Your own uploads sit alongside theirs, marked, so you can see how yours land.
+  const mine = ws.you ? ws.you.videos.map((v) => ({ ...v, channel: ws.you!.channel })) : [];
+  const breakouts = [...ws.breakouts, ...mine.filter((v) => (v.multiplier ?? 0) >= 2 && v.ageHours <= 14 * 24)].sort((a, b) => (b.multiplier ?? 0) - (a.multiplier ?? 0));
+  const uploads = [...ws.latestUploads, ...mine.slice(0, 10)].sort((a, b) => Date.parse(b.published_at) - Date.parse(a.published_at));
+  const youId = ws.you?.channel.id;
   return (
     <>
-      <Card
-        title="Channels"
-        subtitle="Tap a channel for its full profile. Everything else is in the tabs."
-        action={
-          <label className="intel-sort">
-            <span className="intel-muted">Sort</span>
-            <span className="intel-sort-links">
-              {SORT_OPTIONS.map((o) => (
-                <Link key={o.key} href={href({ sort: o.key })} className="intel-chip" aria-current={o.key === sort} scroll={false}>
-                  {o.label}
-                </Link>
-              ))}
-            </span>
-          </label>
-        }
-      >
-        <div className="table-wrap">
-          <table className="intel-table">
-            <thead>
-              <tr>
-                <th>Channel</th>
-                <th>Trend</th>
-                <th className="num">Subs 7d</th>
-                <th className="num">Avg views</th>
-                <th className="num">Best recent</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(({ p, isYou }) => (
-                <tr key={p.channel.id} data-you={isYou}>
-                  <td>
-                    <ChannelCell channel={p.channel} href={profileHref(p.channel.youtube_channel_id)} />
-                    {isYou ? <span className="niche-badge">You</span> : null}
-                  </td>
-                  <td>
-                    <TrendBadge label={p.growth.trend.label} />
-                  </td>
-                  <td className="num">
-                    <Delta value={p.growth.d7.subs} />
-                  </td>
-                  <td className="num">{formatCompact(p.avgViews)}</td>
-                  <td className="num">
-                    {p.bestRecent ? (
-                      <a href={`https://www.youtube.com/watch?v=${p.bestRecent.youtube_video_id}`} target="_blank" rel="noreferrer" title={p.bestRecent.title}>
-                        <Multiplier value={p.bestRecent.multiplier} />
-                      </a>
-                    ) : (
-                      <span className="intel-muted">—</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <Card title="Breakouts right now" subtitle="Last 14 days, beating their channel's normal views">
+        {breakouts.length === 0 ? (
+          <p className="intel-muted">No breakouts in the last 14 days.</p>
+        ) : (
+          <ShowMore items={breakouts} first={5} noun="breakouts" render={(items) => (
+          <ul className="dash-list">
+            {items.map((v) => (
+              <li key={v.id} data-you={v.channel.id === youId}>
+                <a href={v.format === "short" ? `https://www.youtube.com/shorts/${v.youtube_video_id}` : `https://www.youtube.com/watch?v=${v.youtube_video_id}`} target="_blank" rel="noreferrer" className="dash-row">
+                  <Multiplier value={v.multiplier} />
+                  <span className="dash-row-main">
+                    <span className="dash-row-title">{v.title}</span>
+                    <span className="dash-row-sub">
+                      {v.channel.id === youId ? "You" : v.channel.title} · {formatCompact(v.view_count)} views · {formatCompact(Math.round(v.vph))}/hr · {timeAgo(v.published_at)}
+                    </span>
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
+          )} />
+        )}
       </Card>
+      <Card title="Latest uploads" subtitle="Highlighted rows are 3× or more their channel's normal views">
+        <ShowMore items={uploads} first={8} noun="uploads" render={(items) => <VideoTable videos={items} showChannel compact />} />
+      </Card>
+    </>
+  );
+}
 
+function InsightsTab({ ws }: { ws: CompetitorWorkspace }) {
+  return (
+    <>
       <Card title="You vs competitors" subtitle={ws.you ? `Compared with the average of ${ws.competitors.length} competitors` : undefined}>
         {!ws.you || !ws.comparison ? (
           <p className="intel-muted">Add your channel in Edit channels to see how you compare.</p>
@@ -377,89 +469,7 @@ function OverviewTab({ ws, sort, href }: { ws: CompetitorWorkspace; sort: SortKe
             </details>
           </>
         )}
-      </Card>
-    </>
-  );
-}
-
-function GrowthTab({ ws }: { ws: CompetitorWorkspace }) {
-  return (
-    <Card title="Growth" subtitle="From saved snapshots. Trend compares the last 3 days of views with the 4 days before.">
-      <div className="table-wrap">
-        <table className="intel-table">
-          <thead>
-            <tr>
-              <th>Channel</th>
-              <th>Trend</th>
-              <th className="num">Subs 7d</th>
-              <th className="num">Subs 30d</th>
-              <th className="num">Views 7d</th>
-            </tr>
-          </thead>
-          <tbody>
-            {ws.competitors.map((p) => (
-              <tr key={p.channel.id} data-highlight={p.growth.trend.label === "accelerating"}>
-                <td>
-                  <ChannelCell channel={p.channel} href={profileHref(p.channel.youtube_channel_id)} />
-                </td>
-                <td>
-                  <TrendBadge
-                    label={p.growth.trend.label}
-                    title={p.growth.trend.recentDailyViews !== null ? `${formatCompact(p.growth.trend.recentDailyViews)} views/day, was ${formatCompact(p.growth.trend.priorDailyViews)}` : undefined}
-                  />
-                </td>
-                <td className="num"><Delta value={p.growth.d7.subs} pct={p.growth.d7.subsPct} /></td>
-                <td className="num">{p.growth.d30 ? <Delta value={p.growth.d30.subs} /> : <span className="intel-muted">—</span>}</td>
-                <td className="num"><Delta value={p.growth.d7.views} /></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      {ws.competitors.every((p) => p.growth.trend.label === "insufficient") ? (
-        <p className="intel-muted">Growth trends appear after about a week of daily snapshots.</p>
-      ) : null}
-    </Card>
-  );
-}
-
-function ContentTab({ ws }: { ws: CompetitorWorkspace }) {
-  return (
-    <>
-      <Card title="Breakouts right now" subtitle="Last 14 days, beating their channel's normal views">
-        {ws.breakouts.length === 0 ? (
-          <p className="intel-muted">No breakouts in the last 14 days.</p>
-        ) : (
-          <ShowMore items={ws.breakouts} first={5} noun="breakouts" render={(items) => (
-          <ul className="dash-list">
-            {items.map((v) => (
-              <li key={v.id}>
-                <a href={v.format === "short" ? `https://www.youtube.com/shorts/${v.youtube_video_id}` : `https://www.youtube.com/watch?v=${v.youtube_video_id}`} target="_blank" rel="noreferrer" className="dash-row">
-                  <Multiplier value={v.multiplier} />
-                  <span className="dash-row-main">
-                    <span className="dash-row-title">{v.title}</span>
-                    <span className="dash-row-sub">
-                      {v.channel.title} · {formatCompact(v.view_count)} views · {formatCompact(Math.round(v.vph))}/hr · {timeAgo(v.published_at)}
-                    </span>
-                  </span>
-                </a>
-              </li>
-            ))}
-          </ul>
-          )} />
-        )}
-      </Card>
-      <Card title="Latest uploads" subtitle="Highlighted rows are 3× or more their channel's normal views">
-        <ShowMore items={ws.latestUploads} first={8} noun="uploads" render={(items) => <VideoTable videos={items} showChannel />} />
-      </Card>
-    </>
-  );
-}
-
-function InsightsTab({ ws }: { ws: CompetitorWorkspace }) {
-  return (
-    <>
-      <Card title="Opportunities" subtitle="Gaps backed by your competitors' results">
+      </Card>      <Card title="Opportunities" subtitle="Gaps backed by your competitors' results">
         {ws.opportunities.length === 0 ? (
           <p className="intel-muted">{ws.you ? "No clear gaps yet. These appear when competitors get strong, repeated results you're not matching." : "Add your channel to find topic, format, and posting gaps."}</p>
         ) : (

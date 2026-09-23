@@ -88,7 +88,16 @@ export function WeeklyBars({ weeks }: { weeks: { weekStart: string; shorts: numb
   );
 }
 
-export function VideoTable({ videos, showChannel = false }: { videos: (ScoredVideo & { channel?: { title: string; youtube_channel_id: string } })[]; showChannel?: boolean }) {
+export function VideoTable({
+  videos,
+  showChannel = false,
+  compact = false,
+}: {
+  videos: (ScoredVideo & { channel?: { title: string; youtube_channel_id: string } })[];
+  showChannel?: boolean;
+  /** Just views and vs avg, for pages that already show a lot. */
+  compact?: boolean;
+}) {
   if (videos.length === 0) return <div className="dash-empty">No stored uploads in this period yet.</div>;
   return (
     <div className="table-wrap">
@@ -97,9 +106,13 @@ export function VideoTable({ videos, showChannel = false }: { videos: (ScoredVid
           <tr>
             <th>Video</th>
             <th className="num">Views</th>
-            <th className="num">Likes</th>
-            <th className="num">Comments</th>
-            <th className="num">Views/hr</th>
+            {compact ? null : (
+              <>
+                <th className="num">Likes</th>
+                <th className="num">Comments</th>
+                <th className="num">Views/hr</th>
+              </>
+            )}
             <th className="num" title="Views relative to the channel's normal performance">vs avg</th>
           </tr>
         </thead>
@@ -126,9 +139,13 @@ export function VideoTable({ videos, showChannel = false }: { videos: (ScoredVid
                 </a>
               </td>
               <td className="num">{formatCompact(v.view_count)}</td>
-              <td className="num">{formatCompact(v.like_count)}</td>
-              <td className="num">{formatCompact(v.comment_count)}</td>
-              <td className="num">{formatCompact(Math.round(v.vph))}</td>
+              {compact ? null : (
+                <>
+                  <td className="num">{formatCompact(v.like_count)}</td>
+                  <td className="num">{formatCompact(v.comment_count)}</td>
+                  <td className="num">{formatCompact(Math.round(v.vph))}</td>
+                </>
+              )}
               <td className="num">
                 <Multiplier value={v.multiplier} />
               </td>

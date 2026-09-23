@@ -9932,3 +9932,79 @@ a.dash-row:hover {
   flex-direction: column;
   text-align: center;
 }
+
+/* Competitors: colour and motion. Each glance card gets its own hue, the page
+   rises in section by section, and your channel's rows are marked in violet. */
+.intel-glance-item {
+  --g: 139, 92, 246;
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(var(--g), 0.28);
+  background: linear-gradient(160deg, rgba(var(--g), 0.16), rgba(var(--g), 0.03) 70%), var(--dash-surface);
+  animation: intel-rise 0.45s var(--ease) both;
+  transition:
+    transform 0.2s var(--ease),
+    border-color 0.2s var(--ease),
+    box-shadow 0.2s var(--ease);
+}
+.intel-glance-item:nth-child(2) { --g: 236, 72, 153; animation-delay: 60ms; }
+.intel-glance-item:nth-child(3) { --g: 52, 211, 153; animation-delay: 120ms; }
+.intel-glance-item:nth-child(4) { --g: 96, 165, 250; animation-delay: 180ms; }
+.intel-glance-item:hover {
+  transform: translateY(-2px);
+  border-color: rgba(var(--g), 0.6);
+  background: linear-gradient(160deg, rgba(var(--g), 0.22), rgba(var(--g), 0.05) 70%), var(--dash-surface);
+  box-shadow: 0 10px 28px -12px rgba(var(--g), 0.55);
+}
+.intel-glance-label { color: rgb(var(--g)); font-weight: 600; }
+
+.intel-tab[aria-current="page"] {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.28), rgba(236, 72, 153, 0.18));
+  box-shadow: 0 0 18px -6px rgba(139, 92, 246, 0.7);
+}
+
+.intel-card {
+  animation: intel-rise 0.45s var(--ease) both;
+  animation-delay: 120ms;
+}
+.intel-card + .intel-card { animation-delay: 200ms; }
+.intel-card + .intel-card + .intel-card { animation-delay: 280ms; }
+
+.intel-table tbody tr,
+.intel .dash-list > li,
+.intel-opps > li {
+  animation: intel-rise 0.35s var(--ease) both;
+}
+.intel-table tbody tr:nth-child(2), .intel .dash-list > li:nth-child(2), .intel-opps > li:nth-child(2) { animation-delay: 40ms; }
+.intel-table tbody tr:nth-child(3), .intel .dash-list > li:nth-child(3), .intel-opps > li:nth-child(3) { animation-delay: 80ms; }
+.intel-table tbody tr:nth-child(4), .intel .dash-list > li:nth-child(4), .intel-opps > li:nth-child(4) { animation-delay: 120ms; }
+.intel-table tbody tr:nth-child(n + 5), .intel .dash-list > li:nth-child(n + 5), .intel-opps > li:nth-child(n + 5) { animation-delay: 160ms; }
+
+.intel-table tr[data-you="true"] td {
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.2), rgba(139, 92, 246, 0.04));
+}
+.intel-table tr[data-you="true"] td:first-child {
+  box-shadow: inset 3px 0 0 #a78bfa;
+}
+.intel .dash-list > li[data-you="true"] .dash-row {
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.16), transparent);
+  box-shadow: inset 3px 0 0 #a78bfa;
+  border-radius: 10px;
+}
+
+.intel-opps > li {
+  border-left: 3px solid rgba(52, 211, 153, 0.7);
+  background: linear-gradient(90deg, rgba(52, 211, 153, 0.08), transparent 60%);
+}
+
+.intel-more > summary { color: var(--accent-text); }
+
+@keyframes intel-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .intel-glance-item, .intel-card, .intel-table tbody tr, .intel .dash-list > li, .intel-opps > li { animation: none; }
+  .intel-glance-item:hover { transform: none; }
+}
