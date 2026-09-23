@@ -9624,35 +9624,49 @@ a.dash-row:hover {
     box-shadow 0.35s var(--ease);
 }
 
-/* A lit top edge, in the plan's own colours. */
-.pricing-card[data-plan="pro"]::before,
-.pricing-card[data-plan="expert"]::before,
-.billing-plan[data-plan="pro"]::before,
-.billing-plan[data-plan="expert"]::before {
-  content: "";
-  position: absolute;
-  inset: 0 18% auto;
-  height: 2px;
-  border-radius: 999px;
-  background: var(--plan-fill);
-  box-shadow: 0 0 18px 2px var(--plan-glow);
-  pointer-events: none;
+/* The whole card takes the plan's colour, strongest at the top. */
+.pricing-card[data-plan="pro"],
+.billing-plan[data-plan="pro"] {
+  --plan-top: rgba(109, 72, 230, 0.34);
+  --plan-bottom: rgba(20, 12, 40, 0.6);
+  --plan-inner: rgba(139, 92, 246, 0.1);
+  --plan-button: linear-gradient(180deg, #9b6dff, #7c4dff);
+  --plan-button-text: #fff;
 }
 
-/* A soft halo behind the card that breathes. */
-.pricing-card[data-plan="pro"]::after,
-.pricing-card[data-plan="expert"]::after,
-.billing-plan[data-plan="pro"]::after,
-.billing-plan[data-plan="expert"]::after {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  z-index: -1;
-  border-radius: inherit;
-  background: radial-gradient(120% 60% at 50% 0%, var(--plan-glow), transparent 70%);
-  opacity: 0.55;
-  pointer-events: none;
-  animation: plan-breathe 4.5s ease-in-out infinite;
+.pricing-card[data-plan="expert"],
+.billing-plan[data-plan="expert"] {
+  --plan-top: rgba(20, 170, 190, 0.3);
+  --plan-bottom: rgba(4, 26, 32, 0.6);
+  --plan-inner: rgba(34, 211, 238, 0.08);
+  --plan-button: linear-gradient(180deg, #3ee0f5, #14b8a6);
+  --plan-button-text: #03151a;
+}
+
+.pricing-card[data-plan="pro"],
+.pricing-card[data-plan="expert"],
+.billing-plan[data-plan="pro"],
+.billing-plan[data-plan="expert"] {
+  background: linear-gradient(180deg, var(--plan-top), var(--plan-bottom) 75%);
+  border: 1px solid var(--plan-edge);
+}
+
+/* Boxes inside the card pick up the tint instead of sitting grey on top of it. */
+.billing-plan[data-plan="pro"] .billing-plan-credits,
+.billing-plan[data-plan="expert"] .billing-plan-credits {
+  background: var(--plan-inner);
+  border-color: var(--plan-edge);
+}
+
+/* The button is the plan's colour, and glows like the card. */
+.billing-plan[data-plan="pro"] .billing-plan-cta:not(:disabled),
+.billing-plan[data-plan="expert"] .billing-plan-cta:not(:disabled),
+.pricing-card[data-plan="pro"] .pricing-cta,
+.pricing-card[data-plan="expert"] .pricing-cta {
+  background: var(--plan-button);
+  color: var(--plan-button-text);
+  border-color: transparent;
+  box-shadow: 0 8px 26px -8px var(--plan-glow), inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
 .pricing-card[data-plan="pro"]:hover,
@@ -9670,16 +9684,6 @@ a.dash-row:hover {
 .billing-plan[data-current="true"][data-plan="pro"],
 .billing-plan[data-current="true"][data-plan="expert"] {
   border-color: var(--plan);
-}
-
-@keyframes plan-breathe {
-  0%,
-  100% {
-    opacity: 0.4;
-  }
-  50% {
-    opacity: 0.75;
-  }
 }
 
 /* --- Sidebar --- */
@@ -9788,8 +9792,6 @@ a.dash-row:hover {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pricing-card[data-plan]::after,
-  .billing-plan[data-plan]::after,
   .nav-link[aria-current="page"]::before {
     animation: none;
   }
