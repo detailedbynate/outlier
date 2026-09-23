@@ -12,6 +12,7 @@ import { parseNicheQuery } from "@/lib/niches/query";
 import type { NicheCreator, NicheExample } from "@/lib/niches/examples";
 import { reasonFor, type NicheIdea, type NicheResult } from "@/lib/services/niche-service";
 import { asUser } from "@/lib/youtube/quota-context";
+import { TopicInput } from "./topic-input";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -72,7 +73,7 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
           <label htmlFor="topic" className="sr-only">
             Topic
           </label>
-          <input id="topic" name="topic" type="search" defaultValue={asked} placeholder="Try “good niches around fitness” or “top niches”" maxLength={120} autoComplete="off" required />
+          <TopicInput key={asked} defaultValue={asked} />
           <button type="submit">Research</button>
         </form>
         {result ? null : (
