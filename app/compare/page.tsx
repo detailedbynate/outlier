@@ -272,74 +272,132 @@ function Glance({ ws, href }: { ws: CompetitorWorkspace; href: Href }) {
 function OverviewTab({ ws, sort, href }: { ws: CompetitorWorkspace; sort: SortKey; href: Href }) {
   const rows = withYou(ws);
   return (
-    <Card
-      title="Channels"
-      subtitle="Tap a channel for its full profile"
-      action={
-        <div className="intel-card-actions">
-        <label className="intel-more-toggle intel-chip">
-          <input type="checkbox" />
-          <span>More stats</span>
-        </label>
-        <label className="intel-sort">
-          <span className="intel-muted">Sort</span>
-          <span className="intel-sort-links">
-            {SORT_OPTIONS.filter((o) => QUICK_SORTS.includes(o.key) || o.key === sort).map((o) => (
-              <Link key={o.key} href={href({ sort: o.key })} className="intel-chip" aria-current={o.key === sort} scroll={false}>
-                {o.label}
-              </Link>
-            ))}
-          </span>
-        </label>
-        </div>
-      }
-    >
-      <div className="table-wrap">
-        <table className="intel-table">
-          <thead>
-            <tr>
-              <th>Channel</th>
-              <th>Trend</th>
-              <th className="num">Subs 7d</th>
-              <th className="num">Avg views</th>
-              <th className="num intel-extra">Views 7d</th>
-              <th className="num intel-extra">Uploads/wk</th>
-              <th className="num intel-extra">Outlier rate</th>
-              <th className="num">Best recent</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map(({ p, isYou }) => (
-              <tr key={p.channel.id} data-you={isYou}>
-                <td>
-                  <ChannelCell channel={p.channel} href={profileHref(p.channel.youtube_channel_id)} />
-                  {isYou ? <span className="niche-badge">You</span> : null}
-                </td>
-                <td>
-                  <TrendBadge label={p.growth.trend.label} />
-                </td>
-                <td className="num">
-                  <Delta value={p.growth.d7.subs} />
-                </td>
-                <td className="num">{formatCompact(p.avgViews)}</td>
-                <td className="num intel-extra">{formatCompact(p.recentViews)}</td>
-                <td className="num intel-extra">{p.uploadsPerWeek.toFixed(1)}</td>
-                <td className="num intel-extra">{formatPercent(p.outlierRate, 0)}</td>
-                <td className="num">
-                  {p.bestRecent ? (
-                    <a href={`https://www.youtube.com/watch?v=${p.bestRecent.youtube_video_id}`} target="_blank" rel="noreferrer" title={p.bestRecent.title}>
-                      <Multiplier value={p.bestRecent.multiplier} />
-                    </a>
-                  ) : (
-                    <span className="intel-muted">—</span>
-                  )}
-                </td>
+    <>
+      <Card
+        title="Channels"
+        subtitle="Tap a channel for its full profile"
+        action={
+          <div className="intel-card-actions">
+          <label className="intel-more-toggle intel-chip">
+            <input type="checkbox" />
+            <span>More stats</span>
+          </label>
+          <label className="intel-sort">
+            <span className="intel-muted">Sort</span>
+            <span className="intel-sort-links">
+              {SORT_OPTIONS.filter((o) => QUICK_SORTS.includes(o.key) || o.key === sort).map((o) => (
+                <Link key={o.key} href={href({ sort: o.key })} className="intel-chip" aria-current={o.key === sort} scroll={false}>
+                  {o.label}
+                </Link>
+              ))}
+            </span>
+          </label>
+          </div>
+        }
+      >
+        <div className="table-wrap">
+          <table className="intel-table">
+            <thead>
+              <tr>
+                <th>Channel</th>
+                <th>Trend</th>
+                <th className="num">Subs 7d</th>
+                <th className="num">Avg views</th>
+                <th className="num intel-extra">Views 7d</th>
+                <th className="num intel-extra">Uploads/wk</th>
+                <th className="num intel-extra">Outlier rate</th>
+                <th className="num">Best recent</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </Card>
+            </thead>
+            <tbody>
+              {rows.map(({ p, isYou }) => (
+                <tr key={p.channel.id} data-you={isYou}>
+                  <td>
+                    <ChannelCell channel={p.channel} href={profileHref(p.channel.youtube_channel_id)} />
+                    {isYou ? <span className="niche-badge">You</span> : null}
+                  </td>
+                  <td>
+                    <TrendBadge label={p.growth.trend.label} />
+                  </td>
+                  <td className="num">
+                    <Delta value={p.growth.d7.subs} />
+                  </td>
+                  <td className="num">{formatCompact(p.avgViews)}</td>
+                  <td className="num intel-extra">{formatCompact(p.recentViews)}</td>
+                  <td className="num intel-extra">{p.uploadsPerWeek.toFixed(1)}</td>
+                  <td className="num intel-extra">{formatPercent(p.outlierRate, 0)}</td>
+                  <td className="num">
+                    {p.bestRecent ? (
+                      <a href={`https://www.youtube.com/watch?v=${p.bestRecent.youtube_video_id}`} target="_blank" rel="noreferrer" title={p.bestRecent.title}>
+                        <Multiplier value={p.bestRecent.multiplier} />
+                      </a>
+                    ) : (
+                      <span className="intel-muted">—</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+      <Card title="You vs competitors" subtitle={ws.you ? `Compared with the average of ${ws.competitors.length} competitors` : undefined}>
+        {!ws.you || !ws.comparison ? (
+          <p className="intel-muted">Add your channel in Edit channels to see how you compare.</p>
+        ) : (
+          <>
+            {ws.comparison.insights.length > 0 ? (
+              <ul className="intel-insights">
+                {ws.comparison.insights.map((s) => (
+                  <li key={s}>{s}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="intel-muted">Not enough shared data yet to draw clear differences.</p>
+            )}
+            <details className="intel-more">
+              <summary>Full comparison</summary>
+              <div className="table-wrap">
+                <table className="intel-table intel-compare">
+                  <thead>
+                    <tr>
+                      <th>Metric</th>
+                      <th className="num">You</th>
+                      <th className="num">Avg</th>
+                      <th className="num">Diff</th>
+                      {ws.competitors.map((c) => (
+                        <th key={c.channel.id} className="num" title={c.channel.title}>
+                          {c.channel.title.length > 12 ? `${c.channel.title.slice(0, 11)}…` : c.channel.title}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ws.comparison.rows.map((row) => (
+                      <tr key={row.key}>
+                        <th scope="row">{row.label}</th>
+                        <td className="num">
+                          <strong>{formatRowValue(row.you, row.kind)}</strong>
+                        </td>
+                        <td className="num">{formatRowValue(row.competitorAvg, row.kind)}</td>
+                        <td className="num">
+                          <Diff value={row.diff} />
+                        </td>
+                        {row.perCompetitor.map((c) => (
+                          <td key={c.channelId} className="num">
+                            {formatRowValue(c.value, row.kind)}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </details>
+          </>
+        )}
+      </Card>
+    </>
   );
 }
 
@@ -426,62 +484,7 @@ function ContentTab({ ws }: { ws: CompetitorWorkspace }) {
 function InsightsTab({ ws }: { ws: CompetitorWorkspace }) {
   return (
     <>
-      <Card title="You vs competitors" subtitle={ws.you ? `Compared with the average of ${ws.competitors.length} competitors` : undefined}>
-        {!ws.you || !ws.comparison ? (
-          <p className="intel-muted">Add your channel in Edit channels to see how you compare.</p>
-        ) : (
-          <>
-            {ws.comparison.insights.length > 0 ? (
-              <ul className="intel-insights">
-                {ws.comparison.insights.map((s) => (
-                  <li key={s}>{s}</li>
-                ))}
-              </ul>
-            ) : (
-              <p className="intel-muted">Not enough shared data yet to draw clear differences.</p>
-            )}
-            <details className="intel-more">
-              <summary>Full comparison</summary>
-              <div className="table-wrap">
-                <table className="intel-table intel-compare">
-                  <thead>
-                    <tr>
-                      <th>Metric</th>
-                      <th className="num">You</th>
-                      <th className="num">Avg</th>
-                      <th className="num">Diff</th>
-                      {ws.competitors.map((c) => (
-                        <th key={c.channel.id} className="num" title={c.channel.title}>
-                          {c.channel.title.length > 12 ? `${c.channel.title.slice(0, 11)}…` : c.channel.title}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ws.comparison.rows.map((row) => (
-                      <tr key={row.key}>
-                        <th scope="row">{row.label}</th>
-                        <td className="num">
-                          <strong>{formatRowValue(row.you, row.kind)}</strong>
-                        </td>
-                        <td className="num">{formatRowValue(row.competitorAvg, row.kind)}</td>
-                        <td className="num">
-                          <Diff value={row.diff} />
-                        </td>
-                        {row.perCompetitor.map((c) => (
-                          <td key={c.channelId} className="num">
-                            {formatRowValue(c.value, row.kind)}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </details>
-          </>
-        )}
-      </Card>      <Card title="Opportunities" subtitle="Gaps backed by your competitors' results">
+      <Card title="Opportunities" subtitle="Gaps backed by your competitors' results">
         {ws.opportunities.length === 0 ? (
           <p className="intel-muted">{ws.you ? "No clear gaps yet. These appear when competitors get strong, repeated results you're not matching." : "Add your channel to find topic, format, and posting gaps."}</p>
         ) : (
