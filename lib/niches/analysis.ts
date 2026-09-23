@@ -1,6 +1,6 @@
 import { NICHE_DICTIONARY } from "./dictionary";
 import { creatorsFor, examplesFor, type NicheCreator, type NicheExample } from "./examples";
-import { canonicalNiche, displayNicheName, isUsefulNiche, nicheKey, normalizeName } from "./naming";
+import { BROAD_TERMS, canonicalNiche, displayNicheName, isSharedFragment, isUsefulNiche, knownSpan, nicheKey, normalizeName } from "./naming";
 
 /**
  * Niche analysis from stored videos and channels. Pure functions, no I/O:
@@ -184,8 +184,11 @@ export function discoverSubNiches(
 
   const minVideos = Math.max(3, Math.ceil(videos.length * 0.02));
   const titlesById = new Map(videos.map((v) => [v.id, v.title]));
+  const tokensById = new Map(videos.map((v) => [v.id, tokenize(v.title).filter((w) => !exclude.has(w))]));
   const candidates = [...byTerm.entries()]
     .filter(([term, e]) => e.videos.size >= minVideos && e.channels.size >= 2 && !isTopicVariant(term))
+    // "cats" in Battle Cats uploads is really "battle cats": finish the phrase the titles use.
+    .map(([term, e]): [string, typeof e] => [completePhrase(term, e.videos, tokensById), e])
     // A term dominating the whole sample is a synonym of the topic, not a sub-niche.
     .filter(([, e]) => e.videos.size <= videos.length * 0.8)
     // "update" and "lore" are what these uploads say, not what they are about.
@@ -209,6 +212,46 @@ export function discoverSubNiches(
     chosen.push({ term: name, videoIds: candidate.videoIds });
   }
   return chosen;
+}
+
+/**
+ * The fuller phrase a mined term stands for. When most of the titles that use
+ * a term put the same word before or after it, that word is part of the name:
+ * "cats" -> "battle cats", "unboxing super" -> "unboxing super mario".
+ * A phrase that is already a known name only grows into a longer one.
+ */
+export function completePhrase(term: string, videoIds: ReadonlySet<string>, tokensById: ReadonlyMap<string, readonly string[]>, maxWords = 4): string {
+  let words = term.split(" ");
+  while (words.length < maxWords) {
+    let found = 0;
+    const before = new Map<string, number>();
+    const after = new Map<string, number>();
+    for (const id of videoIds) {
+      const tokens = tokensById.get(id) ?? [];
+      const at = tokens.findIndex((_, i) => words.every((w, j) => tokens[i + j] === w));
+      if (at < 0) continue;
+      found += 1;
+      const prev = tokens[at - 1];
+      const next = tokens[at + words.length];
+      if (prev) before.set(prev, (before.get(prev) ?? 0) + 1);
+      if (next) after.set(next, (after.get(next) ?? 0) + 1);
+    }
+    const best = [...[...before].map(([w, n]) => ({ w, n, side: "before" as const })), ...[...after].map(([w, n]) => ({ w, n, side: "after" as const }))]
+      .filter((c) => c.n >= 3 && c.n / Math.max(found, 1) >= 0.6)
+      .sort((a, b) => b.n - a.n)[0];
+    if (!best) break;
+    const next = best.side === "before" ? [best.w, ...words] : [...words, best.w];
+    // Once the phrase names something known, only a longer known name is worth
+    // growing into ("cats" -> "battle cats"); anything else is title filler.
+    const span = knownSpan(words.join(" "));
+    // A shared fragment ("super") is always half a name, so it keeps growing.
+    const grows = knownSpan(next.join(" ")) > span;
+    if (span > 0 && !isSharedFragment(best.w) && !grows) break;
+    // Filler ("guide", "battle") only joins when it completes a known name.
+    if (BROAD_TERMS.has(best.w) && !grows) break;
+    words = next;
+  }
+  return words.join(" ");
 }
 
 const median = (values: number[]): number => {
@@ -366,7 +409,11 @@ export function computeNicheMetrics(videos: readonly NicheVideo[], channels: Rea
   };
 }
 
+/** Bumped when naming or metrics change, so saved reports are rebuilt instead of shown stale. */
+export const NICHE_REPORT_VERSION = 2;
+
 export interface NicheReport {
+  version?: number;
   topic: string;
   overall: NicheMetrics;
   subNiches: SubNiche[];
@@ -388,5 +435,5 @@ export function buildNicheReport(topic: string, videos: readonly NicheVideo[], c
       };
     })
     .sort((a, b) => b.metrics.opportunity - a.metrics.opportunity);
-  return { topic, overall: computeNicheMetrics(videos, channels, now), subNiches };
+  return { version: NICHE_REPORT_VERSION, topic, overall: computeNicheMetrics(videos, channels, now), subNiches };
 }

@@ -292,3 +292,22 @@ describe("sub-niches and topic aliases", () => {
     expect(terms.join(" ")).toMatch(/wubbox|island|breeding/);
   });
 });
+
+describe("niche names from partial phrases", () => {
+  it("finishes a phrase the titles always use, and names it after the game", () => {
+    const rows: NicheVideo[] = [];
+    for (const ch of ["a", "b", "c"]) {
+      for (let i = 0; i < 3; i++) {
+        rows.push(video({ channel: ch, title: `Battle Cats new banner ${i}`, published_at: daysAgo(3 + i) }));
+        rows.push(video({ channel: ch, title: `Unboxing Super Mario figure ${i}`, published_at: daysAgo(4 + i) }));
+      }
+      rows.push(video({ channel: ch, title: "random stream", published_at: daysAgo(9) }));
+    }
+    const terms = discoverSubNiches(rows, "toys").map((s) => s.term);
+    expect(terms).toContain("The Battle Cats");
+    // "Unboxing Super" never shows; the game (or the full phrase) does.
+    expect(terms.some((t) => t === "Super Mario" || t === "Super Mario Unboxing")).toBe(true);
+    expect(terms).not.toContain("Cats");
+    expect(terms.some((t) => /^Unboxing Super$/i.test(t))).toBe(false);
+  });
+});

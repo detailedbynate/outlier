@@ -7,7 +7,7 @@ import type { NicheRepository } from "@/lib/database/repositories/niches";
 import type { UsageRepository } from "@/lib/database/repositories/usage";
 import { videoToRow, type VideoRepository } from "@/lib/database/repositories/videos";
 import type { EnqueueOptions } from "@/lib/jobs/queue";
-import { buildNicheReport, tokenize, topicKey, type Level, type NicheReport } from "@/lib/niches/analysis";
+import { buildNicheReport, NICHE_REPORT_VERSION, tokenize, topicKey, type Level, type NicheReport } from "@/lib/niches/analysis";
 import { canonicalNiche } from "@/lib/niches/naming";
 import { findUnderratedNiches, underratedWindow, type NicheCreator, type NicheExample } from "@/lib/niches/underrated";
 import { isQuotaUnavailable } from "@/lib/youtube/quota-manager";
@@ -537,6 +537,6 @@ Given a topic someone typed, return:
 Example for "stoicism": queries ["stoic philosophy", "marcus aurelius lessons"], related ["stoic", "marcus aurelius", "seneca"].`;
 
 function isReport(value: unknown): value is NicheReport {
-  // Reports from before monthly views and viral channels existed are rebuilt rather than shown half-empty.
-  return typeof value === "object" && value !== null && "overall" in value && "subNiches" in value && typeof value.overall === "object" && value.overall !== null && "monthlyViews" in value.overall;
+  // Reports built before the current naming and metrics are rebuilt rather than shown stale.
+  return typeof value === "object" && value !== null && "subNiches" in value && (value as { version?: number }).version === NICHE_REPORT_VERSION;
 }

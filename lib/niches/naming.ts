@@ -95,9 +95,46 @@ export function nicheKey(term: string): string {
   return normalizeName(base).split(" ").map(singular).join("").toLowerCase();
 }
 
-/** What a mined term should be called on screen. */
+/** How many words of the longest known name inside a phrase: 2 for "battle cats", 1 for "mario", 0 for "unboxing super". */
+export function knownSpan(term: string): number {
+  const words = normalizeName(term).split(" ").filter(Boolean);
+  for (let size = words.length; size >= 1; size--) {
+    for (let start = 0; start + size <= words.length; start++) {
+      const phrase = words.slice(start, start + size).join(" ");
+      if (BY_PHRASE.has(phrase) || (size === 1 && canonicalNiche(phrase))) return size;
+    }
+  }
+  return 0;
+}
+
+/**
+ * The longest known name inside a phrase, with the words around it:
+ * "unboxing super mario" -> Super Mario, rest ["unboxing"].
+ */
+export function knownNameIn(term: string): { name: string; rest: string[] } | null {
+  const words = normalizeName(term).split(" ").filter(Boolean);
+  for (let size = words.length; size >= 2; size--) {
+    for (let start = 0; start + size <= words.length; start++) {
+      const name = BY_PHRASE.get(words.slice(start, start + size).join(" "));
+      if (name) return { name, rest: [...words.slice(0, start), ...words.slice(start + size)] };
+    }
+  }
+  return null;
+}
+
+/**
+ * What a mined term should be called on screen. A phrase built around a known
+ * name leads with it: "unboxing super mario" is "Super Mario Unboxing".
+ */
 export function displayNicheName(term: string): string {
-  return canonicalNiche(term) ?? titleCaseNiche(term);
+  const exact = canonicalNiche(term);
+  if (exact) return exact;
+  const known = knownNameIn(term);
+  if (known) {
+    const rest = known.rest;
+    return rest.length ? `${known.name} ${titleCaseNiche(rest.join(" "))}` : known.name;
+  }
+  return titleCaseNiche(term);
 }
 
 /**
@@ -154,9 +191,13 @@ export const BROAD_TERMS = new Set(
     "process idea ideas thing things stuff part parts level levels mode modes collab collabs version episode series content creator creators " +
     // Words that fill gaming titles without naming anything: from real reports where they beat the actual niche.
     "lore playthrough walkthrough online offline fan fans secret secrets glitch boss fight battle win wins lose noob pro rank ranked " +
-    "getting hilarious funniest simulation indie gameplay stream streamer highlights run runs lets play plays playing " +
+    "getting random hilarious funniest simulation indie gameplay stream streamer highlights run runs lets play plays playing " +
     // Words a game's own uploads repeat without naming a niche inside it.
-    "community event events chapter chapters season seasons patch patches character characters item items skin skins quest quests"
+    "community event events chapter chapters season seasons patch patches character characters item items skin skins quest quests " +
+    // Sizes, ranks and hype: capitalized in titles ("Major Update") but never the niche.
+    "minor major mini mega giant huge tiny small big bigger biggest little new old final ultimate epic rare legendary mythic mythical exclusive " +
+    "hidden special super ultra extreme max maxed perfect official unofficial original classic free cheap expensive easy hard hardest impossible " +
+    "insane powerful strongest weakest fastest slowest longest shortest weird strange scary cursed ranking tier list tierlist"
   ).split(/\s+/),
 );
 
@@ -191,6 +232,9 @@ export function isUsefulNiche(term: string, context: NicheTermContext = {}): boo
   if (context.labeled?.has(term) || canonicalNiche(key)) return true;
 
   const words = key.split(" ");
+  // A phrase that starts or stops halfway through a name ("unboxing super") is a fragment.
+  if (words.length > 1 && [words[0]!, words.at(-1)!].some((word) => isSharedFragment(word))) return false;
+  if (knownNameIn(key)) return true;
   if (words.some((word) => BROAD_TERMS.has(word))) return false;
   if (isSharedFragment(key)) return false;
   // All fragments and no real word: "pok mon" is what a stripped accent used to
@@ -202,5 +246,6 @@ export function isUsefulNiche(term: string, context: NicheTermContext = {}): boo
   if (words.length > 1) return true;
   const word = words[0]!;
   if (word.length < 4) return false;
-  return context.titles ? readsLikeAName(word, context.titles) : false;
+  // A name is capitalized nearly everywhere; filler like "Minor" only in hype titles.
+  return context.titles ? readsLikeAName(word, context.titles, 0.8) : false;
 }
