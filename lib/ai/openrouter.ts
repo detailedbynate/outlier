@@ -49,6 +49,26 @@ function stripCodeFence(text: string): string {
 }
 
 /**
+ * The JSON in a free model's reply. Asked for a schema, some still say
+ * "Here are the labels:" first, leave <think> notes in, or fence it halfway
+ * down, and every batch like that used to be thrown away whole.
+ */
+export function extractJson(text: string): string {
+  const cleaned = stripCodeFence(text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim());
+  try {
+    JSON.parse(cleaned);
+    return cleaned;
+  } catch {
+    // Fall through to looking for it.
+  }
+  const fenced = cleaned.match(/`{3}(?:json)?\s*\n([\s\S]*?)`{3}/i);
+  if (fenced) return fenced[1]!.trim();
+  const start = cleaned.search(/[[{]/);
+  const end = Math.max(cleaned.lastIndexOf("}"), cleaned.lastIndexOf("]"));
+  return start >= 0 && end > start ? cleaned.slice(start, end + 1) : cleaned;
+}
+
+/**
  * OpenRouter's OpenAI-compatible chat API, mainly for its free models as a
  * backup when Gemini's free tier runs out. Structured answers are validated
  * with Zod because not every model honors the JSON schema exactly.
@@ -78,9 +98,11 @@ export class OpenRouterTextProvider implements TextProvider {
     const { text, model, usage } = await this.send(request, { name: request.schemaName, schema: jsonSchemaFor(request.schema) });
     let parsed: unknown;
     try {
-      parsed = JSON.parse(stripCodeFence(text));
+      parsed = JSON.parse(extractJson(text));
     } catch {
-      throw new AppError("UPSTREAM_ERROR", `${request.schemaName}: the model returned invalid JSON.`, { retryable: true });
+      // The ends of the reply say which way it went wrong: a preamble, a cut-off, or prose.
+      const sample = { model, length: text.length, start: text.slice(0, 160), end: text.slice(-160) };
+      throw new AppError("UPSTREAM_ERROR", `${request.schemaName}: the model returned invalid JSON.`, { details: sample, retryable: true });
     }
     const result = request.schema.safeParse(parsed);
     if (!result.success) {

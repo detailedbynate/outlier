@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { FallbackTextProvider } from "@/lib/ai/fallback";
-import { MAX_OPENROUTER_MODELS, OpenRouterTextProvider, OpenRouterUnavailableError } from "@/lib/ai/openrouter";
+import { extractJson, MAX_OPENROUTER_MODELS, OpenRouterTextProvider, OpenRouterUnavailableError } from "@/lib/ai/openrouter";
 import type { TextProvider } from "@/lib/ai/types";
 import { isAppError } from "@/lib/core/errors";
 
@@ -91,5 +91,19 @@ describe("FallbackTextProvider", () => {
     const boom = new OpenRouterUnavailableError(429, "all busy");
     const chain = new FallbackTextProvider([provider("a", vi.fn(async () => Promise.reject(new Error("first")))), provider("b", vi.fn(async () => Promise.reject(boom)))]);
     await expect(chain.generateObject(request)).rejects.toBe(boom);
+  });
+});
+
+describe("extractJson", () => {
+  const fence = "`".repeat(3);
+  it.each([
+    ["plain", '{"a":1}'],
+    ["fenced", `${fence}json\n{"a":1}\n${fence}`],
+    ["a preamble first", 'Here are the labels:\n{"a":1}'],
+    ["thinking left in", '<think>they want labels</think>\n{"a":1}'],
+    ["a fence halfway down", `Sure.\n${fence}json\n{"a":1}\n${fence}\nHope that helps!`],
+    ["trailing commentary", '{"a":1}\n\nLet me know if you need more.'],
+  ])("finds the JSON with %s", (_name, reply) => {
+    expect(JSON.parse(extractJson(reply))).toEqual({ a: 1 });
   });
 });
