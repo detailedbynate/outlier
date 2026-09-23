@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { CreditsMeter } from "@/components/credits-meter";
+import { CreditsMeter, type SidebarPlan } from "@/components/credits-meter";
 import { LowCreditsPrompt } from "@/components/low-credits-prompt";
 import { LOW_CREDITS_THRESHOLD } from "@/lib/services/credits-service";
 import { BrandMark, LogOutIcon } from "@/components/icons";
@@ -61,7 +61,12 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     );
   }
 
-  const credits = await getServices().credits.status(current.user.id);
+  const [credits, subscription] = await Promise.all([
+    getServices().credits.status(current.user.id),
+    // A plan lookup that fails shouldn't take the sidebar down; the chip just doesn't show.
+    current.isOwner ? null : getServices().subscriptions.stateFor(current.user.id).catch(() => null),
+  ]);
+  const plan: SidebarPlan | undefined = current.isOwner ? "owner" : subscription ? subscription.plan.id : undefined;
 
   return (
     <html lang="en" className={geist.variable}>
@@ -74,7 +79,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             <div id="app-sidebar-menu" className="sidebar-menu">
             <SidebarNav isAdmin={current.isAdmin} isOwner={current.isOwner} />
             <div className="sidebar-foot">
-              <CreditsMeter status={credits} />
+              <CreditsMeter status={credits} plan={plan} />
               <form action={signOut} className="sidebar-account">
                 <span className="account-avatar" aria-hidden="true">
                   {current.email.slice(0, 1).toUpperCase()}

@@ -3,7 +3,22 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ComponentType } from "react";
-import { BookmarkIcon, ChartIcon, CoinsIcon, CompassIcon, FlameIcon, GridIcon, PenIcon, ShortsIcon, SlidersIcon, UsersIcon } from "./icons";
+import {
+  BookmarkIcon,
+  ChartIcon,
+  ClipboardIcon,
+  CoinsIcon,
+  CompassIcon,
+  FlameIcon,
+  GiftIcon,
+  GridIcon,
+  LockIcon,
+  PenIcon,
+  ShortsIcon,
+  SlidersIcon,
+  TargetIcon,
+  UsersIcon,
+} from "./icons";
 
 interface NavItem {
   href: string;
@@ -19,7 +34,7 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
   {
     title: "Research tools",
     items: [
-      { href: "/research/niche-finder", label: "Niche Finder", icon: CompassIcon, badge: "New" },
+      { href: "/research/niche-finder", label: "Niche Finder", icon: CompassIcon },
       { href: "/research/shorts-channels", label: "Shorts Channels", icon: ShortsIcon },
       { href: "/viral", label: "Viral Videos", icon: FlameIcon },
       { href: "/analyze", label: "Analyze Video", icon: ChartIcon },
@@ -30,7 +45,7 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
     title: "Library",
     items: [
       { href: "/channels", label: "Tracked Channels", icon: BookmarkIcon },
-      { href: "/compare", label: "Competitors", icon: UsersIcon, badge: "New" },
+      { href: "/compare", label: "Competitors", icon: TargetIcon },
     ],
   },
   {
@@ -38,7 +53,7 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
     items: [
       { href: "/billing", label: "Plans & credits", icon: CoinsIcon },
       { href: "/settings/preferences", label: "Preferences", icon: SlidersIcon },
-      { href: "/referrals", label: "Refer friends", icon: UsersIcon, badge: "Earn" },
+      { href: "/referrals", label: "Refer friends", icon: GiftIcon, badge: "Earn" },
     ],
   },
 ];
@@ -51,7 +66,7 @@ const ADMIN_SECTION: { title: string; items: NavItem[] } = {
   title: "Admin",
   items: [
     { href: "/admin/accounts", label: "Accounts", icon: UsersIcon },
-    { href: "/admin/waitlist", label: "Waitlist", icon: UsersIcon },
+    { href: "/admin/waitlist", label: "Waitlist", icon: ClipboardIcon },
   ],
 };
 
@@ -68,7 +83,7 @@ export function SidebarNav({ isAdmin = false, isOwner = false }: { isAdmin?: boo
             const Icon = item.icon;
             // Locked items say so in their own colour: this is about access, not novelty.
             const locked = item.ownerOnly === true && !isOwner;
-            const badge = locked ? "Coming soon" : item.badge;
+            const badge = locked ? "Soon" : item.badge;
             return (
               <Link key={item.href} href={item.href} className="nav-link" aria-current={active ? "page" : undefined}>
                 <span className="nav-icon">
@@ -76,7 +91,8 @@ export function SidebarNav({ isAdmin = false, isOwner = false }: { isAdmin?: boo
                 </span>
                 <span className="nav-label">{item.label}</span>
                 {badge ? (
-                  <span className="nav-badge" data-variant={locked ? "soon" : undefined}>
+                  <span className="nav-badge" data-variant={locked ? "soon" : undefined} title={locked ? "Coming soon" : undefined}>
+                    {locked ? <LockIcon size={10} /> : null}
                     {badge}
                   </span>
                 ) : null}

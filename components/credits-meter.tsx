@@ -10,8 +10,28 @@ function resetsIn(resetsAt: string, now: Date = new Date()): string {
   return h > 0 ? `${h}h ${minutes % 60}m` : `${minutes}m`;
 }
 
+/** Which plan they're on, where they'll see it every page. Free gets the way up instead. */
+export type SidebarPlan = "owner" | "free" | "pro" | "expert";
+
+const PLAN_LABEL: Record<SidebarPlan, string> = { owner: "Owner", free: "Free", pro: "Pro", expert: "Expert" };
+
+function PlanChip({ plan }: { plan: SidebarPlan }) {
+  if (plan === "free") {
+    return (
+      <Link href="/billing" className="plan-chip" data-plan="free">
+        Upgrade
+      </Link>
+    );
+  }
+  return (
+    <span className="plan-chip" data-plan={plan}>
+      {PLAN_LABEL[plan]}
+    </span>
+  );
+}
+
 /** Sidebar widget: this month's credit usage, extra credits, and where to buy more. */
-export function CreditsMeter({ status }: { status: CreditStatus }) {
+export function CreditsMeter({ status, plan }: { status: CreditStatus; plan?: SidebarPlan }) {
   // Owner accounts have an effectively unlimited allowance.
   if (status.limit >= 1_000_000) {
     return (
@@ -21,6 +41,7 @@ export function CreditsMeter({ status }: { status: CreditStatus }) {
             <CoinsIcon size={15} />
           </span>
           <span className="credits-title">Credits</span>
+          {plan ? <PlanChip plan={plan} /> : null}
         </div>
         <div className="credits-value">
           <strong>Unlimited</strong>
@@ -37,6 +58,7 @@ export function CreditsMeter({ status }: { status: CreditStatus }) {
           <CoinsIcon size={15} />
         </span>
         <span className="credits-title">Credits</span>
+        {plan ? <PlanChip plan={plan} /> : null}
       </div>
       <div className="credits-value">
         <strong>{status.remaining}</strong>

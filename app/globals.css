@@ -9594,3 +9594,206 @@ a.dash-row:hover {
 .sw-ask {
   color: var(--warning);
 }
+
+/* --- Paid plans glow: landing pricing and /billing --- */
+
+.pricing-card[data-plan="pro"],
+.billing-plan[data-plan="pro"] {
+  --plan-glow: rgba(139, 92, 246, 0.35);
+}
+
+.pricing-card[data-plan="expert"],
+.billing-plan[data-plan="expert"] {
+  --plan-glow: rgba(34, 211, 238, 0.3);
+}
+
+.pricing-card[data-plan="pro"],
+.pricing-card[data-plan="expert"],
+.billing-plan[data-plan="pro"],
+.billing-plan[data-plan="expert"] {
+  position: relative;
+  isolation: isolate;
+  box-shadow:
+    0 0 0 1px var(--plan-edge),
+    0 18px 50px -18px var(--plan-glow),
+    0 0 40px -12px var(--plan-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transition:
+    transform 0.25s var(--ease),
+    border-color 0.25s var(--ease),
+    box-shadow 0.35s var(--ease);
+}
+
+/* A lit top edge, in the plan's own colours. */
+.pricing-card[data-plan="pro"]::before,
+.pricing-card[data-plan="expert"]::before,
+.billing-plan[data-plan="pro"]::before,
+.billing-plan[data-plan="expert"]::before {
+  content: "";
+  position: absolute;
+  inset: 0 18% auto;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--plan-fill);
+  box-shadow: 0 0 18px 2px var(--plan-glow);
+  pointer-events: none;
+}
+
+/* A soft halo behind the card that breathes. */
+.pricing-card[data-plan="pro"]::after,
+.pricing-card[data-plan="expert"]::after,
+.billing-plan[data-plan="pro"]::after,
+.billing-plan[data-plan="expert"]::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  border-radius: inherit;
+  background: radial-gradient(120% 60% at 50% 0%, var(--plan-glow), transparent 70%);
+  opacity: 0.55;
+  pointer-events: none;
+  animation: plan-breathe 4.5s ease-in-out infinite;
+}
+
+.pricing-card[data-plan="pro"]:hover,
+.pricing-card[data-plan="expert"]:hover,
+.billing-plan[data-plan="pro"]:hover,
+.billing-plan[data-plan="expert"]:hover {
+  box-shadow:
+    0 0 0 1px var(--plan),
+    0 24px 60px -16px var(--plan-glow),
+    0 0 56px -10px var(--plan-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* The one they're on still reads as theirs. */
+.billing-plan[data-current="true"][data-plan="pro"],
+.billing-plan[data-current="true"][data-plan="expert"] {
+  border-color: var(--plan);
+}
+
+@keyframes plan-breathe {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.75;
+  }
+}
+
+/* --- Sidebar --- */
+
+/* A lit bar beside the page you're on. */
+.nav-link[aria-current="page"]::before {
+  content: "";
+  position: absolute;
+  left: -12px;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--accent-gradient);
+  box-shadow: 0 0 12px 1px rgba(139, 92, 246, 0.6);
+  animation: nav-bar-in 0.3s var(--ease);
+}
+
+.nav-link[aria-current="page"] {
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.16), rgba(139, 92, 246, 0.04));
+}
+
+.nav-link[aria-current="page"] .nav-icon {
+  background: var(--accent-gradient);
+}
+
+.nav-link:hover .nav-label {
+  transform: translateX(2px);
+}
+
+.nav-label {
+  transition: transform 0.2s var(--ease);
+}
+
+.nav-section + .nav-section {
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.nav-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+@keyframes nav-bar-in {
+  from {
+    transform: scaleY(0.2);
+    opacity: 0;
+  }
+  to {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+/* Plan chip in the credits card. */
+.credits-head .plan-chip {
+  margin-left: auto;
+}
+
+.plan-chip {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  color: var(--text-secondary);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.plan-chip[data-plan="pro"] {
+  background: linear-gradient(135deg, #8b5cf6, #6366f1);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 0 14px -2px rgba(139, 92, 246, 0.7);
+}
+
+.plan-chip[data-plan="expert"] {
+  background: linear-gradient(135deg, #22d3ee, #14b8a6);
+  border-color: transparent;
+  color: #04111a;
+  box-shadow: 0 0 14px -2px rgba(34, 211, 238, 0.7);
+}
+
+.plan-chip[data-plan="owner"] {
+  background: var(--accent-gradient);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 0 14px -2px rgba(236, 72, 153, 0.6);
+}
+
+.plan-chip[data-plan="free"] {
+  color: var(--accent-text);
+  border-color: rgba(139, 92, 246, 0.45);
+  transition:
+    background 0.2s var(--ease),
+    box-shadow 0.2s var(--ease);
+}
+
+.plan-chip[data-plan="free"]:hover {
+  background: var(--accent-wash);
+  box-shadow: 0 0 12px -2px rgba(139, 92, 246, 0.6);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pricing-card[data-plan]::after,
+  .billing-plan[data-plan]::after,
+  .nav-link[aria-current="page"]::before {
+    animation: none;
+  }
+  .nav-link:hover .nav-label {
+    transform: none;
+  }
+}
