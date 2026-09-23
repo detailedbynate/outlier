@@ -6,7 +6,8 @@ import { CompassIcon, FlameIcon, SearchIcon, UsersIcon } from "@/components/icon
 import { requireApprovedUser } from "@/lib/auth/session";
 import { isAppError } from "@/lib/core/errors";
 import { formatCompact, formatPercent, timeAgo } from "@/lib/format";
-import { topicKey, type Level, type NicheMetrics, type SubNiche } from "@/lib/niches/analysis";
+import { topicKey, type Level, type NicheMetrics, type SubNiche, type ViralChannel } from "@/lib/niches/analysis";
+import { estimateEarnings, formatMoneyRange, type NicheEarnings } from "@/lib/niches/revenue";
 import { getServices } from "@/lib/services";
 import { parseNicheQuery } from "@/lib/niches/query";
 import type { NicheCreator, NicheExample } from "@/lib/niches/examples";
@@ -48,14 +49,13 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
       error = isAppError(e) && e.expose ? e.message : "Couldn't research that niche. Try again.";
     }
   }
-  const thin = !result || result.report.overall.videos === 0;
   const [popular, allTop, related] = await Promise.all([
     result ? Promise.resolve([]) : services.niches.popularTopics(8),
-    services.niches.topNiches(12),
-    result ? services.niches.relatedNiches(result.topic, result.report, 6) : Promise.resolve([]),
+    services.niches.topNiches(15),
+    result ? services.niches.relatedNiches(result.topic, result.report, 9) : Promise.resolve([]),
   ]);
   // After a report, keep the exploring going: overlapping niches if we have them, otherwise the best ones we know.
-  const topNiches = allTop.filter((idea) => idea.topicKey !== result?.topicKey).slice(0, result ? 6 : 12);
+  const topNiches = allTop.filter((idea) => idea.topicKey !== result?.topicKey).slice(0, result ? 9 : 15);
   const suggestions = [...new Set([...popular.map((p) => p.topic), ...STARTERS])].slice(0, 10);
 
   return (
@@ -90,7 +90,7 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
       {error ? <div className="dash-empty">{error}</div> : null}
       {result ? <Report result={result} drill={drill} /> : null}
       {related.length > 0 ? <IdeaBoard ideas={related} title={`Niches next to ${result!.topic}`} sub="Other researched topics that overlap with this one" /> : null}
-      {topNiches.length > 0 && (related.length === 0 || thin) ? (
+      {topNiches.length > 0 ? (
         <IdeaBoard
           ideas={topNiches}
           featured={result ? 0 : 3}
@@ -118,6 +118,8 @@ function Report({ result, drill }: { result: NicheResult; drill: string }) {
   const overall = report.overall;
   const sourceLabel = result.source === "youtube" ? "Fresh from YouTube" : result.source === "cache" ? "Saved report" : "From Outlier data";
   const top = report.subNiches.slice(0, 3);
+  const rest = report.subNiches.slice(3);
+  const earnings = estimateEarnings(overall.monthlyViews, result.topic);
   const focus = drill ? (report.subNiches.find((sub) => topicKey(sub.term) === topicKey(drill)) ?? null) : null;
 
   return (
@@ -150,6 +152,9 @@ function Report({ result, drill }: { result: NicheResult; drill: string }) {
               &ldquo;{drill}&rdquo; isn&apos;t one of {result.topic}&apos;s niches any more — the report has been rebuilt since that link was made.
             </p>
           ) : null}
+          {focus ? null : <MoneyPanel earnings={earnings} title={`Money in ${result.topic}`} />}
+          {focus ? null : <ViralChannels channels={overall.viralChannels ?? []} title={`Viral competitors in ${result.topic}`} />}
+
           <header className="niche-answer-head">
             <h2>
               {focus ? "Other niches in " : top.length > 0 ? `Top ${top.length} niche${top.length === 1 ? "" : "s"} in ` : ""}
@@ -176,12 +181,49 @@ function Report({ result, drill }: { result: NicheResult; drill: string }) {
                   score={sub.metrics.opportunity}
                   reason={reasonFor(sub.metrics)}
                   metrics={sub.metrics}
+                  earnings={estimateEarnings(sub.metrics.monthlyViews, sub.term, result.topic)}
                   examples={sub.examples ?? breakoutExamples(sub.metrics)}
                   creators={sub.creators ?? []}
                 />
               ))}
             </div>
           )}
+
+          {!focus && rest.length > 0 ? (
+            <section className="niche-rest" aria-label={`More niches in ${result.topic}`}>
+              <h3 className="dash-subhead">
+                <CompassIcon size={14} /> {rest.length} more niche{rest.length === 1 ? "" : "s"} in {result.topic}
+              </h3>
+              <div className="niche-idea-grid">
+                {rest.map((sub, i) => {
+                  const money = estimateEarnings(sub.metrics.monthlyViews, sub.term, result.topic);
+                  return (
+                    <Link
+                      key={sub.term}
+                      href={`/research/niche-finder?topic=${encodeURIComponent(result.topic)}&sub=${encodeURIComponent(sub.term)}`}
+                      className="dash-panel niche-idea"
+                      style={{ "--i": i + 1 } as CSSProperties}
+                    >
+                      <header className="niche-idea-head">
+                        <h3>{sub.term}</h3>
+                        <span className="niche-score" data-band={band(sub.metrics.opportunity)}>
+                          {sub.metrics.opportunity}
+                        </span>
+                      </header>
+                      <p className="niche-idea-reason">{reasonFor(sub.metrics)}</p>
+                      <IdeaTags demand={sub.metrics.demand} competition={sub.metrics.competition} format={sub.metrics.format.best} smallShare={sub.metrics.smallChannelShare} />
+                      {money ? (
+                        <p className="niche-idea-money">
+                          <span>~{formatMoneyRange(money.typicalMonthly)}/mo typical</span>
+                          <span>RPM {formatMoneyRange(money.blendedRpm)}</span>
+                        </p>
+                      ) : null}
+                    </Link>
+                  );
+                })}
+              </div>
+            </section>
+          ) : null}
 
           <details className="niche-topic-details">
             <summary>Topic details for {result.topic}</summary>
@@ -231,6 +273,8 @@ function SubNicheReport({ sub, topic }: { sub: SubNiche; topic: string }) {
       </header>
 
       <MetricGrid metrics={metrics} />
+      <MoneyPanel earnings={estimateEarnings(metrics.monthlyViews, sub.term, topic)} title={`Money in ${sub.term}`} />
+      <ViralChannels channels={metrics.viralChannels ?? []} title={`Viral competitors in ${sub.term}`} />
 
       <h3 className="dash-subhead">
         <FlameIcon size={14} /> Uploads in this niche
@@ -375,6 +419,7 @@ function NicheCard({
   creators,
   metrics,
   tags,
+  earnings,
 }: {
   rank: number;
   name: string;
@@ -386,6 +431,7 @@ function NicheCard({
   creators: NicheCreator[];
   metrics?: NicheMetrics;
   tags?: TagValues;
+  earnings?: NicheEarnings | null;
 }) {
   const [lead, ...more] = examples;
   const tagValues: TagValues | undefined = metrics
@@ -404,6 +450,23 @@ function NicheCard({
           {score}
         </span>
       </header>
+
+      {earnings ? (
+        <dl className="niche-money-strip">
+          <div>
+            <dt>RPM</dt>
+            <dd>{formatMoneyRange(earnings.blendedRpm)}</dd>
+          </div>
+          <div>
+            <dt>Typical channel</dt>
+            <dd>~{formatMoneyRange(earnings.typicalMonthly)}/mo</dd>
+          </div>
+          <div>
+            <dt>Top channel</dt>
+            <dd>~{formatMoneyRange(earnings.topMonthly)}/mo</dd>
+          </div>
+        </dl>
+      ) : null}
 
       {lead ? <ExampleVideo example={lead} featured /> : <p className="dash-row-sub">No example videos stored yet.</p>}
 
@@ -476,6 +539,78 @@ function ExampleVideo({ example, featured = false }: { example: NicheExample; fe
         </span>
       </span>
     </a>
+  );
+}
+
+/** What a channel here might earn: RPM for its category and format mix, times the views channels actually get. */
+function MoneyPanel({ earnings, title }: { earnings: NicheEarnings | null; title: string }) {
+  if (!earnings) return null;
+  const items = [
+    {
+      label: "Est. RPM",
+      value: formatMoneyRange(earnings.blendedRpm),
+      hint: `Long-form ${formatMoneyRange(earnings.rpm.long)} · Shorts ${formatMoneyRange(earnings.rpm.shorts)} per 1K views`,
+    },
+    { label: "Typical channel / month", value: `~${formatMoneyRange(earnings.typicalMonthly)}`, hint: `${formatCompact(earnings.monthlyViews.typical)} views a month` },
+    { label: "Top channel / month", value: `~${formatMoneyRange(earnings.topMonthly)}`, hint: `${formatCompact(earnings.monthlyViews.top)} views a month` },
+  ];
+  return (
+    <section className="niche-money" aria-label={title}>
+      <header>
+        <h3 className="dash-subhead">{title}</h3>
+        {earnings.category ? <span className="niche-money-cat">{earnings.category}</span> : null}
+      </header>
+      <dl>
+        {items.map((item) => (
+          <div key={item.label}>
+            <dt>{item.label}</dt>
+            <dd>{item.value}</dd>
+            <span>{item.hint}</span>
+          </div>
+        ))}
+      </dl>
+      <p className="niche-money-note">
+        Estimates from typical {earnings.category ?? "YouTube"} RPMs and the views channels here got in the last 30 days. Real earnings depend on audience
+        country, season and how many views are monetized.
+      </p>
+    </section>
+  );
+}
+
+/** Channels here that go viral most often, with the upload that went furthest. */
+function ViralChannels({ channels, title }: { channels: ViralChannel[]; title: string }) {
+  if (channels.length === 0) return null;
+  return (
+    <section className="niche-viral" aria-label={title}>
+      <h3 className="dash-subhead">
+        <FlameIcon size={14} /> {title}
+      </h3>
+      <div className="niche-viral-grid">
+        {channels.map((c, i) => (
+          <a
+            key={c.youtube_channel_id}
+            href={c.best.format === "short" ? `https://www.youtube.com/shorts/${c.best.youtube_video_id}` : `https://www.youtube.com/watch?v=${c.best.youtube_video_id}`}
+            target="_blank"
+            rel="noreferrer"
+            className="niche-viral-card"
+            style={{ "--i": i + 1 } as CSSProperties}
+          >
+            <span className="niche-viral-head">
+              {c.thumbnail_url ? <img src={c.thumbnail_url} alt="" loading="lazy" /> : <span className="niche-creator-blank" />}
+              <span className="niche-viral-name">
+                <strong>{c.title}</strong>
+                <em>{c.subscriber_count !== null ? `${formatCompact(c.subscriber_count)} subs` : "Hidden subs"}</em>
+              </span>
+              <span className="dash-mult">{c.bestMultiplier}×</span>
+            </span>
+            <span className="niche-viral-best">{c.best.title}</span>
+            <span className="niche-viral-meta">
+              {c.viralUploads} viral upload{c.viralUploads === 1 ? "" : "s"} · best {formatCompact(c.best.view_count)} views
+            </span>
+          </a>
+        ))}
+      </div>
+    </section>
   );
 }
 

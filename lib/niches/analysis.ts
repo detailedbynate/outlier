@@ -58,6 +58,24 @@ export interface NicheMetrics {
   confidence: Level;
   topChannels: { youtube_channel_id: string; title: string; thumbnail_url: string | null; subscriber_count: number | null; videos: number; views: number }[];
   breakouts: { youtube_video_id: string; title: string; channel_title: string; view_count: number; multiplier: number; format: string; published_at: string }[];
+  /**
+   * Views a channel here pulls in a month, from its last 30 days of uploads:
+   * the median active channel and the busiest one. Missing on older cached reports.
+   */
+  monthlyViews?: { typical: number; top: number; shortsShare: number };
+  /** Channels going viral most often here, most breakouts first. Missing on older cached reports. */
+  viralChannels?: ViralChannel[];
+}
+
+export interface ViralChannel {
+  youtube_channel_id: string;
+  title: string;
+  thumbnail_url: string | null;
+  subscriber_count: number | null;
+  /** Uploads at 3x+ the channel's usual views. */
+  viralUploads: number;
+  bestMultiplier: number;
+  best: { youtube_video_id: string; title: string; view_count: number; format: string };
 }
 
 export interface SubNiche {
@@ -269,6 +287,39 @@ export function computeNicheMetrics(videos: readonly NicheVideo[], channels: Rea
   const competitionScore = clamp01(1 - concentration);
   const opportunity = Math.round(100 * (0.3 * demandScore + 0.2 * growthScore + 0.2 * viralScore + 0.15 * smallScore + 0.15 * competitionScore));
 
+  // Monthly views per channel: what its last 30 days of uploads have pulled in.
+  const monthByChannel = new Map<string, number>();
+  let recentShortViews = 0;
+  let recentViews = 0;
+  for (const v of recent) {
+    monthByChannel.set(v.channel_id, (monthByChannel.get(v.channel_id) ?? 0) + v.view_count);
+    recentViews += v.view_count;
+    if (v.format === "short") recentShortViews += v.view_count;
+  }
+  const channelMonths = [...monthByChannel.values()];
+
+  const viralByChannel = new Map<string, { v: NicheVideo; m: number }[]>();
+  for (const x of viral) viralByChannel.set(x.v.channel_id, [...(viralByChannel.get(x.v.channel_id) ?? []), x]);
+  const viralChannels: ViralChannel[] = [...viralByChannel.entries()]
+    .flatMap(([id, hits]) => {
+      const c = channels.get(id);
+      if (!c) return [];
+      const top = [...hits].sort((a, b) => b.m - a.m)[0]!;
+      return [
+        {
+          youtube_channel_id: c.youtube_channel_id,
+          title: c.title,
+          thumbnail_url: c.thumbnail_url,
+          subscriber_count: c.subscriber_count,
+          viralUploads: hits.length,
+          bestMultiplier: round(top.m, 1),
+          best: { youtube_video_id: top.v.youtube_video_id, title: top.v.title, view_count: top.v.view_count, format: top.v.format },
+        },
+      ];
+    })
+    .sort((a, b) => b.viralUploads - a.viralUploads || b.bestMultiplier - a.bestMultiplier)
+    .slice(0, 8);
+
   const level = (value: number, low: number, high: number): Level => (value >= high ? "high" : value >= low ? "medium" : "low");
 
   return {
@@ -306,6 +357,12 @@ export function computeNicheMetrics(videos: readonly NicheVideo[], channels: Rea
         format: v.format,
         published_at: v.published_at,
       })),
+    monthlyViews: {
+      typical: Math.round(median(channelMonths)),
+      top: channelMonths.length ? Math.max(...channelMonths) : 0,
+      shortsShare: recentViews > 0 ? round(recentShortViews / recentViews, 3) : videos.length && shorts.length / videos.length >= 0.5 ? 1 : 0,
+    },
+    viralChannels,
   };
 }
 
@@ -320,7 +377,7 @@ export function buildNicheReport(topic: string, videos: readonly NicheVideo[], c
   const byId = new Map(videos.map((v) => [v.id, v]));
   // What the labeler already decided these channels are about beats anything mined from titles.
   const labeled = new Set([...channels.values()].flatMap((c) => c.niche_terms ?? []));
-  const subNiches = discoverSubNiches(videos, topic, 8, labeled)
+  const subNiches = discoverSubNiches(videos, topic, 12, labeled)
     .map(({ term, videoIds }) => {
       const subVideos = [...videoIds].map((id) => byId.get(id)!);
       return {

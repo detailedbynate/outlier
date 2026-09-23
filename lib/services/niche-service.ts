@@ -537,5 +537,6 @@ Given a topic someone typed, return:
 Example for "stoicism": queries ["stoic philosophy", "marcus aurelius lessons"], related ["stoic", "marcus aurelius", "seneca"].`;
 
 function isReport(value: unknown): value is NicheReport {
-  return typeof value === "object" && value !== null && "overall" in value && "subNiches" in value;
+  // Reports from before monthly views and viral channels existed are rebuilt rather than shown half-empty.
+  return typeof value === "object" && value !== null && "overall" in value && "subNiches" in value && typeof value.overall === "object" && value.overall !== null && "monthlyViews" in value.overall;
 }
