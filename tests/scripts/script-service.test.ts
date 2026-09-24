@@ -94,6 +94,12 @@ describe("script prompt", () => {
     expect(system).toContain("niche: long distance running");
   });
 
+  it("asks for plain words and a hook of a few words", () => {
+    const system = scriptSystemPrompt();
+    expect(system).toMatch(/8 words at most/);
+    expect(system).toMatch(/Simple words/);
+  });
+
   it("forbids the invention that made the early scripts untrustworthy", () => {
     expect(scriptSystemPrompt()).toMatch(/Do not invent facts, statistics/);
   });

@@ -25,8 +25,9 @@ import { WORDS_PER_SECOND, type ScriptRequest } from "./schema";
  */
 const LAYOUT = `Every Short you write follows this shape. Do not label the parts in your output — they should only be audible in how it flows.
 
-1. HOOK (the opening sentence, under 3 seconds)
-   One sentence. The most surprising, specific, concrete thing you have.
+1. HOOK (the opening sentence, under 2 seconds)
+   One very short sentence: 8 words at most, ideally fewer. The most surprising, specific, concrete thing you have.
+   Short beats clever: "Your coffee is bitter for one reason." not a long setup.
    It states something, it does not promise something. No greeting, no "in this video", no "let me tell you".
 
 2. TURN (the next sentence or two)
@@ -47,6 +48,7 @@ const LAYOUT = `Every Short you write follows this shape. Do not label the parts
 
 const RULES = `How to write the words:
 
+- Simple words. Write the way a 12-year-old talks: everyday words, no fancy vocabulary, no jargon unless the niche uses it every day. If there's a shorter, plainer word, use it ("use" not "utilize", "fix" not "remedy", "a lot" not "substantially").
 - Spoken English. Short sentences. One clause each. Read it aloud in your head; if you run out of breath, cut it.
 - Write what a person says, not what a document says. Contractions. No "furthermore", no "additionally", no "in conclusion".
 - Be specific. "A lot of players" is weak; "most people playing on hard" is strong. Specificity is what makes it sound like you know the subject.
@@ -70,10 +72,10 @@ What you must not do:
 const EXAMPLES = `Two examples of the shape done well.
 
 Example — niche: home coffee, 25 seconds:
-"Your coffee is bitter because you're grinding too fine, not because the beans are cheap. Everyone blames the beans first, then buys expensive ones that taste exactly the same. Bitterness is over-extraction: the water sat in the grounds too long and pulled out everything, including what you don't want. Go one step coarser on the grinder. Just one. Same beans, same machine, and it stops tasting burnt. You didn't need better coffee. You needed bigger pieces of it."
+"Your coffee is bitter for one reason. You're grinding too fine, not buying cheap beans. Everyone blames the beans first, then buys expensive ones that taste exactly the same. Bitter means the water pulled too much out of the grounds, including the bad stuff. Go one step coarser on the grinder. Just one. Same beans, same machine, and it stops tasting burnt. You didn't need better coffee. You needed bigger pieces of it."
 
 Example — niche: long distance running, 30 seconds:
-"Most runners aren't undertrained. They're never recovered. The usual week is every run at a pace that feels productive, and that pace is the problem. It's too fast to recover from and too slow to make you faster, so you get the fatigue without the fitness. Keep two hard sessions a week. Run everything else slow enough to hold a conversation. It feels like cheating for about a month, and then the hard days get easier, because you finally show up to them fresh."`;
+"You're not undertrained. You're tired. Most runners are never recovered. The usual week is every run at a pace that feels productive, and that pace is the problem. It's too fast to recover from and too slow to make you faster, so you get the fatigue without the fitness. Keep two hard sessions a week. Run everything else slow enough to hold a conversation. It feels like cheating for about a month, and then the hard days get easier, because you finally show up to them fresh."`;
 
 /** Enough samples to show a voice rather than one person's off day. */
 const MIN_SAMPLES = 2;
