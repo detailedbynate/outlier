@@ -55,7 +55,17 @@ export function ScriptForm({
           </label>
           <label className="sw-field">
             <span>Video idea or title</span>
-            <input name="idea" defaultValue={seed?.idea || state.sent.idea} placeholder="why your redstone door keeps breaking" maxLength={400} required autoComplete="off" onChange={(e) => setIdea(e.target.value)} />
+            <textarea
+              name="idea"
+              className="sw-idea-input"
+              defaultValue={seed?.idea || state.sent.idea}
+              placeholder="why your redstone door keeps breaking"
+              maxLength={1500}
+              rows={1}
+              required
+              autoComplete="off"
+              onChange={(e) => setIdea(e.target.value)}
+            />
             {askForDetails ? (
               <small className="sw-ask" role="status">
                 Sounds new. The writer doesn&apos;t know what&apos;s in recent updates, so add what changed here or it&apos;ll keep it general.

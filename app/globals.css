@@ -10338,3 +10338,12 @@ a.dash-row:hover {
 .sw-idea-why {
   color: var(--text-secondary);
 }
+
+/* The idea box grows with what's typed, from one line up to a comfortable paragraph. */
+.sw-idea-input {
+  field-sizing: content;
+  min-height: 2.6em;
+  max-height: 12em;
+  resize: vertical;
+  line-height: 1.45;
+}
