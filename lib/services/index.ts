@@ -1,5 +1,8 @@
 import "server-only";
 import { env } from "@/lib/core/env";
+import { onBalanceEmpty } from "@/lib/ai/balance";
+import { logger } from "@/lib/core/logger";
+import { emailEnabled, sendEmail } from "@/lib/email/send";
 import { SupabaseAccountProvisioner, SupabaseAuthModeration, SupabaseInviteSender } from "@/lib/auth/invites";
 import { ModerationRepository } from "@/lib/database/repositories/moderation";
 import { NicheRepository } from "@/lib/database/repositories/niches";
@@ -133,6 +136,26 @@ export function getServices(): Services {
 
   const config = env();
   const lazyDb = () => getAdminDatabase();
+
+  // A spent Anthropic balance pauses the script writer; the owner hears about it by email.
+  onBalanceEmpty(async (detail) => {
+    logger.error("anthropic balance is empty", { detail });
+    if (!emailEnabled()) return;
+    const lines = [
+      "Outlier's Anthropic balance ran out, so the Script Writer is paused for members and labeling has fallen back to the free models.",
+      "Top up at https://console.anthropic.com/settings/billing and everything resumes on its own.",
+      `Anthropic said: ${detail}`,
+    ];
+    const escape = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    for (const to of config.OWNER_EMAILS.split(",").map((e) => e.trim()).filter(Boolean)) {
+      await sendEmail({
+        to,
+        subject: "Outlier: Anthropic balance is empty",
+        text: lines.join("\n\n"),
+        html: lines.map((line) => `<p>${escape(line)}</p>`).join(""),
+      });
+    }
+  });
   const lazy = <T extends object>(factory: () => T): T => {
     let instance: T | undefined;
     return new Proxy({} as T, {

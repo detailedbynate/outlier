@@ -1,4 +1,5 @@
 import { AnthropicTextProvider } from "./anthropic";
+import { AiBalanceEmptyError } from "./balance";
 import { FallbackTextProvider } from "./fallback";
 import { GeminiTextProvider } from "./gemini";
 import { OpenRouterTextProvider } from "./openrouter";
@@ -67,8 +68,9 @@ export const PREMIUM_SCRIPT_MODEL = "claude-sonnet-5";
  *
  * Order is deliberate. Claude first when there's a key, because it follows the
  * layout and the honesty rules far better than anything free. Then a paid
- * OpenRouter model if one is named. Then the free chain, so a spent balance or
- * an outage degrades to a worse script rather than no script at all.
+ * OpenRouter model if one is named. Then the free chain, so an outage degrades
+ * to a worse script rather than no script at all. A spent balance is different:
+ * that pauses the writer (and emails the owner) instead.
  */
 export function scriptProvider(config: {
   SCRIPT_MODEL?: string | undefined;
@@ -102,5 +104,6 @@ export function scriptProvider(config: {
     );
   }
   if (chain.length === 0) return null;
-  return chain.length === 1 ? chain[0]! : new FallbackTextProvider(chain);
+  // A spent Anthropic balance pauses the writer rather than handing members a free model's script.
+  return chain.length === 1 ? chain[0]! : new FallbackTextProvider(chain, { stopOn: (error) => error instanceof AiBalanceEmptyError });
 }

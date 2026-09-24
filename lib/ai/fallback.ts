@@ -11,7 +11,11 @@ const log = createLogger({ module: "ai.fallback" });
 export class FallbackTextProvider implements TextProvider {
   readonly name: string;
 
-  constructor(private readonly providers: TextProvider[]) {
+  constructor(
+    private readonly providers: TextProvider[],
+    /** Errors that end the chain instead of moving on, e.g. a spent balance for scripts. */
+    private readonly options: { stopOn?: (error: unknown) => boolean } = {},
+  ) {
     if (providers.length === 0) throw new Error("FallbackTextProvider needs at least one provider");
     this.name = providers.map((p) => p.name).join("+");
   }
@@ -33,6 +37,7 @@ export class FallbackTextProvider implements TextProvider {
         return await call(provider);
       } catch (error) {
         lastError = error;
+        if (this.options.stopOn?.(error)) throw error;
         if (i < this.providers.length - 1) log.warn("ai provider failed, trying the next one", { provider: provider.name, error });
       }
     }
