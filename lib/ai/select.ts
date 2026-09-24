@@ -5,8 +5,11 @@ import { OpenRouterTextProvider } from "./openrouter";
 import type { TextProvider } from "./types";
 
 /**
- * Free first: Gemini, then OpenRouter's free models when Gemini is rate-limited.
- * Claude when chosen or when it's the only key; rules only otherwise.
+ * Claude (Haiku by default) first when there's a key, then the free models.
+ *
+ * Free used to go first, but the hourly job gets 40 seconds and the free
+ * reasoning models routinely took longer on a batch, so nothing was labeled
+ * for days. Haiku answers a batch in seconds for well under a cent.
  */
 export function labelingProvider(config: {
   NICHE_LABEL_PROVIDER: "auto" | "gemini" | "openrouter" | "anthropic" | "rules";
@@ -39,9 +42,9 @@ export function labelingProvider(config: {
     case "anthropic":
       return claude();
     default: {
-      const free = [gemini(), openrouter()].filter((p): p is GeminiTextProvider | OpenRouterTextProvider => p !== null);
-      if (free.length > 1) return new FallbackTextProvider(free);
-      return free[0] ?? claude();
+      const chain: TextProvider[] = [claude(), gemini(), openrouter()].filter((p) => p !== null);
+      if (chain.length > 1) return new FallbackTextProvider(chain);
+      return chain[0] ?? null;
     }
   }
 }

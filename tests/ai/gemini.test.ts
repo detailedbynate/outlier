@@ -71,10 +71,11 @@ describe("GeminiTextProvider", () => {
 describe("labelingProvider", () => {
   const base = { NICHE_LABEL_PROVIDER: "auto" as const, GEMINI_MODEL: "gemini-2.5-flash", NICHE_LABEL_MODEL: "claude-opus-5" };
 
-  it("prefers free Gemini (backed by OpenRouter when both are set), then Claude, then rules only", () => {
-    expect(labelingProvider({ ...base, GEMINI_API_KEY: "g", OPENROUTER_API_KEY: "o", ANTHROPIC_API_KEY: "a" })?.name).toBe("gemini+openrouter");
-    expect(labelingProvider({ ...base, OPENROUTER_API_KEY: "o", ANTHROPIC_API_KEY: "a" })?.name).toBe("openrouter");
-    expect(labelingProvider({ ...base, GEMINI_API_KEY: "g", ANTHROPIC_API_KEY: "a" })?.name).toBe("gemini");
+  it("prefers Claude, backed by the free models, then the free models alone, then rules only", () => {
+    expect(labelingProvider({ ...base, GEMINI_API_KEY: "g", OPENROUTER_API_KEY: "o", ANTHROPIC_API_KEY: "a" })?.name).toBe("anthropic+gemini+openrouter");
+    expect(labelingProvider({ ...base, OPENROUTER_API_KEY: "o", ANTHROPIC_API_KEY: "a" })?.name).toBe("anthropic+openrouter");
+    expect(labelingProvider({ ...base, GEMINI_API_KEY: "g", OPENROUTER_API_KEY: "o" })?.name).toBe("gemini+openrouter");
+    expect(labelingProvider({ ...base, OPENROUTER_API_KEY: "o" })?.name).toBe("openrouter");
     expect(labelingProvider({ ...base, ANTHROPIC_API_KEY: "a" })?.name).toBe("anthropic");
     expect(labelingProvider(base)).toBeNull();
   });

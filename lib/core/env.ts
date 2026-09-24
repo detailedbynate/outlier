@@ -175,12 +175,12 @@ const serverEnvSchema = z.object({
   /** Comma-separated OpenRouter models, tried in order. Blank uses a built-in list of free ones. */
   OPENROUTER_MODELS: optionalString,
   /**
-   * Who gives unsure channels a second opinion: "auto" uses Gemini, falling back to OpenRouter's free
-   * models, whichever keys are set; Claude only when neither is; otherwise rules only. "rules" never calls an AI.
+   * Who gives unsure channels a second opinion: "auto" uses Claude first, then Gemini, then OpenRouter's
+   * free models, whichever keys are set; otherwise rules only. "rules" never calls an AI.
    */
   NICHE_LABEL_PROVIDER: z.enum(["auto", "gemini", "openrouter", "anthropic", "rules"]).default("auto"),
   /** Claude model for niche labeling when Anthropic is the provider. */
-  NICHE_LABEL_MODEL: z.string().trim().min(1).default("claude-opus-5"),
+  NICHE_LABEL_MODEL: z.string().trim().min(1).default("claude-haiku-4-5"),
   /** Channels per model call when labeling. */
   NICHE_LABEL_BATCH_SIZE: z.coerce.number().int().min(1).max(50).default(20),
   /** Channels labeled per hourly run. */
