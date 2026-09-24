@@ -7,6 +7,7 @@ import { ComingSoonLock } from "./coming-soon";
 import { SavedScripts } from "./saved-scripts";
 import { StyleSamples } from "./style-samples";
 import { Writer } from "./writer";
+import { writerOpenTo } from "@/lib/scripts/access";
 
 export const dynamic = "force-dynamic";
 // Reading the niche and generating a script both take time; a Short script is the slowest thing here.
@@ -16,13 +17,13 @@ export const metadata: Metadata = { title: "Script Writer · Outlier" };
 export default async function ScriptwriterPage() {
   const current = await requireApprovedUser();
   const cost = CREDIT_COSTS.write_script;
-  // Free sees an upgrade; a paid plan sees "not yet", because there's nothing
-  // for them to buy — the writer just isn't open to anyone but the owner.
+  // Expert (and the owner) get the writer. Free sees an upgrade; Pro sees "soon",
+  // because Pro opens later and there's nothing for them to buy in between.
   const plan = current.isOwner ? null : await getServices().subscriptions.stateFor(current.user.id).catch(() => null);
+  const canWrite = writerOpenTo(plan?.plan.id, current.isOwner);
   const onFreePlan = !current.isOwner && (plan?.plan.id ?? "free") === "free";
 
-  // Only the owner can write one, so only the owner has any to show.
-  const [saved, styles] = current.isOwner
+  const [saved, styles] = canWrite
     ? await Promise.all([
         getServices().repositories.savedScripts.listForUser(current.user.id),
         getServices().repositories.styleSamples.listForUser(current.user.id),
@@ -43,7 +44,7 @@ export default async function ScriptwriterPage() {
         </div>
       </header>
 
-      {current.isOwner ? (
+      {canWrite ? (
         <>
           <Writer cost={cost} ideaCost={CREDIT_COSTS.find_ideas} limited={!current.isOwner} />
           <StyleSamples samples={styles} />

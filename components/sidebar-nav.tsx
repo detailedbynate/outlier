@@ -25,7 +25,7 @@ interface NavItem {
   label: string;
   icon: ComponentType<{ size?: number }>;
   badge?: string;
-  /** Owner-only for now: everyone else sees it badged, and lands on the locked preview. */
+  /** Open to the owner and plans that include it; everyone else sees it badged, and lands on the locked preview. */
   ownerOnly?: boolean;
 }
 
@@ -70,7 +70,7 @@ const ADMIN_SECTION: { title: string; items: NavItem[] } = {
   ],
 };
 
-export function SidebarNav({ isAdmin = false, isOwner = false }: { isAdmin?: boolean; isOwner?: boolean }) {
+export function SidebarNav({ isAdmin = false, isOwner = false, writerOpen = isOwner }: { isAdmin?: boolean; isOwner?: boolean; writerOpen?: boolean }) {
   const pathname = usePathname();
   const sections = isAdmin ? [...SECTIONS, ADMIN_SECTION] : SECTIONS;
   return (
@@ -82,7 +82,7 @@ export function SidebarNav({ isAdmin = false, isOwner = false }: { isAdmin?: boo
             const active = isActive(pathname, item.href);
             const Icon = item.icon;
             // Locked items say so in their own colour: this is about access, not novelty.
-            const locked = item.ownerOnly === true && !isOwner;
+            const locked = item.ownerOnly === true && !writerOpen;
             const badge = locked ? "Soon" : item.badge;
             return (
               <Link key={item.href} href={item.href} className="nav-link" aria-current={active ? "page" : undefined}>

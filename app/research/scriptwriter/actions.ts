@@ -8,6 +8,7 @@ import { DURATIONS, TONES, type Duration, type Tone } from "@/lib/scripts/schema
 import { getServices } from "@/lib/services";
 import { asUser } from "@/lib/youtube/quota-context";
 import { DEFAULT_SECONDS, DEFAULT_TONE, emptyIdeaState, emptyScriptState, type IdeaState, type ScriptState } from "./state";
+import { hasWriterAccess } from "@/lib/scripts/access";
 
 const text = (value: FormDataEntryValue | null, max: number): string => String(value ?? "").trim().slice(0, max);
 
@@ -38,7 +39,7 @@ export async function writeScript(_previous: ScriptState, formData: FormData): P
     tone: tone(formData.get("tone")),
   };
 
-  if (!current.isOwner) return { ...emptyScriptState, sent, error: "The script writer isn't open yet." };
+  if (!(await hasWriterAccess(current))) return { ...emptyScriptState, sent, error: "The Script Writer is on the Expert plan." };
   if (!sent.topic) return { ...emptyScriptState, sent, error: "Pick a niche to write for." };
   if (!sent.idea) return { ...emptyScriptState, sent, error: "Say what the Short should be about." };
 
@@ -76,17 +77,17 @@ export async function writeScript(_previous: ScriptState, formData: FormData): P
 /** Remove a saved script. Scoped to the owner inside the repository. */
 export async function deleteSavedScript(formData: FormData): Promise<void> {
   const current = await requireApprovedUser();
-  if (!current.isOwner) return;
+  if (!(await hasWriterAccess(current))) return;
   const id = text(formData.get("id"), 40);
   if (!id) return;
   await getServices().repositories.savedScripts.delete(current.user.id, id);
   revalidatePath("/research/scriptwriter");
 }
 
-/** Paste in a script to teach the writer a voice. Owner-only, like writing one. */
+/** Paste in a script to teach the writer a voice. Open to whoever can write one. */
 export async function addStyleSample(formData: FormData): Promise<void> {
   const current = await requireApprovedUser();
-  if (!current.isOwner) return;
+  if (!(await hasWriterAccess(current))) return;
   const body = text(formData.get("body"), 6_000);
   // Matches the column's check constraint, so a short paste fails here rather than in Postgres.
   if (body.length < 40) return;
@@ -97,7 +98,7 @@ export async function addStyleSample(formData: FormData): Promise<void> {
 /** Remove a style sample. Scoped to the owner inside the repository. */
 export async function deleteStyleSample(formData: FormData): Promise<void> {
   const current = await requireApprovedUser();
-  if (!current.isOwner) return;
+  if (!(await hasWriterAccess(current))) return;
   const id = text(formData.get("id"), 40);
   if (!id) return;
   await getServices().repositories.styleSamples.delete(current.user.id, id);
@@ -105,14 +106,14 @@ export async function deleteStyleSample(formData: FormData): Promise<void> {
 }
 
 /**
- * Find ideas for a niche. Owner-only like the writer, and rate limited for
+ * Find ideas for a niche. Open to the same plans as the writer, and rate limited for
  * everyone else, because it is a paid model call too — just a cheaper one.
  */
 export async function findIdeas(_previous: IdeaState, formData: FormData): Promise<IdeaState> {
   const current = await requireApprovedUser();
   const topic = text(formData.get("topic"), 80);
 
-  if (!current.isOwner) return { ...emptyIdeaState, topic, error: "The script writer isn't open yet." };
+  if (!(await hasWriterAccess(current))) return { ...emptyIdeaState, topic, error: "The Script Writer is on the Expert plan." };
   if (!topic) return { ...emptyIdeaState, topic, error: "Type a niche to find ideas for." };
 
   const services = getServices();

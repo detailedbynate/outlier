@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * The script writer is owner-only while it's still being judged.
+ * The script writer is open to the owner and the Expert plan only.
  *
  * The blur on the page is presentation: a member who opens devtools can find the
  * server action's id in the shared client bundle and POST to it directly. These
@@ -13,6 +13,8 @@ const write = vi.fn();
 const assertAvailable = vi.fn();
 const enforce = vi.fn();
 const charge = vi.fn();
+const plans: Record<string, "free" | "pro" | "expert"> = { "member-1": "pro", "free-1": "free", "expert-1": "expert" };
+const stateFor = vi.fn(async (userId: string) => ({ plan: { id: plans[userId] ?? "free" } }));
 let currentUser: { user: { id: string }; isOwner: boolean };
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -20,7 +22,7 @@ vi.mock("@/lib/auth/session", () => ({ requireApprovedUser: async () => currentU
 vi.mock("@/lib/core/logger", () => ({ logger: { warn: vi.fn(), info: vi.fn(), error: vi.fn(), debug: vi.fn() } }));
 vi.mock("@/lib/youtube/quota-context", () => ({ asUser: async (_id: string, _op: string, run: () => unknown) => run() }));
 vi.mock("@/lib/services", () => ({
-  getServices: () => ({ scripts: { write }, credits: { assertAvailable, charge }, rateLimits: { enforce } }),
+  getServices: () => ({ scripts: { write }, credits: { assertAvailable, charge }, rateLimits: { enforce }, subscriptions: { stateFor } }),
 }));
 
 const form = (fields: Record<string, string>) => {
@@ -47,7 +49,7 @@ describe("writeScript access", () => {
 
     const state = await writeScript(emptyScriptState, form(valid));
 
-    expect(state.error).toBe("The script writer isn't open yet.");
+    expect(state.error).toBe("The Script Writer is on the Expert plan.");
     expect(state.result).toBeNull();
     // Nothing was generated, and nothing was charged for.
     expect(write).not.toHaveBeenCalled();
@@ -64,8 +66,29 @@ describe("writeScript access", () => {
 
     const state = await writeScript(emptyScriptState, form({ ...valid, topic: "", idea: "" }));
 
-    expect(state.error).toBe("The script writer isn't open yet.");
+    expect(state.error).toBe("The Script Writer is on the Expert plan.");
     expect(write).not.toHaveBeenCalled();
+  });
+
+  it("refuses the free plan too", async () => {
+    currentUser = { user: { id: "free-1" }, isOwner: false };
+    const { writeScript } = await import("@/app/research/scriptwriter/actions");
+    const { emptyScriptState } = await import("@/app/research/scriptwriter/state");
+    expect((await writeScript(emptyScriptState, form(valid))).error).toBe("The Script Writer is on the Expert plan.");
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it("writes for Expert, on the standard model and the three hour limit", async () => {
+    currentUser = { user: { id: "expert-1" }, isOwner: false };
+    const { writeScript } = await import("@/app/research/scriptwriter/actions");
+    const { emptyScriptState } = await import("@/app/research/scriptwriter/state");
+
+    const state = await writeScript(emptyScriptState, form(valid));
+
+    expect(state.error).toBeNull();
+    expect(write).toHaveBeenCalledWith(expect.anything(), "expert-1", { premium: false });
+    expect(enforce).toHaveBeenCalledWith("scriptUser", "expert-1");
+    expect(charge).toHaveBeenCalled();
   });
 
   it("writes for the owner", async () => {

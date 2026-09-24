@@ -12,6 +12,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { getServices } from "@/lib/services";
 import { signOut } from "./login/actions";
 import "./globals.css";
+import { writerOpenTo } from "@/lib/scripts/access";
 
 const geist = Geist({ subsets: ["latin"], display: "swap", variable: "--font-sans" });
 
@@ -77,7 +78,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             <Brand />
             <MobileMenuToggle />
             <div id="app-sidebar-menu" className="sidebar-menu">
-            <SidebarNav isAdmin={current.isAdmin} isOwner={current.isOwner} />
+            <SidebarNav isAdmin={current.isAdmin} isOwner={current.isOwner} writerOpen={writerOpenTo(subscription?.plan.id, current.isOwner)} />
             <div className="sidebar-foot">
               <CreditsMeter status={credits} plan={plan} />
               <form action={signOut} className="sidebar-account">
