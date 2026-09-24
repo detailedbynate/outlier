@@ -7,6 +7,7 @@ import type { NicheRepository } from "@/lib/database/repositories/niches";
 import type { UsageRepository } from "@/lib/database/repositories/usage";
 import { videoToRow, type VideoRepository } from "@/lib/database/repositories/videos";
 import type { EnqueueOptions } from "@/lib/jobs/queue";
+import { refineSubNiches } from "@/lib/niches/refine";
 import { buildNicheReport, NICHE_REPORT_VERSION, tokenize, topicKey, type Level, type NicheReport } from "@/lib/niches/analysis";
 import { canonicalNiche } from "@/lib/niches/naming";
 import { findUnderratedNiches, underratedWindow, type NicheCreator, type NicheExample } from "@/lib/niches/underrated";
@@ -179,6 +180,8 @@ export class NicheService {
       enqueue?: (type: string, payload: unknown, options?: EnqueueOptions) => Promise<unknown>;
       /** Plans searches for topics with no stored data. Without it, the topic is searched as typed. */
       ai?: Pick<TextProvider, "generateObject"> | null;
+      /** A fast model that drops junk sub-niche names and fixes the rest. Without it, mined names are shown as they are. */
+      namer?: Pick<TextProvider, "generateObject"> | null;
     },
     config: Partial<NicheConfig> = {},
     logger?: Logger,
@@ -331,6 +334,14 @@ export class NicheService {
     }
 
     const report = buildNicheReport(topic, sample.videos, sample.channels, now);
+    if (this.deps.namer && report.subNiches.length > 0) {
+      try {
+        report.subNiches = await refineSubNiches(this.deps.namer, topic, report.subNiches);
+      } catch (error) {
+        // The mined names are rough but usable; a slow or failed model shouldn't cost the report.
+        this.log.warn("niche name cleanup failed; keeping mined names", { topic: key, error });
+      }
+    }
     if (report.overall.videos === 0 && !notice) notice = "No stored videos match this topic yet.";
 
     await this.saveSearch(key, topic, cached, now, {

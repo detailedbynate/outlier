@@ -19,6 +19,8 @@ export function normalizeName(value: string): string {
     .normalize("NFKD")
     .replace(/[̀-ͯ]/g, "")
     .toLowerCase()
+    // "Let's" is one word, not "let s".
+    .replace(/['’]/g, "")
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
 }
@@ -222,14 +224,14 @@ export function isSharedFragment(term: string): boolean {
 /**
  * Is this mined term worth showing as a niche?
  *
- * Known niches and labeled terms pass. A phrase passes when none of its words is
+ * Known niches pass, and labeled terms that aren't junk. A phrase passes when none of its words is
  * filler. A bare word has to read like a name in its titles, which is what keeps
  * "Backrooms" and drops "update".
  */
 export function isUsefulNiche(term: string, context: NicheTermContext = {}): boolean {
   const key = normalizeName(term);
   if (!key) return false;
-  if (context.labeled?.has(term) || canonicalNiche(key)) return true;
+  if (canonicalNiche(key)) return true;
 
   const words = key.split(" ");
   // A phrase that starts or stops halfway through a name ("unboxing super") is a fragment.
@@ -238,10 +240,13 @@ export function isUsefulNiche(term: string, context: NicheTermContext = {}): boo
   if (words.some((word) => BROAD_TERMS.has(word))) return false;
   if (isSharedFragment(key)) return false;
   // All fragments and no real word: "pok mon" is what a stripped accent used to
-  // leave behind. "sea glass hunting" has a short word but is still a niche.
+  // leave behind, "let s" what an apostrophe did. "sea glass hunting" has a short word but is still a niche.
   if (words.every((word) => word.length < 4)) return false;
+  if (words.some((word) => word.length === 1)) return false;
   // Verbs aren't topics: "getting", "stopped".
   if (words.every((word) => /(?:ed|ing)$/.test(word))) return false;
+  // Stored labels still pass the checks above: older ones include junk like "let s".
+  if (context.labeled?.has(term)) return true;
 
   if (words.length > 1) return true;
   const word = words[0]!;

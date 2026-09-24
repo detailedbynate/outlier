@@ -115,10 +115,14 @@ describe("isUsefulNiche", () => {
     expect(isUsefulNiche("mario", { titles: mixed("Mario") })).toBe(true);
   });
 
-  it("trusts a channel's own niche label over any of these rules", () => {
-    // "battle" is filler on its own, but if the labeler called it the niche, it is one.
-    expect(isUsefulNiche("battle", { labeled: new Set(["battle"]) })).toBe(true);
-    expect(isUsefulNiche("battle", {})).toBe(false);
+  it("trusts a channel's niche label only when it isn't junk", () => {
+    // A labeled name that no title capitalizes still counts...
+    expect(isUsefulNiche("sea glass", { labeled: new Set(["sea glass"]) })).toBe(true);
+    expect(isUsefulNiche("wubbox", { labeled: new Set(["wubbox"]) })).toBe(true);
+    // ...but older labels carry apostrophe and accent debris, and filler words.
+    expect(isUsefulNiche("let s", { labeled: new Set(["let s"]) })).toBe(false);
+    expect(isUsefulNiche("pok mon", { labeled: new Set(["pok mon"]) })).toBe(false);
+    expect(isUsefulNiche("battle", { labeled: new Set(["battle"]) })).toBe(false);
   });
 
   it("keeps a bare word that reads like a name, and drops one that doesn't", () => {

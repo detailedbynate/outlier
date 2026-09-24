@@ -30,6 +30,7 @@ import { JobQueue } from "@/lib/jobs/queue";
 import type { JobRegistry } from "@/lib/jobs/registry";
 import { JobScheduler } from "@/lib/jobs/scheduler";
 import { labelingProvider, scriptProvider } from "@/lib/ai/select";
+import { AnthropicTextProvider } from "@/lib/ai/anthropic";
 import { SavedScriptRepository } from "@/lib/database/repositories/saved-scripts";
 import { StyleSampleRepository } from "@/lib/database/repositories/style-samples";
 import { TranscriptRepository } from "@/lib/database/repositories/transcripts";
@@ -349,6 +350,8 @@ export function getServices(): Services {
         storage,
         enqueue,
         ai: text,
+        // Haiku alone, not a free fallback chain: this runs while someone waits for the page.
+        namer: config.ANTHROPIC_API_KEY ? new AnthropicTextProvider({ apiKey: config.ANTHROPIC_API_KEY, model: "claude-haiku-4-5" }) : null,
       },
       { dailyYoutubeRefreshes: config.NICHE_DAILY_YOUTUBE_REFRESHES, language: quality.language, regionCode },
     ),

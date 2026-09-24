@@ -192,7 +192,7 @@ export function discoverSubNiches(
     // A term dominating the whole sample is a synonym of the topic, not a sub-niche.
     .filter(([, e]) => e.videos.size <= videos.length * 0.8)
     // "update" and "lore" are what these uploads say, not what they are about.
-    .filter(([term, e]) => isUsefulNiche(term, { labeled, titles: [...e.videos].map((id) => titlesById.get(id) ?? "") }))
+    .filter(([term, e]) => !isHashtagMush(term) && isUsefulNiche(term, { labeled, titles: [...e.videos].map((id) => titlesById.get(id) ?? "") }))
     .map(([term, e]) => ({ term, videoIds: e.videos, score: e.videos.size * Math.log2(1 + e.channels.size) }))
     .sort((a, b) => b.score - a.score || a.term.localeCompare(b.term));
 
@@ -207,6 +207,7 @@ export function discoverSubNiches(
     if (chosen.some((c) => normalizeName(c.term).split(" ").some((w) => words.has(w)))) continue;
     // "rdr2" and "red dead" are one niche under one name, so only the first of them shows.
     const name = displayNicheName(candidate.term);
+    if (belongsElsewhere(name, topic)) continue;
     if (takenNames.has(nicheKey(name))) continue;
     takenNames.add(nicheKey(name));
     chosen.push({ term: name, videoIds: candidate.videoIds });
@@ -246,12 +247,43 @@ export function completePhrase(term: string, videoIds: ReadonlySet<string>, toke
     const span = knownSpan(words.join(" "));
     // A shared fragment ("super") is always half a name, so it keeps growing.
     const grows = knownSpan(next.join(" ")) > span;
-    if (span > 0 && !isSharedFragment(best.w) && !grows) break;
+    // A game's name is already whole ("minecraft" doesn't need "survival"); anything else
+    // still reaching for a shared fragment ("unboxing" -> "super") is half a name.
+    const isGame = ENTRY_BY_NAME.get(canonicalNiche(words.join(" ")) ?? "")?.kind === "game";
+    if (span > 0 && (isGame || !isSharedFragment(best.w)) && !grows) break;
     // Filler ("guide", "battle") only joins when it completes a known name.
     if (BROAD_TERMS.has(best.w) && !grows) break;
     words = next;
   }
   return words.join(" ");
+}
+
+/** Dictionary entries by proper name. */
+const ENTRY_BY_NAME = new Map(NICHE_DICTIONARY.map((entry) => [entry.name, entry]));
+
+/**
+ * Is this name a whole other niche rather than one inside the topic? Roblox
+ * turning up in Minecraft uploads, or ASMR in Super Mario ones, is cross-posting,
+ * not a niche. A game that lives inside the topic (Blox Fruits in Roblox) stays.
+ */
+function belongsElsewhere(name: string, topic: string): boolean {
+  const entry = ENTRY_BY_NAME.get(name);
+  if (!entry) return false;
+  // The topic by its exact name or alias only: "gaming" is not Retro Gaming.
+  const key = normalizeName(topic);
+  const topicEntry = NICHE_DICTIONARY.find((e) => normalizeName(e.name) === key || e.aliases.some((alias) => normalizeName(alias) === key));
+  if (!topicEntry || entry.name === topicEntry.name) return false;
+  if (entry.within && normalizeName(entry.within) === normalizeName(topicEntry.name)) return false;
+  // Inside a game, any other known game or topic is somewhere else. Inside a broad
+  // topic ("gaming", "fitness"), known games and topics are exactly its niches.
+  return topicEntry.kind === "game";
+}
+
+/** Hashtags run together ("ocarinaoftime", "adoptmeroblox") that no dictionary entry explains. */
+function isHashtagMush(term: string): boolean {
+  return normalizeName(term)
+    .split(" ")
+    .some((word) => word.length >= 13 && !canonicalNiche(word));
 }
 
 const median = (values: number[]): number => {
@@ -410,7 +442,7 @@ export function computeNicheMetrics(videos: readonly NicheVideo[], channels: Rea
 }
 
 /** Bumped when naming or metrics change, so saved reports are rebuilt instead of shown stale. */
-export const NICHE_REPORT_VERSION = 2;
+export const NICHE_REPORT_VERSION = 3;
 
 export interface NicheReport {
   version?: number;
