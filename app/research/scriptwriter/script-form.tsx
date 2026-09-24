@@ -23,11 +23,12 @@ const snap = (value: number): number => DURATIONS.reduce<number>((best, d) => (M
 /** The writer: what they want, then what it wrote. */
 export function ScriptForm({
   cost,
-  limited,
+  limitNote,
   seed,
 }: {
   cost: number;
-  limited: boolean;
+  /** "4 scripts a day", or null when there's no limit. */
+  limitNote: string | null;
   /** An idea picked from the finder above, which wins over whatever was last submitted. */
   seed?: { topic: string; idea: string } | null;
 }) {
@@ -114,7 +115,7 @@ export function ScriptForm({
             <PenIcon size={15} /> {pending ? "Writing…" : "Write the script"}
           </button>
           <small>
-            {cost} credits{limited ? " · one script every 3 hours" : ""}
+            {cost} credits{limitNote ? ` · ${limitNote}` : ""}
           </small>
         </div>
       </form>

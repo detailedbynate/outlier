@@ -7,7 +7,7 @@ import { ComingSoonLock } from "./coming-soon";
 import { SavedScripts } from "./saved-scripts";
 import { StyleSamples } from "./style-samples";
 import { Writer } from "./writer";
-import { writerOpenTo } from "@/lib/scripts/access";
+import { writerOpenTo, writerTerms } from "@/lib/scripts/access";
 
 export const dynamic = "force-dynamic";
 // Reading the niche and generating a script both take time; a Short script is the slowest thing here.
@@ -46,7 +46,7 @@ export default async function ScriptwriterPage() {
 
       {canWrite ? (
         <>
-          <Writer cost={cost} ideaCost={CREDIT_COSTS.find_ideas} limited={!current.isOwner} />
+          <Writer cost={cost} ideaCost={CREDIT_COSTS.find_ideas} limitNote={writerTerms(plan?.plan.id, current.isOwner)?.limitNote ?? null} />
           <StyleSamples samples={styles} />
           <SavedScripts scripts={saved} />
         </>

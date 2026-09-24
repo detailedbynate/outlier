@@ -78,7 +78,7 @@ describe("writeScript access", () => {
     expect(write).not.toHaveBeenCalled();
   });
 
-  it("writes for Expert, on the standard model and the three hour limit", async () => {
+  it("writes for Expert on the owner's model, four a day", async () => {
     currentUser = { user: { id: "expert-1" }, isOwner: false };
     const { writeScript } = await import("@/app/research/scriptwriter/actions");
     const { emptyScriptState } = await import("@/app/research/scriptwriter/state");
@@ -86,8 +86,8 @@ describe("writeScript access", () => {
     const state = await writeScript(emptyScriptState, form(valid));
 
     expect(state.error).toBeNull();
-    expect(write).toHaveBeenCalledWith(expect.anything(), "expert-1", { premium: false });
-    expect(enforce).toHaveBeenCalledWith("scriptUser", "expert-1");
+    expect(write).toHaveBeenCalledWith(expect.anything(), "expert-1", { premium: true });
+    expect(enforce).toHaveBeenCalledWith("scriptExpert", "expert-1");
     expect(charge).toHaveBeenCalled();
   });
 

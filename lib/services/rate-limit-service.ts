@@ -18,6 +18,8 @@ export const RATE_LIMITS = {
   nicheUser: { windowSeconds: 3600, maxHits: 40 },
   /** Shorts scripts per user: one every three hours. Each is a paid model call. */
   scriptUser: { windowSeconds: 10_800, maxHits: 1 },
+  /** Expert: four scripts a day. */
+  scriptExpert: { windowSeconds: 86_400, maxHits: 4 },
 } as const;
 
 export type RateLimitPolicy = keyof typeof RATE_LIMITS;
