@@ -311,3 +311,23 @@ describe("niche names from partial phrases", () => {
     expect(terms.some((t) => /^Unboxing Super$/i.test(t))).toBe(false);
   });
 });
+
+describe("focusOnTopic", () => {
+  it("keeps only uploads about the topic when there are enough of them", async () => {
+    const { focusOnTopic } = await import("@/lib/niches/analysis");
+    const rows = [
+      ...Array.from({ length: 35 }, (_, i) => video({ channel: "a", title: `Destiny 2 raid guide ${i}` })),
+      ...Array.from({ length: 5 }, (_, i) => video({ channel: "a", title: `new loot pool ${i}`, tags: ["destiny2"] })),
+      ...Array.from({ length: 60 }, (_, i) => video({ channel: "a", title: `Fortnite victory royale ${i}` })),
+    ];
+    const kept = focusOnTopic(rows, "Destiny 2");
+    expect(kept).toHaveLength(40);
+    expect(kept.some((v) => /fortnite/i.test(v.title))).toBe(false);
+  });
+
+  it("keeps the whole sample for broad topics whose uploads rarely say the word", async () => {
+    const { focusOnTopic } = await import("@/lib/niches/analysis");
+    const rows = Array.from({ length: 50 }, (_, i) => video({ channel: "a", title: `leg day routine ${i}` }));
+    expect(focusOnTopic(rows, "fitness")).toHaveLength(50);
+  });
+});

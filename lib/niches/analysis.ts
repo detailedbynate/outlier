@@ -153,6 +153,30 @@ export function topicAliases(topic: string): string[] {
 }
 
 
+/** Enough on-topic uploads to build a report from them alone. */
+const MIN_FOCUSED_VIDEOS = 30;
+
+/**
+ * Only the uploads that are about the topic, when there are enough of them.
+ *
+ * A topic's channels are found by their labels and names, then every recent
+ * upload of theirs is sampled. A Destiny 2 streamer who also plays Fortnite
+ * brought the Fortnite uploads along, and those outnumbered Destiny in the
+ * report. So uploads have to name the topic (or one of its aliases or search
+ * terms) in the title or tags. Broad topics like "fitness", whose uploads rarely
+ * say the word, keep the whole sample.
+ */
+export function focusOnTopic<V extends Pick<NicheVideo, "title" | "tags">>(videos: readonly V[], topic: string, related: readonly string[] = []): V[] {
+  const phrases = [...new Set([topic, ...related, ...topicAliases(topic)].map(normalizeName).filter((p) => p.length >= 3))];
+  const squashed = phrases.map((p) => p.replace(/ /g, "")).filter((p) => p.length >= 5);
+  const mentions = (video: V) => {
+    const text = ` ${normalizeName([video.title, ...video.tags].join(" "))} `;
+    return phrases.some((p) => text.includes(` ${p} `)) || squashed.some((p) => text.replace(/ /g, "").includes(p));
+  };
+  const focused = videos.filter(mentions);
+  return focused.length >= MIN_FOCUSED_VIDEOS ? focused : [...videos];
+}
+
 /**
  * Sub-niches that actually appear in the data: terms shared by several videos
  * from several channels, excluding the topic itself. Overlapping terms are
@@ -442,7 +466,7 @@ export function computeNicheMetrics(videos: readonly NicheVideo[], channels: Rea
 }
 
 /** Bumped when naming or metrics change, so saved reports are rebuilt instead of shown stale. */
-export const NICHE_REPORT_VERSION = 3;
+export const NICHE_REPORT_VERSION = 4;
 
 export interface NicheReport {
   version?: number;

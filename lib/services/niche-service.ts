@@ -8,7 +8,7 @@ import type { UsageRepository } from "@/lib/database/repositories/usage";
 import { videoToRow, type VideoRepository } from "@/lib/database/repositories/videos";
 import type { EnqueueOptions } from "@/lib/jobs/queue";
 import { refineSubNiches } from "@/lib/niches/refine";
-import { buildNicheReport, NICHE_REPORT_VERSION, tokenize, topicKey, type Level, type NicheReport } from "@/lib/niches/analysis";
+import { buildNicheReport, focusOnTopic, NICHE_REPORT_VERSION, tokenize, topicKey, type Level, type NicheReport } from "@/lib/niches/analysis";
 import { canonicalNiche } from "@/lib/niches/naming";
 import { findUnderratedNiches, underratedWindow, type NicheCreator, type NicheExample } from "@/lib/niches/underrated";
 import { isQuotaUnavailable } from "@/lib/youtube/quota-manager";
@@ -333,7 +333,7 @@ export class NicheService {
       notice = "Limited data for this topic so far. Results fill in as more channels are tracked.";
     }
 
-    const report = buildNicheReport(topic, sample.videos, sample.channels, now);
+    const report = buildNicheReport(topic, focusOnTopic(sample.videos, topic, related), sample.channels, now);
     if (this.deps.namer && report.subNiches.length > 0) {
       try {
         report.subNiches = await refineSubNiches(this.deps.namer, topic, report.subNiches);
