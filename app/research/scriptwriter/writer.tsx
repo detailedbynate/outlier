@@ -41,18 +41,20 @@ function IdeaFinder({ cost, onUse }: { cost: number; onUse: (topic: string, idea
     <section className="sw-ideas">
       <div className="sw-ideas-head">
         <div>
-          <h2 className="sw-saved-head">Find ideas</h2>
+          <h2 className="sw-saved-head">
+            Need an idea? <em className="sw-optional">optional</em>
+          </h2>
           <p className="dash-row-sub">
-            Type a niche and it suggests Shorts to make. It can see everything you&apos;ve already written, so it won&apos;t
-            suggest the same thing twice.
+            Type your niche and get 6 ideas for Shorts. Pick one and it fills in the script form below. It skips anything
+            you&apos;ve already written.
           </p>
         </div>
       </div>
 
       <form action={submit} className="sw-ideas-form">
-        <input name="topic" defaultValue={state.topic} placeholder="minecraft redstone" maxLength={80} required autoComplete="off" />
+        <input name="topic" defaultValue={state.topic} placeholder="Your niche, e.g. minecraft redstone" maxLength={80} required autoComplete="off" />
         <button type="submit" className="btn btn-primary" disabled={pending}>
-          {pending ? "Thinking…" : "Find ideas"}
+          {pending ? "Thinking…" : "Get ideas"}
         </button>
         <small>{cost} credits</small>
       </form>
@@ -71,11 +73,20 @@ function IdeaFinder({ cost, onUse }: { cost: number; onUse: (topic: string, idea
         <ul className="sw-idea-list">
           {state.ideas.map((idea, i) => (
             <li key={idea.title} className="sw-idea" style={{ "--i": i } as CSSProperties}>
+              <span className="sw-idea-num">Idea {i + 1}</span>
               <h3>{idea.title}</h3>
-              <p className="sw-idea-hook">&ldquo;{idea.hook}&rdquo;</p>
-              <p className="sw-idea-why">{idea.why}</p>
+              <dl className="sw-idea-parts">
+                <div>
+                  <dt>First line of the video</dt>
+                  <dd className="sw-idea-hook">&ldquo;{idea.hook}&rdquo;</dd>
+                </div>
+                <div>
+                  <dt>Why people would watch</dt>
+                  <dd className="sw-idea-why">{idea.why}</dd>
+                </div>
+              </dl>
               <button type="button" className="sw-idea-use" onClick={() => onUse(state.topic, idea.title)}>
-                Write this →
+                Use this idea ↓
               </button>
             </li>
           ))}

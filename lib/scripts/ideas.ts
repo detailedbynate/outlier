@@ -11,8 +11,8 @@ import { z } from "zod";
  */
 
 export const IDEA = z.object({
-  /** The video, as a title someone would actually click. Same limits as a script title. */
-  title: z.string().min(1).max(55),
+  /** The video, as a plain title someone would actually click. Up to eight words. */
+  title: z.string().min(1).max(70),
   /** The first line of the Short, so the idea can be judged on whether it opens well. */
   hook: z.string().min(1).max(160),
   /** Why this one is worth making, in a line. Not a summary of the title. */
@@ -49,7 +49,9 @@ What to avoid:
 - Inventing facts, numbers, versions, prices or events to make an idea sound compelling.
 - Suggesting something the creator has already made. You will be shown what they have written.
 - Near-duplicates of each other. Six ideas should be six different videos, not one idea phrased six ways.
-- Titles that are sentences. Six words at most, no colons.`;
+- Titles that are sentences. Eight words at most, no colons.
+
+Write for someone skimming a list: the title says plainly what the video is (a viewer should get it at a glance, no insider shorthand or clever wordplay), and the reason says in plain words why people would watch it.`;
 
 const oneLine = (value: string) => value.replace(/[\r\n]+/g, " ").trim();
 
@@ -90,7 +92,7 @@ export function ideaUserPrompt(request: IdeaRequest): string {
 
   parts.push(
     ``,
-    `For each idea give the title, the opening line of the Short, and one line on why it earns attention.`,
+    `For each idea give the title, the opening line of the Short, and one plain sentence on why people would watch it.`,
     `Use what you actually know about ${oneLine(request.topic)}. An idea you can't be specific about is not an idea.`,
   );
   return parts.join("\n");

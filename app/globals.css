@@ -10303,3 +10303,38 @@ a.dash-row:hover {
     transform: none;
   }
 }
+
+/* Idea cards: every part labeled, so it's clear what each line is. */
+.sw-optional {
+  font-style: normal;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.sw-idea-num {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+}
+.sw-idea-parts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 2px 0 0;
+}
+.sw-idea-parts dt {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+.sw-idea-parts dd {
+  margin: 0;
+}
+.sw-idea-why {
+  color: var(--text-secondary);
+}
