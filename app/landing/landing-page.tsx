@@ -181,9 +181,9 @@ function PricingSection() {
                   {paid ? <span className="pricing-per">/month</span> : null}
                   {sale ? <span className="pricing-was">{formatPrice(plan.listPriceCents!)}</span> : null}
                 </div>
-                <span className="pricing-terms">
-                  {sale ? `Launch price until 1 October, then ${formatPrice(plan.listPriceCents!)}` : paid ? "Cancel any time" : "No card needed"}
-                </span>
+                {sale || !paid ? (
+                  <span className="pricing-terms">{sale ? `Launch price until 1 October, then ${formatPrice(plan.listPriceCents!)}` : "No card needed"}</span>
+                ) : null}
                 <div className="pricing-credits">
                   <strong>{plan.monthlyCredits.toLocaleString("en-US")} credits a month</strong>
                   <span>{plan.creditsNote}</span>
@@ -201,7 +201,8 @@ function PricingSection() {
                   </ScrollLink>
                 )}
                 <ul className="pricing-points">
-                  {plan.features.map((feature) => (
+                  {/* "Cancel any time" already sits under the button. */}
+                  {plan.features.filter((feature) => feature !== "Cancel any time").map((feature) => (
                     <li key={feature}>
                       <CheckIcon />
                       {feature}
