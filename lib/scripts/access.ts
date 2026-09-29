@@ -3,6 +3,15 @@ import { getServices } from "@/lib/services";
 import type { PlanId } from "@/lib/billing/plans";
 import type { RateLimitPolicy } from "@/lib/services/rate-limit-service";
 
+/** The page tour runs until this day (UTC), for anyone who hasn't said "don't show again". */
+export const SCRIPT_TOUR_UNTIL = "2026-10-13";
+export const SCRIPT_TOUR_DISMISSED_KEY = "script_tour_dismissed";
+
+/** Whether to walk this person through the writer page. */
+export function showScriptTour(userMetadata: Record<string, unknown> | undefined, now: Date): boolean {
+  return now.toISOString().slice(0, 10) <= SCRIPT_TOUR_UNTIL && userMetadata?.[SCRIPT_TOUR_DISMISSED_KEY] !== true;
+}
+
 /** Plans the Script Writer is open to, besides the owner. Pro joins when it opens. */
 export const WRITER_PLANS: readonly PlanId[] = ["expert"];
 

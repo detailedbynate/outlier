@@ -8,7 +8,17 @@ import { DURATIONS, TONES, type Duration, type Tone } from "@/lib/scripts/schema
 import { getServices } from "@/lib/services";
 import { asUser } from "@/lib/youtube/quota-context";
 import { DEFAULT_SECONDS, DEFAULT_TONE, emptyIdeaState, emptyScriptState, type IdeaState, type ScriptState } from "./state";
-import { writerAccess } from "@/lib/scripts/access";
+import { writerAccess, SCRIPT_TOUR_DISMISSED_KEY } from "@/lib/scripts/access";
+import { getAdminDatabase } from "@/lib/database";
+
+/** "Don't show again" on the page tour, remembered on the account so it holds on every device. */
+export async function dismissScriptTour(): Promise<void> {
+  const current = await requireApprovedUser();
+  if (current.isTestSession) return;
+  // The auth server merges user_metadata keys, so other profile fields are kept.
+  const { error } = await getAdminDatabase().auth.admin.updateUserById(current.user.id, { user_metadata: { [SCRIPT_TOUR_DISMISSED_KEY]: true } });
+  if (error) logger.warn("could not save script tour dismissal", { error: error.message });
+}
 
 const text = (value: FormDataEntryValue | null, max: number): string => String(value ?? "").trim().slice(0, max);
 
