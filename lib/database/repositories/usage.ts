@@ -9,6 +9,15 @@ export class UsageRepository {
     return unwrap(await this.db.from("usage_events").insert(event).select("*").single(), "usage_events.insert");
   }
 
+  /** When the latest event of this type happened, or null if it never has. */
+  async latestAt(eventType: string): Promise<string | null> {
+    const rows = unwrap(
+      await this.db.from("usage_events").select("occurred_at").eq("event_type", eventType).order("occurred_at", { ascending: false }).limit(1),
+      "usage_events.latestAt",
+    );
+    return rows[0]?.occurred_at ?? null;
+  }
+
   /** Total quantity of an event type since a point in time (for daily limits). */
   async countSince(eventType: string, since: Date): Promise<number> {
     const rows = unwrap(

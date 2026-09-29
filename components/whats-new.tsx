@@ -15,8 +15,8 @@ const EXIT_MS = 260;
  * markChangelogSeen); this browser remembers it too, so a slow or failed save
  * doesn't bring it back on the next page.
  */
-export function WhatsNew() {
-  const key = `outlier:changelog:${CHANGELOG.id}`;
+export function WhatsNew({ version }: { version: string }) {
+  const key = `outlier:changelog:${version}`;
   const [open, setOpen] = useState(false);
   // The entrance is a CSS animation that plays on mount; "out" runs the exit.
   const [phase, setPhase] = useState<"in" | "out">("in");

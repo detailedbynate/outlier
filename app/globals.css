@@ -8709,6 +8709,30 @@ a.dash-row:hover {
   padding: 9px 18px;
 }
 
+/* Admin: show the changelog again */
+.changelog-admin {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+  flex-wrap: wrap;
+}
+
+.changelog-admin h2 {
+  margin: 0 0 4px;
+}
+
+.changelog-admin p {
+  margin: 0;
+}
+
+.changelog-republish {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 /* What's new: shown once per changelog (components/whats-new.tsx) */
 .whats-new-backdrop {
   position: fixed;

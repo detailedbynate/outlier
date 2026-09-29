@@ -10,7 +10,9 @@ import { formatNumber, timeAgo } from "@/lib/format";
 import { DURATIONS, moderationState, type AccountStatus } from "@/lib/moderation/status";
 import { getServices } from "@/lib/services";
 import type { AccountRole } from "@/types/database";
-import { AdjustCreditsForm, CreateAccountForm, EditAccountForm, NewSignInLinkForm, PlanForm } from "./account-forms";
+import { CHANGELOG } from "@/lib/changelog";
+import { CHANGELOG_REPUBLISH_EVENT } from "@/lib/changelog-version";
+import { AdjustCreditsForm, CreateAccountForm, EditAccountForm, NewSignInLinkForm, PlanForm, RepublishChangelogForm } from "./account-forms";
 import { moderateAccounts } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -61,10 +63,11 @@ export default async function AccountsPage({ searchParams }: { searchParams: Sea
 
   const services = getServices();
   const config = env();
-  const [users, log, quota] = await Promise.all([
+  const [users, log, quota, republishedAt] = await Promise.all([
     services.moderation.listUsers(),
     services.moderation.recentActions(30).catch(() => []),
     services.quota.summary().catch(() => null),
+    services.repositories.usage.latestAt(CHANGELOG_REPUBLISH_EVENT).catch(() => null),
   ]);
 
   const now = new Date();
@@ -108,6 +111,17 @@ export default async function AccountsPage({ searchParams }: { searchParams: Sea
           note={quota ? `of ${formatNumber(quota.limits.daily)} · users ${formatNumber(quota.used.user)}` : undefined}
         />
       </div>
+
+      <section className="card changelog-admin">
+        <div>
+          <h2>What&apos;s new popup</h2>
+          <p className="stat-note">
+            Shows once to each account: {CHANGELOG.items.map((i) => i.title).join(" · ")}.{" "}
+            {republishedAt ? `Last shown again ${timeAgo(republishedAt)}.` : "Edit it in lib/changelog.ts."}
+          </p>
+        </div>
+        <RepublishChangelogForm />
+      </section>
 
       <section className="card">
         <h2>Create an account</h2>

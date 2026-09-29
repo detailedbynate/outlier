@@ -9,6 +9,7 @@ import { logger } from "@/lib/core/logger";
 import type { BulkState } from "@/components/bulk-panel";
 import { getServices } from "@/lib/services";
 import { findPlan, type PlanId } from "@/lib/billing/plans";
+import { CHANGELOG_REPUBLISH_EVENT, forgetChangelogVersion } from "@/lib/changelog-version";
 
 export interface AccountFormState {
   status: "idle" | "ok" | "error";
@@ -29,6 +30,25 @@ async function confirmUrl(): Promise<string> {
 }
 
 const text = (formData: FormData, key: string) => String(formData.get(key) ?? "");
+
+export interface RepublishState {
+  status: "idle" | "ok" | "error";
+  message: string | null;
+}
+
+/** Shows the "What's new" popup to every account again, including people who already closed it. */
+export async function republishChangelog(): Promise<RepublishState> {
+  const current = await requireAdmin();
+  try {
+    await getServices().repositories.usage.record({ event_type: CHANGELOG_REPUBLISH_EVENT, user_id: current.user.id, occurred_at: new Date().toISOString() });
+    forgetChangelogVersion();
+    revalidatePath("/", "layout");
+    return { status: "ok", message: "Done. Everyone sees it on the next page they open." };
+  } catch (error) {
+    logger.warn("changelog republish failed", { error });
+    return { status: "error", message: "Couldn't show it again. Try once more." };
+  }
+}
 
 export async function createAccount(_prev: AccountFormState, formData: FormData): Promise<AccountFormState> {
   const current = await requireAdmin();

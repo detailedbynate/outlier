@@ -10,6 +10,7 @@ import { MobileMenuToggle } from "@/components/mobile-menu-toggle";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { WhatsNew } from "@/components/whats-new";
 import { shouldShowChangelog } from "@/lib/changelog";
+import { currentChangelogVersion } from "@/lib/changelog-version";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getServices } from "@/lib/services";
 import { signOut } from "./login/actions";
@@ -64,13 +65,14 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     );
   }
 
-  const [credits, subscription] = await Promise.all([
+  const [credits, subscription, changelogVersion] = await Promise.all([
     getServices().credits.status(current.user.id),
     // A plan lookup that fails shouldn't take the sidebar down; the chip just doesn't show.
     current.isOwner ? null : getServices().subscriptions.stateFor(current.user.id).catch(() => null),
+    currentChangelogVersion(),
   ]);
   // One popup at a time: the changelog goes first, the credits prompt can wait a page.
-  const showChangelog = current.onboardingCompleted && shouldShowChangelog(current.user);
+  const showChangelog = current.onboardingCompleted && shouldShowChangelog(current.user, changelogVersion);
   const plan: SidebarPlan | undefined = current.isOwner ? "owner" : subscription ? subscription.plan.id : undefined;
 
   return (
@@ -110,7 +112,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             ) : null}
             {children}
           </main>
-          {showChangelog ? <WhatsNew /> : null}
+          {showChangelog ? <WhatsNew version={changelogVersion} /> : null}
           {!showChangelog && credits.limit < 1_000_000 && current.moderation.status !== "restricted" ? (
             <LowCreditsPrompt remaining={credits.remaining} threshold={LOW_CREDITS_THRESHOLD} month={credits.resetsAt.slice(0, 7)} />
           ) : null}

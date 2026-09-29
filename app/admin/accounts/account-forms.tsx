@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import type { AccountRole } from "@/types/database";
 import { PLANS } from "@/lib/billing/plans";
-import { adjustCredits, createAccount, newSignInLink, setAccountPlan, updateAccount, type AccountFormState } from "./actions";
+import { adjustCredits, createAccount, newSignInLink, republishChangelog, setAccountPlan, updateAccount, type AccountFormState, type RepublishState } from "./actions";
 
 const initial: AccountFormState = { status: "idle", message: null, link: null };
 
@@ -171,6 +171,29 @@ export function PlanForm({ userId, plan }: { userId: string; plan: string }) {
         {pending ? "Saving…" : "Set plan"}
       </button>
       <Status state={state} />
+    </form>
+  );
+}
+
+/** Shows the "What's new" popup to everyone again. Asks first: it reaches every account. */
+export function RepublishChangelogForm() {
+  const [state, action, pending] = useActionState<RepublishState>(republishChangelog, { status: "idle", message: null });
+  return (
+    <form
+      action={action}
+      className="changelog-republish"
+      onSubmit={(e) => {
+        if (!window.confirm("Show the What's new popup to every account again?")) e.preventDefault();
+      }}
+    >
+      <button type="submit" disabled={pending}>
+        {pending ? "Showing…" : "Show it to everyone again"}
+      </button>
+      {state.message ? (
+        <span className={state.status === "error" ? "form-error" : "stat-note"} role="status">
+          {state.message}
+        </span>
+      ) : null}
     </form>
   );
 }
