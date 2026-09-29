@@ -8709,6 +8709,61 @@ a.dash-row:hover {
   padding: 9px 18px;
 }
 
+/* What's new: shown once per changelog (components/whats-new.tsx) */
+.whats-new {
+  width: min(460px, 100%);
+  gap: 12px;
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  box-shadow: 0 0 40px rgba(139, 92, 246, 0.18);
+}
+
+.whats-new-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-self: start;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-text);
+  border: 1px solid rgba(139, 92, 246, 0.5);
+  box-shadow: 0 0 12px rgba(139, 92, 246, 0.3);
+}
+
+.whats-new-list {
+  display: grid;
+  gap: 12px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.whats-new-list li {
+  display: grid;
+  gap: 2px;
+  padding-left: 14px;
+  border-left: 2px solid rgba(139, 92, 246, 0.6);
+}
+
+.whats-new-list strong {
+  font-size: 14px;
+}
+
+.whats-new-list span {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.whats-new-cta {
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  box-shadow: 0 0 16px rgba(139, 92, 246, 0.45);
+}
+
 .credits-buy {
   justify-content: center;
   margin-top: 10px;

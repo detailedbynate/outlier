@@ -8,6 +8,8 @@ import { LOW_CREDITS_THRESHOLD } from "@/lib/services/credits-service";
 import { BrandMark, LogOutIcon } from "@/components/icons";
 import { MobileMenuToggle } from "@/components/mobile-menu-toggle";
 import { SidebarNav } from "@/components/sidebar-nav";
+import { WhatsNew } from "@/components/whats-new";
+import { shouldShowChangelog } from "@/lib/changelog";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getServices } from "@/lib/services";
 import { signOut } from "./login/actions";
@@ -67,6 +69,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     // A plan lookup that fails shouldn't take the sidebar down; the chip just doesn't show.
     current.isOwner ? null : getServices().subscriptions.stateFor(current.user.id).catch(() => null),
   ]);
+  // One popup at a time: the changelog goes first, the credits prompt can wait a page.
+  const showChangelog = current.onboardingCompleted && shouldShowChangelog(current.user);
   const plan: SidebarPlan | undefined = current.isOwner ? "owner" : subscription ? subscription.plan.id : undefined;
 
   return (
@@ -106,7 +110,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             ) : null}
             {children}
           </main>
-          {credits.limit < 1_000_000 && current.moderation.status !== "restricted" ? (
+          {showChangelog ? <WhatsNew /> : null}
+          {!showChangelog && credits.limit < 1_000_000 && current.moderation.status !== "restricted" ? (
             <LowCreditsPrompt remaining={credits.remaining} threshold={LOW_CREDITS_THRESHOLD} month={credits.resetsAt.slice(0, 7)} />
           ) : null}
         </div>
