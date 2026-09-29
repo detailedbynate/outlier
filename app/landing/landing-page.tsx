@@ -189,9 +189,12 @@ function PricingSection() {
                   <span>{plan.creditsNote}</span>
                 </div>
                 {paid ? (
-                  <button type="submit" className="pill-button pill-button-lg pricing-cta">
-                    Get {plan.name}
-                  </button>
+                  <>
+                    <button type="submit" className="pill-button pill-button-lg pricing-cta">
+                      Get {plan.name}
+                    </button>
+                    <span className="pricing-cancel">Cancel any time</span>
+                  </>
                 ) : (
                   <ScrollLink to="waitlist" className="pill-button pill-button-ghost pill-button-lg">
                     Join the free list

@@ -3567,6 +3567,14 @@ html:has(.landing-root) {
 }
 
 /* Landing pricing: the page's one ask, so it gets the width and the air. */
+/* Small reassurance under a plan's buttons. The card's 14px gap is tightened so it reads as part of the button. */
+.pricing-cancel {
+  margin-top: -8px;
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: center;
+}
+
 /* Why choose Outlier: four short reasons in a 2x2 grid. */
 .why-section {
   max-width: 1120px;
