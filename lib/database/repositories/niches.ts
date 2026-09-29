@@ -17,6 +17,20 @@ export class NicheRepository {
     return rows[0] ?? null;
   }
 
+  /** Latest opportunity score for each topic that has a report, read out of the stored JSON rather than loading whole reports. */
+  async currentScores(topicKeys: string[]): Promise<Map<string, { opportunity: number; computedAt: string | null }>> {
+    const scores = new Map<string, { opportunity: number; computedAt: string | null }>();
+    if (topicKeys.length === 0) return scores;
+    const rows = unwrap(
+      await this.db.from("niche_reports").select("topic_key, computed_at, opportunity:report->overall->opportunity").in("topic_key", topicKeys),
+      "niche_reports.currentScores",
+    ) as unknown as { topic_key: string; computed_at: string | null; opportunity: unknown }[];
+    for (const row of rows) {
+      if (typeof row.opportunity === "number") scores.set(row.topic_key, { opportunity: row.opportunity, computedAt: row.computed_at });
+    }
+    return scores;
+  }
+
   async saveReport(row: TablesInsert<"niche_reports">): Promise<void> {
     assertOk(await this.db.from("niche_reports").upsert(row, { onConflict: "topic_key" }), "niche_reports.save");
   }
@@ -105,7 +119,7 @@ export class NicheRepository {
     return unwrap(
       await this.db
         .from("videos")
-        .select("id, youtube_video_id, channel_id, title, tags, format, view_count, like_count, comment_count, published_at")
+        .select("id, youtube_video_id, channel_id, title, tags, format, view_count, like_count, comment_count, published_at, duration_seconds")
         .gte("published_at", since.toISOString())
         .order("published_at", { ascending: false })
         .range(from, to),
@@ -221,7 +235,7 @@ export class NicheRepository {
   async topicSample(topic: string, since: Date, limit = 1_500, related: string[] = []): Promise<{ videos: NicheVideo[]; channels: Map<string, NicheChannel> }> {
     const topics = [...new Set([topic, ...related].map((t) => t.trim()).filter((t) => escapePattern(t).length >= 2))].slice(0, 5);
     if (topics.length === 0 || escapePattern(topic).length < 2) return { videos: [], channels: new Map() };
-    const columns = "id, youtube_video_id, channel_id, title, tags, format, view_count, like_count, comment_count, published_at";
+    const columns = "id, youtube_video_id, channel_id, title, tags, format, view_count, like_count, comment_count, published_at, duration_seconds";
 
     // Channels confidently labeled with the topic are in. Channels that only mention it (in their
     // name, description, or a video title) are in only when their recent uploads are about it:

@@ -4,6 +4,7 @@ import type { ChannelRepository, ShortsChannelFilters } from "@/lib/database/rep
 import type { UsageRepository } from "@/lib/database/repositories/usage";
 import type { FastVideo, VideoRepository } from "@/lib/database/repositories/videos";
 import { parseChannelIdentifier } from "@/lib/youtube/parse";
+import type { OwnChannelMonth } from "@/lib/niches/fit";
 import type { ChannelRow, ShortsChannelRow, VideoFeedRow } from "@/types/database";
 import type { CreditStatus, CreditsService } from "./credits-service";
 import { SHORTS_DISCOVERY_EVENT, type ResearchService } from "./research-service";
@@ -196,6 +197,29 @@ export class DashboardService {
       .slice(0, 5);
 
     return { own: ownSummary, ownPending: ownIdentifier && !ownChannel ? ownIdentifier : null, tracked: trackedWithGrowth };
+  }
+
+  /**
+   * The creator's own channel over the last 30 days, measured the way niche
+   * reports measure channels (views on that month's uploads). Null when the
+   * channel isn't set or isn't synced yet.
+   */
+  async ownChannelMonth(ownIdentifier: string | null, now: Date = new Date()): Promise<OwnChannelMonth | null> {
+    if (!ownIdentifier) return null;
+    const { ids, handles } = splitIdentifiers([ownIdentifier]);
+    const rows = await this.deps.channels.findByIdentifiers(ids, handles);
+    const channel = rows.find((c) => matches(c, ownIdentifier));
+    if (!channel) return null;
+    const uploads = await this.deps.videos.feed({ orderBy: "published_at", limit: 100, channelIds: [channel.id], publishedAfter: new Date(now.getTime() - 30 * 86_400_000) });
+    const views = uploads.map((v) => v.view_count).sort((x, y) => x - y);
+    const mid = Math.floor(views.length / 2);
+    return {
+      title: channel.title,
+      subscribers: channel.subscriber_count,
+      monthViews: views.reduce((sum, v) => sum + v, 0),
+      uploads30d: uploads.length,
+      medianViews: views.length === 0 ? 0 : views.length % 2 ? views[mid]! : Math.round((views[mid - 1]! + views[mid]!) / 2),
+    };
   }
 
   async competitorWatch(competitors: readonly string[], now: Date = new Date()): Promise<CompetitorWatch> {

@@ -13,6 +13,9 @@ import { parseNicheQuery } from "@/lib/niches/query";
 import type { NicheCreator, NicheExample } from "@/lib/niches/examples";
 import { reasonFor, type NicheIdea, type NicheResult } from "@/lib/services/niche-service";
 import { asUser } from "@/lib/youtube/quota-context";
+import { nicheFit, type OwnChannelMonth } from "@/lib/niches/fit";
+import { isSaved, readSavedNiches } from "@/lib/niches/saved";
+import { CompareBox, FitPanel, Patterns, SaveNicheButton, SavedNiches, ScoreBreakdown, TrendChart } from "./insights";
 import { TopicInput } from "./topic-input";
 
 export const dynamic = "force-dynamic";
@@ -49,10 +52,14 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
       error = isAppError(e) && e.expose ? e.message : "Couldn't research that niche. Try again.";
     }
   }
-  const [popular, allTop, related] = await Promise.all([
+  const savedList = readSavedNiches(user.user_metadata);
+  const [popular, allTop, related, saved, own] = await Promise.all([
     result ? Promise.resolve([]) : services.niches.popularTopics(8),
     services.niches.topNiches(15),
     result ? services.niches.relatedNiches(result.topic, result.report, 9) : Promise.resolve([]),
+    result ? Promise.resolve([]) : services.niches.savedWithScores(savedList),
+    // Only a report needs the creator's own numbers, for "how you'd fit".
+    result ? ownChannel(user.id) : Promise.resolve(null),
   ]);
   // After a report, keep the exploring going: overlapping niches if we have them, otherwise the best ones we know.
   const topNiches = allTop.filter((idea) => idea.topicKey !== result?.topicKey).slice(0, result ? 9 : 15);
@@ -88,7 +95,8 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
       </header>
 
       {error ? <div className="dash-empty">{error}</div> : null}
-      {result ? <Report result={result} drill={drill} /> : null}
+      {result ? null : <SavedNiches niches={saved} />}
+      {result ? <Report result={result} drill={drill} saved={isSaved(savedList, result.topic)} own={own} /> : null}
       {related.length > 0 ? <IdeaBoard ideas={related} title={`Niches next to ${result!.topic}`} sub="Other researched topics that overlap with this one" /> : null}
       {topNiches.length > 0 ? (
         <IdeaBoard
@@ -113,7 +121,26 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
   );
 }
 
-function Report({ result, drill }: { result: NicheResult; drill: string }) {
+/** The creator's channel over the last 30 days, or why there isn't one. */
+async function ownChannel(userId: string): Promise<{ hasChannel: boolean; month: OwnChannelMonth | null }> {
+  const services = getServices();
+  try {
+    const preferences = await services.onboarding.getPreferences(userId);
+    const channel = preferences?.channel ?? null;
+    return { hasChannel: channel !== null, month: channel ? await services.dashboard.ownChannelMonth(channel) : null };
+  } catch {
+    return { hasChannel: false, month: null };
+  }
+}
+
+type Own = Awaited<ReturnType<typeof ownChannel>> | null;
+
+function Fit({ metrics, own }: { metrics: NicheMetrics; own: Own }) {
+  if (!own) return null;
+  return <FitPanel fit={own.month ? nicheFit(metrics, own.month) : null} channelTitle={own.month?.title ?? null} hasChannel={own.hasChannel} />;
+}
+
+function Report({ result, drill, saved, own }: { result: NicheResult; drill: string; saved: boolean; own: Own }) {
   const { report } = result;
   const overall = report.overall;
   const sourceLabel = result.source === "youtube" ? "Fresh from YouTube" : result.source === "cache" ? "Saved report" : "From Outlier data";
@@ -135,6 +162,10 @@ function Report({ result, drill }: { result: NicheResult; drill: string }) {
         </span>
         {result.notice ? <span className="niche-notice">{result.notice}</span> : null}
       </div>
+      <div className="niche-actions">
+        <SaveNicheButton topic={result.topic} score={overall.opportunity} saved={saved} />
+        <CompareBox topic={result.topic} />
+      </div>
 
       {overall.videos === 0 ? (
         <div className="dash-empty">
@@ -146,12 +177,18 @@ function Report({ result, drill }: { result: NicheResult; drill: string }) {
         </div>
       ) : (
         <section className="niche-answer" aria-label={focus ? `${focus.term} in ${result.topic}` : `Top niches in ${result.topic}`}>
-          {focus ? <SubNicheReport sub={focus} topic={result.topic} /> : null}
+          {focus ? <SubNicheReport sub={focus} topic={result.topic} own={own} /> : null}
           {drill && !focus ? (
             <p className="dash-row-sub">
               &ldquo;{drill}&rdquo; isn&apos;t one of {result.topic}&apos;s niches any more — the report has been rebuilt since that link was made.
             </p>
           ) : null}
+          {focus ? null : (
+            <div className="niche-insights">
+              <ScoreBreakdown metrics={overall} />
+              <Fit metrics={overall} own={own} />
+            </div>
+          )}
           {focus ? null : <MoneyPanel earnings={earnings} title={`Money in ${result.topic}`} />}
           {focus ? null : <ViralChannels channels={overall.viralChannels ?? []} title={`Viral competitors in ${result.topic}`} />}
 
@@ -187,6 +224,13 @@ function Report({ result, drill }: { result: NicheResult; drill: string }) {
                 />
               ))}
             </div>
+          )}
+
+          {focus ? null : (
+            <>
+              <TrendChart weekly={overall.weekly} />
+              <Patterns patterns={overall.patterns} topic={result.topic} />
+            </>
           )}
 
           {!focus && rest.length > 0 ? (
@@ -250,7 +294,7 @@ function Report({ result, drill }: { result: NicheResult; drill: string }) {
  * for a slice of those videos — "escape" inside "steal a brainrot" is a group
  * of uploads, not a subject you can look up on its own.
  */
-function SubNicheReport({ sub, topic }: { sub: SubNiche; topic: string }) {
+function SubNicheReport({ sub, topic, own }: { sub: SubNiche; topic: string; own: Own }) {
   const metrics = sub.metrics;
   const examples = sub.examples ?? breakoutExamples(metrics);
   const creators = sub.creators ?? [];
@@ -273,7 +317,13 @@ function SubNicheReport({ sub, topic }: { sub: SubNiche; topic: string }) {
       </header>
 
       <MetricGrid metrics={metrics} />
+      <div className="niche-insights">
+        <ScoreBreakdown metrics={metrics} />
+        <Fit metrics={metrics} own={own} />
+      </div>
+      <TrendChart weekly={metrics.weekly} />
       <MoneyPanel earnings={estimateEarnings(metrics.monthlyViews, sub.term, topic)} title={`Money in ${sub.term}`} />
+      <Patterns patterns={metrics.patterns} topic={sub.term} />
       <ViralChannels channels={metrics.viralChannels ?? []} title={`Viral competitors in ${sub.term}`} />
 
       <h3 className="dash-subhead">

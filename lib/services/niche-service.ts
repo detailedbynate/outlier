@@ -170,7 +170,7 @@ export class NicheService {
 
   constructor(
     private readonly deps: {
-      niches: Pick<NicheRepository, "getReport" | "saveReport" | "claimRefresh" | "releaseClaim" | "topicSample" | "popularTopics" | "recentReports" | "recentSample">;
+      niches: Pick<NicheRepository, "getReport" | "currentScores" | "saveReport" | "claimRefresh" | "releaseClaim" | "topicSample" | "popularTopics" | "recentReports" | "recentSample">;
       youtube: Pick<YouTubeService, "searchVideos" | "getChannels">;
       channels: Pick<ChannelRepository, "upsertMany">;
       videos: Pick<VideoRepository, "upsertMany">;
@@ -270,6 +270,12 @@ export class NicheService {
       if (suggestions.length >= limit) break;
     }
     return suggestions;
+  }
+
+  /** Where saved niches stand now, from stored reports only (no research is run). */
+  async savedWithScores<T extends { key: string; score: number }>(saved: readonly T[]): Promise<(T & { current: number | null; computedAt: string | null })[]> {
+    const scores = await this.deps.niches.currentScores(saved.map((n) => n.key)).catch(() => new Map<string, { opportunity: number; computedAt: string | null }>());
+    return saved.map((n) => ({ ...n, current: scores.get(n.key)?.opportunity ?? null, computedAt: scores.get(n.key)?.computedAt ?? null }));
   }
 
   research(topic: string, options: { userId: string | null; now?: Date } = { userId: null }): Promise<NicheResult> {

@@ -1,5 +1,6 @@
 import { NICHE_DICTIONARY } from "./dictionary";
 import { creatorsFor, examplesFor, type NicheCreator, type NicheExample } from "./examples";
+import { breakoutPatterns, SCORE_WEIGHTS, weeklyUploads, type NichePatterns, type ScorePart, type WeekBucket } from "./insights";
 import { BROAD_TERMS, canonicalNiche, displayNicheName, isSharedFragment, isUsefulNiche, knownSpan, nicheKey, normalizeName } from "./naming";
 
 /**
@@ -20,6 +21,8 @@ export interface NicheVideo {
   published_at: string;
   /** Views vs the channel's typical upload, when computed. */
   outlier_score: number | null;
+  /** Length in seconds, when stored. */
+  duration_seconds?: number | null;
 }
 
 export interface NicheChannel {
@@ -65,6 +68,12 @@ export interface NicheMetrics {
   monthlyViews?: { typical: number; top: number; shortsShare: number };
   /** Channels going viral most often here, most breakouts first. Missing on older cached reports. */
   viralChannels?: ViralChannel[];
+  /** What the opportunity score is made of. Missing on older cached reports. */
+  scoreParts?: ScorePart[];
+  /** Uploads by week, oldest first. Missing on older cached reports. */
+  weekly?: WeekBucket[];
+  /** What breakout uploads have in common; missing with too few breakouts. */
+  patterns?: NichePatterns;
 }
 
 export interface ViralChannel {
@@ -384,7 +393,9 @@ export function computeNicheMetrics(videos: readonly NicheVideo[], channels: Rea
   const viralScore = clamp01(viralRate / 0.25);
   const smallScore = smallChannelShare ?? 0.5;
   const competitionScore = clamp01(1 - concentration);
-  const opportunity = Math.round(100 * (0.3 * demandScore + 0.2 * growthScore + 0.2 * viralScore + 0.15 * smallScore + 0.15 * competitionScore));
+  const parts: Record<ScorePart["key"], number> = { demand: demandScore, growth: growthScore, viral: viralScore, small: smallScore, competition: competitionScore };
+  const scoreParts: ScorePart[] = (Object.keys(SCORE_WEIGHTS) as ScorePart["key"][]).map((key) => ({ key, score: round(parts[key], 3), weight: SCORE_WEIGHTS[key] }));
+  const opportunity = Math.round(100 * scoreParts.reduce((sum, p) => sum + p.score * p.weight, 0));
 
   // Monthly views per channel: what its last 30 days of uploads have pulled in.
   const monthByChannel = new Map<string, number>();
@@ -462,11 +473,18 @@ export function computeNicheMetrics(videos: readonly NicheVideo[], channels: Rea
       shortsShare: recentViews > 0 ? round(recentShortViews / recentViews, 3) : videos.length && shorts.length / videos.length >= 0.5 ? 1 : 0,
     },
     viralChannels,
+    scoreParts,
+    weekly: weeklyUploads(videos, now),
+    patterns: breakoutPatterns(
+      videos,
+      viral.map((x) => x.v),
+      tokenize,
+    ),
   };
 }
 
 /** Bumped when naming or metrics change, so saved reports are rebuilt instead of shown stale. */
-export const NICHE_REPORT_VERSION = 4;
+export const NICHE_REPORT_VERSION = 5;
 
 export interface NicheReport {
   version?: number;

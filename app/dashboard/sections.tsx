@@ -19,6 +19,7 @@ import type { ActivityItem } from "@/lib/analytics/dashboard";
 import { formatCompact, formatMultiplier, formatPercent, timeAgo } from "@/lib/format";
 import { getServices } from "@/lib/services";
 import type { ChannelSummary } from "@/lib/services/dashboard-service";
+import type { SavedNiche } from "@/lib/niches/saved";
 import type { VideoFeedRow } from "@/types/database";
 
 type IconType = ComponentType<{ size?: number }>;
@@ -674,6 +675,50 @@ export async function CompetitorWatchSection({ userId, ownChannel, competitors }
         </>
       )}
       {watch.missing.length > 0 && watch.found.length > 0 ? <p className="dash-footnote">Not synced yet: {watch.missing.slice(0, 3).join(", ")}</p> : null}
+    </Panel>
+  );
+}
+
+/* ---------------------------------------------------------------------------
+   Saved niches (from the Niche Finder)
+--------------------------------------------------------------------------- */
+
+export async function SavedNichesSection({ saved }: { saved: SavedNiche[] }) {
+  if (saved.length === 0) return null;
+  const niches = await getServices().niches.savedWithScores(saved.slice(0, 8));
+  return (
+    <Panel
+      icon={CompassIcon}
+      title="Niches you're watching"
+      subtitle="Opportunity scores now, and the change since you saved them"
+      tone="blue"
+      action={
+        <Link href="/research/niche-finder" className="dash-link">
+          Niche Finder →
+        </Link>
+      }
+      className="home-span-12"
+      index={7}
+    >
+      <ul className="home-niches">
+        {niches.map((n) => {
+          const now = n.current ?? n.score;
+          const delta = n.current === null ? 0 : n.current - n.score;
+          return (
+            <li key={n.key}>
+              <Link href={`/research/niche-finder?topic=${encodeURIComponent(n.topic)}`} className="home-niche">
+                <span className="home-niche-name">{n.topic}</span>
+                <span className="home-niche-score" data-band={now >= 65 ? "high" : now >= 45 ? "mid" : "low"}>
+                  {now}
+                </span>
+                <span className="home-niche-delta" data-dir={delta > 0 ? "up" : delta < 0 ? "down" : "flat"}>
+                  {delta > 0 ? `▲ ${delta}` : delta < 0 ? `▼ ${-delta}` : "—"}
+                </span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
     </Panel>
   );
 }

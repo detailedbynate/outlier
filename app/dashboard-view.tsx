@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { greetingName } from "@/lib/analytics/dashboard";
 import type { CurrentUser } from "@/lib/auth/session";
 import { timeAgo } from "@/lib/format";
+import { readSavedNiches } from "@/lib/niches/saved";
 import { getServices } from "@/lib/services";
 import {
   CompetitorWatchSection,
@@ -12,6 +13,7 @@ import {
   PanelSkeleton,
   RecentActivitySection,
   ResearchShortcuts,
+  SavedNichesSection,
   TrackedSection,
   YourChannelSection,
   YourChannelSkeleton,
@@ -68,6 +70,10 @@ export async function DashboardView({ current }: { current: CurrentUser }) {
         </Suspense>
         <Suspense fallback={<PanelSkeleton className="home-span-5" rows={5} />}>
           <HeatingUpSection niches={niches} lastVisitAt={lastVisitAt} />
+        </Suspense>
+
+        <Suspense fallback={null}>
+          <SavedNichesSection saved={readSavedNiches(current.user.user_metadata)} />
         </Suspense>
 
         <Suspense fallback={<PanelSkeleton className="home-span-4" rows={4} />}>
