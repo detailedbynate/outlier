@@ -1,7 +1,7 @@
 /* ===========================================================================
    Outlier design system
-   Black surfaces, glass panels, one violet accent. Gradients are reserved for
-   the brand mark and the primary call to action; everything else is solid.
+   Black surfaces, glass panels, one violet accent. Solid colours throughout;
+   the only gradients left are functional (loading shimmer, text-legibility scrims).
 =========================================================================== */
 
 :root {
@@ -23,8 +23,8 @@
   --accent: #8b5cf6;
   --accent-2: #ec4899;
   --accent-text: #c4b5fd;
-  /* Brand mark and the one primary CTA per page. */
-  --accent-gradient: linear-gradient(135deg, #8b5cf6, #ec4899);
+  /* Kept as a name so older rules still resolve; it's the solid accent now. */
+  --accent-gradient: #8b5cf6;
   --accent-track: rgba(139, 92, 246, 0.2);
   --accent-wash: rgba(139, 92, 246, 0.12);
   --on-accent: #ffffff;
@@ -42,10 +42,6 @@
   --glass-border: rgba(255, 255, 255, 0.09);
   --glass-shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 10px 30px rgba(0, 0, 0, 0.5);
   --shadow-pop: 0 20px 50px rgba(0, 0, 0, 0.65);
-
-  --ambient-1: rgba(139, 92, 246, 0.13);
-  --ambient-2: rgba(236, 72, 153, 0.06);
-  --ambient-3: rgba(56, 189, 248, 0.04);
 
   --radius-sm: 8px;
   --radius: 12px;
@@ -79,8 +75,7 @@ body {
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  /* One faint glow so the black has depth without looking painted. */
-  background: radial-gradient(45vw 40vw at 15% -8%, var(--ambient-1), transparent 70%);
+  background: var(--page);
 }
 
 a {
@@ -4082,47 +4077,6 @@ body:has(.onboarding-root) .ambient {
   overflow: clip;
 }
 
-.ob-backdrop {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-}
-
-.ob-orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.55;
-  animation: drift 16s ease-in-out infinite alternate;
-}
-
-.ob-orb-a {
-  width: 520px;
-  height: 520px;
-  top: -160px;
-  left: -120px;
-  background: radial-gradient(circle, var(--ambient-1), transparent 70%);
-}
-
-.ob-orb-b {
-  width: 460px;
-  height: 460px;
-  right: -140px;
-  top: 20%;
-  background: radial-gradient(circle, var(--ambient-2), transparent 70%);
-  animation-delay: -6s;
-}
-
-.ob-orb-c {
-  width: 600px;
-  height: 600px;
-  left: 30%;
-  bottom: -320px;
-  background: radial-gradient(circle, var(--ambient-3), transparent 70%);
-  animation-delay: -11s;
-}
-
 .ob-top {
   display: flex;
   justify-content: space-between;
@@ -4277,10 +4231,7 @@ body:has(.onboarding-root) .ambient {
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: conic-gradient(from var(--angle, 0deg), rgba(139, 92, 246, 0.6), rgba(236, 72, 153, 0.5), transparent 60%, rgba(139, 92, 246, 0.6));
-  -webkit-mask: radial-gradient(circle, transparent 50px, #000 51px);
-  mask: radial-gradient(circle, transparent 50px, #000 51px);
-  animation: spin-border 3.5s linear infinite;
+  border: 3px solid rgba(139, 92, 246, 0.6);
 }
 
 .wave,
@@ -8051,7 +8002,7 @@ a.dash-row:hover {
 .billing-plan[data-plan="pro"],
 .billing-plan[data-plan="expert"] {
   border-color: var(--plan-edge);
-  background: linear-gradient(180deg, var(--plan-soft), transparent 70%);
+  background: var(--plan-soft);
 }
 
 .billing-plan[data-current="true"] {
@@ -8654,14 +8605,13 @@ a.dash-row:hover {
   animation: sw-rise 0.45s var(--ease) both;
 }
 
-/* A slow sheen across the top edge, so the panel doesn't read as a dead box. */
+/* A plain violet hairline along the top edge. */
 .sw-form::before {
   content: "";
   position: absolute;
   inset: 0 0 auto;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.7), transparent);
-  animation: sw-sweep 6s var(--ease) infinite;
+  background: rgba(139, 92, 246, 0.45);
 }
 
 .sw-controls {
@@ -9000,18 +8950,6 @@ a.dash-row:hover {
   from {
     opacity: 0;
     transform: translateY(-6px);
-  }
-}
-
-@keyframes sw-sweep {
-  0%,
-  100% {
-    opacity: 0;
-    transform: translateX(-60%);
-  }
-  50% {
-    opacity: 1;
-    transform: translateX(60%);
   }
 }
 
@@ -9448,7 +9386,7 @@ a.dash-row:hover {
   --plan-top: rgba(109, 72, 230, 0.34);
   --plan-bottom: rgba(20, 12, 40, 0.6);
   --plan-inner: rgba(139, 92, 246, 0.1);
-  --plan-button: linear-gradient(180deg, #9b6dff, #7c4dff);
+  --plan-button: #8b5cf6;
   --plan-button-text: #fff;
 }
 
@@ -9457,7 +9395,7 @@ a.dash-row:hover {
   --plan-top: rgba(20, 170, 190, 0.3);
   --plan-bottom: rgba(4, 26, 32, 0.6);
   --plan-inner: rgba(34, 211, 238, 0.08);
-  --plan-button: linear-gradient(180deg, #3ee0f5, #14b8a6);
+  --plan-button: #14b8a6;
   --plan-button-text: #03151a;
 }
 
@@ -9465,7 +9403,7 @@ a.dash-row:hover {
 .pricing-card[data-plan="expert"],
 .billing-plan[data-plan="pro"],
 .billing-plan[data-plan="expert"] {
-  background: linear-gradient(180deg, var(--plan-top), var(--plan-bottom) 75%);
+  background: var(--plan-inner);
   border: 1px solid var(--plan-edge);
 }
 
@@ -9521,7 +9459,7 @@ a.dash-row:hover {
 }
 
 .nav-link[aria-current="page"] {
-  background: linear-gradient(90deg, rgba(139, 92, 246, 0.16), rgba(139, 92, 246, 0.04));
+  background: rgba(139, 92, 246, 0.12);
 }
 
 .nav-link[aria-current="page"] .nav-icon {
@@ -9576,14 +9514,14 @@ a.dash-row:hover {
 }
 
 .plan-chip[data-plan="pro"] {
-  background: linear-gradient(135deg, #8b5cf6, #6366f1);
+  background: #8b5cf6;
   border-color: transparent;
   color: #fff;
   box-shadow: 0 0 14px -2px rgba(139, 92, 246, 0.7);
 }
 
 .plan-chip[data-plan="expert"] {
-  background: linear-gradient(135deg, #22d3ee, #14b8a6);
+  background: #14b8a6;
   border-color: transparent;
   color: #04111a;
   box-shadow: 0 0 14px -2px rgba(34, 211, 238, 0.7);
@@ -9671,18 +9609,18 @@ a.dash-row:hover {
   --pack: #a78bfa;
   --pack-edge: rgba(139, 92, 246, 0.45);
   --pack-glow: rgba(139, 92, 246, 0.35);
-  --pack-button: linear-gradient(180deg, #9b6dff, #7c4dff);
+  --pack-button: #8b5cf6;
   --pack-button-text: #fff;
-  background: linear-gradient(180deg, rgba(109, 72, 230, 0.34), rgba(20, 12, 40, 0.6) 80%);
+  background: rgba(139, 92, 246, 0.1);
 }
 
 .billing-pack[data-pack="large"] {
   --pack: #22d3ee;
   --pack-edge: rgba(34, 211, 238, 0.42);
   --pack-glow: rgba(34, 211, 238, 0.3);
-  --pack-button: linear-gradient(180deg, #3ee0f5, #14b8a6);
+  --pack-button: #14b8a6;
   --pack-button-text: #03151a;
-  background: linear-gradient(180deg, rgba(20, 170, 190, 0.3), rgba(4, 26, 32, 0.6) 80%);
+  background: rgba(34, 211, 238, 0.08);
 }
 
 .billing-pack[data-pack="medium"],
@@ -9756,7 +9694,7 @@ a.dash-row:hover {
   position: relative;
   overflow: hidden;
   border-color: rgba(var(--g), 0.28);
-  background: linear-gradient(160deg, rgba(var(--g), 0.16), rgba(var(--g), 0.03) 70%), var(--dash-surface);
+  background: linear-gradient(rgba(var(--g), 0.08), rgba(var(--g), 0.08)), var(--dash-surface);
   animation: intel-rise 0.45s var(--ease) both;
   transition:
     transform 0.2s var(--ease),
@@ -9769,13 +9707,13 @@ a.dash-row:hover {
 .intel-glance-item:hover {
   transform: translateY(-2px);
   border-color: rgba(var(--g), 0.6);
-  background: linear-gradient(160deg, rgba(var(--g), 0.22), rgba(var(--g), 0.05) 70%), var(--dash-surface);
+  background: linear-gradient(rgba(var(--g), 0.12), rgba(var(--g), 0.12)), var(--dash-surface);
   box-shadow: 0 10px 28px -12px rgba(var(--g), 0.55);
 }
 .intel-glance-label { color: rgb(var(--g)); font-weight: 600; }
 
 .intel-tab[aria-current="page"] {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.28), rgba(236, 72, 153, 0.18));
+  background: rgba(139, 92, 246, 0.22);
   box-shadow: 0 0 18px -6px rgba(139, 92, 246, 0.7);
 }
 
@@ -9843,14 +9781,14 @@ a.dash-row:hover {
   outline-offset: 2px;
 }
 .intel .dash-list > li[data-you="true"] .dash-row {
-  background: linear-gradient(90deg, rgba(139, 92, 246, 0.16), transparent);
+  background: rgba(139, 92, 246, 0.1);
   box-shadow: inset 3px 0 0 #a78bfa;
   border-radius: 10px;
 }
 
 .intel-opps > li {
   border-left: 3px solid rgba(52, 211, 153, 0.7);
-  background: linear-gradient(90deg, rgba(52, 211, 153, 0.08), transparent 60%);
+  background: rgba(52, 211, 153, 0.05);
 }
 
 .intel-more > summary { color: var(--accent-text); }
@@ -9928,7 +9866,7 @@ a.dash-row:hover {
   padding: 18px 20px;
   border-radius: 16px;
   border: 1px solid rgba(52, 211, 153, 0.3);
-  background: linear-gradient(160deg, rgba(52, 211, 153, 0.12), rgba(52, 211, 153, 0.02) 70%), var(--dash-surface, transparent);
+  background: linear-gradient(rgba(52, 211, 153, 0.06), rgba(52, 211, 153, 0.06)), var(--dash-surface, transparent);
   animation: intel-rise 0.45s var(--ease) both;
 }
 .niche-money > header {
@@ -10047,7 +9985,7 @@ a.dash-row:hover {
   border-radius: 14px;
   color: inherit;
   border: 1px solid rgba(236, 72, 153, 0.28);
-  background: linear-gradient(160deg, rgba(236, 72, 153, 0.12), rgba(236, 72, 153, 0.02) 70%), var(--dash-surface, transparent);
+  background: linear-gradient(rgba(236, 72, 153, 0.06), rgba(236, 72, 153, 0.06)), var(--dash-surface, transparent);
   animation: intel-rise 0.4s var(--ease) both;
   animation-delay: calc(var(--i, 0) * 45ms);
   transition:

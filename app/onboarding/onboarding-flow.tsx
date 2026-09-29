@@ -149,12 +149,6 @@ export function OnboardingFlow({ firstName }: { firstName: string | null }) {
 
   return (
     <div className="onboarding-root" onKeyDown={onKeyDown}>
-      <div className="ob-backdrop" aria-hidden="true">
-        <span className="ob-orb ob-orb-a" />
-        <span className="ob-orb ob-orb-b" />
-        <span className="ob-orb ob-orb-c" />
-      </div>
-
       <header className="ob-top">
         <span className="ob-brand">
           <BrandMark size={28} />
