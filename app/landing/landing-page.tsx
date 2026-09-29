@@ -5,7 +5,7 @@ import { env } from "@/lib/core/env";
 import { logger } from "@/lib/core/logger";
 import { getServices } from "@/lib/services";
 import { LandingHeader } from "./landing-header";
-import { AnalyzeMock, GrowthMock, PicksMock, ResearchMock } from "./mock-visuals";
+import { AnalyzeMock, GrowthMock, PicksMock, ResearchMock, type ShowcasePick } from "./mock-visuals";
 import { Reveal } from "./motion";
 import { ScrollLink } from "./scroll-link";
 import { WaitlistForm } from "./waitlist-form";
@@ -37,14 +37,15 @@ const NICHES = [
   "motivation",
 ];
 
-const FEATURES: {
+function features(picks: ShowcasePick[]): {
   id: string;
   eyebrow: string;
   title: string;
   body: string;
   points: string[];
   visual: ReactNode;
-}[] = [
+}[] {
+  return [
   {
     id: "features",
     eyebrow: "Shorts research",
@@ -67,7 +68,7 @@ const FEATURES: {
     title: "Five breakout channels, picked every day",
     body: "Each day Outlier scans rotating niches and surfaces the channels whose newest Shorts are outperforming their size by the widest margin.",
     points: ["New niches every day", "Ranked by views vs. channel size", "No searching, no credits"],
-    visual: <PicksMock />,
+    visual: <PicksMock picks={picks} />,
   },
   {
     id: "analyze",
@@ -75,9 +76,10 @@ const FEATURES: {
     title: "See exactly how far a video beat its channel",
     body: "Paste any video to get views per day, engagement, and an outlier score measured against that channel's recent uploads.",
     points: ["Outlier score vs. channel median", "Views per day and engagement", "Works on Shorts and long-form"],
-    visual: <AnalyzeMock />,
+    visual: <AnalyzeMock pick={picks[0] ?? null} />,
   },
-];
+  ];
+}
 
 /** Pro's price for a new subscriber today: the launch price during the sale, the list price after. */
 function proPrice(): string {
@@ -159,6 +161,33 @@ function DiscordIcon() {
   );
 }
 
+/** Latest daily picks, biggest outliers first, for the product previews. Empty if unavailable. */
+async function showcasePicks(now: Date): Promise<ShowcasePick[]> {
+  try {
+    const picks = await getServices().trending.currentPicks();
+    return picks
+      .filter((p) => p.channel_median_views && p.outlier_multiplier && p.video_views > 0)
+      .sort((a, b) => b.outlier_multiplier! - a.outlier_multiplier!)
+      .map((p) => {
+        const days = p.video_published_at ? Math.max(1, (now.getTime() - Date.parse(p.video_published_at)) / 86_400_000) : 1;
+        return {
+          videoId: p.youtube_video_id,
+          title: p.video_title,
+          niche: p.niche,
+          views: p.video_views,
+          medianViews: p.channel_median_views!,
+          multiplier: p.outlier_multiplier!,
+          viewsPerDay: Math.round(p.video_views / days),
+          engagement: p.engagement,
+        };
+      });
+  } catch (error) {
+    // The landing page must render even if the database is unavailable.
+    logger.warn("landing showcase picks unavailable", { error });
+    return [];
+  }
+}
+
 /** Plans, priced straight from the same definitions the app bills against. */
 function PricingSection() {
   const sellable = sellablePlans();
@@ -235,7 +264,7 @@ function PricingSection() {
 }
 
 export async function LandingPage({ referralCode = null }: { referralCode?: string | null } = {}) {
-  const count = await waitlistCount();
+  const [count, picks] = await Promise.all([waitlistCount(), showcasePicks(new Date())]);
   const discordUrl = env().DISCORD_INVITE_URL ?? DISCORD_INVITE;
 
   return (
@@ -283,7 +312,7 @@ export async function LandingPage({ referralCode = null }: { referralCode?: stri
         </div>
 
         <div className="feature-sections">
-          {FEATURES.map((feature, index) => (
+          {features(picks).map((feature, index) => (
             <section key={feature.id} id={feature.id} className={`feature-row ${index % 2 === 1 ? "is-flipped" : ""}`}>
               <Reveal className="feature-copy">
                 <span className="feature-eyebrow">{feature.eyebrow}</span>
