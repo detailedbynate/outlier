@@ -5,6 +5,11 @@ import { markChangelogSeen } from "@/app/changelog-actions";
 import { CHANGELOG } from "@/lib/changelog";
 import { ZapIcon } from "./icons";
 
+/** How long after the page has loaded before it comes in, so it doesn't land on a half-drawn page. */
+const SETTLE_MS = 900;
+/** Matches the exit transition in globals.css. */
+const EXIT_MS = 260;
+
 /**
  * Shows the current changelog once. The account remembers it (see
  * markChangelogSeen); this browser remembers it too, so a slow or failed save
@@ -13,6 +18,8 @@ import { ZapIcon } from "./icons";
 export function WhatsNew() {
   const key = `outlier:changelog:${CHANGELOG.id}`;
   const [open, setOpen] = useState(false);
+  // The entrance is a CSS animation that plays on mount; "out" runs the exit.
+  const [phase, setPhase] = useState<"in" | "out">("in");
 
   useEffect(() => {
     let seen = false;
@@ -21,9 +28,18 @@ export function WhatsNew() {
     } catch {
       // Storage blocked: the account flag still stops it after this time.
     }
-    // Reading storage has to wait until mount, so this can't be initial state.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (!seen) setOpen(true);
+    if (seen) return;
+
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const show = () => {
+      timer = setTimeout(() => setOpen(true), SETTLE_MS);
+    };
+    if (document.readyState === "complete") show();
+    else window.addEventListener("load", show, { once: true });
+    return () => {
+      window.removeEventListener("load", show);
+      clearTimeout(timer);
+    };
   }, [key]);
 
   useEffect(() => {
@@ -38,17 +54,19 @@ export function WhatsNew() {
   if (!open) return null;
 
   function close() {
+    if (phase === "out") return;
     try {
       window.localStorage.setItem(key, "1");
     } catch {
       // Nothing to remember it in.
     }
-    setOpen(false);
+    setPhase("out");
+    setTimeout(() => setOpen(false), EXIT_MS);
     void markChangelogSeen().catch(() => undefined);
   }
 
   return (
-    <div className="low-credits-backdrop" role="presentation" onClick={close}>
+    <div className="whats-new-backdrop" data-phase={phase} role="presentation" onClick={close}>
       <div className="low-credits whats-new" role="dialog" aria-modal="true" aria-labelledby="whats-new-title" onClick={(e) => e.stopPropagation()}>
         <span className="whats-new-badge">
           <ZapIcon size={14} /> New

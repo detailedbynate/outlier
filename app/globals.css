@@ -8710,6 +8710,88 @@ a.dash-row:hover {
 }
 
 /* What's new: shown once per changelog (components/whats-new.tsx) */
+.whats-new-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  animation: whats-new-fade 0.45s var(--ease) both;
+}
+
+.whats-new-backdrop .whats-new {
+  animation: whats-new-rise 0.6s var(--ease) 0.08s both;
+}
+
+/* Each item follows the card in, one after another. */
+.whats-new-list li {
+  animation: whats-new-item 0.4s var(--ease) both;
+}
+
+.whats-new-list li:nth-child(1) { animation-delay: 0.22s; }
+.whats-new-list li:nth-child(2) { animation-delay: 0.3s; }
+.whats-new-list li:nth-child(3) { animation-delay: 0.38s; }
+.whats-new-list li:nth-child(4) { animation-delay: 0.46s; }
+.whats-new-list li:nth-child(5) { animation-delay: 0.54s; }
+
+.whats-new-backdrop[data-phase="out"] {
+  animation: whats-new-fade 0.26s var(--ease) reverse both;
+}
+
+.whats-new-backdrop[data-phase="out"] .whats-new {
+  animation: whats-new-leave 0.26s var(--ease) both;
+}
+
+@keyframes whats-new-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes whats-new-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes whats-new-item {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes whats-new-leave {
+  to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .whats-new-backdrop,
+  .whats-new-backdrop .whats-new,
+  .whats-new-list li {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+  }
+}
+
 .whats-new {
   width: min(460px, 100%);
   gap: 12px;

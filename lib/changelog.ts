@@ -9,6 +9,10 @@ export const CHANGELOG = {
   title: "What's new in Outlier",
   items: [
     {
+      title: "Script Writer is here",
+      body: "Give it your niche and an idea and it writes the script: hook, turn, payoff, ready to read out. Show it a couple of your scripts and it writes in your voice. On the Expert plan.",
+    },
+    {
       title: "A new dashboard",
       body: "Your channel comes first now: subscriber growth, a views-per-upload chart that marks your best video, and how you stack up against your competitors.",
     },
@@ -19,10 +23,6 @@ export const CHANGELOG = {
     {
       title: "Forgot your password?",
       body: "You can reset it yourself from the sign-in page. We'll email you a link.",
-    },
-    {
-      title: "A cleaner look",
-      body: "A new flat logo and a calmer design across the app.",
     },
   ],
 } as const;
