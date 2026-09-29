@@ -3,7 +3,7 @@ import type Stripe from "stripe";
 import { env } from "@/lib/core/env";
 import { logger } from "@/lib/core/logger";
 import { getServices } from "@/lib/services";
-import { findPlan, PAID_PLANS, type Plan, type PlanId } from "./plans";
+import { findPlan, onSale, PAID_PLANS, type Plan, type PlanId } from "./plans";
 import { getStripe } from "./stripe";
 
 /**
@@ -16,12 +16,32 @@ import { getStripe } from "./stripe";
  * whatever Stripe currently says.
  */
 
-/** The recurring Price a plan is billed against, or null when it isn't configured. */
-export function priceIdFor(plan: Plan): string | null {
+/** The Stripe Price for a plan's list price, used once its launch sale is over. */
+function listPriceIdFor(plan: Plan): string | null {
+  return plan.id === "pro" ? (env().STRIPE_PRICE_PRO_LIST ?? null) : null;
+}
+
+/**
+ * Has this plan moved to its list price? Only once the sale is over *and* the
+ * list-price Stripe Price exists; until then it keeps charging, and showing, the
+ * launch price, so what we display always matches what Stripe bills.
+ */
+function atListPrice(plan: Plan, now: Date): boolean {
+  return plan.listPriceCents !== undefined && !onSale(plan, now) && listPriceIdFor(plan) !== null;
+}
+
+/** The recurring Price a new subscriber to this plan is billed against, or null when it isn't configured. */
+export function priceIdFor(plan: Plan, now: Date = new Date()): string | null {
+  if (atListPrice(plan, now)) return listPriceIdFor(plan);
   const config = env();
   if (plan.id === "pro") return config.STRIPE_PRICE_PRO ?? null;
   if (plan.id === "expert") return config.STRIPE_PRICE_EXPERT ?? null;
   return null;
+}
+
+/** What a new subscriber to this plan pays each month, in US cents. */
+export function priceCentsFor(plan: Plan, now: Date = new Date()): number {
+  return atListPrice(plan, now) ? plan.listPriceCents! : plan.priceCents;
 }
 
 /** Paid plans that have a Stripe Price behind them, so we can't sell what we can't bill. */
@@ -33,9 +53,10 @@ export function sellablePlans(): Plan[] {
 export function planForSubscription(subscription: Stripe.Subscription): PlanId | null {
   const priceId = subscription.items.data[0]?.price.id;
   if (!priceId) return null;
-  for (const plan of PAID_PLANS) {
-    if (priceIdFor(plan) === priceId) return plan.id;
-  }
+  const config = env();
+  // Launch-price subscribers keep their Price after the sale, so both Pro Prices mean Pro.
+  if (priceId === config.STRIPE_PRICE_PRO || priceId === config.STRIPE_PRICE_PRO_LIST) return "pro";
+  if (priceId === config.STRIPE_PRICE_EXPERT) return "expert";
   // A Price we no longer sell: honour it by name if the metadata says which plan.
   return findPlan(subscription.metadata?.planId)?.id ?? null;
 }

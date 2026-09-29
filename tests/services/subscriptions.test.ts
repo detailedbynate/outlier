@@ -1,5 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { FREE_PLAN, isEntitled, onSale, PLANS, planOrFree, SALE_ENDS_AT } from "@/lib/billing/plans";
+import { planForSubscription, priceCentsFor, priceIdFor } from "@/lib/billing/subscriptions";
+import { resetEnvCache } from "@/lib/core/env";
 import { SubscriptionService } from "@/lib/services/subscription-service";
 import type { SubscriptionRepository } from "@/lib/database/repositories/subscriptions";
 import type { SubscriptionRow } from "@/types/database";
@@ -54,6 +56,56 @@ describe("plans", () => {
   it("keeps a plan running while Stripe retries a failed card", () => {
     expect(["active", "trialing", "past_due"].every(isEntitled)).toBe(true);
     expect(["canceled", "unpaid", "incomplete", "inactive"].some(isEntitled)).toBe(false);
+  });
+});
+
+describe("launch sale ending", () => {
+  const before = new Date(SALE_ENDS_AT - 1);
+  const after = new Date(SALE_ENDS_AT);
+
+  function prices(list?: string) {
+    vi.stubEnv("STRIPE_PRICE_PRO", "price_pro_launch");
+    vi.stubEnv("STRIPE_PRICE_PRO_LIST", list ?? "");
+    vi.stubEnv("STRIPE_PRICE_EXPERT", "price_expert");
+    resetEnvCache();
+  }
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    resetEnvCache();
+  });
+
+  it("sells Pro at the launch price until the sale ends", () => {
+    prices("price_pro_list");
+    expect(priceIdFor(pro, before)).toBe("price_pro_launch");
+    expect(priceCentsFor(pro, before)).toBe(1_000);
+  });
+
+  it("moves new Pro subscribers to the list price after the sale", () => {
+    prices("price_pro_list");
+    expect(priceIdFor(pro, after)).toBe("price_pro_list");
+    expect(priceCentsFor(pro, after)).toBe(1_500);
+  });
+
+  it("keeps showing and charging the launch price if the list Price isn't set up", () => {
+    prices();
+    expect(priceIdFor(pro, after)).toBe("price_pro_launch");
+    expect(priceCentsFor(pro, after)).toBe(1_000);
+  });
+
+  it("leaves Expert alone", () => {
+    prices("price_pro_list");
+    const expert = PLANS.find((plan) => plan.id === "expert")!;
+    expect(priceIdFor(expert, after)).toBe("price_expert");
+    expect(priceCentsFor(expert, after)).toBe(3_000);
+  });
+
+  it("recognises both Pro Prices, so launch subscribers stay on Pro", () => {
+    prices("price_pro_list");
+    const sub = (price: string) => ({ items: { data: [{ price: { id: price } }] }, metadata: {} }) as never;
+    expect(planForSubscription(sub("price_pro_launch"))).toBe("pro");
+    expect(planForSubscription(sub("price_pro_list"))).toBe("pro");
+    expect(planForSubscription(sub("price_expert"))).toBe("expert");
   });
 });
 

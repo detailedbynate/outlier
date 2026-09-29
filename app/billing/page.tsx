@@ -8,7 +8,7 @@ import { billingEnabled, fulfillCheckout, getStripe } from "@/lib/billing/stripe
 import { getServices } from "@/lib/services";
 import { FREE_PLAN, onSale, PLANS } from "@/lib/billing/plans";
 import { ZapIcon } from "@/components/icons";
-import { sellablePlans, syncSubscription } from "@/lib/billing/subscriptions";
+import { priceCentsFor, sellablePlans, syncSubscription } from "@/lib/billing/subscriptions";
 import { openBillingPortal, startCheckout, startSubscription } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -139,7 +139,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Sear
                   </div>
 
                   <div className="billing-plan-price">
-                    <strong>{paid ? formatPrice(plan.priceCents) : "Free"}</strong>
+                    <strong>{paid ? formatPrice(priceCentsFor(plan, now)) : "Free"}</strong>
                     {sale ? <span className="billing-plan-was">{formatPrice(plan.listPriceCents!)}</span> : null}
                   </div>
                   <span className="billing-plan-terms">

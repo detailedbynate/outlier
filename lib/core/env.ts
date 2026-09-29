@@ -150,6 +150,8 @@ const serverEnvSchema = z.object({
    * isn't offered, so a half-configured Stripe can't sell something it can't bill.
    */
   STRIPE_PRICE_PRO: optionalString,
+  /** Pro at its list price, charged to new subscribers once the launch sale ends. */
+  STRIPE_PRICE_PRO_LIST: optionalString,
   STRIPE_PRICE_EXPERT: optionalString,
 
   /** Resend API key, for the emails Outlier sends itself (the subscriber's signup link). */

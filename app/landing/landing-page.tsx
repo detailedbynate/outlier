@@ -11,7 +11,7 @@ import { ScrollLink } from "./scroll-link";
 import { WaitlistForm } from "./waitlist-form";
 import { formatPrice } from "@/lib/billing/packs";
 import { onSale, PLANS } from "@/lib/billing/plans";
-import { sellablePlans } from "@/lib/billing/subscriptions";
+import { priceCentsFor, sellablePlans } from "@/lib/billing/subscriptions";
 import { startPublicSubscription } from "./checkout";
 
 /** Community invite; DISCORD_INVITE_URL overrides it. */
@@ -79,7 +79,13 @@ const FEATURES: {
   },
 ];
 
-const WHY = [
+/** Pro's price for a new subscriber today: the launch price during the sale, the list price after. */
+function proPrice(): string {
+  return formatPrice(priceCentsFor(PLANS[1]!));
+}
+
+function why() {
+  return [
   {
     title: "Made for Shorts",
     body: "The filters, scores and daily picks are all built around Shorts, where a small channel can go from nothing to millions of views in a week.",
@@ -94,11 +100,16 @@ const WHY = [
   },
   {
     title: "Priced for creators",
-    body: `Plans start at ${formatPrice(PLANS[1]!.priceCents)} a month and you can cancel any time. Credits you top up never expire.`,
+    body: `Plans start at ${proPrice()} a month and you can cancel any time. Credits you top up never expire.`,
   },
-];
+  ];
+}
 
-const FAQ = [
+function faq(now: Date) {
+  const pro = PLANS[1]!;
+  const expert = PLANS[2]!;
+  const launch = onSale(pro, now) ? ` Pro is a launch price and goes to ${formatPrice(pro.listPriceCents!)} on 1 October.` : "";
+  return [
   {
     q: "What is Outlier?",
     a: "Outlier is a research tool for YouTube creators. It finds channels and videos that are outperforming their size, especially on Shorts, so you can spot winning niches, formats, and ideas early.",
@@ -109,7 +120,7 @@ const FAQ = [
   },
   {
     q: "How much does it cost?",
-    a: "Pro is $10 a month and Expert is $30, both billed monthly and cancellable any time from your account. Pro is a launch price and goes to $15 in October. Every plan has every tool; the difference is how much research you can do each month.",
+    a: `Pro is ${proPrice()} a month and Expert is ${formatPrice(priceCentsFor(expert, now))}, both billed monthly and cancellable any time from your account.${launch} Every plan has every tool; the difference is how much research you can do each month.`,
   },
   {
     q: "Do I need to connect my YouTube account?",
@@ -119,7 +130,8 @@ const FAQ = [
     q: "Is Outlier affiliated with YouTube?",
     a: "No. Outlier is an independent product and isn't affiliated with or endorsed by YouTube or Google.",
   },
-];
+  ];
+}
 
 async function waitlistCount(): Promise<number> {
   try {
@@ -177,7 +189,7 @@ function PricingSection() {
                 </div>
                 <p className="pricing-blurb">{plan.blurb}</p>
                 <div className="pricing-price">
-                  <strong>{paid ? formatPrice(plan.priceCents) : "Free"}</strong>
+                  <strong>{paid ? formatPrice(priceCentsFor(plan, now)) : "Free"}</strong>
                   {paid ? <span className="pricing-per">/month</span> : null}
                   {sale ? <span className="pricing-was">{formatPrice(plan.listPriceCents!)}</span> : null}
                 </div>
@@ -257,7 +269,7 @@ export async function LandingPage({ referralCode = null }: { referralCode?: stri
               See what it does
             </ScrollLink>
           </div>
-          <p className="landing-count">From {formatPrice(PLANS[1]!.priceCents)} a month · cancel any time</p>
+          <p className="landing-count">From {proPrice()} a month · cancel any time</p>
         </section>
 
         <div className="marquee" aria-hidden="true">
@@ -299,7 +311,7 @@ export async function LandingPage({ referralCode = null }: { referralCode?: stri
             <h2 className="feature-title">Why choose Outlier</h2>
           </Reveal>
           <div className="why-grid">
-            {WHY.map((item, i) => (
+            {why().map((item, i) => (
               <Reveal key={item.title} delay={i * 60} className="why-item">
                 <h3>{item.title}</h3>
                 <p>{item.body}</p>
@@ -329,7 +341,7 @@ export async function LandingPage({ referralCode = null }: { referralCode?: stri
             <h2 className="feature-title">Questions, answered</h2>
           </Reveal>
           <div className="faq-list">
-            {FAQ.map((item, i) => (
+            {faq(new Date()).map((item, i) => (
               <Reveal key={item.q} delay={i * 60}>
                 <details className="faq-item">
                   <summary>
