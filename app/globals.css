@@ -433,6 +433,21 @@ h2 {
   gap: 10px;
 }
 
+/* Keep credits and the account row in view while a long menu scrolls. The
+   sidebar is a see-through glass panel, so the pinned part gets the colour it
+   shows over the black page. Desktop only: phones use the drop-down menu. */
+@media (min-width: 901px) {
+  .sidebar-foot {
+    position: sticky;
+    bottom: -12px;
+    z-index: 1;
+    margin: 0 -12px -12px;
+    padding: 12px;
+    background: #0b0b0c;
+    box-shadow: 0 -14px 16px -6px #0b0b0c;
+  }
+}
+
 .credits {
   border-radius: 14px;
   padding: 12px;
