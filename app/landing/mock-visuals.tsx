@@ -1,4 +1,4 @@
-import { CountUp, TiltCard, Typewriter } from "./motion";
+import { CountUp, Typewriter } from "./motion";
 
 /**
  * Illustrative product previews for the landing page. They show what each tool
@@ -16,7 +16,7 @@ function SearchGlyph() {
 
 export function ResearchMock() {
   return (
-    <TiltCard className="mock">
+    <div className="mock">
       <div className="mock-search">
         <SearchGlyph />
         <span>
@@ -42,13 +42,13 @@ export function ResearchMock() {
           </div>
         ))}
       </div>
-    </TiltCard>
+    </div>
   );
 }
 
 export function GrowthMock() {
   return (
-    <TiltCard className="mock">
+    <div className="mock">
       <div className="mock-head">
         <span className="mock-avatar mock-avatar-lg" />
         <span className="mock-lines">
@@ -61,21 +61,11 @@ export function GrowthMock() {
         </span>
       </div>
       <svg className="mock-chart" viewBox="0 0 320 120" preserveAspectRatio="none" aria-hidden="true">
-        <defs>
-          <linearGradient id="mock-area" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#8b5cf6" stopOpacity="0.35" />
-            <stop offset="1" stopColor="#8b5cf6" stopOpacity="0" />
-          </linearGradient>
-          <linearGradient id="mock-line" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0" stopColor="#6366f1" />
-            <stop offset="1" stopColor="#ec4899" />
-          </linearGradient>
-        </defs>
         {[30, 60, 90].map((y) => (
           <line key={y} x1="0" x2="320" y1={y} y2={y} className="mock-grid" />
         ))}
-        <path className="mock-area" d="M0 104 C40 100 60 96 90 90 S150 84 180 70 S240 30 270 22 S310 10 320 8 V120 H0 Z" fill="url(#mock-area)" />
-        <path className="mock-path" d="M0 104 C40 100 60 96 90 90 S150 84 180 70 S240 30 270 22 S310 10 320 8" stroke="url(#mock-line)" />
+        <path className="mock-area" d="M0 104 C40 100 60 96 90 90 S150 84 180 70 S240 30 270 22 S310 10 320 8 V120 H0 Z" fill="#8b5cf6" fillOpacity="0.14" />
+        <path className="mock-path" d="M0 104 C40 100 60 96 90 90 S150 84 180 70 S240 30 270 22 S310 10 320 8" stroke="#8b5cf6" />
         <circle className="mock-dot" cx="320" cy="8" r="5" />
       </svg>
       <div className="mock-stats">
@@ -92,7 +82,7 @@ export function GrowthMock() {
           <span>subs · 48h</span>
         </div>
       </div>
-    </TiltCard>
+    </div>
   );
 }
 
@@ -103,7 +93,7 @@ export function PicksMock() {
     { niche: "tech", views: "5.9M" },
   ];
   return (
-    <TiltCard className="mock mock-picks">
+    <div className="mock mock-picks">
       <div className="picks-stack">
         {picks.map((pick, i) => (
           <div key={pick.niche} className="pick-card" style={{ animationDelay: `${i * -2}s` }}>
@@ -117,24 +107,17 @@ export function PicksMock() {
           </div>
         ))}
       </div>
-    </TiltCard>
+    </div>
   );
 }
 
 export function AnalyzeMock() {
   return (
-    <TiltCard className="mock mock-analyze">
+    <div className="mock mock-analyze">
       <div className="gauge">
         <svg viewBox="0 0 120 120" aria-hidden="true">
-          <defs>
-            <linearGradient id="gauge-stroke" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stopColor="#fb923c" />
-              <stop offset="0.5" stopColor="#ec4899" />
-              <stop offset="1" stopColor="#8b5cf6" />
-            </linearGradient>
-          </defs>
           <circle cx="60" cy="60" r="50" className="gauge-track" />
-          <circle cx="60" cy="60" r="50" className="gauge-fill" stroke="url(#gauge-stroke)" />
+          <circle cx="60" cy="60" r="50" className="gauge-fill" stroke="#8b5cf6" />
         </svg>
         <div className="gauge-value">
           <strong>
@@ -163,6 +146,6 @@ export function AnalyzeMock() {
           </strong>
         </div>
       </div>
-    </TiltCard>
+    </div>
   );
 }

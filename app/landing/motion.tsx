@@ -59,34 +59,6 @@ export function Reveal({
   );
 }
 
-/** Card that tilts toward the pointer and shows a soft spotlight where it hovers. */
-export function TiltCard({ children, className = "" }: { children: ReactNode; className?: string }) {
-  const ref = useRef<HTMLDivElement>(null);
-
-  const onMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    const el = ref.current;
-    if (!el || event.pointerType !== "mouse" || prefersReducedMotion()) return;
-    const rect = el.getBoundingClientRect();
-    const x = (event.clientX - rect.left) / rect.width;
-    const y = (event.clientY - rect.top) / rect.height;
-    el.style.setProperty("--rx", `${(0.5 - y) * 6}deg`);
-    el.style.setProperty("--ry", `${(x - 0.5) * 8}deg`);
-    el.style.setProperty("--mx", `${x * 100}%`);
-    el.style.setProperty("--my", `${y * 100}%`);
-  };
-
-  const onLeave = () => {
-    ref.current?.style.setProperty("--rx", "0deg");
-    ref.current?.style.setProperty("--ry", "0deg");
-  };
-
-  return (
-    <div ref={ref} className={`tilt-card ${className}`} onPointerMove={onMove} onPointerLeave={onLeave}>
-      {children}
-    </div>
-  );
-}
-
 /** Cycles through phrases with a typing and deleting effect. Server-renders the first phrase. */
 export function Typewriter({ phrases }: { phrases: string[] }) {
   const textRef = useRef<HTMLSpanElement>(null);

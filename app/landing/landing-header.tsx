@@ -48,7 +48,6 @@ export function LandingHeader() {
   return (
     <header className={`pill-header ${scrolled ? "is-scrolled" : ""}`}>
       <div className="pill-header-inner">
-        <span className="pill-glass" aria-hidden="true" />
         <Link href="/" className="pill-brand" aria-label="Outlier home" onClick={(e) => {
           if (window.location.pathname === "/") {
             e.preventDefault();

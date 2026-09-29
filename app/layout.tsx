@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
+import { DM_Sans } from "next/font/google";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { CreditsMeter, type SidebarPlan } from "@/components/credits-meter";
@@ -14,7 +14,7 @@ import { signOut } from "./login/actions";
 import "./globals.css";
 import { writerOpenTo } from "@/lib/scripts/access";
 
-const geist = Geist({ subsets: ["latin"], display: "swap", variable: "--font-sans" });
+const dmSans = DM_Sans({ subsets: ["latin"], display: "swap", variable: "--font-sans" });
 
 export const metadata: Metadata = {
   title: "Outlier",
@@ -35,7 +35,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
 
   if (!current?.approved) {
     return (
-      <html lang="en" className={geist.variable}>
+      <html lang="en" className={dmSans.variable}>
         <body>
           <div className="ambient" aria-hidden="true" />
           <div className="shell">
@@ -70,7 +70,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const plan: SidebarPlan | undefined = current.isOwner ? "owner" : subscription ? subscription.plan.id : undefined;
 
   return (
-    <html lang="en" className={geist.variable}>
+    <html lang="en" className={dmSans.variable}>
       <body>
         <div className="ambient" aria-hidden="true" />
         <div className="app">

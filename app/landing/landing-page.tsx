@@ -14,6 +14,9 @@ import { onSale, PLANS } from "@/lib/billing/plans";
 import { sellablePlans } from "@/lib/billing/subscriptions";
 import { startPublicSubscription } from "./checkout";
 
+/** Community invite; DISCORD_INVITE_URL overrides it. */
+const DISCORD_INVITE = "https://discord.gg/4SwnX4DR6q";
+
 /** Hide small numbers rather than advertising an empty waitlist. */
 const SHOW_WAITLIST_COUNT_FROM = 25;
 
@@ -73,6 +76,25 @@ const FEATURES: {
     body: "Paste any video to get views per day, engagement, and an outlier score measured against that channel's recent uploads.",
     points: ["Outlier score vs. channel median", "Views per day and engagement", "Works on Shorts and long-form"],
     visual: <AnalyzeMock />,
+  },
+];
+
+const WHY = [
+  {
+    title: "Made for Shorts",
+    body: "The filters, scores and daily picks are all built around Shorts, where a small channel can go from nothing to millions of views in a week.",
+  },
+  {
+    title: "Measured against the channel",
+    body: "200K views means little on its own. Outlier compares every video with what that channel usually gets, so you see what actually overperformed.",
+  },
+  {
+    title: "Fresh numbers",
+    body: "Thousands of channels are rechecked throughout the day, so the growth you sort by is hours old, not weeks.",
+  },
+  {
+    title: "Priced for creators",
+    body: `Plans start at ${formatPrice(PLANS[1]!.priceCents)} a month and you can cancel any time. Credits you top up never expire.`,
   },
 ];
 
@@ -198,24 +220,17 @@ function PricingSection() {
 
 export async function LandingPage({ referralCode = null }: { referralCode?: string | null } = {}) {
   const count = await waitlistCount();
-  const discordUrl = env().DISCORD_INVITE_URL;
+  const discordUrl = env().DISCORD_INVITE_URL ?? DISCORD_INVITE;
 
   return (
     <div className="landing-root">
-      <div className="landing-backdrop" aria-hidden="true">
-        <div className="landing-grid" />
-        <div className="landing-glow landing-glow-a" />
-        <div className="landing-glow landing-glow-b" />
-      </div>
+      <div className="landing-backdrop" aria-hidden="true" />
 
       <LandingHeader />
 
       <main>
         <section className="landing-hero">
           <div className="logo-halo" aria-hidden="true">
-            <span className="halo-ring halo-ring-1" />
-            <span className="halo-ring halo-ring-2" />
-            <span className="halo-ring halo-ring-3" />
             <span className="logo-tile logo-tile-image">
               <BrandMark size={84} />
             </span>
@@ -224,7 +239,7 @@ export async function LandingPage({ referralCode = null }: { referralCode?: stri
           <h1 className="landing-title">
             Find your next outlier
             <br />
-            <span className="landing-title-accent">before everyone else</span>
+            before everyone else
           </h1>
           <p className="landing-subtitle">
             Outlier finds the Shorts channels and videos outperforming their size, so you can spot a winning niche while it&apos;s still early.
@@ -273,6 +288,21 @@ export async function LandingPage({ referralCode = null }: { referralCode?: stri
             </section>
           ))}
         </div>
+
+        <section id="why" className="why-section">
+          <Reveal>
+            <span className="feature-eyebrow">Why Outlier</span>
+            <h2 className="feature-title">Why choose Outlier</h2>
+          </Reveal>
+          <div className="why-grid">
+            {WHY.map((item, i) => (
+              <Reveal key={item.title} delay={i * 60} className="why-item">
+                <h3>{item.title}</h3>
+                <p>{item.body}</p>
+              </Reveal>
+            ))}
+          </div>
+        </section>
 
         <PricingSection />
 

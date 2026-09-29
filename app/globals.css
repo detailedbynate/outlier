@@ -2561,53 +2561,6 @@ html:has(.landing-root) .topbar {
   background: #000000;
 }
 
-/* Faint architectural grid, fading out toward the edges. */
-.landing-grid {
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
-  background-size: 120px 120px;
-  background-position: center top;
-  -webkit-mask-image: radial-gradient(70% 60% at 50% 40%, #000 20%, transparent 75%);
-  mask-image: radial-gradient(70% 60% at 50% 40%, #000 20%, transparent 75%);
-}
-
-.landing-glow {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(90px);
-  opacity: 0.7;
-  animation: drift 18s ease-in-out infinite alternate;
-}
-
-.landing-glow-a {
-  width: 60vw;
-  height: 60vw;
-  left: -18vw;
-  bottom: -30vw;
-  background: radial-gradient(circle, rgba(139, 92, 246, 0.3), transparent 65%);
-}
-
-.landing-glow-b {
-  width: 46vw;
-  height: 46vw;
-  right: -14vw;
-  top: 18vh;
-  background: radial-gradient(circle, rgba(236, 72, 153, 0.16), transparent 65%);
-  animation-delay: -9s;
-}
-
-@keyframes drift {
-  from {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  to {
-    transform: translate3d(4vw, -3vh, 0) scale(1.08);
-  }
-}
-
 .landing-hero {
   flex: 1;
   width: 100%;
@@ -2640,50 +2593,12 @@ html:has(.landing-root) .topbar {
   animation-delay: 320ms;
 }
 
-/* Logo with concentric rings. */
+/* Logo above the headline. */
 .logo-halo {
   position: relative;
   display: grid;
   place-items: center;
-  width: 150px;
-  height: 150px;
   margin-bottom: 28px;
-}
-
-.halo-ring {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  animation: halo 4.5s ease-in-out infinite;
-}
-
-.halo-ring-1 {
-  inset: 38px;
-  border-color: rgba(167, 139, 250, 0.22);
-}
-
-.halo-ring-2 {
-  inset: 18px;
-  border-color: rgba(167, 139, 250, 0.12);
-  animation-delay: 0.4s;
-}
-
-.halo-ring-3 {
-  inset: 0;
-  animation-delay: 0.8s;
-}
-
-@keyframes halo {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1.05);
-    opacity: 0.55;
-  }
 }
 
 .logo-tile {
@@ -2697,9 +2612,7 @@ html:has(.landing-root) .topbar {
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.12) inset,
-    0 20px 50px rgba(99, 102, 241, 0.35);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
+    0 20px 50px rgba(0, 0, 0, 0.5);
 }
 
 .landing-title {
@@ -2708,15 +2621,7 @@ html:has(.landing-root) .topbar {
   line-height: 1.08;
   font-weight: 600;
   letter-spacing: -0.045em;
-  color: #cfcbe0;
-}
-
-.landing-title-accent {
-  background: var(--accent-gradient);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  font-weight: 700;
+  color: #f6f4ff;
 }
 
 .landing-subtitle {
@@ -2850,22 +2755,6 @@ html:has(.landing-root) .topbar {
   text-underline-offset: 3px;
 }
 
-@media (max-width: 600px) {
-  .logo-halo {
-    width: 120px;
-    height: 120px;
-  }
-
-  .halo-ring-1 {
-    inset: 28px;
-  }
-
-  .halo-ring-2 {
-    inset: 12px;
-  }
-
-}
-
 /* Admin */
 .invite-controls {
   display: flex;
@@ -2953,87 +2842,12 @@ html:has(.landing-root) {
   /* Liquid glass: translucent tint + heavy blur/saturation of what's behind. */
   background: rgba(10, 10, 14, 0.55);
   border: 1px solid rgba(255, 255, 255, 0.14);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.28),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.05),
-    inset 0 0 22px rgba(255, 255, 255, 0.04),
-    0 10px 30px rgba(0, 0, 0, 0.35),
-    0 30px 80px rgba(20, 10, 60, 0.35);
-  -webkit-backdrop-filter: blur(28px) saturate(200%) brightness(1.08);
-  backdrop-filter: blur(28px) saturate(200%) brightness(1.08);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
   transition:
     background 0.35s var(--ease),
     box-shadow 0.35s var(--ease);
-}
-
-/* Specular sheen and soft edge refraction layered inside the glass. */
-.pill-glass {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: inherit;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.pill-glass::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  /* A single top-edge highlight, the way real glass catches light. */
-  background: radial-gradient(60% 120% at 50% -40%, rgba(255, 255, 255, 0.12), transparent 70%);
-}
-
-.pill-glass::after {
-  content: "";
-  position: absolute;
-  top: -60%;
-  bottom: -60%;
-  width: 28%;
-  left: -30%;
-  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.12), transparent);
-  transform: skewX(-18deg);
-  animation: glass-sweep 9s var(--ease) 1.5s infinite;
-}
-
-@keyframes glass-sweep {
-  0%,
-  70% {
-    left: -30%;
-  }
-  100% {
-    left: 120%;
-  }
-}
-
-/* Slowly rotating gradient hairline around the pill. */
-.pill-header-inner::before {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  padding: 1px;
-  background: conic-gradient(from var(--angle, 0deg), transparent 0deg, rgba(139, 92, 246, 0.7) 60deg, rgba(236, 72, 153, 0.6) 120deg, transparent 180deg, transparent 360deg);
-  -webkit-mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  animation: spin-border 8s linear infinite;
-  opacity: 0.8;
-  pointer-events: none;
-}
-
-@property --angle {
-  syntax: "<angle>";
-  inherits: false;
-  initial-value: 0deg;
-}
-
-@keyframes spin-border {
-  to {
-    --angle: 360deg;
-  }
 }
 
 .pill-header.is-scrolled .pill-header-inner {
@@ -3164,13 +2978,6 @@ html:has(.landing-root) {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .pill-glass::after {
-    animation: none;
-    display: none;
-  }
-}
-
 /* ---------------------------------------------------------------------------
    Landing: marquee, feature rows, mock visuals, FAQ, CTA, Discord
 --------------------------------------------------------------------------- */
@@ -3251,15 +3058,9 @@ html:has(.landing-root) {
 
 .feature-eyebrow {
   display: inline-block;
-  padding: 5px 12px;
-  border-radius: 8px;
-  font-size: 11.5px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: #c4b5fd;
-  background: rgba(139, 92, 246, 0.14);
-  border: 1px solid rgba(139, 92, 246, 0.28);
+  font-size: 15px;
+  font-weight: 600;
+  color: #a78bfa;
 }
 
 .feature-title {
@@ -3303,18 +3104,8 @@ html:has(.landing-root) {
 }
 
 /* Mock product previews */
-.tilt-card {
-  --rx: 0deg;
-  --ry: 0deg;
-  --mx: 50%;
-  --my: 50%;
-  position: relative;
-  transform: perspective(1000px) rotateX(var(--rx)) rotateY(var(--ry));
-  transition: transform 0.25s var(--ease);
-  will-change: transform;
-}
-
 .mock {
+  position: relative;
   padding: 26px;
   border-radius: 26px;
   background: rgba(255, 255, 255, 0.04);
@@ -3325,21 +3116,6 @@ html:has(.landing-root) {
   -webkit-backdrop-filter: blur(18px);
   backdrop-filter: blur(18px);
   overflow: hidden;
-}
-
-.mock::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: radial-gradient(360px circle at var(--mx) var(--my), rgba(139, 92, 246, 0.16), transparent 60%);
-  opacity: 0;
-  transition: opacity 0.3s var(--ease);
-  pointer-events: none;
-}
-
-.mock:hover::before {
-  opacity: 1;
 }
 
 .mock-search {
@@ -3460,8 +3236,6 @@ html:has(.landing-root) {
   height: 8px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.14);
-  background-size: 200% 100%;
-  animation: shimmer 2.4s ease-in-out infinite;
 }
 
 .mock-line-sm {
@@ -3542,7 +3316,7 @@ html:has(.landing-root) {
 }
 
 .mock-dot {
-  fill: #ec4899;
+  fill: #8b5cf6;
   stroke: #0b0822;
   stroke-width: 3;
 }
@@ -3616,7 +3390,7 @@ html:has(.landing-root) {
   color: #34d399;
 }
 
-/* Daily picks: gently floating stack */
+/* Daily picks: a staggered stack */
 .mock-picks {
   min-height: 320px;
   display: grid;
@@ -3635,22 +3409,11 @@ html:has(.landing-root) {
 .pick-card {
   background: rgba(255, 255, 255, 0.045);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
-  animation: float 6s ease-in-out infinite;
 }
 
 .pick-card:nth-child(2) {
   margin-left: 28px;
   margin-right: -28px;
-}
-
-@keyframes float {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-8px);
-  }
 }
 
 .pick-thumb {
@@ -3804,6 +3567,49 @@ html:has(.landing-root) {
 }
 
 /* Landing pricing: the page's one ask, so it gets the width and the air. */
+/* Why choose Outlier: four short reasons in a 2x2 grid. */
+.why-section {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 40px clamp(16px, 4vw, 40px) 96px;
+  text-align: center;
+}
+
+.why-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  margin-top: 40px;
+  text-align: left;
+}
+
+.why-item {
+  padding: 28px 26px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.why-item h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.why-item p {
+  margin: 10px 0 0;
+  font-size: 15px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+@media (max-width: 700px) {
+  .why-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .pricing-section {
   max-width: 1120px;
   margin: 0 auto;
@@ -3849,7 +3655,7 @@ html:has(.landing-root) {
 
 .pricing-card[data-plan="pro"],
 .pricing-card[data-plan="expert"] {
-  background: linear-gradient(180deg, var(--plan-soft), rgba(255, 255, 255, 0.025));
+  background: var(--plan-soft);
   border-color: var(--plan-edge);
 }
 
@@ -4004,7 +3810,7 @@ html:has(.landing-root) {
 }
 
 .landing-list-inner .landing-form-wrap {
-  margin-top: 26px;
+  margin: 26px auto 0;
 }
 
 /* Where Stripe sends a new subscriber. */
@@ -4164,7 +3970,8 @@ html:has(.landing-root) {
   background: #5865f2;
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.25) inset,
-    0 14px 36px rgba(88, 101, 242, 0.45);
+    0 0 24px rgba(88, 101, 242, 0.7),
+    0 14px 40px rgba(88, 101, 242, 0.5);
   animation: fab-in 0.8s var(--ease) 0.6s both;
   transition:
     gap 0.35s var(--ease),
@@ -4186,6 +3993,10 @@ html:has(.landing-root) {
   gap: 10px;
   padding: 0 20px 0 16px;
   transform: translateY(-2px);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.25) inset,
+    0 0 36px rgba(88, 101, 242, 0.9),
+    0 16px 44px rgba(88, 101, 242, 0.6);
 }
 
 .discord-fab:hover .discord-fab-label,
@@ -5176,31 +4987,14 @@ body:has(.onboarding-root) .ambient {
 
 .pill-button-primary {
   color: #fff;
-  background: var(--accent-gradient);
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.35),
-    0 6px 20px rgba(109, 93, 252, 0.45);
-}
-
-.pill-button-primary::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.35) 50%, transparent 70%);
-  transform: translateX(-120%);
-  transition: transform 0.7s var(--ease);
+  background: var(--accent);
+  border: 1px solid transparent;
+  box-shadow: 0 0 18px rgba(139, 92, 246, 0.35);
 }
 
 .pill-button-primary:hover {
-  transform: translateY(-1px);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.35),
-    0 10px 28px rgba(109, 93, 252, 0.6);
-}
-
-.pill-button-primary:hover::after {
-  transform: translateX(120%);
+  background: #7c4dee;
+  box-shadow: 0 0 24px rgba(139, 92, 246, 0.5);
 }
 
 .pill-button-primary:active {
