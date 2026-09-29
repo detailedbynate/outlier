@@ -118,6 +118,28 @@ function Avatar({ src, large = false }: { src: string | null; large?: boolean })
 
 const shortDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 
+/** A colour partway along a scale of hex stops, for bars that brighten with their value. `t` is 0 to 1. */
+function scale(stops: readonly string[], t: number): string {
+  const clamped = Math.min(Math.max(t, 0), 1) * (stops.length - 1);
+  const i = Math.min(Math.floor(clamped), stops.length - 2);
+  const f = clamped - i;
+  const rgb = (hex: string) => [1, 3, 5].map((k) => parseInt(hex.slice(k, k + 2), 16));
+  const [a, b] = [rgb(stops[i]!), rgb(stops[i + 1]!)];
+  return `rgb(${a.map((v, k) => Math.round(v + (b[k]! - v) * f)).join(" ")})`;
+}
+
+/** Slow to hot: dim brown through amber to orange-red. */
+const HEAT = ["#78350f", "#d97706", "#fbbf24", "#f97316", "#ef4444"] as const;
+/** Competitors, smallest to biggest. */
+const PINK = ["#5b1f3d", "#9d2b66", "#db2777", "#f472b6"] as const;
+/** You, same idea in violet. */
+const VIOLET = ["#3b1f78", "#6d28d9", "#8b5cf6", "#c4b5fd"] as const;
+
+/** Inline colour and glow for a bar; `t` is how close it is to the top value. */
+function barStyle(stops: readonly string[], t: number, width: string): CSSProperties {
+  return { width, "--bar": scale(stops, t), "--glow": `${Math.round(4 + t * 14)}px`, "--glow-strength": `${Math.round(20 + t * 60)}%` } as CSSProperties;
+}
+
 function median(values: number[]): number | null {
   if (values.length === 0) return null;
   const sorted = [...values].sort((a, b) => a - b);
@@ -515,6 +537,8 @@ export async function HeatingUpSection({ niches, lastVisitAt }: { niches: string
         <ul className="dash-list">
           {pulse.movers.map((c) => {
             const vph = Number(c.live_vph ?? c.recent_vph ?? 0);
+            // Square root, so one giant channel doesn't flatten the rest.
+            const share = Math.sqrt(vph / top);
             return (
               <li key={c.channel_id}>
                 <Link href={`/channels/${c.youtube_channel_id}`} className="dash-row home-meter-row">
@@ -522,11 +546,12 @@ export async function HeatingUpSection({ niches, lastVisitAt }: { niches: string
                   <span className="dash-row-main">
                     <span className="dash-row-title">{c.title}</span>
                     <span className="home-meter" aria-hidden="true">
-                      {/* Square root, so one giant channel doesn't flatten the rest. */}
-                      <span style={{ width: `${Math.sqrt(vph / top) * 100}%` }} />
+                      <span style={barStyle(HEAT, share, `${share * 100}%`)} />
                     </span>
                   </span>
-                  <span className="dash-metric">{vph ? `${formatCompact(Math.round(vph))}/h` : "—"}</span>
+                  <span className="dash-metric home-heat-value" style={{ color: scale(HEAT, Math.max(share, 0.45)) }}>
+                    {vph ? `${formatCompact(Math.round(vph))}/h` : "—"}
+                  </span>
                 </Link>
               </li>
             );
@@ -619,7 +644,8 @@ export async function CompetitorWatchSection({ userId, ownChannel, competitors }
                       {r.you ? <em>You</em> : null}
                     </span>
                     <span className="home-versus-bar" aria-hidden="true">
-                      <span style={{ width: `${Math.max((r.subs / top) * 100, 2)}%` }} />
+                      {/* Length is to scale; colour uses the square root so the smaller channels still differ from each other. */}
+                      <span style={barStyle(r.you ? VIOLET : PINK, Math.sqrt(r.subs / top), `${Math.max((r.subs / top) * 100, 2)}%`)} />
                     </span>
                   </span>
                   <span className="home-versus-value">

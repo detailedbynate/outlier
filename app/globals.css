@@ -6981,12 +6981,19 @@ a.dash-row:hover {
   overflow: hidden;
 }
 
-.home-meter span {
+.home-meter span,
+.home-versus-bar span {
+  --bar: var(--dash-amber);
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: var(--dash-amber);
-  box-shadow: 0 0 8px rgba(251, 191, 36, 0.6);
+  /* Darker at the start, the bar's own colour at the tip; brighter bars glow more (set inline). */
+  background: linear-gradient(90deg, color-mix(in srgb, var(--bar) 35%, #0e0d13), var(--bar));
+  box-shadow: 0 0 var(--glow, 8px) color-mix(in srgb, var(--bar) var(--glow-strength, 50%), transparent);
+}
+
+.home-meter {
+  height: 6px;
 }
 
 /* You vs competitors */
@@ -7057,17 +7064,7 @@ a.dash-row:hover {
   overflow: hidden;
 }
 
-.home-versus-bar span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: rgba(236, 72, 153, 0.55);
-}
 
-.home-versus li[data-you] .home-versus-bar span {
-  background: var(--dash-violet);
-  box-shadow: 0 0 10px rgba(139, 92, 246, 0.7);
-}
 
 .home-versus-value {
   display: flex;
