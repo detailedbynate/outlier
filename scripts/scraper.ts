@@ -13,8 +13,9 @@
  * (INNERTUBE_* settings, see .env.example); this script decides which channels
  * to read, when to wait, and how fast to go.
  *
- * Channels that posted in the last couple of weeks are re-read roughly daily;
- * everything else waits out the longer interval. A dormant channel has nothing
+ * Channels that posted in the last couple of weeks are re-read roughly daily,
+ * ones quiet for three months only monthly, and everything else waits out the
+ * usual interval. A dormant channel has nothing
  * new to find, and reads spent on it are reads not spent on one that uploads.
  *
  * Each round ends by reading a few transcripts for the library's best Shorts
@@ -47,6 +48,10 @@ const DISCOVERED_REFRESH_DAYS = 6;
 const ACTIVE_WITHIN_DAYS = 14;
 /** How often an active channel is re-read. Short, because it keeps producing new uploads. */
 const ACTIVE_REFRESH_HOURS = 20;
+/** No upload in this long counts as dormant... */
+const DORMANT_AFTER_DAYS = 90;
+/** ...and a dormant channel is re-read this rarely, just to notice if it comes back. */
+const DORMANT_REFRESH_DAYS = 30;
 /** Nothing due: look again in a while. */
 const IDLE_WAIT = 15 * MINUTE;
 /** A channel that failed is left to the worker for this long. */
@@ -152,6 +157,7 @@ async function main(): Promise<void> {
       new Date(now - DISCOVERED_REFRESH_DAYS * 24 * HOUR),
       batch + skipUntil.size,
       { since: new Date(now - ACTIVE_WITHIN_DAYS * 24 * HOUR), before: new Date(now - ACTIVE_REFRESH_HOURS * HOUR) },
+      { since: new Date(now - DORMANT_AFTER_DAYS * 24 * HOUR), before: new Date(now - DORMANT_REFRESH_DAYS * 24 * HOUR) },
     ).then((rows) => rows.filter((row) => (skipUntil.get(row.youtube_channel_id) ?? 0) < now).slice(0, batch));
     for (const [id, until] of skipUntil) if (until < now) skipUntil.delete(id);
     if (due.length === 0) {

@@ -73,6 +73,9 @@ const emptyPayload = z.object({}).default({});
 
 /** Channels found by research tools refresh weekly instead of daily. */
 const DISCOVERED_REFRESH_DAYS = 7;
+/** Untracked channels with no upload in DORMANT_AFTER_DAYS only come round every DORMANT_REFRESH_DAYS. */
+const DORMANT_AFTER_DAYS = 90;
+const DORMANT_REFRESH_DAYS = 30;
 
 /** Return a "skipped" result instead of failing when storage is full — retrying won't help until data is pruned. */
 async function skipIfOverBudget<T>(run: () => Promise<T>): Promise<T | { skipped: "storage_budget"; message: string }> {
@@ -137,7 +140,10 @@ export function createJobRegistry(deps: JobDependencies): JobRegistry {
           // Slightly shorter than the interval so a channel synced at 09:05 yesterday is due at 09:00 today.
           const trackedBefore = new Date(Date.now() - deps.config.syncIntervalHours * 0.9 * 3_600_000);
           const discoveredBefore = new Date(Date.now() - DISCOVERED_REFRESH_DAYS * 86_400_000);
-          const channels = await deps.channelRepository.listDueForRefresh(trackedBefore, discoveredBefore, deps.config.syncMaxChannelsPerRun);
+          const channels = await deps.channelRepository.listDueForRefresh(trackedBefore, discoveredBefore, deps.config.syncMaxChannelsPerRun, undefined, {
+            since: new Date(Date.now() - DORMANT_AFTER_DAYS * 86_400_000),
+            before: new Date(Date.now() - DORMANT_REFRESH_DAYS * 86_400_000),
+          });
           const day = new Date().toISOString().slice(0, 10);
           for (const channel of channels) {
             await deps.enqueue(

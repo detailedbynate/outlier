@@ -255,20 +255,28 @@ export class ChannelRepository {
    * find, and waiting out the dormant interval to reach it means the newest
    * uploads sit unseen for days while reads go to channels that stopped posting
    * in 2023. `activeSince` says how recent an upload has to be to count.
+   *
+   * `dormant` does the opposite for the untracked queue: a channel with no
+   * upload since `dormant.since` (or none stored at all) waits until
+   * `dormant.before` instead of `discoveredBefore`.
    */
   async listDueForRefresh(
     trackedBefore: Date,
     discoveredBefore: Date,
     limit: number,
     active?: { since: Date; before: Date },
+    dormant?: { since: Date; before: Date },
   ): Promise<ChannelRow[]> {
     const stale = (before: Date) => `last_synced_at.is.null,last_synced_at.lt.${before.toISOString()}`;
+    const staleUntracked = dormant
+      ? `last_synced_at.is.null,and(last_synced_at.lt.${discoveredBefore.toISOString()},last_video_at.gte.${dormant.since.toISOString()}),last_synced_at.lt.${dormant.before.toISOString()}`
+      : stale(discoveredBefore);
     const due = (tracked: boolean, before: Date) =>
       this.db
         .from("channels")
         .select("*")
         .eq("tracked", tracked)
-        .or(stale(before))
+        .or(tracked ? stale(before) : staleUntracked)
         .order("last_synced_at", { ascending: true, nullsFirst: true })
         .limit(limit);
 
