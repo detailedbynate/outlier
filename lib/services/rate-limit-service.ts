@@ -10,6 +10,9 @@ export const RATE_LIMITS = {
   signInIp: { windowSeconds: 900, maxHits: 10 },
   /** Sign-in attempts per email, across IPs. */
   signInEmail: { windowSeconds: 900, maxHits: 8 },
+  /** "Forgot password" emails per IP and per address. Each one sends a real email. */
+  passwordResetIp: { windowSeconds: 3600, maxHits: 5 },
+  passwordResetEmail: { windowSeconds: 3600, maxHits: 3 },
   /** Channel comparisons per user (each can sync new channels from YouTube). */
   compareUser: { windowSeconds: 3600, maxHits: 30 },
   /** Checkout sessions started from the public pricing page, per IP. */

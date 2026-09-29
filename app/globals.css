@@ -4824,6 +4824,20 @@ body:has(.onboarding-root) .ambient {
 }
 
 .prose-card a,
+.auth-forgot {
+  align-self: flex-end;
+  margin-top: -4px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.auth-forgot:hover {
+  color: var(--text-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .auth-card .stat-note a {
   color: var(--accent-text);
   text-decoration: underline;

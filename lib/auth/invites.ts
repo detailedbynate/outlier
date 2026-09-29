@@ -53,7 +53,7 @@ export class SupabaseInviteSender implements InviteSender {
 }
 
 /** One-time link that signs an existing account in and sends it to /set-password. */
-async function createPasswordLink(client: DatabaseClient, email: string, redirectTo: string): Promise<string> {
+export async function createPasswordLink(client: DatabaseClient, email: string, redirectTo: string): Promise<string> {
   const result = await client.auth.admin.generateLink({ type: "recovery", email, options: { redirectTo } });
   if (result.error || !result.data.properties?.hashed_token) {
     throw new AppError("UPSTREAM_ERROR", `Could not create a sign-in link: ${result.error?.message ?? "no token"}`, { cause: result.error, expose: true });

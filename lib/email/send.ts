@@ -33,6 +33,43 @@ export async function sendEmail(input: { to: string; subject: string; html: stri
 
 const escape = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+/** The "Forgot password?" email: one button that leads to choosing a new password. */
+export function passwordResetEmail(input: { url: string }): { subject: string; html: string; text: string } {
+  const url = escape(input.url);
+  const subject = "Reset your Outlier password";
+  const text = [
+    `Someone asked to reset the password for this Outlier account. If it was you, choose a new one here:`,
+    input.url,
+    ``,
+    `The link works once and expires soon. If you didn't ask for this, ignore this email and your password stays the same.`,
+    ``,
+    `Outlier · useoutlier.online`,
+  ].join("\n");
+
+  const html = `<!doctype html><html><body style="margin:0;padding:0;background:#0b0b10;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0b0b10;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#14141c;border:1px solid rgba(255,255,255,0.08);border-radius:18px;padding:36px 32px;">
+        <tr><td style="color:#ffffff;font-size:22px;font-weight:700;padding-bottom:14px;">Reset your password</td></tr>
+        <tr><td style="color:rgba(255,255,255,0.72);font-size:15px;line-height:1.6;padding-bottom:12px;">
+          Someone asked to reset the password for this Outlier account. If it was you, choose a new one below.
+        </td></tr>
+        <tr><td style="padding:18px 0 8px;">
+          <a href="${url}" style="display:inline-block;background:#8b5cf6;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:13px 26px;border-radius:999px;">Choose a new password</a>
+        </td></tr>
+        <tr><td style="color:rgba(255,255,255,0.45);font-size:12.5px;line-height:1.6;padding-top:14px;">
+          The link works once and expires soon. If you didn't ask for this, ignore this email and your password stays the same. If the button doesn't work, paste this into your browser:<br>
+          <a href="${url}" style="color:#a78bfa;word-break:break-all;">${url}</a>
+        </td></tr>
+      </table>
+      <div style="color:rgba(255,255,255,0.3);font-size:12px;padding-top:18px;">Outlier · useoutlier.online</div>
+    </td></tr>
+  </table>
+</body></html>`;
+
+  return { subject, html, text };
+}
+
 /** The email a new subscriber gets: one button, one link, and what happens next. */
 export function signupEmail(input: { planName: string; url: string; days: number }): { subject: string; html: string; text: string } {
   const url = escape(input.url);
