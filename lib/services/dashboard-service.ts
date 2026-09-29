@@ -38,8 +38,13 @@ export interface NichePulse {
 export interface ChannelSummary {
   channel: ChannelRow;
   growth: ChannelGrowth;
+  /** Newest first; enough for the uploads chart. */
   recent: VideoFeedRow[];
   alerts: ChannelAlert[];
+  /** Stored uploads from the last 30 days (capped by how many `recent` holds). */
+  uploads30d: number;
+  /** One point per day for the last 30 days, oldest first. */
+  history: { day: string; subs: number | null; views: number }[];
 }
 
 export interface YourChannels {
@@ -151,7 +156,7 @@ export class DashboardService {
       // Full rows only (the grid is 3 wide).
       fastShorts: (fast.length > 3 ? fast.slice(0, Math.floor(fast.length / 3) * 3) : fast).map((v) => ({ ...v, channel: byUuid.get(v.channel_id) ?? null })),
       movers: [...movers].sort((a, b) => Number(b.live_vph ?? b.recent_vph ?? 0) - Number(a.live_vph ?? a.recent_vph ?? 0)),
-      picks: picks.slice(0, 3),
+      picks: picks.slice(0, 5),
       newSinceLastVisit: lastVisitAt ? fast.filter((v) => Date.parse(v.published_at) > Date.parse(lastVisitAt)).length : 0,
       scoped: scoped && fast === fastScoped,
     };
@@ -169,13 +174,18 @@ export class DashboardService {
 
     let ownSummary: ChannelSummary | null = null;
     if (ownChannel) {
-      const recent = await this.deps.videos.feed({ orderBy: "published_at", limit: 6, channelIds: [ownChannel.id] });
+      const [recent, snapshots] = await Promise.all([
+        this.deps.videos.feed({ orderBy: "published_at", limit: 12, channelIds: [ownChannel.id] }),
+        this.deps.channels.snapshotsForChannels([ownChannel.id], new Date(now.getTime() - 30 * 86_400_000)),
+      ]);
       const channelGrowthValue = growth.get(ownChannel.id) ?? empty();
       ownSummary = {
         channel: ownChannel,
         growth: channelGrowthValue,
         recent,
         alerts: channelAlerts({ growth: channelGrowthValue, videos: recent, lastUploadAt: recent[0]?.published_at ?? null }, now),
+        history: dailyHistory(snapshots),
+        uploads30d: recent.filter((v) => Date.parse(v.published_at) >= now.getTime() - 30 * 86_400_000).length,
       };
     }
 
@@ -245,6 +255,16 @@ export class DashboardService {
     const rows = await this.deps.channels.findByIds([...new Set(uuids)]);
     return new Map(rows.map((r) => [r.id, r]));
   }}
+
+/** Last snapshot of each day, oldest first. */
+function dailyHistory(snapshots: readonly { captured_at: string; subscriber_count: number | null; view_count: number }[]): ChannelSummary["history"] {
+  const byDay = new Map<string, ChannelSummary["history"][number]>();
+  for (const s of snapshots) {
+    const day = s.captured_at.slice(0, 10);
+    byDay.set(day, { day, subs: s.subscriber_count, views: s.view_count });
+  }
+  return [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day));
+}
 
 function empty(): ChannelGrowth {
   return { subs24h: null, subs7d: null, views24h: null, views7d: null };

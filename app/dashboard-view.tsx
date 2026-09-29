@@ -6,12 +6,15 @@ import { timeAgo } from "@/lib/format";
 import { getServices } from "@/lib/services";
 import {
   CompetitorWatchSection,
+  CreditsPill,
+  HeatingUpSection,
   NichePulseSection,
-  OverviewStats,
   PanelSkeleton,
   RecentActivitySection,
   ResearchShortcuts,
-  YourChannelsSection,
+  TrackedSection,
+  YourChannelSection,
+  YourChannelSkeleton,
 } from "./dashboard/sections";
 
 /** Signed-in home: a daily command center. Callers must check access first. Uses stored data only (no YouTube quota). */
@@ -20,55 +23,60 @@ export async function DashboardView({ current }: { current: CurrentUser }) {
   const userId = current.user.id;
   const [preferences, lastVisitAt] = await Promise.all([services.onboarding.getPreferences(userId), (current.isTestSession ? Promise.resolve(null) : services.dashboard.registerVisit(userId))]);
   const niches = preferences?.niches ?? [];
+  const ownChannel = preferences?.channel ?? null;
   const name = greetingName(current.email, current.user.user_metadata?.full_name as string | undefined);
 
   return (
-    <div className="dash">
-      <header className="dash-hero">
+    <div className="dash home">
+      <header className="dash-hero home-hero">
         <div className="dash-hero-text">
           <span className="dash-eyebrow">
             <span className="dash-live" aria-hidden="true" />
             Command center
           </span>
           <h1>Welcome back, {name}</h1>
-          <p>
-            {lastVisitAt ? `Here's what moved since you were last here ${timeAgo(lastVisitAt)}.` : "Here's what's moving in your space right now."}{" "}
-            <Link href="/settings/preferences" className="dash-link">
-              Tune your niches
-            </Link>
-          </p>
+          <p>{lastVisitAt ? `Here's what moved since you were last here ${timeAgo(lastVisitAt)}.` : "Here's how your channel and your niches are doing."}</p>
         </div>
-        <Suspense fallback={<div className="dash-stats dash-stats-loading" aria-hidden="true">{[0, 1, 2, 3].map((i) => <span key={i} className="dash-stat sk-block" />)}</div>}>
-          <OverviewStats userId={userId} lastVisitAt={lastVisitAt} niches={niches.length} />
-        </Suspense>
+        <div className="home-hero-side">
+          <Suspense fallback={<span className="home-credits sk-block" aria-hidden="true" />}>
+            <CreditsPill userId={userId} lastVisitAt={lastVisitAt} />
+          </Suspense>
+          <Link href="/settings/preferences" className="button-ghost button-small">
+            Tune your niches
+          </Link>
+        </div>
       </header>
 
-      <Suspense fallback={<PanelSkeleton className="dash-pulse" rows={4} />}>
-        <NichePulseSection niches={niches} lastVisitAt={lastVisitAt} />
-      </Suspense>
+      <div className="home-grid">
+        <Suspense fallback={<YourChannelSkeleton />}>
+          <YourChannelSection userId={userId} ownChannel={ownChannel} />
+        </Suspense>
 
-      <div className="dash-columns">
-        <Suspense fallback={<PanelSkeleton rows={4} />}>
-          <YourChannelsSection userId={userId} ownChannel={preferences?.channel ?? null} />
+        <Suspense
+          fallback={
+            <>
+              <PanelSkeleton className="home-span-8" rows={5} />
+              <PanelSkeleton className="home-span-4" rows={5} />
+            </>
+          }
+        >
+          <NichePulseSection niches={niches} lastVisitAt={lastVisitAt} />
         </Suspense>
-        <Suspense fallback={<PanelSkeleton rows={4} />}>
-          <CompetitorWatchSection competitors={preferences?.competitors ?? []} />
-        </Suspense>
-      </div>
 
-      <div className="dash-columns dash-columns-bottom">
-        <section className="dash-panel dash-shortcuts-panel" style={{ "--i": 3 } as React.CSSProperties} aria-label="Research shortcuts">
-          <header className="dash-panel-head">
-            <div className="dash-panel-titles">
-              <h2>Research shortcuts</h2>
-              <p>Jump straight into a tool</p>
-            </div>
-          </header>
-          <ResearchShortcuts isOwner={current.isOwner} />
-        </section>
-        <Suspense fallback={<PanelSkeleton rows={3} />}>
-          <RecentActivitySection userId={userId} />
+        <Suspense fallback={<PanelSkeleton className="home-span-7" rows={5} />}>
+          <CompetitorWatchSection userId={userId} ownChannel={ownChannel} competitors={preferences?.competitors ?? []} />
         </Suspense>
+        <Suspense fallback={<PanelSkeleton className="home-span-5" rows={5} />}>
+          <HeatingUpSection niches={niches} lastVisitAt={lastVisitAt} />
+        </Suspense>
+
+        <Suspense fallback={<PanelSkeleton className="home-span-4" rows={4} />}>
+          <TrackedSection userId={userId} ownChannel={ownChannel} />
+        </Suspense>
+        <Suspense fallback={<PanelSkeleton className="home-span-4" rows={4} />}>
+          <RecentActivitySection userId={userId} lastVisitAt={lastVisitAt} />
+        </Suspense>
+        <ResearchShortcuts isOwner={current.isOwner} />
       </div>
     </div>
   );

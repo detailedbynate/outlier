@@ -1,11 +1,10 @@
 /* eslint-disable @next/next/no-img-element -- YouTube images are already CDN-optimized */
 import Link from "next/link";
-import type { ComponentType, ReactNode } from "react";
+import { cache, type ComponentType, type CSSProperties, type ReactNode } from "react";
 import {
   BookmarkIcon,
   ChartIcon,
   CompassIcon,
-  EyeIcon,
   FlameIcon,
   LockIcon,
   PenIcon,
@@ -17,11 +16,19 @@ import {
   ZapIcon,
 } from "@/components/icons";
 import type { ActivityItem } from "@/lib/analytics/dashboard";
-import { formatCompact, formatMultiplier, timeAgo } from "@/lib/format";
+import { formatCompact, formatMultiplier, formatPercent, timeAgo } from "@/lib/format";
 import { getServices } from "@/lib/services";
+import type { ChannelSummary } from "@/lib/services/dashboard-service";
 import type { VideoFeedRow } from "@/types/database";
 
 type IconType = ComponentType<{ size?: number }>;
+type Tone = "violet" | "pink" | "green" | "amber" | "blue";
+
+/* The same numbers feed several cards; fetch them once per request. */
+const loadYourChannels = cache((userId: string, own: string | null) => getServices().dashboard.yourChannels(userId, own));
+const loadOverview = cache((userId: string, lastVisitAt: string | null) => getServices().dashboard.overview(userId, lastVisitAt));
+// Keyed by a string: cache() compares arguments by identity, and each caller builds its own array.
+const loadPulse = cache((niches: string, lastVisitAt: string | null) => getServices().dashboard.nichePulse(niches ? niches.split("\n") : [], lastVisitAt));
 
 /* ---------------------------------------------------------------------------
    Building blocks
@@ -37,21 +44,23 @@ export function Panel({
   tone = "violet",
   index = 0,
 }: {
-  icon: IconType;
+  icon?: IconType;
   title: string;
   subtitle?: ReactNode;
   action?: ReactNode;
   children: ReactNode;
   className?: string;
-  tone?: "violet" | "pink" | "green" | "amber" | "blue";
+  tone?: Tone;
   index?: number;
 }) {
   return (
-    <section className={`dash-panel ${className}`} style={{ "--i": index } as React.CSSProperties} aria-label={title}>
+    <section className={`dash-panel ${className}`} style={{ "--i": index } as CSSProperties} aria-label={title}>
       <header className="dash-panel-head">
-        <span className="dash-icon" data-tone={tone}>
-          <Icon size={16} />
-        </span>
+        {Icon ? (
+          <span className="dash-icon" data-tone={tone}>
+            <Icon size={16} />
+          </span>
+        ) : null}
         <div className="dash-panel-titles">
           <h2>{title}</h2>
           {subtitle ? <p>{subtitle}</p> : null}
@@ -73,13 +82,14 @@ function Empty({ title, children, action }: { title: string; children?: ReactNod
   );
 }
 
-function Delta({ value, suffix }: { value: number | null; suffix: string }) {
-  if (value === null) return <span className="dash-delta" data-dir="none">— {suffix}</span>;
+function Delta({ value, suffix }: { value: number | null; suffix?: string }) {
+  if (value === null) return <span className="dash-delta" data-dir="none">—{suffix ? ` ${suffix}` : ""}</span>;
   const dir = value > 0 ? "up" : value < 0 ? "down" : "flat";
   return (
     <span className="dash-delta" data-dir={dir}>
       {value > 0 ? "+" : value < 0 ? "−" : ""}
-      {formatCompact(Math.abs(value))} {suffix}
+      {formatCompact(Math.abs(value))}
+      {suffix ? ` ${suffix}` : ""}
     </span>
   );
 }
@@ -101,178 +111,434 @@ export function PanelSkeleton({ className = "", rows = 3 }: { className?: string
   );
 }
 
+function Avatar({ src, large = false }: { src: string | null; large?: boolean }) {
+  const className = `dash-avatar${large ? " home-avatar-xl" : ""}`;
+  return src ? <img className={className} src={src} alt="" loading="lazy" /> : <span className={className} />;
+}
+
+const shortDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+
+function median(values: number[]): number | null {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2;
+}
+
 /* ---------------------------------------------------------------------------
-   1. Overview stats
+   Header: credits
 --------------------------------------------------------------------------- */
 
-export async function OverviewStats({ userId, lastVisitAt, niches }: { userId: string; lastVisitAt: string | null; niches: number }) {
-  const overview = await getServices().dashboard.overview(userId, lastVisitAt);
-  const { credits } = overview;
-  const creditShare = credits.limit > 0 ? Math.min(credits.remaining / credits.limit, 1) : 0;
+export async function CreditsPill({ userId, lastVisitAt }: { userId: string; lastVisitAt: string | null }) {
+  const { credits } = await loadOverview(userId, lastVisitAt);
   const unlimited = credits.limit >= 1_000_000;
-
-  const stats: { label: string; value: string; note: string; href: string }[] = [
-    { label: "Tracked channels", value: formatCompact(overview.trackedChannels), note: "refreshed daily", href: "/channels" },
-    { label: "Research this week", value: String(overview.researchThisWeek), note: "searches, tracks, analyses", href: "/research/shorts-channels" },
-    { label: "Your niches", value: String(niches), note: niches ? "shaping your pulse" : "add some in preferences", href: "/settings/preferences" },
-  ];
-
+  const share = unlimited ? 1 : credits.limit > 0 ? Math.min(credits.remaining / credits.limit, 1) : 0;
+  const r = 15;
+  const circumference = 2 * Math.PI * r;
   return (
-    <div className="dash-stats">
-      {stats.map((s, i) => (
-        <Link key={s.label} href={s.href} className="dash-stat" style={{ "--i": i } as React.CSSProperties}>
-          <span className="dash-stat-label">{s.label}</span>
-          <span className="dash-stat-value">{s.value}</span>
-          <span className="dash-stat-note">{s.note}</span>
-        </Link>
-      ))}
-      <div className="dash-stat" style={{ "--i": 3 } as React.CSSProperties}>
-        <span className="dash-stat-label">Credits this month</span>
-        <span className="dash-stat-value">{unlimited ? "∞" : formatCompact(credits.remaining)}</span>
-        {unlimited ? (
-          <span className="dash-stat-note">unlimited</span>
-        ) : (
-          <>
-            <span className="dash-meter" role="meter" aria-valuemin={0} aria-valuemax={credits.limit} aria-valuenow={credits.remaining}>
-              <span style={{ width: `${creditShare * 100}%` }} />
-            </span>
-            <span className="dash-stat-note">of {formatCompact(credits.limit)} · resets on the 1st</span>
-          </>
-        )}
-      </div>
-    </div>
+    <Link href="/billing" className="home-credits" title="Credits reset on the 1st">
+      <svg width="38" height="38" viewBox="0 0 38 38" aria-hidden="true">
+        <circle cx="19" cy="19" r={r} className="home-ring-track" />
+        <circle cx="19" cy="19" r={r} className="home-ring-fill" strokeDasharray={`${share * circumference} ${circumference}`} transform="rotate(-90 19 19)" />
+      </svg>
+      <span>
+        <strong>{unlimited ? "Unlimited" : formatCompact(credits.remaining)}</strong>
+        <small>{unlimited ? "credits" : `of ${formatCompact(credits.limit)} credits left`}</small>
+      </span>
+    </Link>
   );
 }
 
 /* ---------------------------------------------------------------------------
-   2. Niche Pulse
+   1. Your channel: profile card, uploads chart, key numbers
+--------------------------------------------------------------------------- */
+
+/** Drops a lone reading that jumps away from both neighbours in the same direction (a bad sync, not real growth). */
+function dropBlips(points: number[]): number[] {
+  return points.filter((v, i) => {
+    const prev = points[i - 1];
+    const next = points[i + 1];
+    if (prev === undefined || next === undefined) return true;
+    const off = (n: number) => Math.abs(v - n) / Math.max(n, 1);
+    return !(off(prev) > 0.02 && off(next) > 0.02 && Math.sign(v - prev) === Math.sign(v - next));
+  });
+}
+
+function Sparkline({ points: raw }: { points: number[] }) {
+  const points = dropBlips(raw);
+  if (points.length < 2) return <div className="home-spark home-spark-empty">Growth chart fills in after a few daily syncs.</div>;
+  const min = Math.min(...points);
+  const max = Math.max(...points);
+  const span = max - min || 1;
+  const xy = points.map((v, i) => [(i / (points.length - 1)) * 100, 92 - ((v - min) / span) * 80] as const);
+  const line = xy.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(2)},${y.toFixed(2)}`).join(" ");
+  const [lastX, lastY] = xy[xy.length - 1]!;
+  return (
+    <div className="home-spark">
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        <path d={`${line} L100,100 L0,100 Z`} className="home-spark-area" />
+        <path d={line} className="home-spark-line" vectorEffect="non-scaling-stroke" />
+      </svg>
+      <span className="home-spark-dot" style={{ left: `${lastX}%`, top: `${lastY}%` }} />
+    </div>
+  );
+}
+
+function ChannelCard({ own }: { own: ChannelSummary }) {
+  const { channel, growth, history, alerts } = own;
+  const subs = history.map((h) => h.subs).filter((v): v is number => v !== null);
+  const lastUpload = own.recent[0]?.published_at ?? null;
+  return (
+    <section className="dash-panel home-channel home-span-4" style={{ "--i": 0 } as CSSProperties} aria-label="Your channel">
+      <header className="home-channel-head">
+        <Avatar src={channel.thumbnail_url} large />
+        <div className="dash-row-main">
+          <span className="home-kicker">Your channel</span>
+          <Link href={`/channels/${channel.youtube_channel_id}`} className="home-channel-name">
+            {channel.title}
+          </Link>
+          {channel.handle ? <span className="dash-row-sub">{channel.handle.startsWith("@") ? channel.handle : `@${channel.handle}`}</span> : null}
+        </div>
+      </header>
+
+      <div className="home-big">
+        <span className="home-big-value">{formatCompact(channel.subscriber_count)}</span>
+        <span className="home-big-label">
+          subscribers <Delta value={growth.subs7d} suffix="this week" />
+        </span>
+      </div>
+
+      <Sparkline points={subs} />
+
+      <dl className="home-facts">
+        <div>
+          <dt>Views today</dt>
+          <dd>
+            <Delta value={growth.views24h} />
+          </dd>
+        </div>
+        <div>
+          <dt>Views this week</dt>
+          <dd>
+            <Delta value={growth.views7d} />
+          </dd>
+        </div>
+        <div>
+          <dt>Subs today</dt>
+          <dd>
+            <Delta value={growth.subs24h} />
+          </dd>
+        </div>
+        <div>
+          <dt>Last upload</dt>
+          <dd>{lastUpload ? timeAgo(lastUpload) : "—"}</dd>
+        </div>
+      </dl>
+
+      {alerts[0] ? (
+        <p className="home-alert" data-tone={alerts[0].tone}>
+          <strong>{alerts[0].title}</strong>
+          <span>{alerts[0].detail}</span>
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+function UploadsChart({ videos, channelMedian }: { videos: VideoFeedRow[]; channelMedian: number | null }) {
+  const bars = [...videos].reverse();
+  const max = Math.max(...bars.map((v) => v.view_count), channelMedian ?? 0, 1);
+  const best = bars.reduce<VideoFeedRow | null>((top, v) => (!top || Number(v.outlier_score ?? 0) > Number(top.outlier_score ?? 0) ? v : top), null);
+  const pct = (n: number) => `${Math.max((n / max) * 100, 1.5)}%`;
+  return (
+    <section className="dash-panel home-chart home-span-8" style={{ "--i": 1 } as CSSProperties} aria-label="Your recent uploads">
+      <header className="dash-panel-head">
+        <div className="dash-panel-titles">
+          <h2>Views per upload</h2>
+          <p>Your last {bars.length} uploads · hover a bar for the video</p>
+        </div>
+        <div className="dash-panel-action home-legend">
+          <span data-key="bar">Views</span>
+          {channelMedian ? <span data-key="median">Your median · {formatCompact(channelMedian)}</span> : null}
+        </div>
+      </header>
+
+      <div className="home-bars" role="list">
+        <div className="home-gridlines" aria-hidden="true">
+          <span data-label={formatCompact(max)} />
+          <span data-label={formatCompact(max / 2)} />
+          <span data-label="0" />
+        </div>
+        {channelMedian ? (
+          <span className="home-median-plot" aria-hidden="true">
+            <span className="home-median" style={{ bottom: pct(channelMedian) }} />
+          </span>
+        ) : null}
+        {bars.map((v, i) => {
+          const score = v.outlier_score === null ? null : Number(v.outlier_score);
+          const isBest = v === best && (score ?? 0) >= 1.5;
+          return (
+            <a
+              key={v.video_id}
+              role="listitem"
+              href={`https://www.youtube.com/watch?v=${v.youtube_video_id}`}
+              target="_blank"
+              rel="noreferrer"
+              className="home-bar"
+              data-best={isBest || undefined}
+              data-edge={i < 2 ? "start" : i >= bars.length - 2 ? "end" : undefined}
+              data-above={channelMedian !== null && v.view_count >= channelMedian ? "" : undefined}
+              aria-label={`${v.title}: ${formatCompact(v.view_count)} views`}
+            >
+              <span className="home-bar-fill" style={{ height: pct(v.view_count) }}>
+                {isBest ? (
+                  <span className="home-bar-flag">
+                    {formatMultiplier(score)} · {formatCompact(v.view_count)}
+                  </span>
+                ) : null}
+              </span>
+              <span className="home-bar-tip">
+                <strong>{v.title}</strong>
+                {formatCompact(v.view_count)} views{score !== null ? ` · ${formatMultiplier(score)} usual` : ""}
+              </span>
+              <span className="home-bar-label">{shortDate.format(new Date(v.published_at))}</span>
+            </a>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function KeyNumbers({ own, channelMedian }: { own: ChannelSummary; channelMedian: number | null }) {
+  const typical = channelMedian;
+  const best = own.recent.reduce<VideoFeedRow | null>((top, v) => (!top || Number(v.outlier_score ?? 0) > Number(top.outlier_score ?? 0) ? v : top), null);
+  const uploads30 = own.uploads30d;
+  const rates = own.recent.map((v) => (v.engagement_rate === null ? null : Number(v.engagement_rate))).filter((v): v is number => v !== null);
+  const engagement = rates.length ? rates.reduce((a, b) => a + b, 0) / rates.length : null;
+
+  const tiles: { label: string; value: string; note: string; tone: Tone }[] = [
+    { label: "Typical views", value: formatCompact(typical), note: "your median per upload", tone: "violet" },
+    {
+      label: "Best recent upload",
+      value: best?.outlier_score ? formatMultiplier(Number(best.outlier_score)) : "—",
+      note: best ? best.title : "no uploads yet",
+      tone: "pink",
+    },
+    { label: "Uploads · 30 days", value: uploads30 >= own.recent.length && own.recent.length > 0 ? `${uploads30}+` : String(uploads30), note: uploads30 >= 8 ? "steady schedule" : "more uploads, more chances", tone: "green" },
+    { label: "Engagement", value: formatPercent(engagement), note: "likes + comments per view", tone: "amber" },
+  ];
+
+  return (
+    <div className="home-tiles home-span-12">
+      {tiles.map((t, i) => (
+        <div key={t.label} className="dash-stat home-tile" data-tone={t.tone} style={{ "--i": i + 2 } as CSSProperties}>
+          <span className="dash-stat-label">{t.label}</span>
+          <span className="dash-stat-value">{t.value}</span>
+          <span className="dash-stat-note" title={t.note}>
+            {t.note}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export async function YourChannelSection({ userId, ownChannel }: { userId: string; ownChannel: string | null }) {
+  const data = await loadYourChannels(userId, ownChannel);
+  const own = data.own;
+
+  if (!own) {
+    return (
+      <section className="dash-panel home-span-12 home-onboard" aria-label="Your channel">
+        <span className="dash-icon" data-tone="green">
+          <PlayCircleIcon size={18} />
+        </span>
+        <div className="dash-panel-titles">
+          <h2>{data.ownPending ? "Your channel isn't synced yet" : "Add your channel"}</h2>
+          <p>
+            {data.ownPending
+              ? `We'll pull in ${data.ownPending} so you can see subscriber growth, views per upload, and alerts here.`
+              : "See your subscriber growth, views per upload, and an alert when one of your videos breaks out."}
+          </p>
+        </div>
+        <Link href={data.ownPending ? `/compare?you=${encodeURIComponent(data.ownPending)}` : "/settings/preferences"} className="button-ghost button-small">
+          {data.ownPending ? "Load my channel" : "Add in preferences"}
+        </Link>
+      </section>
+    );
+  }
+
+  const stored = own.recent.find((v) => v.channel_median_views !== null)?.channel_median_views;
+  const channelMedian = stored != null ? Number(stored) : median(own.recent.map((v) => v.view_count));
+  return (
+    <>
+      <ChannelCard own={own} />
+      {own.recent.length > 0 ? (
+        <UploadsChart videos={own.recent} channelMedian={channelMedian} />
+      ) : (
+        <section className="dash-panel home-span-8">
+          <Empty title="No uploads stored yet">Your views-per-upload chart appears after the next sync.</Empty>
+        </section>
+      )}
+      <KeyNumbers own={own} channelMedian={channelMedian} />
+    </>
+  );
+}
+
+export function YourChannelSkeleton() {
+  return (
+    <>
+      <PanelSkeleton className="home-span-4" rows={6} />
+      <PanelSkeleton className="home-span-8" rows={6} />
+    </>
+  );
+}
+
+/* ---------------------------------------------------------------------------
+   2. Niche Pulse and today's picks
 --------------------------------------------------------------------------- */
 
 export async function NichePulseSection({ niches, lastVisitAt }: { niches: string[]; lastVisitAt: string | null }) {
-  const pulse = await getServices().dashboard.nichePulse(niches, lastVisitAt);
-  const subtitle = pulse.scoped ? `Moving right now in ${niches.slice(0, 3).join(", ")}${niches.length > 3 ? "…" : ""}` : "Moving right now across Outlier";
+  const pulse = await loadPulse(niches.join("\n"), lastVisitAt);
+  const subtitle = pulse.scoped ? `Fast-moving Shorts in ${niches.slice(0, 3).join(", ")}${niches.length > 3 ? "…" : ""} · last 48h` : "Fast-moving Shorts across Outlier · last 48h";
 
   return (
-    <Panel
-      icon={ZapIcon}
-      title="Niche Pulse"
-      subtitle={
-        <>
-          <span className="dash-live" aria-hidden="true" />
-          {subtitle}
-          {pulse.newSinceLastVisit > 0 ? <span className="dash-new">{pulse.newSinceLastVisit} new since your last visit</span> : null}
-        </>
-      }
-      action={
-        <Link href="/research/shorts-channels?sort=vph" className="dash-link">
-          All rising Shorts →
-        </Link>
-      }
-      className="dash-pulse"
-      index={0}
-    >
-      {pulse.topics.length > 0 ? (
-        <div className="dash-topics">
-          {pulse.topics.map((t) => (
-            <Link key={t.label} href={`/research/shorts-channels?q=${encodeURIComponent(t.label)}`} className="dash-topic" data-mine={t.mine}>
-              {t.mine ? <span className="dash-topic-dot" /> : null}
-              {t.label}
-            </Link>
-          ))}
-        </div>
-      ) : null}
+    <>
+      <Panel
+        icon={ZapIcon}
+        title="Niche Pulse"
+        subtitle={
+          <>
+            <span className="dash-live" aria-hidden="true" />
+            {subtitle}
+            {pulse.newSinceLastVisit > 0 ? <span className="dash-new">{pulse.newSinceLastVisit} new since your last visit</span> : null}
+          </>
+        }
+        action={
+          <Link href="/research/shorts-channels?sort=vph" className="dash-link">
+            All rising Shorts →
+          </Link>
+        }
+        className="dash-pulse home-span-8"
+        index={3}
+      >
+        {pulse.topics.length > 0 ? (
+          <div className="dash-topics">
+            {pulse.topics.slice(0, 8).map((t) => (
+              <Link key={t.label} href={`/research/shorts-channels?q=${encodeURIComponent(t.label)}`} className="dash-topic" data-mine={t.mine}>
+                {t.mine ? <span className="dash-topic-dot" /> : null}
+                {t.label}
+              </Link>
+            ))}
+          </div>
+        ) : null}
 
-      <div className="dash-pulse-grid">
-        <div>
-          <h3 className="dash-subhead">
-            <ShortsIcon size={14} /> Fast-moving Shorts <span>· last 48h</span>
-          </h3>
-          {pulse.fastShorts.length === 0 ? (
-            <Empty title="No fresh Shorts yet">New uploads appear here as channels sync. Discover channels in your niche to fill this in.</Empty>
-          ) : (
-            <div className="dash-shorts">
-              {pulse.fastShorts.map((v, i) => (
-                <a
-                  key={v.id}
-                  href={`https://www.youtube.com/shorts/${v.youtube_video_id}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="dash-short"
-                  style={{ "--i": i } as React.CSSProperties}
-                  title={v.title}
-                >
-                  <span className="dash-short-thumb">
-                    <img src={`https://i.ytimg.com/vi/${v.youtube_video_id}/hqdefault.jpg`} alt="" loading="lazy" />
-                    <span className="dash-vph" title={v.live ? "Current views per hour" : "Views per hour since upload"}>
-                      {formatCompact(Math.round(v.vph))}/h
+        {pulse.fastShorts.length === 0 ? (
+          <Empty title="No fresh Shorts yet">New uploads appear here as channels sync. Discover channels in your niche to fill this in.</Empty>
+        ) : (
+          <div className="dash-shorts home-shorts">
+            {pulse.fastShorts.map((v, i) => (
+              <a
+                key={v.id}
+                href={`https://www.youtube.com/shorts/${v.youtube_video_id}`}
+                target="_blank"
+                rel="noreferrer"
+                className="dash-short"
+                style={{ "--i": i } as CSSProperties}
+                title={v.title}
+              >
+                <span className="dash-short-thumb">
+                  <img src={`https://i.ytimg.com/vi/${v.youtube_video_id}/hqdefault.jpg`} alt="" loading="lazy" />
+                  <span className="dash-vph" title={v.live ? "Current views per hour" : "Views per hour since upload"}>
+                    {formatCompact(Math.round(v.vph))}/h
+                  </span>
+                </span>
+                <span className="dash-short-title">{v.title}</span>
+                <span className="dash-short-meta">
+                  {v.channel ? v.channel.title : "Unknown channel"} · {formatCompact(v.view_count)} views
+                </span>
+              </a>
+            ))}
+          </div>
+        )}
+      </Panel>
+
+      <Panel
+        icon={FlameIcon}
+        title="Today's breakout picks"
+        subtitle="Small channels beating their usual views"
+        tone="pink"
+        action={
+          <Link href="/viral" className="dash-link">
+            More →
+          </Link>
+        }
+        className="home-span-4"
+        index={4}
+      >
+        {pulse.picks.length === 0 ? (
+          <Empty title="Today's picks aren't in yet">They&apos;re chosen once a day from the freshest breakouts.</Empty>
+        ) : (
+          <ul className="dash-list">
+            {pulse.picks.map((p) => (
+              <li key={p.id}>
+                <a href={`https://www.youtube.com/shorts/${p.youtube_video_id}`} target="_blank" rel="noreferrer" className="dash-row">
+                  <span className="home-pick-thumb">
+                    <img src={`https://i.ytimg.com/vi/${p.youtube_video_id}/mqdefault.jpg`} alt="" loading="lazy" />
+                  </span>
+                  <span className="dash-row-main">
+                    <span className="dash-row-title">{p.video_title}</span>
+                    <span className="dash-row-sub">
+                      {p.channel_title} · {p.niche}
                     </span>
                   </span>
-                  <span className="dash-short-title">{v.title}</span>
-                  <span className="dash-short-meta">
-                    {v.channel ? v.channel.title : "Unknown channel"} · {formatCompact(v.view_count)} views
-                  </span>
+                  <span className="dash-mult">{p.outlier_multiplier ? formatMultiplier(Number(p.outlier_multiplier)) : "—"}</span>
                 </a>
-              ))}
-            </div>
-          )}
-        </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
+    </>
+  );
+}
 
-        <div className="dash-side">
-          <h3 className="dash-subhead">
-            <TrendingIcon size={14} /> Channels heating up
-          </h3>
-          {pulse.movers.length === 0 ? (
-            <Empty title="No movers yet">Channels in your niches show up once they&apos;re in the catalog.</Empty>
-          ) : (
-            <ul className="dash-list">
-              {pulse.movers.map((c) => (
-                <li key={c.channel_id}>
-                  <Link href={`/channels/${c.youtube_channel_id}`} className="dash-row">
-                    {c.thumbnail_url ? <img className="dash-avatar" src={c.thumbnail_url} alt="" loading="lazy" /> : <span className="dash-avatar" />}
-                    <span className="dash-row-main">
-                      <span className="dash-row-title">{c.title}</span>
-                      <span className="dash-row-sub">
-                        {formatCompact(c.subscriber_count)} subs
-                        {c.top_multiplier ? ` · best ${formatMultiplier(Number(c.top_multiplier))}` : ""}
-                      </span>
+export async function HeatingUpSection({ niches, lastVisitAt }: { niches: string[]; lastVisitAt: string | null }) {
+  const pulse = await loadPulse(niches.join("\n"), lastVisitAt);
+  const top = Math.max(...pulse.movers.map((c) => Number(c.live_vph ?? c.recent_vph ?? 0)), 1);
+  return (
+    <Panel icon={TrendingIcon} title="Channels heating up" subtitle="Most views per hour in your niches" tone="amber" className="home-span-5" index={6}>
+      {pulse.movers.length === 0 ? (
+        <Empty title="No movers yet">Channels in your niches show up once they&apos;re in the catalog.</Empty>
+      ) : (
+        <ul className="dash-list">
+          {pulse.movers.map((c) => {
+            const vph = Number(c.live_vph ?? c.recent_vph ?? 0);
+            return (
+              <li key={c.channel_id}>
+                <Link href={`/channels/${c.youtube_channel_id}`} className="dash-row home-meter-row">
+                  <Avatar src={c.thumbnail_url} />
+                  <span className="dash-row-main">
+                    <span className="dash-row-title">{c.title}</span>
+                    <span className="home-meter" aria-hidden="true">
+                      {/* Square root, so one giant channel doesn't flatten the rest. */}
+                      <span style={{ width: `${Math.sqrt(vph / top) * 100}%` }} />
                     </span>
-                    <span className="dash-metric">{c.live_vph ?? c.recent_vph ? `${formatCompact(Math.round(Number(c.live_vph ?? c.recent_vph)))}/h` : "—"}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {pulse.picks.length > 0 ? (
-            <>
-              <h3 className="dash-subhead">
-                <FlameIcon size={14} /> Today&apos;s breakout picks
-              </h3>
-              <ul className="dash-list">
-                {pulse.picks.map((p) => (
-                  <li key={p.id}>
-                    <a href={`https://www.youtube.com/shorts/${p.youtube_video_id}`} target="_blank" rel="noreferrer" className="dash-row">
-                      <span className="dash-mult">{p.outlier_multiplier ? formatMultiplier(Number(p.outlier_multiplier)) : "—"}</span>
-                      <span className="dash-row-main">
-                        <span className="dash-row-title">{p.video_title}</span>
-                        <span className="dash-row-sub">
-                          {p.channel_title} · {p.niche}
-                        </span>
-                      </span>
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </>
-          ) : null}
-        </div>
-      </div>
+                  </span>
+                  <span className="dash-metric">{vph ? `${formatCompact(Math.round(vph))}/h` : "—"}</span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </Panel>
   );
 }
 
 /* ---------------------------------------------------------------------------
-   3. Your Channels
+   3. Competitors: you against them
 --------------------------------------------------------------------------- */
 
 function VideoRow({ video }: { video: VideoFeedRow }) {
@@ -285,7 +551,7 @@ function VideoRow({ video }: { video: VideoFeedRow }) {
       <span className="dash-row-main">
         <span className="dash-row-title">{video.title}</span>
         <span className="dash-row-sub">
-          {formatCompact(video.view_count)} views · {timeAgo(video.published_at)}
+          {video.channel_title} · {formatCompact(video.view_count)} views · {timeAgo(video.published_at)}
         </span>
       </span>
       <span className="dash-metric" data-hot={score !== null && score >= 2}>
@@ -295,132 +561,28 @@ function VideoRow({ video }: { video: VideoFeedRow }) {
   );
 }
 
-export async function YourChannelsSection({ userId, ownChannel }: { userId: string; ownChannel: string | null }) {
-  const data = await getServices().dashboard.yourChannels(userId, ownChannel);
-  const own = data.own;
-
-  return (
-    <Panel
-      icon={PlayCircleIcon}
-      title="Your Channels"
-      subtitle="Performance and anything unusual"
-      tone="green"
-      action={
-        <Link href="/channels" className="dash-link">
-          Manage →
-        </Link>
-      }
-      index={1}
-    >
-      {own ? (
-        <div className="dash-own">
-          <div className="dash-own-head">
-            {own.channel.thumbnail_url ? <img className="dash-avatar dash-avatar-lg" src={own.channel.thumbnail_url} alt="" /> : <span className="dash-avatar dash-avatar-lg" />}
-            <div className="dash-row-main">
-              <Link href={`/channels/${own.channel.youtube_channel_id}`} className="dash-own-name">
-                {own.channel.title}
-              </Link>
-              <span className="dash-row-sub">{formatCompact(own.channel.subscriber_count)} subscribers</span>
-            </div>
-          </div>
-          <div className="dash-deltas">
-            <Delta value={own.growth.subs24h} suffix="subs 24h" />
-            <Delta value={own.growth.subs7d} suffix="subs 7d" />
-            <Delta value={own.growth.views24h} suffix="views 24h" />
-            <Delta value={own.growth.views7d} suffix="views 7d" />
-          </div>
-          {own.alerts.length > 0 ? (
-            <ul className="dash-alerts">
-              {own.alerts.map((a) => (
-                <li key={a.title} className="dash-alert" data-tone={a.tone}>
-                  <strong>{a.title}</strong>
-                  <span>{a.detail}</span>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-          {own.recent.length > 0 ? (
-            <>
-              <h3 className="dash-subhead">Recent uploads</h3>
-              <ul className="dash-list">
-                {own.recent.slice(0, 3).map((v) => (
-                  <li key={v.video_id}>
-                    <VideoRow video={v} />
-                  </li>
-                ))}
-              </ul>
-            </>
-          ) : null}
-        </div>
-      ) : data.ownPending ? (
-        <Empty
-          title="Your channel isn't synced yet"
-          action={
-            <Link href={`/compare?you=${encodeURIComponent(data.ownPending)}`} className="button-ghost button-small">
-              Load my channel
-            </Link>
-          }
-        >
-          We&apos;ll pull in {data.ownPending} so you can see growth and alerts here.
-        </Empty>
-      ) : (
-        <Empty
-          title="Add your channel"
-          action={
-            <Link href="/settings/preferences" className="button-ghost button-small">
-              Add in preferences
-            </Link>
-          }
-        >
-          See your subscriber and view changes, plus alerts when a video breaks out.
-        </Empty>
-      )}
-
-      {data.tracked.length > 0 ? (
-        <>
-          <h3 className="dash-subhead">
-            <BookmarkIcon size={14} /> Tracked · biggest movers
-          </h3>
-          <ul className="dash-list">
-            {data.tracked.map((c) => (
-              <li key={c.id}>
-                <Link href={`/channels/${c.youtube_channel_id}`} className="dash-row">
-                  {c.thumbnail_url ? <img className="dash-avatar" src={c.thumbnail_url} alt="" loading="lazy" /> : <span className="dash-avatar" />}
-                  <span className="dash-row-main">
-                    <span className="dash-row-title">{c.title}</span>
-                    <span className="dash-row-sub">{formatCompact(c.subscriber_count)} subs</span>
-                  </span>
-                  <Delta value={c.growth.views24h} suffix="24h" />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </>
-      ) : null}
-    </Panel>
-  );
-}
-
-/* ---------------------------------------------------------------------------
-   4. Competitor Watch
---------------------------------------------------------------------------- */
-
-export async function CompetitorWatchSection({ competitors }: { competitors: string[] }) {
-  const watch = await getServices().dashboard.competitorWatch(competitors);
-  const compareHref = `/compare`;
+export async function CompetitorWatchSection({ userId, ownChannel, competitors }: { userId: string; ownChannel: string | null; competitors: string[] }) {
+  const [watch, mine] = await Promise.all([getServices().dashboard.competitorWatch(competitors), loadYourChannels(userId, ownChannel)]);
+  const you = mine.own?.channel ?? null;
+  const rows = [
+    ...(you ? [{ id: you.id, title: you.title, href: `/channels/${you.youtube_channel_id}`, thumb: you.thumbnail_url, subs: you.subscriber_count ?? 0, week: mine.own?.growth.subs7d ?? null, you: true }] : []),
+    ...watch.found.map((c) => ({ id: c.id, title: c.title, href: `/channels/${c.youtube_channel_id}`, thumb: c.thumbnail_url, subs: c.subscriber_count ?? 0, week: c.growth.subs7d, you: false })),
+  ].sort((a, b) => b.subs - a.subs);
+  const top = Math.max(...rows.map((r) => r.subs), 1);
 
   return (
     <Panel
       icon={UsersIcon}
-      title="Competitor Watch"
-      subtitle={watch.configured ? `${watch.found.length} of ${watch.configured} competitors synced` : "Channels you're up against"}
+      title="You vs competitors"
+      subtitle={watch.configured ? `Subscribers, and who grew this week` : "Channels you're up against"}
       tone="pink"
       action={
-        <Link href={compareHref} className="dash-link">
+        <Link href="/compare" className="dash-link">
           Compare →
         </Link>
       }
-      index={2}
+      className="home-span-7"
+      index={5}
     >
       {watch.configured === 0 ? (
         <Empty
@@ -431,13 +593,13 @@ export async function CompetitorWatchSection({ competitors }: { competitors: str
             </Link>
           }
         >
-          Add a few channels to see their new uploads, breakouts, and growth here.
+          Add a few channels to see how you stack up, plus their breakout videos.
         </Empty>
       ) : watch.found.length === 0 ? (
         <Empty
           title="Competitors aren't synced yet"
           action={
-            <Link href={compareHref} className="button-ghost button-small">
+            <Link href="/compare" className="button-ghost button-small">
               Load them
             </Link>
           }
@@ -446,44 +608,37 @@ export async function CompetitorWatchSection({ competitors }: { competitors: str
         </Empty>
       ) : (
         <>
-          <ul className="dash-list">
-            {watch.found.slice(0, 5).map((c) => (
-              <li key={c.id}>
-                <Link href={`/channels/${c.youtube_channel_id}`} className="dash-row">
-                  {c.thumbnail_url ? <img className="dash-avatar" src={c.thumbnail_url} alt="" loading="lazy" /> : <span className="dash-avatar" />}
-                  <span className="dash-row-main">
-                    <span className="dash-row-title">{c.title}</span>
-                    <span className="dash-row-sub">{formatCompact(c.subscriber_count)} subs</span>
+          <ul className="home-versus">
+            {rows.map((r) => (
+              <li key={r.id} data-you={r.you || undefined}>
+                <Link href={r.href} className="home-versus-row">
+                  <Avatar src={r.thumb} />
+                  <span className="home-versus-main">
+                    <span className="home-versus-name">
+                      {r.title}
+                      {r.you ? <em>You</em> : null}
+                    </span>
+                    <span className="home-versus-bar" aria-hidden="true">
+                      <span style={{ width: `${Math.max((r.subs / top) * 100, 2)}%` }} />
+                    </span>
                   </span>
-                  <Delta value={c.growth.subs7d} suffix="subs 7d" />
+                  <span className="home-versus-value">
+                    <strong>{formatCompact(r.subs)}</strong>
+                    <Delta value={r.week} suffix="7d" />
+                  </span>
                 </Link>
               </li>
             ))}
           </ul>
 
           <h3 className="dash-subhead">
-            <FlameIcon size={14} /> Biggest performers · 30d
+            <FlameIcon size={14} /> Their best this month
           </h3>
           {watch.topPerformers.length === 0 ? (
-            <Empty title="No breakouts this month" />
+            <p className="dash-footnote">No breakouts from them in the last 30 days.</p>
           ) : (
             <ul className="dash-list">
-              {watch.topPerformers.map((v) => (
-                <li key={v.video_id}>
-                  <VideoRow video={v} />
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <h3 className="dash-subhead">
-            <EyeIcon size={14} /> Recent uploads · 14d
-          </h3>
-          {watch.uploads.length === 0 ? (
-            <Empty title="Nothing new in two weeks" />
-          ) : (
-            <ul className="dash-list">
-              {watch.uploads.slice(0, 4).map((v) => (
+              {watch.topPerformers.slice(0, 3).map((v) => (
                 <li key={v.video_id}>
                   <VideoRow video={v} />
                 </li>
@@ -492,63 +647,75 @@ export async function CompetitorWatchSection({ competitors }: { competitors: str
           )}
         </>
       )}
-      {watch.missing.length > 0 && watch.found.length > 0 ? (
-        <p className="dash-footnote">Not synced yet: {watch.missing.slice(0, 3).join(", ")}</p>
-      ) : null}
+      {watch.missing.length > 0 && watch.found.length > 0 ? <p className="dash-footnote">Not synced yet: {watch.missing.slice(0, 3).join(", ")}</p> : null}
     </Panel>
   );
 }
 
 /* ---------------------------------------------------------------------------
-   5. Research shortcuts
+   4. Tracked channels, recent activity, shortcuts
 --------------------------------------------------------------------------- */
 
-const SHORTCUTS: { href: string; label: string; note: string; icon: IconType; tone: string; ownerOnly?: boolean }[] = [
-  { href: "/research/shorts-channels", label: "Search Channels", note: "Find Shorts channels by niche", icon: SearchIcon, tone: "violet" },
-  { href: "/viral", label: "Viral Videos", note: "Videos beating their channel", icon: FlameIcon, tone: "pink" },
-  { href: "/analyze", label: "Analyze Video", note: "Why did it take off?", icon: ChartIcon, tone: "blue" },
-  { href: "/research/niche-finder", label: "Find Ideas", note: "Research niches and sub-niches", icon: CompassIcon, tone: "amber" },
-  // Still owner-only. Everyone else sees it here and lands on the locked preview.
-  { href: "/research/scriptwriter", label: "Script Writer", note: "Write a Short from the niche's outliers", icon: PenIcon, tone: "green", ownerOnly: true },
-];
-
-export function ResearchShortcuts({ isOwner = false }: { isOwner?: boolean }) {
+export async function TrackedSection({ userId, ownChannel }: { userId: string; ownChannel: string | null }) {
+  const data = await loadYourChannels(userId, ownChannel);
   return (
-    <div className="dash-shortcuts">
-      {SHORTCUTS.map((s, i) => {
-        const locked = s.ownerOnly === true && !isOwner;
-        return (
-          <Link key={s.href} href={s.href} className="dash-shortcut" data-locked={locked ? "" : undefined} style={{ "--i": i } as React.CSSProperties}>
-            <span className="dash-icon" data-tone={s.tone}>
-              <s.icon size={18} />
-            </span>
-            <span className="dash-shortcut-text">
-              <strong>
-                {s.label}
-                {locked ? <span className="dash-soon">Coming soon</span> : null}
-              </strong>
-              <span>{s.note}</span>
-            </span>
-            <span className="dash-shortcut-arrow" aria-hidden="true">
-              {locked ? <LockIcon size={14} /> : "→"}
-            </span>
-          </Link>
-        );
-      })}
-    </div>
+    <Panel
+      icon={BookmarkIcon}
+      title="Tracked channels"
+      subtitle="Biggest movers in the last 24h"
+      tone="green"
+      action={
+        <Link href="/channels" className="dash-link">
+          All →
+        </Link>
+      }
+      className="home-span-4"
+      index={7}
+    >
+      {data.tracked.length === 0 ? (
+        <Empty
+          title="Nothing tracked yet"
+          action={
+            <Link href="/research/shorts-channels" className="button-ghost button-small">
+              Find channels
+            </Link>
+          }
+        >
+          Track a channel to follow its growth every day.
+        </Empty>
+      ) : (
+        <ul className="dash-list">
+          {data.tracked.map((c) => (
+            <li key={c.id}>
+              <Link href={`/channels/${c.youtube_channel_id}`} className="dash-row">
+                <Avatar src={c.thumbnail_url} />
+                <span className="dash-row-main">
+                  <span className="dash-row-title">{c.title}</span>
+                  <span className="dash-row-sub">{formatCompact(c.subscriber_count)} subs</span>
+                </span>
+                <Delta value={c.growth.views24h} suffix="views" />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Panel>
   );
 }
 
-/* ---------------------------------------------------------------------------
-   6. Recent activity
---------------------------------------------------------------------------- */
-
 const ACTIVITY_ICON: Record<ActivityItem["kind"], IconType> = { search: SearchIcon, track: BookmarkIcon, analyze: ChartIcon, other: ZapIcon };
 
-export async function RecentActivitySection({ userId }: { userId: string }) {
-  const items = await getServices().dashboard.recentActivity(userId);
+export async function RecentActivitySection({ userId, lastVisitAt }: { userId: string; lastVisitAt: string | null }) {
+  const [items, overview] = await Promise.all([getServices().dashboard.recentActivity(userId, 5), loadOverview(userId, lastVisitAt)]);
   return (
-    <Panel icon={BookmarkIcon} title="Recent activity" subtitle="Pick up where you left off" tone="blue" index={4}>
+    <Panel
+      icon={ShortsIcon}
+      title="Recent activity"
+      subtitle={`${overview.researchThisWeek} research ${overview.researchThisWeek === 1 ? "action" : "actions"} this week`}
+      tone="blue"
+      className="home-span-4"
+      index={8}
+    >
       {items.length === 0 ? (
         <Empty title="Nothing yet">Your searches, tracked channels, and analyzed videos will show up here.</Empty>
       ) : (
@@ -570,6 +737,44 @@ export async function RecentActivitySection({ userId }: { userId: string }) {
           })}
         </ul>
       )}
+    </Panel>
+  );
+}
+
+const SHORTCUTS: { href: string; label: string; note: string; icon: IconType; tone: Tone; ownerOnly?: boolean }[] = [
+  { href: "/research/shorts-channels", label: "Search Channels", note: "Find Shorts channels by niche", icon: SearchIcon, tone: "violet" },
+  { href: "/viral", label: "Viral Videos", note: "Videos beating their channel", icon: FlameIcon, tone: "pink" },
+  { href: "/analyze", label: "Analyze Video", note: "Why did it take off?", icon: ChartIcon, tone: "blue" },
+  { href: "/research/niche-finder", label: "Find Ideas", note: "Research niches and sub-niches", icon: CompassIcon, tone: "amber" },
+  // Still owner-only. Everyone else sees it here and lands on the locked preview.
+  { href: "/research/scriptwriter", label: "Script Writer", note: "Write a Short from the niche's outliers", icon: PenIcon, tone: "green", ownerOnly: true },
+];
+
+export function ResearchShortcuts({ isOwner = false }: { isOwner?: boolean }) {
+  return (
+    <Panel title="Jump into a tool" className="home-span-4 dash-shortcuts-panel" index={9}>
+      <div className="dash-shortcuts home-shortcuts">
+        {SHORTCUTS.map((s, i) => {
+          const locked = s.ownerOnly === true && !isOwner;
+          return (
+            <Link key={s.href} href={s.href} className="dash-shortcut" data-locked={locked ? "" : undefined} style={{ "--i": i } as CSSProperties}>
+              <span className="dash-icon" data-tone={s.tone}>
+                <s.icon size={16} />
+              </span>
+              <span className="dash-shortcut-text">
+                <strong>
+                  {s.label}
+                  {locked ? <span className="dash-soon">Coming soon</span> : null}
+                </strong>
+                <span>{s.note}</span>
+              </span>
+              <span className="dash-shortcut-arrow" aria-hidden="true">
+                {locked ? <LockIcon size={14} /> : "→"}
+              </span>
+            </Link>
+          );
+        })}
+      </div>
     </Panel>
   );
 }
