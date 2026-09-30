@@ -218,7 +218,10 @@ export function getServices(): Services {
     snapshotVideoMaxAgeDays: config.SNAPSHOT_VIDEO_MAX_AGE_DAYS,
     language: config.OUTLIER_LANGUAGE.toLowerCase(),
   });
-  const videos = new VideoService(youtube);
+  const transcriptReader = config.INNERTUBE_INGEST_ENABLED ? lazy(() => createTranscriptReader()) : null;
+  // No live transcript reads from Analyze yet: the reader hasn't returned a transcript in production,
+  // so it would only add seconds of waiting. Stored transcripts are still shown when there are any.
+  const videos = new VideoService(youtube, { videos: repositories.videos, transcripts: repositories.transcripts, reader: null });
 
   // Job handlers enqueue follow-up jobs, but the queue needs the registry first: bind late.
   const queueRef: { current?: JobQueue } = {};
@@ -265,7 +268,6 @@ export function getServices(): Services {
   );
 
   // Transcripts only exist on the scraped path; the Data API can't see them.
-  const transcriptReader = config.INNERTUBE_INGEST_ENABLED ? lazy(() => createTranscriptReader()) : null;
   const transcripts = new TranscriptService({ videos: repositories.videos, transcripts: repositories.transcripts, reader: transcriptReader });
 
   const jobRegistry = createJobRegistry({
