@@ -296,7 +296,7 @@ function OverviewTab({ ws, sort, href }: { ws: CompetitorWorkspace; sort: SortKe
         }
       >
         <div className="table-wrap">
-          <table className="intel-table">
+          <table className="intel-table card-table">
             <thead>
               <tr>
                 <th>Channel</th>
@@ -312,21 +312,21 @@ function OverviewTab({ ws, sort, href }: { ws: CompetitorWorkspace; sort: SortKe
             <tbody>
               {rows.map(({ p, isYou }) => (
                 <tr key={p.channel.id} data-you={isYou}>
-                  <td>
+                  <td className="card-table-title">
                     <ChannelCell channel={p.channel} href={profileHref(p.channel.youtube_channel_id)} />
                     {isYou ? <span className="niche-badge">You</span> : null}
                   </td>
-                  <td>
+                  <td data-label="Trend">
                     <TrendBadge label={p.growth.trend.label} />
                   </td>
-                  <td className="num">
+                  <td className="num" data-label="Subs 7d">
                     <Delta value={p.growth.d7.subs} />
                   </td>
-                  <td className="num">{formatCompact(p.avgViews)}</td>
-                  <td className="num intel-extra">{formatCompact(p.recentViews)}</td>
-                  <td className="num intel-extra">{p.uploadsPerWeek.toFixed(1)}</td>
-                  <td className="num intel-extra">{formatPercent(p.outlierRate, 0)}</td>
-                  <td className="num">
+                  <td className="num" data-label="Avg views">{formatCompact(p.avgViews)}</td>
+                  <td className="num intel-extra" data-label="Views 7d">{formatCompact(p.recentViews)}</td>
+                  <td className="num intel-extra" data-label="Uploads/wk">{p.uploadsPerWeek.toFixed(1)}</td>
+                  <td className="num intel-extra" data-label="Outlier rate">{formatPercent(p.outlierRate, 0)}</td>
+                  <td className="num" data-label="Best recent">
                     {p.bestRecent ? (
                       <a href={`https://www.youtube.com/watch?v=${p.bestRecent.youtube_video_id}`} target="_blank" rel="noreferrer" title={p.bestRecent.title}>
                         <Multiplier value={p.bestRecent.multiplier} />
@@ -405,7 +405,7 @@ function GrowthTab({ ws }: { ws: CompetitorWorkspace }) {
   return (
     <Card title="Growth" subtitle="From saved snapshots. Trend compares the last 3 days of views with the 4 days before.">
       <div className="table-wrap">
-        <table className="intel-table">
+        <table className="intel-table card-table">
           <thead>
             <tr>
               <th>Channel</th>
@@ -418,19 +418,19 @@ function GrowthTab({ ws }: { ws: CompetitorWorkspace }) {
           <tbody>
             {withYou(ws).map(({ p, isYou }) => (
               <tr key={p.channel.id} data-you={isYou} data-highlight={p.growth.trend.label === "accelerating"}>
-                <td>
+                <td className="card-table-title">
                   <ChannelCell channel={p.channel} href={profileHref(p.channel.youtube_channel_id)} />
                   {isYou ? <span className="niche-badge">You</span> : null}
                 </td>
-                <td>
+                <td data-label="Trend">
                   <TrendBadge
                     label={p.growth.trend.label}
                     title={p.growth.trend.recentDailyViews !== null ? `${formatCompact(p.growth.trend.recentDailyViews)} views/day, was ${formatCompact(p.growth.trend.priorDailyViews)}` : undefined}
                   />
                 </td>
-                <td className="num"><Delta value={p.growth.d7.subs} pct={p.growth.d7.subsPct} /></td>
-                <td className="num">{p.growth.d30 ? <Delta value={p.growth.d30.subs} /> : <span className="intel-muted">—</span>}</td>
-                <td className="num"><Delta value={p.growth.d7.views} /></td>
+                <td className="num" data-label="Subs 7d"><Delta value={p.growth.d7.subs} pct={p.growth.d7.subsPct} /></td>
+                <td className="num" data-label="Subs 30d">{p.growth.d30 ? <Delta value={p.growth.d30.subs} /> : <span className="intel-muted">—</span>}</td>
+                <td className="num" data-label="Views 7d"><Delta value={p.growth.d7.views} /></td>
               </tr>
             ))}
           </tbody>

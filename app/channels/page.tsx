@@ -28,7 +28,7 @@ export default async function ChannelsPage() {
           <div className="empty">No channels yet. Track one above.</div>
         ) : (
           <div className="table-wrap">
-            <table>
+            <table className="card-table">
               <thead>
                 <tr>
                   <th>Channel</th>
@@ -44,7 +44,7 @@ export default async function ChannelsPage() {
               <tbody>
                 {channels.map((channel) => (
                   <tr key={channel.id}>
-                    <td>
+                    <td className="card-table-title">
                       <Link href={`/channels/${channel.youtube_channel_id}`} className="row" style={{ gap: 10 }}>
                         {channel.thumbnail_url ? <img className="avatar" src={channel.thumbnail_url} alt="" loading="lazy" /> : null}
                         <span>
@@ -53,11 +53,11 @@ export default async function ChannelsPage() {
                         </span>
                       </Link>
                     </td>
-                    <td className="num">{channel.hidden_subscriber_count ? "Hidden" : formatCompact(channel.subscriber_count)}</td>
-                    <td className="num">{formatCompact(channel.view_count)}</td>
-                    <td className="num">{formatNumber(channel.video_count)}</td>
-                    <td className="num muted">{timeAgo(channel.last_synced_at)}</td>
-                    <td className="num">
+                    <td className="num" data-label="Subscribers">{channel.hidden_subscriber_count ? "Hidden" : formatCompact(channel.subscriber_count)}</td>
+                    <td className="num" data-label="Total views">{formatCompact(channel.view_count)}</td>
+                    <td className="num" data-label="Videos">{formatNumber(channel.video_count)}</td>
+                    <td className="num muted" data-label="Last synced">{timeAgo(channel.last_synced_at)}</td>
+                    <td className="num card-table-action">
                       <form action={setChannelTracked}>
                         <input type="hidden" name="channelId" value={channel.id} />
                         <input type="hidden" name="tracked" value="false" />

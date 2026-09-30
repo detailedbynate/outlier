@@ -101,7 +101,7 @@ export function VideoTable({
   if (videos.length === 0) return <div className="dash-empty">No stored uploads in this period yet.</div>;
   return (
     <div className="table-wrap">
-      <table className="intel-videos">
+      <table className="intel-videos card-table">
         <thead>
           <tr>
             <th>Video</th>
@@ -119,7 +119,7 @@ export function VideoTable({
         <tbody>
           {videos.map((v) => (
             <tr key={v.id} data-breakout={(v.multiplier ?? 0) >= 3}>
-              <td>
+              <td className="card-table-title">
                 <a
                   href={v.format === "short" ? `https://www.youtube.com/shorts/${v.youtube_video_id}` : `https://www.youtube.com/watch?v=${v.youtube_video_id}`}
                   target="_blank"
@@ -138,15 +138,15 @@ export function VideoTable({
                   </span>
                 </a>
               </td>
-              <td className="num">{formatCompact(v.view_count)}</td>
+              <td className="num" data-label="Views">{formatCompact(v.view_count)}</td>
               {compact ? null : (
                 <>
-                  <td className="num">{formatCompact(v.like_count)}</td>
-                  <td className="num">{formatCompact(v.comment_count)}</td>
-                  <td className="num">{formatCompact(Math.round(v.vph))}</td>
+                  <td className="num" data-label="Likes">{formatCompact(v.like_count)}</td>
+                  <td className="num" data-label="Comments">{formatCompact(v.comment_count)}</td>
+                  <td className="num" data-label="Views/hr">{formatCompact(Math.round(v.vph))}</td>
                 </>
               )}
-              <td className="num">
+              <td className="num" data-label="vs avg">
                 <Multiplier value={v.multiplier} />
               </td>
             </tr>

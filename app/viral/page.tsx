@@ -60,21 +60,21 @@ export default async function ViralPage({ searchParams }: { searchParams: Search
       <PageHeader icon={FlameIcon} title="Viral Videos" subtitle="Videos ranked by how far they beat their channel’s typical views." />
 
       <div className="row" style={{ gap: 20 }}>
-        <div className="chips" aria-label="Published within">
+        <div className="chips chips-scroll" aria-label="Published within">
           {RANGES.map((o) => (
             <Link key={o.key} href={href({ range: o.key })} className="chip" aria-current={o.key === range}>
               {o.label}
             </Link>
           ))}
         </div>
-        <div className="chips" aria-label="Format">
+        <div className="chips chips-scroll" aria-label="Format">
           {FORMATS.map((o) => (
             <Link key={o.key} href={href({ format: o.key })} className="chip" aria-current={o.key === format}>
               {o.label}
             </Link>
           ))}
         </div>
-        <div className="chips" aria-label="Sort by">
+        <div className="chips chips-scroll" aria-label="Sort by">
           {SORTS.map((o) => (
             <Link key={o.key} href={href({ sort: o.key })} className="chip" aria-current={o.key === sort}>
               {o.label}
