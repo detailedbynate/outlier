@@ -7,7 +7,7 @@ import type { SavedScriptRow } from "@/types/database";
  * Scripts someone has written, newest first.
  *
  * Everything is kept automatically. A script costs eight credits and can only
- * be asked for once every three hours, so a "save" button would just be a way
+ * be asked for once every six hours on Pro, so a "save" button would just be a way
  * to lose one — deleting the duds is the cheaper mistake to allow.
  */
 export class SavedScriptRepository {

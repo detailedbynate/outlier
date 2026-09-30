@@ -63,7 +63,7 @@ export const PLANS: readonly Plan[] = [
     blurb: "For creators researching every week",
     creditsNote: "Research most days without watching the meter",
     features: [
-      "Everything on Free, plus the Shorts Script Writer",
+      "Everything on Free, plus the Shorts Script Writer (a script every 6 hours)",
       "30× the credits of Free",
       "Top up any time — bought credits never expire",
       "Cancel any time",
@@ -76,7 +76,13 @@ export const PLANS: readonly Plan[] = [
     priceCents: 3_000,
     blurb: "For studios running several channels",
     creditsNote: "A whole roster's research, every week of the month",
-    features: ["Everything on Pro", "Over 3× the credits of Pro", "Room for a whole roster of channels", "Cancel any time"],
+    features: [
+      "Everything on Pro",
+      "Over 3× the credits of Pro",
+      "Script Writer on our sharpest writing model, 4 scripts a day",
+      "Room for a whole roster of channels",
+      "Cancel any time",
+    ],
   },
 ];
 

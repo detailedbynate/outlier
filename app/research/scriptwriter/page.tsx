@@ -18,8 +18,7 @@ export const metadata: Metadata = { title: "Script Writer · Outlier" };
 export default async function ScriptwriterPage() {
   const current = await requireApprovedUser();
   const cost = CREDIT_COSTS.write_script;
-  // Expert (and the owner) get the writer. Free sees an upgrade; Pro sees "soon",
-  // because Pro opens later and there's nothing for them to buy in between.
+  // Pro and Expert (and the owner) get the writer; Free sees what it does and an upgrade.
   const plan = current.isOwner ? null : await getServices().subscriptions.stateFor(current.user.id).catch(() => null);
   const canWrite = writerOpenTo(plan?.plan.id, current.isOwner);
   const onFreePlan = !current.isOwner && (plan?.plan.id ?? "free") === "free";

@@ -31,6 +31,17 @@ describe("ScriptService", () => {
     expect(generateObject).toHaveBeenCalledTimes(1);
   });
 
+  it("gives the basic writer to plans without Claude, and never falls back to Claude", async () => {
+    const basic = vi.fn().mockResolvedValue({ object: script, model: "gemini-model", usage: {} });
+    const { service, generateObject } = serviceWith({ basicAi: { name: "basic", generateText: vi.fn(), generateObject: basic } });
+    expect((await service.write({ topic: "fishing", idea: "an idea" }, undefined, { basic: true })).model).toBe("gemini-model");
+    expect(generateObject).not.toHaveBeenCalled();
+
+    const { service: noBasic, generateObject: claude } = serviceWith();
+    await expect(noBasic.write({ topic: "fishing", idea: "an idea" }, undefined, { basic: true })).rejects.toThrow("isn't available");
+    expect(claude).not.toHaveBeenCalled();
+  });
+
   it("returns the script and counts its spoken words", async () => {
     const { service } = serviceWith();
     const result = await service.write({ topic: "car detailing", idea: "an idea" });

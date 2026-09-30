@@ -12,7 +12,7 @@ export const CHANGELOG = {
   items: [
     {
       title: "Script Writer is here",
-      body: "Give it your niche and an idea and it writes the script: hook, turn, payoff, ready to read out. Show it a couple of your scripts and it writes in your voice. On the Expert plan.",
+      body: "Give it your niche and an idea and it writes the script: hook, turn, payoff, ready to read out. Show it a couple of your scripts and it writes in your voice. On Pro and Expert.",
     },
     {
       title: "A new dashboard",

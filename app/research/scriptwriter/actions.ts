@@ -50,7 +50,7 @@ export async function writeScript(_previous: ScriptState, formData: FormData): P
   };
 
   const access = await writerAccess(current);
-  if (!access) return { ...emptyScriptState, sent, error: "The Script Writer is on the Expert plan." };
+  if (!access) return { ...emptyScriptState, sent, error: "The Script Writer is on the Pro and Expert plans." };
   if (!sent.topic) return { ...emptyScriptState, sent, error: "Pick a niche to write for." };
   if (!sent.idea) return { ...emptyScriptState, sent, error: "Say what the Short should be about." };
 
@@ -60,13 +60,13 @@ export async function writeScript(_previous: ScriptState, formData: FormData): P
     // charged again only on success — a failed generation costs nothing.
     await services.credits.assertAvailable(current.user.id, "write_script");
     // Each is a paid model call, and a script is meant to be worked with rather
-    // than rerolled until something sticks: Expert gets four a day, the owner no limit.
+    // than rerolled until something sticks: Pro gets one every six hours, Expert four a day, the owner no limit.
     if (access.limit) await services.rateLimits.enforce(access.limit, current.user.id);
     const result = await asUser(current.user.id, "action:write_script", () =>
       services.scripts.write(
         { topic: sent.topic, idea: sent.idea, angle: sent.angle || undefined, targetSeconds: sent.seconds, tone: sent.tone },
         current.user.id,
-        { premium: access.premium },
+        { premium: access.premium, basic: access.basic },
       ),
     );
     const { charged } = await services.credits.charge(current.user.id, "write_script");
@@ -123,16 +123,16 @@ export async function findIdeas(_previous: IdeaState, formData: FormData): Promi
   const topic = text(formData.get("topic"), 80);
 
   const access = await writerAccess(current);
-  if (!access) return { ...emptyIdeaState, topic, error: "The Script Writer is on the Expert plan." };
+  if (!access) return { ...emptyIdeaState, topic, error: "The Script Writer is on the Pro and Expert plans." };
   if (!topic) return { ...emptyIdeaState, topic, error: "Type a niche to find ideas for." };
 
   const services = getServices();
   try {
     await services.credits.assertAvailable(current.user.id, "find_ideas");
-    // Ideas are cheap and lead to scripts, which are what's limited; the three hour
-    // plan still waits between idea searches too.
-    if (access.limit === "scriptUser") await services.rateLimits.enforce("scriptUser", current.user.id);
-    const result = await asUser(current.user.id, "action:find_ideas", () => services.scripts.ideas(topic, current.user.id, { premium: access.premium }));
+    // Ideas are cheap and lead to scripts, which are what's limited. Pro gets its own
+    // idea allowance, so finding an idea doesn't spend the six-hourly script.
+    if (access.limit === "scriptUser") await services.rateLimits.enforce("scriptIdeasUser", current.user.id);
+    const result = await asUser(current.user.id, "action:find_ideas", () => services.scripts.ideas(topic, current.user.id, { premium: access.premium, basic: access.basic }));
     const { charged } = await services.credits.charge(current.user.id, "find_ideas");
     revalidatePath("/", "layout");
     return { ideas: result.ideas, error: null, charged, topic };

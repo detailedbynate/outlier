@@ -21,10 +21,18 @@ import { SCRIPT, type ScriptRequest, type ScriptResult } from "@/lib/scripts/sch
 
 export const SCRIPT_EVENT = "script.write";
 
+/** Which writer a request gets: `premium` for the deeper Claude model, `basic` for the one without Claude. */
+export interface WriterOptions {
+  premium?: boolean;
+  basic?: boolean;
+}
+
 export interface ScriptDeps {
   ai: TextProvider | null;
-  /** A deeper, pricier writer for the owner. Falls back to `ai` when absent. */
+  /** A deeper, pricier writer for the owner and Expert. Falls back to `ai` when absent. */
   premiumAi?: TextProvider | null;
+  /** The writer for plans without Claude (Pro). Never falls back to `ai`, which is Claude. */
+  basicAi?: TextProvider | null;
   /** Every script is kept; there's no save button to forget. Also what ideas avoid repeating. */
   saved: Pick<SavedScriptRepository, "save" | "listForUser" | "delete">;
   /** Their own scripts, which the writer copies the voice of. */
@@ -39,16 +47,17 @@ export class ScriptService {
     this.log = deps.logger ?? createLogger({ module: "services.scripts" });
   }
 
-  private writer(premium = false): TextProvider | null {
-    return (premium && this.deps.premiumAi) || this.deps.ai;
+  private writer(options: WriterOptions): TextProvider | null {
+    if (options.basic) return this.deps.basicAi ?? null;
+    return (options.premium && this.deps.premiumAi) || this.deps.ai;
   }
 
-  async write(request: ScriptRequest, userId?: string, options: { premium?: boolean } = {}): Promise<ScriptResult> {
+  async write(request: ScriptRequest, userId?: string, options: WriterOptions = {}): Promise<ScriptResult> {
     const topic = request.topic.trim();
     const idea = request.idea.trim();
     if (!topic) throw new ValidationError("Pick a niche to write for.");
     if (!idea) throw new ValidationError("Say what the Short should be about.");
-    const ai = this.writer(options.premium);
+    const ai = this.writer(options);
     if (!ai) throw new AppError("CONFIG_ERROR", "Script writing isn't available right now.", { expose: true });
 
     // Their own scripts are the examples, when they've given us any.
@@ -111,10 +120,10 @@ export class ScriptService {
    * into a chatbot is memory — it can see every script they've made and is told
    * not to suggest any of them again.
    */
-  async ideas(topic: string, userId?: string, options: { premium?: boolean } = {}): Promise<IdeaResult> {
+  async ideas(topic: string, userId?: string, options: WriterOptions = {}): Promise<IdeaResult> {
     const niche = topic.trim();
     if (!niche) throw new ValidationError("Pick a niche to find ideas for.");
-    const ai = this.writer(options.premium);
+    const ai = this.writer(options);
     if (!ai) throw new AppError("CONFIG_ERROR", "Idea finding isn't available right now.", { expose: true });
 
     let alreadyMade: string[] = [];

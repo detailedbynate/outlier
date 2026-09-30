@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * The script writer is open to the owner and the Expert plan only.
+ * The script writer is open to the owner and the Pro and Expert plans; Free is refused.
  *
  * The blur on the page is presentation: a member who opens devtools can find the
  * server action's id in the shared client bundle and POST to it directly. These
@@ -42,40 +42,44 @@ describe("writeScript access", () => {
     write.mockResolvedValue({ script: { beats: [] }, sources: [], seconds: 30, model: "test" });
   });
 
-  it("refuses a member posting straight to the action", async () => {
+  it("refuses a free member posting straight to the action", async () => {
+    currentUser = { user: { id: "free-1" }, isOwner: false };
+    const { writeScript } = await import("@/app/research/scriptwriter/actions");
+    const { emptyScriptState } = await import("@/app/research/scriptwriter/state");
+
+    const state = await writeScript(emptyScriptState, form(valid));
+
+    expect(state.error).toBe("The Script Writer is on the Pro and Expert plans.");
+    expect(state.result).toBeNull();
+    // Nothing was generated, and nothing was charged for.
+    expect(write).not.toHaveBeenCalled();
+    expect(assertAvailable).not.toHaveBeenCalled();
+    expect(charge).not.toHaveBeenCalled();
+    // Refused before the limiter, so a free member can't burn anyone's window either.
+    expect(enforce).not.toHaveBeenCalled();
+  });
+
+  it("refuses before it even checks the input, so nothing leaks through a validation path", async () => {
+    currentUser = { user: { id: "free-1" }, isOwner: false };
+    const { writeScript } = await import("@/app/research/scriptwriter/actions");
+    const { emptyScriptState } = await import("@/app/research/scriptwriter/state");
+
+    const state = await writeScript(emptyScriptState, form({ ...valid, topic: "", idea: "" }));
+
+    expect(state.error).toBe("The Script Writer is on the Pro and Expert plans.");
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it("writes for Pro without Claude, one every six hours", async () => {
     currentUser = { user: { id: "member-1" }, isOwner: false };
     const { writeScript } = await import("@/app/research/scriptwriter/actions");
     const { emptyScriptState } = await import("@/app/research/scriptwriter/state");
 
     const state = await writeScript(emptyScriptState, form(valid));
 
-    expect(state.error).toBe("The Script Writer is on the Expert plan.");
-    expect(state.result).toBeNull();
-    // Nothing was generated, and nothing was charged for.
-    expect(write).not.toHaveBeenCalled();
-    expect(assertAvailable).not.toHaveBeenCalled();
-    expect(charge).not.toHaveBeenCalled();
-    // Refused before the limiter, so a member can't burn the owner's window either.
-    expect(enforce).not.toHaveBeenCalled();
-  });
-
-  it("refuses before it even checks the input, so nothing leaks through a validation path", async () => {
-    currentUser = { user: { id: "member-1" }, isOwner: false };
-    const { writeScript } = await import("@/app/research/scriptwriter/actions");
-    const { emptyScriptState } = await import("@/app/research/scriptwriter/state");
-
-    const state = await writeScript(emptyScriptState, form({ ...valid, topic: "", idea: "" }));
-
-    expect(state.error).toBe("The Script Writer is on the Expert plan.");
-    expect(write).not.toHaveBeenCalled();
-  });
-
-  it("refuses the free plan too", async () => {
-    currentUser = { user: { id: "free-1" }, isOwner: false };
-    const { writeScript } = await import("@/app/research/scriptwriter/actions");
-    const { emptyScriptState } = await import("@/app/research/scriptwriter/state");
-    expect((await writeScript(emptyScriptState, form(valid))).error).toBe("The Script Writer is on the Expert plan.");
-    expect(write).not.toHaveBeenCalled();
+    expect(state.error).toBeNull();
+    expect(write).toHaveBeenCalledWith(expect.anything(), "member-1", { premium: false, basic: true });
+    expect(enforce).toHaveBeenCalledWith("scriptUser", "member-1");
   });
 
   it("writes for Expert on the owner's model, four a day", async () => {
@@ -86,7 +90,7 @@ describe("writeScript access", () => {
     const state = await writeScript(emptyScriptState, form(valid));
 
     expect(state.error).toBeNull();
-    expect(write).toHaveBeenCalledWith(expect.anything(), "expert-1", { premium: true });
+    expect(write).toHaveBeenCalledWith(expect.anything(), "expert-1", { premium: true, basic: false });
     expect(enforce).toHaveBeenCalledWith("scriptExpert", "expert-1");
     expect(charge).toHaveBeenCalled();
   });
@@ -101,8 +105,8 @@ describe("writeScript access", () => {
     expect(state.error).toBeNull();
     expect(state.result).not.toBeNull();
     expect(state.charged).toBe(8);
-    expect(write).toHaveBeenCalledWith(expect.objectContaining({ topic: "minecraft", targetSeconds: 30, tone: "energetic" }), "owner-1", { premium: true });
-    // No three hour wait for the owner: they're the one testing it, and paying for it.
+    expect(write).toHaveBeenCalledWith(expect.objectContaining({ topic: "minecraft", targetSeconds: 30, tone: "energetic" }), "owner-1", { premium: true, basic: false });
+    // No wait for the owner: they're the one testing it, and paying for it.
     expect(enforce).not.toHaveBeenCalled();
   });
 });

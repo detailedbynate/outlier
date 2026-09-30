@@ -28,6 +28,12 @@ describe("scriptProvider", () => {
     expect(model(scriptProvider({ ...base, ANTHROPIC_API_KEY: "k" }, { premium: true }))).toBe("claude-sonnet-5");
   });
 
+  it("leaves Claude out entirely for the plans that write without it", () => {
+    const provider = scriptProvider({ ...base, ANTHROPIC_API_KEY: "k", GEMINI_API_KEY: "g", OPENROUTER_API_KEY: "o" }, { claude: false });
+    expect(names(provider)).toEqual(["gemini", "openrouter"]);
+    expect(scriptProvider({ ...base, ANTHROPIC_API_KEY: "k" }, { claude: false })).toBeNull();
+  });
+
   it("falls back to free models when there's no Claude key", () => {
     const provider = scriptProvider({ ...base, GEMINI_API_KEY: "g", OPENROUTER_API_KEY: "o" });
     expect(names(provider)).toEqual(["gemini", "openrouter"]);

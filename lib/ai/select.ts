@@ -79,11 +79,13 @@ export function scriptProvider(config: {
   GEMINI_MODEL: string;
   OPENROUTER_API_KEY?: string | undefined;
   OPENROUTER_MODELS?: string | undefined;
-}, options: { premium?: boolean } = {}): TextProvider | null {
+}, options: { premium?: boolean; claude?: boolean } = {}): TextProvider | null {
   const chain: TextProvider[] = [];
   const named = config.SCRIPT_MODEL?.trim();
+  // Pro writes without Claude: Gemini first, then the OpenRouter models.
+  const useClaude = options.claude !== false;
 
-  if (config.ANTHROPIC_API_KEY) {
+  if (useClaude && config.ANTHROPIC_API_KEY) {
     // A Claude id in SCRIPT_MODEL picks the standard model; anything else is meant for OpenRouter.
     const model = options.premium ? PREMIUM_SCRIPT_MODEL : named?.startsWith("claude-") ? named : DEFAULT_SCRIPT_MODEL;
     chain.push(new AnthropicTextProvider({ apiKey: config.ANTHROPIC_API_KEY, model }));
