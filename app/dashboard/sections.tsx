@@ -1,5 +1,6 @@
 /* eslint-disable @next/next/no-img-element -- YouTube images are already CDN-optimized */
 import Link from "next/link";
+import { after } from "next/server";
 import { cache, type ComponentType, type CSSProperties, type ReactNode } from "react";
 import {
   BookmarkIcon,
@@ -17,9 +18,11 @@ import {
 } from "@/components/icons";
 import type { ActivityItem } from "@/lib/analytics/dashboard";
 import { formatCompact, formatMultiplier, formatPercent, timeAgo } from "@/lib/format";
+import { syncOwnChannel } from "@/lib/onboarding/own-channel";
 import { getServices } from "@/lib/services";
 import type { ChannelSummary } from "@/lib/services/dashboard-service";
 import type { SavedNiche } from "@/lib/niches/saved";
+import { AutoRefresh } from "./auto-refresh";
 import type { VideoFeedRow } from "@/types/database";
 
 type IconType = ComponentType<{ size?: number }>;
@@ -140,6 +143,34 @@ const VIOLET = ["#3b1f78", "#6d28d9", "#8b5cf6", "#c4b5fd"] as const;
 function barStyle(stops: readonly string[], t: number, width: string): CSSProperties {
   return { width, "--bar": scale(stops, t), "--glow": `${Math.round(4 + t * 14)}px`, "--glow-strength": `${Math.round(20 + t * 60)}%` } as CSSProperties;
 }
+
+/**
+ * A made-up channel for the preview new accounts see behind the "loading" or
+ * "add your channel" card. Fixed numbers, so it looks the same for everyone.
+ */
+const SAMPLE_VIEWS = [21_000, 34_000, 18_000, 26_000, 95_000, 31_000, 22_000, 48_000, 27_000, 19_000, 38_000, 29_000];
+const SAMPLE_MEDIAN = 28_000;
+const SAMPLE_CHANNEL: ChannelSummary = {
+  channel: { title: "Your channel", handle: "@yourchannel", subscriber_count: 12_400, thumbnail_url: null, youtube_channel_id: "sample" } as ChannelSummary["channel"],
+  growth: { subs24h: 35, subs7d: 240, views24h: 18_500, views7d: 142_000 },
+  alerts: [{ tone: "good", title: "3.4× your usual views", detail: "Your latest upload is taking off." }],
+  history: Array.from({ length: 30 }, (_, i) => ({ day: `2026-09-${String(i + 1).padStart(2, "0")}`, subs: 12_000 + i * 14 + (i % 4) * 6, views: 0 })),
+  uploads30d: 9,
+  recent: SAMPLE_VIEWS.map(
+    (views, i) =>
+      ({
+        video_id: `sample-${i}`,
+        youtube_video_id: "",
+        title: "One of your uploads",
+        view_count: views,
+        outlier_score: views / SAMPLE_MEDIAN,
+        channel_median_views: SAMPLE_MEDIAN,
+        engagement_rate: 0.045,
+        // Newest first, three days apart.
+        published_at: new Date(Date.UTC(2026, 8, 28 - i * 3)).toISOString(),
+      }) as VideoFeedRow,
+  ),
+};
 
 function median(values: number[]): number | null {
   if (values.length === 0) return null;
@@ -372,23 +403,40 @@ export async function YourChannelSection({ userId, ownChannel }: { userId: strin
   const own = data.own;
 
   if (!own) {
+    const pending = data.ownPending;
+    // Keep trying to pull it in while they're looking at this; throttled inside.
+    if (pending) after(() => syncOwnChannel(userId, pending));
     return (
-      <section className="dash-panel home-span-12 home-onboard" aria-label="Your channel">
-        <span className="dash-icon" data-tone="green">
-          <PlayCircleIcon size={18} />
-        </span>
-        <div className="dash-panel-titles">
-          <h2>{data.ownPending ? "Your channel isn't synced yet" : "Add your channel"}</h2>
-          <p>
-            {data.ownPending
-              ? `We'll pull in ${data.ownPending} so you can see subscriber growth, views per upload, and alerts here.`
-              : "See your subscriber growth, views per upload, and an alert when one of your videos breaks out."}
-          </p>
+      <div className="home-span-12 home-sample">
+        <div className="home-sample-preview" aria-hidden="true" inert>
+          <ChannelCard own={SAMPLE_CHANNEL} />
+          <UploadsChart videos={SAMPLE_CHANNEL.recent} channelMedian={SAMPLE_MEDIAN} />
         </div>
-        <Link href={data.ownPending ? `/compare?you=${encodeURIComponent(data.ownPending)}` : "/settings/preferences"} className="button-ghost button-small">
-          {data.ownPending ? "Load my channel" : "Add in preferences"}
-        </Link>
-      </section>
+        <section className="home-sample-card dash-panel" aria-label="Your channel">
+          {pending ? (
+            <>
+              <span className="home-sample-spinner" aria-hidden="true" />
+              <h2>Loading {pending}</h2>
+              <p>
+                We&apos;re pulling in your channel now. It usually takes a minute or two, and this page updates by itself. Here&apos;s
+                what you&apos;ll see.
+              </p>
+              <AutoRefresh />
+            </>
+          ) : (
+            <>
+              <span className="dash-icon" data-tone="green">
+                <PlayCircleIcon size={18} />
+              </span>
+              <h2>Add your channel to see this for it</h2>
+              <p>Subscriber growth, views on every upload, your best video, and an alert when one breaks out.</p>
+              <Link href="/settings/preferences" className="button-ghost button-small">
+                Add your channel
+              </Link>
+            </>
+          )}
+        </section>
+      </div>
     );
   }
 

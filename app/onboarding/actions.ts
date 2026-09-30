@@ -1,10 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { requireApprovedUser } from "@/lib/auth/session";
 import { isAppError } from "@/lib/core/errors";
 import { logger } from "@/lib/core/logger";
 import type { OnboardingInput } from "@/lib/onboarding/schema";
+import { syncOwnChannel } from "@/lib/onboarding/own-channel";
 import { getServices } from "@/lib/services";
 
 export type CompleteOnboardingResult = { ok: true } | { ok: false; error: string; field?: string };
@@ -13,6 +15,9 @@ export async function completeOnboarding(input: OnboardingInput): Promise<Comple
   const { user } = await requireApprovedUser({ allowIncompleteOnboarding: true });
   try {
     await getServices().onboarding.complete(user.id, input);
+    // Start pulling their channel in now, so it's (usually) there by the time the dashboard loads.
+    const channel = input.hasChannel ? input.channel?.trim() : null;
+    if (channel) after(() => syncOwnChannel(user.id, channel));
     revalidatePath("/", "layout");
     return { ok: true };
   } catch (error) {

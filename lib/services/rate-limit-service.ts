@@ -19,8 +19,12 @@ export const RATE_LIMITS = {
   checkoutIp: { windowSeconds: 3600, maxHits: 10 },
   /** Niche Finder searches per user. */
   nicheUser: { windowSeconds: 3600, maxHits: 40 },
-  /** Shorts scripts per user: one every three hours. Each is a paid model call. */
-  scriptUser: { windowSeconds: 10_800, maxHits: 1 },
+  /** Pulling in a creator's own channel after onboarding, retried from the dashboard at most this often. */
+  ownChannelSync: { windowSeconds: 600, maxHits: 1 },
+  /** Pro: one Shorts script every six hours. */
+  scriptUser: { windowSeconds: 21_600, maxHits: 1 },
+  /** Pro: idea searches, kept apart from scripts so looking for an idea never uses up the script. */
+  scriptIdeasUser: { windowSeconds: 21_600, maxHits: 3 },
   /** Expert: four scripts a day. */
   scriptExpert: { windowSeconds: 86_400, maxHits: 4 },
 } as const;
