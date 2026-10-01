@@ -17,6 +17,8 @@ export interface PaywallPrice {
   /** The price after the launch sale, shown struck through while it runs. */
   was: string | null;
   until: string | null;
+  /** Days free before the first charge, when they haven't subscribed before. */
+  trialDays: number | null;
 }
 
 export function PaywallDialog({ feature, price }: { feature: FeatureCopy; price: PaywallPrice }) {
@@ -70,20 +72,41 @@ export function PaywallDialog({ feature, price }: { feature: FeatureCopy; price:
                   </li>
                 ))}
               </ul>
-              <Link href="/billing" className="paywall-cta">
-                Get Pro for
-                {price.was ? (
-                  <span className="paywall-was">
-                    <span className="sr-only">was </span>
-                    {price.was}
-                  </span>
-                ) : null}
-                <span className="paywall-now">
-                  {price.was ? <span className="sr-only">now </span> : null}
-                  {price.now}/mo
-                </span>
-              </Link>
-              <p className="paywall-price-note">{price.was ? `Launch price until ${price.until}. ` : ""}Cancel any time.</p>
+              {price.trialDays ? (
+                <>
+                  <Link href="/billing" className="paywall-cta">
+                    Try Pro free for {price.trialDays} days
+                  </Link>
+                  <p className="paywall-price-note paywall-then">
+                    Then
+                    {price.was ? (
+                      <span className="paywall-was">
+                        <span className="sr-only">was </span>
+                        {price.was}
+                      </span>
+                    ) : null}
+                    <span className="paywall-now">{price.now}/mo</span>
+                    <span>Cancel before it ends and you pay nothing.</span>
+                  </p>
+                </>
+              ) : (
+                <>
+                  <Link href="/billing" className="paywall-cta">
+                    Get Pro for
+                    {price.was ? (
+                      <span className="paywall-was">
+                        <span className="sr-only">was </span>
+                        {price.was}
+                      </span>
+                    ) : null}
+                    <span className="paywall-now">
+                      {price.was ? <span className="sr-only">now </span> : null}
+                      {price.now}/mo
+                    </span>
+                  </Link>
+                  <p className="paywall-price-note">{price.was ? `Launch price until ${price.until}. ` : ""}Cancel any time.</p>
+                </>
+              )}
               <button type="button" className="paywall-later" onClick={() => setOpen(false)}>
                 Not now
               </button>

@@ -21,6 +21,12 @@ export default function RefundsPage() {
         paid for, and then the account drops to Free. Nothing is deleted when you cancel.
       </p>
 
+      <h2>Free trials</h2>
+      <p>
+        A new subscription starts with a 3-day free trial. Cancel any time before it ends and you won&apos;t be charged
+        anything. If you don&apos;t cancel, the first month is charged when the trial ends.
+      </p>
+
       <h2>Refunds on subscriptions</h2>
       <p>
         If you&apos;re unhappy with Outlier, email us within <strong>7 days</strong> of your first payment and we&apos;ll refund

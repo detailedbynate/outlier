@@ -10,7 +10,7 @@ import { Reveal } from "./motion";
 import { ScrollLink } from "./scroll-link";
 import { WaitlistForm } from "./waitlist-form";
 import { formatPrice } from "@/lib/billing/packs";
-import { onSale, PLANS, SALE_ENDS_LABEL } from "@/lib/billing/plans";
+import { FREE_TRIAL_DAYS, onSale, PLANS, SALE_ENDS_LABEL } from "@/lib/billing/plans";
 import { priceCentsFor, sellablePlans } from "@/lib/billing/subscriptions";
 import { startPublicSubscription } from "./checkout";
 
@@ -118,11 +118,11 @@ function faq(now: Date) {
   },
   {
     q: "When can I get in?",
-    a: "Straight away. Subscribing creates your account: pick a plan, pay, and we email you a sign-in link within a minute. There's no password to make up.",
+    a: `Straight away. Pick a plan and start a ${FREE_TRIAL_DAYS}-day free trial: that creates your account, and we email you a sign-in link within a minute. There's no password to make up.`,
   },
   {
     q: "How much does it cost?",
-    a: `Pro is ${proPrice()} a month and Expert is ${formatPrice(priceCentsFor(expert, now))}, both billed monthly and cancellable any time from your account.${launch} Free has Shorts Channels; Pro and Expert open every tool, and differ in how much research you can do each month.`,
+    a: `Pro is ${proPrice()} a month and Expert is ${formatPrice(priceCentsFor(expert, now))}, both billed monthly and cancellable any time from your account. Both start with a ${FREE_TRIAL_DAYS}-day free trial: we take your card at the start and charge it when the trial ends, unless you cancel first.${launch} Free has Shorts Channels; Pro and Expert open every tool, and differ in how much research you can do each month.`,
   },
   {
     q: "Do I need to connect my YouTube account?",
@@ -232,9 +232,9 @@ function PricingSection() {
                 {paid ? (
                   <>
                     <button type="submit" className="pill-button pill-button-lg pricing-cta">
-                      Get {plan.name}
+                      Try {plan.name} free for {FREE_TRIAL_DAYS} days
                     </button>
-                    <span className="pricing-cancel">Cancel any time</span>
+                    <span className="pricing-cancel">Then {formatPrice(priceCentsFor(plan, now))}/month. Cancel before the trial ends and you pay nothing.</span>
                   </>
                 ) : (
                   <ScrollLink to="waitlist" className="pill-button pill-button-ghost pill-button-lg">
@@ -256,8 +256,9 @@ function PricingSection() {
         })}
       </div>
       <p className="pricing-foot">
-        Payments are handled by Stripe. Subscribing creates your account — we email you a sign-in link straight after. It renews
-        monthly until you cancel; see our <Link href="/terms">Terms</Link> and <Link href="/refunds">Refund Policy</Link>.
+        Payments are handled by Stripe. Starting a trial creates your account, and we email you a sign-in link straight after.
+        Your card is charged when the {FREE_TRIAL_DAYS}-day trial ends, then monthly until you cancel; see our{" "}
+        <Link href="/terms">Terms</Link> and <Link href="/refunds">Refund Policy</Link>.
       </p>
     </section>
   );
@@ -292,7 +293,7 @@ export async function LandingPage({ referralCode = null }: { referralCode?: stri
 
           <div className="landing-cta-row">
             <ScrollLink to="pricing" className="pill-button pill-button-primary pill-button-lg">
-              Subscribe now
+              Start your free trial
             </ScrollLink>
             <ScrollLink to="features" className="pill-button pill-button-ghost pill-button-lg">
               See what it does
@@ -386,9 +387,9 @@ export async function LandingPage({ referralCode = null }: { referralCode?: stri
 
         <Reveal className="final-cta">
           <h2>Ready to find your next outlier?</h2>
-          <p>Pick a plan and start researching today.</p>
+          <p>Try any plan free for {FREE_TRIAL_DAYS} days and start researching today.</p>
           <ScrollLink to="pricing" className="pill-button pill-button-primary pill-button-lg">
-            Subscribe now
+            Start your free trial
           </ScrollLink>
         </Reveal>
       </main>

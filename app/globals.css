@@ -13223,3 +13223,37 @@ body.app-body {
   color: #fff;
   text-decoration: none;
 }
+
+/* Under the trial button: "Then $15 $10/mo", with the same strike and tag, smaller. */
+.paywall-then {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 6px;
+  margin-top: 11px;
+  font-size: 13px;
+  color: #c4c4cc;
+}
+
+.paywall-then .paywall-now {
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(124, 92, 245, 0.18);
+  color: #d6ccfd;
+  font-weight: 700;
+}
+
+.paywall-then .paywall-was {
+  color: #8d8d98;
+}
+
+.paywall-then .paywall-was::after {
+  background: #c4c4cc;
+}
+
+.paywall-then > span:last-child {
+  flex-basis: 100%;
+  color: #a5a5b0;
+  font-size: 12.5px;
+}

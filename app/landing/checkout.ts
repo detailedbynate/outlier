@@ -2,7 +2,7 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { findPlan } from "@/lib/billing/plans";
+import { FREE_TRIAL_DAYS, findPlan } from "@/lib/billing/plans";
 import { getStripe } from "@/lib/billing/stripe";
 import { priceIdFor } from "@/lib/billing/subscriptions";
 import { env } from "@/lib/core/env";
@@ -39,7 +39,14 @@ export async function startPublicSubscription(formData: FormData): Promise<void>
       line_items: [{ price, quantity: 1 }],
       allow_promotion_codes: true,
       metadata: { planId: plan.id },
-      subscription_data: { metadata: { planId: plan.id } },
+      // Everyone subscribing from the landing page is new, so they get the free trial.
+      subscription_data: {
+        metadata: { planId: plan.id },
+        trial_period_days: FREE_TRIAL_DAYS,
+        // No card on file when the trial ends means no plan, not an unpaid one.
+        trial_settings: { end_behavior: { missing_payment_method: "cancel" } },
+      },
+      payment_method_collection: "always",
       success_url: `${base}/welcome?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${base}/?checkout=cancelled#pricing`,
     });

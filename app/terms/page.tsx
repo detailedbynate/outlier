@@ -42,10 +42,17 @@ export default function TermsPage() {
 
       <h2>3. Billing and renewal</h2>
       <p>
-        Outlier is a paid subscription. The price is shown before you buy and charged to your payment method immediately, then{" "}
+        Outlier is a paid subscription. The price is shown before you buy and charged to your payment method immediately (or
+        when your free trial ends, below), then{" "}
         <strong>automatically every month on the same date until you cancel</strong>. Prices are in US dollars. Stripe processes
         payments and acts as the seller of record; any applicable sales tax or VAT is handled at checkout and shown in your
         receipt.
+      </p>
+      <p>
+        <strong>Free trials.</strong> A new subscription starts with a free trial of the length shown at checkout (currently
+        3 days), once per person. You give a payment method when the trial starts. When it ends, the plan&apos;s price is
+        charged to that payment method and the subscription renews monthly from then on, unless you cancel before the trial
+        ends — in which case you aren&apos;t charged at all. You can cancel from Plans &amp; credits → Manage plan.
       </p>
       <p>
         <strong>Price changes.</strong> The advertised price of a plan can change, including at the end of a launch sale. If

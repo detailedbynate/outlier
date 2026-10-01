@@ -40,6 +40,13 @@ export interface Plan {
   features: readonly string[];
 }
 
+/**
+ * New subscribers get this many days free. Stripe takes the card at checkout
+ * and charges when the days are up unless they cancel first. Once per account:
+ * only someone who has never subscribed gets it.
+ */
+export const FREE_TRIAL_DAYS = 3;
+
 /** The launch sale ends at the start of this day (UTC), when Pro goes to its list price. */
 export const SALE_ENDS_AT = Date.UTC(2026, 10, 1);
 /** The sale's end date as the pages show it. */

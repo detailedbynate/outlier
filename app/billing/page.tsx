@@ -6,10 +6,10 @@ import { logger } from "@/lib/core/logger";
 import { CREDIT_PACKS, formatPrice } from "@/lib/billing/packs";
 import { billingEnabled, fulfillCheckout, getStripe } from "@/lib/billing/stripe";
 import { getServices } from "@/lib/services";
-import { FREE_PLAN, onSale, PLANS, SALE_ENDS_LABEL } from "@/lib/billing/plans";
+import { FREE_PLAN, FREE_TRIAL_DAYS, onSale, PLANS, SALE_ENDS_LABEL } from "@/lib/billing/plans";
 import { ZapIcon } from "@/components/icons";
 import { priceCentsFor, sellablePlans, syncSubscription } from "@/lib/billing/subscriptions";
-import { offerOpen, timeLeft, TRIAL_OFFER } from "@/lib/billing/trial";
+import { freeTrialEligible, offerOpen, timeLeft, TRIAL_OFFER } from "@/lib/billing/trial";
 import { openBillingPortal, startCheckout, startSubscription } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -57,6 +57,9 @@ export default async function BillingPage({ searchParams }: { searchParams: Sear
   const trial = subscription.trial;
   const trialLive = trial !== null && Date.parse(trial.endsAt) > now.getTime();
   const trialOffer = offerOpen(trial, now.getTime());
+  const freeTrial = freeTrialEligible(subscription);
+  // Stripe's own trial: they've subscribed, and the first charge is at the period end.
+  const stripeTrial = subscription.status === "trialing" && subscription.plan.priceCents > 0;
   const fmtEnd = (iso: string) => new Date(iso).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
 
   return (
@@ -104,7 +107,9 @@ export default async function BillingPage({ searchParams }: { searchParams: Sear
               ? `You're on a free ${subscription.plan.name} trial until ${fmtEnd(trial.endsAt)} (${timeLeft(Date.parse(trial.endsAt) - now.getTime())} left). After that your account goes back to Free unless you pick a plan.`
               : trial && trialOffer
                 ? `Your trial ended ${fmtEnd(trial.endsAt)}, so you're on Free. The trial price on Expert is still open for a few more days.`
-                : subscription.plan.priceCents > 0
+                : stripeTrial && !subscription.cancelAtPeriodEnd
+                  ? `Your free trial of ${subscription.plan.name} ends ${subscription.currentPeriodEnd ? fmtEnd(subscription.currentPeriodEnd) : "soon"}, and your first charge is then. To stop it, cancel before then in Manage plan.`
+                  : subscription.plan.priceCents > 0
               ? subscription.cancelAtPeriodEnd
                 ? `Your ${subscription.plan.name} plan ends ${subscription.currentPeriodEnd ? new Date(subscription.currentPeriodEnd).toLocaleDateString("en-US", { dateStyle: "medium" }) : "at the end of this period"}.`
                 : `You're on ${subscription.plan.name}. Change or cancel any time.`
@@ -165,6 +170,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Sear
                   </div>
                   <span className="billing-plan-terms">
                     {paid ? "per month, billed monthly" : "no card needed"}
+                    {paid && freeTrial && !manage ? ` · ${FREE_TRIAL_DAYS} days free first` : ""}
                     {offered ? ` · trial price for your first ${TRIAL_OFFER.months} months, then ${formatPrice(priceCentsFor(plan, now))}` : ""}
                     {sale ? ` · launch price until ${SALE_ENDS_LABEL}, then ${formatPrice(plan.listPriceCents!)}` : ""}
                   </span>
@@ -177,7 +183,9 @@ export default async function BillingPage({ searchParams }: { searchParams: Sear
                           ? paid
                             ? "Manage plan"
                             : "Your plan"
-                          : offered
+                          : freeTrial
+                            ? `Start ${FREE_TRIAL_DAYS}-day free trial`
+                            : offered
                             ? `Get ${plan.name} for ${formatPrice(TRIAL_OFFER.priceCents)}` : PLAN_ORDER.get(plan.id)! < PLAN_ORDER.get(subscription.plan.id)! ? `Switch to ${plan.name}` : `Get ${plan.name}`}
                     </button>
                   ) : (

@@ -37,6 +37,14 @@ export const TRIAL_OFFER = {
   graceMs: 7 * DAY,
 } as const;
 
+/**
+ * Does this account get the free trial at checkout? Only if it has never had
+ * a Stripe subscription: a customer id on the row means it already has.
+ */
+export function freeTrialEligible(state: { hasBilling: boolean }): boolean {
+  return !state.hasBilling;
+}
+
 /** Longest trial the panel gives: past this it's a comp, and Set plan is the tool for that. */
 export const MAX_TRIAL_MS = 90 * DAY;
 

@@ -96,3 +96,11 @@ describe("free plan access", async () => {
     for (const copy of Object.values(PAID_FEATURES)) expect(copy.points.length).toBe(3);
   });
 });
+
+describe("free trial at checkout", async () => {
+  const { freeTrialEligible } = await import("@/lib/billing/trial");
+  it("is for accounts that have never subscribed", () => {
+    expect(freeTrialEligible({ hasBilling: false })).toBe(true);
+    expect(freeTrialEligible({ hasBilling: true })).toBe(false);
+  });
+});
