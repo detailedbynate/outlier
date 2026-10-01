@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireApprovedUser } from "@/lib/auth/session";
+import { paidFeaturesLocked } from "@/lib/billing/feature-gate";
 import { logger } from "@/lib/core/logger";
 import { getAdminDatabase } from "@/lib/database";
 import { readSavedNiches, SAVED_NICHES_KEY, withoutSaved, withSaved } from "@/lib/niches/saved";
@@ -12,6 +13,7 @@ import { readSavedNiches, SAVED_NICHES_KEY, withoutSaved, withSaved } from "@/li
  */
 export async function toggleSavedNiche(formData: FormData): Promise<void> {
   const current = await requireApprovedUser();
+  if (await paidFeaturesLocked(current)) return;
   const topic = String(formData.get("topic") ?? "").trim().slice(0, 60);
   const score = Number(formData.get("score"));
   const save = formData.get("save") === "1";

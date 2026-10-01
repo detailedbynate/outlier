@@ -6,6 +6,9 @@ import { WEEKDAYS, type TitleTraitKey } from "@/lib/analytics/video-insights";
 import { isAppError } from "@/lib/core/errors";
 import { formatCompact, formatDuration, formatMultiplier, formatNumber, formatPercent, timeAgo } from "@/lib/format";
 import { requireApprovedUser } from "@/lib/auth/session";
+import { Paywall } from "@/components/paywall";
+import { paidFeaturesLocked } from "@/lib/billing/feature-gate";
+import { PAID_FEATURES } from "@/lib/billing/features";
 import { getServices } from "@/lib/services";
 import { parseVideoId } from "@/lib/youtube/parse";
 import { asUser } from "@/lib/youtube/quota-context";
@@ -17,7 +20,10 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 export default async function AnalyzePage({ searchParams }: { searchParams: Promise<{ v?: string }> }) {
-  const { user } = await requireApprovedUser();
+  const current = await requireApprovedUser();
+  const { user } = current;
+  // Free is Shorts Channels only: show the paywall before loading anything.
+  if (await paidFeaturesLocked(current)) return <Paywall feature={PAID_FEATURES["analyze"]} />;
   const { v } = await searchParams;
   const input = v?.trim() ?? "";
 

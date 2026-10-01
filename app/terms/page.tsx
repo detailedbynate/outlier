@@ -29,9 +29,8 @@ export default function TermsPage() {
 
       <h2>2. Plans, credits, and what you get</h2>
       <p>
-        Every plan reaches every research tool, and plans differ mainly in how many credits you get each month. A small number of
-        features are available only on particular plans — the Shorts Script Writer is on Pro and above — and where that applies
-        it&apos;s shown on the pricing page. Credits are spent on the expensive work — discovering channels, deep searches,
+        The Free plan includes Shorts Channels only. Every other tool, including the Shorts Script Writer, is on the paid plans,
+        which differ mainly in how many credits you get each month. What each plan includes is shown on the pricing page. Credits are spent on the expensive work — discovering channels, deep searches,
         analysing videos, niche research, writing scripts — and what each action costs is shown in the app before you spend it.
       </p>
       <p>

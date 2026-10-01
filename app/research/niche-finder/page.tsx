@@ -4,6 +4,9 @@ import Link from "next/link";
 import type { CSSProperties } from "react";
 import { CompassIcon, FlameIcon, SearchIcon, UsersIcon } from "@/components/icons";
 import { requireApprovedUser } from "@/lib/auth/session";
+import { Paywall } from "@/components/paywall";
+import { paidFeaturesLocked } from "@/lib/billing/feature-gate";
+import { PAID_FEATURES } from "@/lib/billing/features";
 import { isAppError } from "@/lib/core/errors";
 import { formatCompact, formatPercent, timeAgo } from "@/lib/format";
 import { topicKey, type Level, type NicheMetrics, type SubNiche, type ViralChannel } from "@/lib/niches/analysis";
@@ -30,7 +33,10 @@ const FORMAT_LABEL = { shorts: "Shorts", long_form: "Long-form", both: "Both wor
 type SearchParams = Promise<{ topic?: string; sub?: string }>;
 
 export default async function NicheFinderPage({ searchParams }: { searchParams: SearchParams }) {
-  const { user } = await requireApprovedUser();
+  const current = await requireApprovedUser();
+  const { user } = current;
+  // Free is Shorts Channels only: show the paywall before loading anything.
+  if (await paidFeaturesLocked(current)) return <Paywall feature={PAID_FEATURES["niche-finder"]} />;
   const params = await searchParams;
   const asked = (params.topic ?? "").trim().slice(0, 120);
   // "Dig into X" drills into one sub-niche of the topic already researched. It

@@ -84,3 +84,15 @@ describe("trials", () => {
     expect(timeLeft(40 * 60_000)).toBe("40 minutes");
   });
 });
+
+describe("free plan access", async () => {
+  const { opensPaidFeatures, PAID_FEATURES } = await import("@/lib/billing/features");
+  it("opens the paid tools on any paid plan or trial, and for staff", () => {
+    expect(opensPaidFeatures(FREE_PLAN.priceCents, false)).toBe(false);
+    expect(opensPaidFeatures(FREE_PLAN.priceCents, true)).toBe(true);
+    for (const plan of PLANS.filter((p) => p.priceCents > 0)) expect(opensPaidFeatures(plan.priceCents, false)).toBe(true);
+  });
+  it("has paywall copy for every locked tool", () => {
+    for (const copy of Object.values(PAID_FEATURES)) expect(copy.points.length).toBe(3);
+  });
+});

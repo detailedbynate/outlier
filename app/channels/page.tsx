@@ -5,6 +5,9 @@ import Link from "next/link";
 import { TrackChannelForm } from "@/components/track-channel-form";
 import { formatCompact, formatNumber, timeAgo } from "@/lib/format";
 import { requireApprovedUser } from "@/lib/auth/session";
+import { Paywall } from "@/components/paywall";
+import { paidFeaturesLocked } from "@/lib/billing/feature-gate";
+import { PAID_FEATURES } from "@/lib/billing/features";
 import { getServices } from "@/lib/services";
 import { setChannelTracked } from "../research/shorts-channels/actions";
 
@@ -12,6 +15,8 @@ export const dynamic = "force-dynamic";
 
 export default async function ChannelsPage() {
   const current = await requireApprovedUser();
+  // Free is Shorts Channels only: show the paywall before loading anything.
+  if (await paidFeaturesLocked(current)) return <Paywall feature={PAID_FEATURES["tracked"]} />;
   const channels = await getServices().repositories.channels.listFollowed(current.user.id, { limit: 200 });
 
   return (

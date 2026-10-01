@@ -19,7 +19,6 @@ export interface TrialReminderProps {
   endsAt: string;
   /** Time between reminders, from lib/billing/trial; it shortens as the end nears. */
   everyMs: number;
-  freeCredits: number;
   /** The Expert trial price, when they can still get it. */
   offer: { price: string; was: string; months: number; until: string } | null;
 }
@@ -30,7 +29,7 @@ export interface TrialReminderProps {
  * When it last showed is kept in this browser; a cleared browser just sees it
  * a little sooner.
  */
-export function TrialReminder({ planName, endsAt, everyMs, freeCredits, offer }: TrialReminderProps) {
+export function TrialReminder({ planName, endsAt, everyMs, offer }: TrialReminderProps) {
   const pathname = usePathname();
   const key = `outlier:trial-reminder:${endsAt}`;
   const [open, setOpen] = useState(false);
@@ -105,8 +104,8 @@ export function TrialReminder({ planName, endsAt, everyMs, freeCredits, offer }:
         <h2 id="trial-reminder-title">{ended ? `Your ${planName} trial has ended` : `Your ${planName} trial ends in ${timeLeft(left)}`}</h2>
         <p>
           {ended
-            ? `Your account is back on Free: ${freeCredits} credits a month and no Script Writer. Pick a plan to carry on where you left off.`
-            : `On ${endDate} your account goes back to Free: ${freeCredits} credits a month and no Script Writer. Buy a plan before then to keep using Outlier without a gap.`}
+            ? `Your account is back on Free, which has Shorts Channels only. Pick a plan to get every tool back and carry on where you left off.`
+            : `On ${endDate} your account goes back to Free, which has Shorts Channels only. Buy a plan before then to keep every tool without a gap.`}
         </p>
         {offer ? (
           <div className="trial-offer">

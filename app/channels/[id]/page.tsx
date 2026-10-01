@@ -6,13 +6,18 @@ import { StatTile } from "@/components/stat-tile";
 import { VideoCard } from "@/components/video-card";
 import { daysAgo, formatCompact, formatNumber, timeAgo } from "@/lib/format";
 import { requireApprovedUser } from "@/lib/auth/session";
+import { Paywall } from "@/components/paywall";
+import { paidFeaturesLocked } from "@/lib/billing/feature-gate";
+import { PAID_FEATURES } from "@/lib/billing/features";
 import { getServices } from "@/lib/services";
 import { CHANNEL_ID_PATTERN } from "@/lib/youtube/parse";
 
 export const dynamic = "force-dynamic";
 
 export default async function ChannelPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireApprovedUser();
+  const current = await requireApprovedUser();
+  // Free is Shorts Channels only: show the paywall before loading anything.
+  if (await paidFeaturesLocked(current)) return <Paywall feature={PAID_FEATURES["tracked"]} />;
   const { id } = await params;
   if (!CHANNEL_ID_PATTERN.test(id)) notFound();
 

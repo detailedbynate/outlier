@@ -4,6 +4,9 @@ import type { ReactNode } from "react";
 import { UsersIcon } from "@/components/icons";
 import { ALERT_KINDS, ALERT_LABEL, SORT_OPTIONS, type ComparisonRow, type PatternStat, type SortKey } from "@/lib/competitors/intel";
 import { requireApprovedUser } from "@/lib/auth/session";
+import { Paywall } from "@/components/paywall";
+import { paidFeaturesLocked } from "@/lib/billing/feature-gate";
+import { PAID_FEATURES } from "@/lib/billing/features";
 import { formatCompact, formatPercent, timeAgo } from "@/lib/format";
 import { MAX_COMPETITORS } from "@/lib/onboarding/schema";
 import { getServices } from "@/lib/services";
@@ -57,7 +60,10 @@ function formatRowValue(value: number | null, kind: ComparisonRow["kind"]): stri
 }
 
 export default async function CompetitorsPage({ searchParams }: { searchParams: SearchParams }) {
-  const { user } = await requireApprovedUser();
+  const current = await requireApprovedUser();
+  const { user } = current;
+  // Free is Shorts Channels only: show the paywall before loading anything.
+  if (await paidFeaturesLocked(current)) return <Paywall feature={PAID_FEATURES["competitors"]} />;
   const params = await searchParams;
   const services = getServices();
   const preferences = await services.onboarding.getPreferences(user.id);

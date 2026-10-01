@@ -68,7 +68,7 @@ export function ComingSoonLock({ children, mode = "soon" }: { children: ReactNod
             </p>
             {upgrade ? (
               <>
-                <p className="sw-modal-note">It&apos;s part of Pro. Your research tools stay exactly as they are on Free.</p>
+                <p className="sw-modal-note">It&apos;s part of Pro, along with every other research tool.</p>
                 <Link href="/billing" className="btn btn-primary">
                   See Pro
                 </Link>

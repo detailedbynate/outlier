@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireApprovedUser } from "@/lib/auth/session";
+import { paidFeaturesLocked } from "@/lib/billing/feature-gate";
 import { isAppError } from "@/lib/core/errors";
 import { logger } from "@/lib/core/logger";
 import { channelReferenceSchema, MAX_COMPETITORS } from "@/lib/onboarding/schema";
@@ -25,7 +26,10 @@ function hrefFor(you: string, competitors: string[], extra: Record<string, strin
  * list to preferences, then show the page. Fresh channels cost no YouTube quota.
  */
 export async function syncCompetitors(formData: FormData): Promise<void> {
-  const { user } = await requireApprovedUser();
+  const current = await requireApprovedUser();
+  // Competitors is a paid tool; the page is a paywall on Free, and so is this.
+  if (await paidFeaturesLocked(current)) redirect("/compare");
+  const { user } = current;
   const services = getServices();
   const you = text(formData, "you");
   const competitors = [...new Set(formData.getAll("c").map((c) => String(c).trim()).filter(Boolean))]
@@ -49,7 +53,9 @@ export async function syncCompetitors(formData: FormData): Promise<void> {
 }
 
 export async function saveCompetitorAlerts(formData: FormData): Promise<void> {
-  const { user } = await requireApprovedUser();
+  const current = await requireApprovedUser();
+  if (await paidFeaturesLocked(current)) return;
+  const { user } = current;
   await getServices().competitors.setAlerts(user.id, formData.getAll("alerts").map(String));
   revalidatePath("/compare");
 }

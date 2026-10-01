@@ -3,6 +3,9 @@ import { redirect } from "next/navigation";
 import { REFERRAL_COOKIE } from "@/lib/referrals/links";
 import { normalizeReferralCode } from "@/lib/services/referral-service";
 import { getCurrentUser } from "@/lib/auth/session";
+import { Paywall } from "@/components/paywall";
+import { paidFeaturesLocked } from "@/lib/billing/feature-gate";
+import { PAID_FEATURES } from "@/lib/billing/features";
 import { DashboardView } from "./dashboard-view";
 import { LandingPage } from "./landing/landing-page";
 
@@ -14,5 +17,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const referralCode = normalizeReferralCode((await searchParams).ref) ?? normalizeReferralCode((await cookies()).get(REFERRAL_COOKIE)?.value);
   if (current && !current.approved) redirect("/not-approved");
   if (current && !current.onboardingCompleted) redirect("/onboarding");
-  return current ? <DashboardView current={current} /> : <LandingPage referralCode={referralCode} />;
+  if (!current) return <LandingPage referralCode={referralCode} />;
+  // Free is Shorts Channels only: the dashboard is a paywall there.
+  if (await paidFeaturesLocked(current)) return <Paywall feature={PAID_FEATURES.dashboard} />;
+  return <DashboardView current={current} />;
 }

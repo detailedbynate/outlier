@@ -1,12 +1,12 @@
 /**
- * Subscription plans. Mostly a plan is one thing: how many credits the user gets
- * each month. Every research tool is on every plan, because credits already
- * price the expensive work.
+ * Subscription plans: which tools a plan opens, and how many credits it gets
+ * each month.
  *
- * The Shorts Script Writer is the exception, and it is one on purpose: it is the
- * only thing here that costs real money per use on top of credits, so it sits on
- * Pro and above. Anything else gated later belongs in this comment too, because
- * the Terms say out loud which features are plan-specific.
+ * Free opens Shorts Channels and nothing else; every other tool is a paywall
+ * there (lib/billing/features). Pro and Expert open every tool, and differ in
+ * credits and in how the Shorts Script Writer runs for them. Anything gated
+ * later belongs in this comment too, because the Terms say out loud which
+ * features are plan-specific.
  *
  * Prices are in US cents and Stripe is the seller of record. The price a plan
  * charges lives here, but the Stripe Price it charges against comes from the
@@ -51,9 +51,9 @@ export const PLANS: readonly Plan[] = [
     name: "Free",
     monthlyCredits: 50,
     priceCents: 0,
-    blurb: "For trying Outlier on one channel",
-    creditsNote: "Enough to explore a niche and see what the tools find",
-    features: ["Every research tool", "Shorts Channels, Niche Finder, competitor tracking", "Credits reset on the 1st"],
+    blurb: "For finding Shorts channels to learn from",
+    creditsNote: "Enough to search Shorts Channels most weeks",
+    features: ["Shorts Channels search", "Every other tool is on Pro", "Credits reset on the 1st"],
   },
   {
     id: "pro",
@@ -65,7 +65,8 @@ export const PLANS: readonly Plan[] = [
     blurb: "For creators researching every week",
     creditsNote: "Research most days without watching the meter",
     features: [
-      "Everything on Free, plus the Shorts Script Writer (a script every 6 hours)",
+      "Every tool: Dashboard, Niche Finder, Viral Videos, Analyze Video, competitor tracking",
+      "The Shorts Script Writer (a script every 6 hours)",
       "30× the credits of Free",
       "Top up any time — bought credits never expire",
       "Cancel any time",

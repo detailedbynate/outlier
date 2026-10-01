@@ -5,6 +5,9 @@ import { notFound } from "next/navigation";
 import type { CSSProperties, ReactNode } from "react";
 import { ChartIcon, FlameIcon, PlayCircleIcon, TrendingIcon, ZapIcon } from "@/components/icons";
 import { requireApprovedUser } from "@/lib/auth/session";
+import { Paywall } from "@/components/paywall";
+import { paidFeaturesLocked } from "@/lib/billing/feature-gate";
+import { PAID_FEATURES } from "@/lib/billing/features";
 import type { PatternStat } from "@/lib/competitors/intel";
 import { formatCompact, formatPercent, timeAgo } from "@/lib/format";
 import { CHANNEL_ID_PATTERN } from "@/lib/youtube/parse";
@@ -32,7 +35,9 @@ function Panel({ icon: Icon, title, subtitle, children, tone = "violet", index =
 }
 
 export default async function CompetitorProfilePage({ params }: { params: Promise<{ channelId: string }> }) {
-  await requireApprovedUser();
+  const current = await requireApprovedUser();
+  // Free is Shorts Channels only: show the paywall before loading anything.
+  if (await paidFeaturesLocked(current)) return <Paywall feature={PAID_FEATURES["competitors"]} />;
   const { channelId } = await params;
   if (!CHANNEL_ID_PATTERN.test(channelId)) notFound();
   const detail = await getServices().competitors.detail(channelId);

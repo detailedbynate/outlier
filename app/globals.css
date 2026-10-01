@@ -12664,3 +12664,171 @@ a.dash-row:hover {
   font: inherit;
   font-size: 0.82rem;
 }
+
+/* Free plan paywall (components/paywall.tsx): a made-up page behind the blur */
+.nav-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nav-badge[data-variant="soon"] {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+}
+
+.paywall-preview {
+  display: grid;
+  gap: 16px;
+}
+
+.paywall-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.paywall-tile {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.paywall-tile span {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.paywall-tile strong {
+  font-size: 24px;
+}
+
+.paywall-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 180px;
+  padding: 18px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.paywall-chart span {
+  flex: 1;
+  border-radius: 6px 6px 2px 2px;
+  background: linear-gradient(180deg, #a78bfa, rgba(139, 92, 246, 0.35));
+}
+
+.paywall-rows {
+  display: grid;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.paywall-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.paywall-row + .paywall-row {
+  border-top: 1px solid var(--border);
+}
+
+.paywall-row strong {
+  color: #fdba74;
+}
+
+.paywall-row-title {
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.paywall-thumb {
+  width: 44px;
+  height: 58px;
+  border-radius: 8px;
+  background: linear-gradient(160deg, rgba(139, 92, 246, 0.5), rgba(236, 72, 153, 0.35));
+}
+
+.paywall-points {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.paywall-points li {
+  position: relative;
+  padding-left: 22px;
+}
+
+.paywall-points li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: var(--accent-text);
+  font-weight: 700;
+}
+
+.paywall-free-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.paywall-free-link:hover {
+  color: var(--text-primary);
+}
+
+@media (max-width: 640px) {
+  .paywall-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .paywall-chart {
+    height: 130px;
+    gap: 5px;
+  }
+}
+
+.paywall-points {
+  margin: 4px auto 8px;
+  max-width: 340px;
+}
+
+.paywall-actions {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.paywall-cta {
+  justify-content: center;
+  min-width: 200px;
+  padding: 11px 22px;
+}

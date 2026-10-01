@@ -122,7 +122,7 @@ function faq(now: Date) {
   },
   {
     q: "How much does it cost?",
-    a: `Pro is ${proPrice()} a month and Expert is ${formatPrice(priceCentsFor(expert, now))}, both billed monthly and cancellable any time from your account.${launch} Every plan has every tool; the difference is how much research you can do each month.`,
+    a: `Pro is ${proPrice()} a month and Expert is ${formatPrice(priceCentsFor(expert, now))}, both billed monthly and cancellable any time from your account.${launch} Free has Shorts Channels; Pro and Expert open every tool, and differ in how much research you can do each month.`,
   },
   {
     q: "Do I need to connect my YouTube account?",
@@ -201,7 +201,7 @@ function PricingSection() {
         <span className="feature-eyebrow">Pricing</span>
         <h2 className="feature-title">Pick a plan, start today</h2>
         <p className="pricing-lede">
-          Every plan has every tool. What changes is how much research you can do each month — and you can top up any time.
+          Free gets you Shorts Channels. Pro and Expert open every tool, and differ in how much research you can do each month — and you can top up any time.
         </p>
       </Reveal>
       <div className="pricing-grid">

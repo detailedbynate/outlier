@@ -10,7 +10,7 @@ import { MobileMenuToggle } from "@/components/mobile-menu-toggle";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { TrialReminder, type TrialReminderProps } from "@/components/trial-reminder";
 import { WhatsNew } from "@/components/whats-new";
-import { FREE_PLAN, findPlan } from "@/lib/billing/plans";
+import { findPlan } from "@/lib/billing/plans";
 import { priceIdFor } from "@/lib/billing/subscriptions";
 import { offerOpen, reminderEvery, TRIAL_OFFER, type Trial } from "@/lib/billing/trial";
 import { formatPrice } from "@/lib/billing/packs";
@@ -90,7 +90,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             <Brand />
             <MobileMenuToggle />
             <div id="app-sidebar-menu" className="sidebar-menu">
-            <SidebarNav isAdmin={current.isAdmin} isOwner={current.isOwner} writerOpen={writerOpenTo(subscription?.plan.id, current.isOwner)} />
+            <SidebarNav isAdmin={current.isAdmin} isOwner={current.isOwner} writerOpen={writerOpenTo(subscription?.plan.id, current.isOwner)} freePlan={!current.isAdmin && subscription?.plan.priceCents === 0} />
             <div className="sidebar-foot">
               <CreditsMeter status={credits} plan={plan} />
               <form action={signOut} className="sidebar-account">
@@ -145,5 +145,5 @@ function trialReminderFor(trial: Trial | null): TrialReminderProps | null {
           until: new Date(Date.parse(trial.endsAt) + TRIAL_OFFER.graceMs).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
         }
       : null;
-  return { planName: findPlan(trial.planId)!.name, endsAt: trial.endsAt, everyMs, freeCredits: FREE_PLAN.monthlyCredits, offer };
+  return { planName: findPlan(trial.planId)!.name, endsAt: trial.endsAt, everyMs, offer };
 }

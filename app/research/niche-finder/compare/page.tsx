@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CompassIcon } from "@/components/icons";
 import { requireApprovedUser } from "@/lib/auth/session";
+import { Paywall } from "@/components/paywall";
+import { paidFeaturesLocked } from "@/lib/billing/feature-gate";
+import { PAID_FEATURES } from "@/lib/billing/features";
 import { isAppError } from "@/lib/core/errors";
 import { formatCompact, formatPercent } from "@/lib/format";
 import type { NicheMetrics } from "@/lib/niches/analysis";
@@ -71,7 +74,10 @@ async function research(userId: string, topic: string): Promise<{ result: NicheR
 }
 
 export default async function CompareNichesPage({ searchParams }: { searchParams: SearchParams }) {
-  const { user } = await requireApprovedUser();
+  const current = await requireApprovedUser();
+  const { user } = current;
+  // Free is Shorts Channels only: show the paywall before loading anything.
+  if (await paidFeaturesLocked(current)) return <Paywall feature={PAID_FEATURES["niche-finder"]} />;
   const params = await searchParams;
   const a = (params.a ?? "").trim().slice(0, 60);
   const b = (params.b ?? "").trim().slice(0, 60);
