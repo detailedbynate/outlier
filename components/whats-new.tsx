@@ -67,7 +67,7 @@ export function WhatsNew({ version }: { version: string }) {
 
   return (
     <div className="whats-new-backdrop" data-phase={phase} role="presentation" onClick={close}>
-      <div className="low-credits whats-new" role="dialog" aria-modal="true" aria-labelledby="whats-new-title" onClick={(e) => e.stopPropagation()}>
+      <div className="low-credits whats-new" role="dialog" aria-modal="true" aria-labelledby="whats-new-title" tabIndex={-1} autoFocus onClick={(e) => e.stopPropagation()}>
         <span className="whats-new-badge">
           <ZapIcon size={14} /> New
         </span>
@@ -81,7 +81,7 @@ export function WhatsNew({ version }: { version: string }) {
           ))}
         </ul>
         <div className="low-credits-actions">
-          <button type="button" className="low-credits-cta whats-new-cta" onClick={close} autoFocus>
+          <button type="button" className="low-credits-cta whats-new-cta" onClick={close}>
             Got it
           </button>
         </div>

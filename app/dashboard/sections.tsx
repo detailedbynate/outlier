@@ -488,7 +488,7 @@ export async function NichePulseSection({ niches, lastVisitAt }: { niches: strin
         }
         action={
           <Link href="/research/shorts-channels?sort=vph" className="dash-link">
-            All rising Shorts →
+            All rising Shorts
           </Link>
         }
         className="dash-pulse home-span-8"
@@ -542,7 +542,7 @@ export async function NichePulseSection({ niches, lastVisitAt }: { niches: strin
         tone="pink"
         action={
           <Link href="/viral" className="dash-link">
-            More →
+            More
           </Link>
         }
         className="home-span-4"
@@ -652,7 +652,7 @@ export async function CompetitorWatchSection({ userId, ownChannel, competitors }
       tone="pink"
       action={
         <Link href="/compare" className="dash-link">
-          Compare →
+          Compare
         </Link>
       }
       className="home-span-7"
@@ -742,7 +742,7 @@ export async function SavedNichesSection({ saved }: { saved: SavedNiche[] }) {
       tone="blue"
       action={
         <Link href="/research/niche-finder" className="dash-link">
-          Niche Finder →
+          Niche Finder
         </Link>
       }
       className="home-span-12"
@@ -785,7 +785,7 @@ export async function TrackedSection({ userId, ownChannel }: { userId: string; o
       tone="green"
       action={
         <Link href="/channels" className="dash-link">
-          All →
+          All
         </Link>
       }
       className="home-span-4"

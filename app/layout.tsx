@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { DM_Sans } from "next/font/google";
+import { DM_Sans, Schibsted_Grotesk } from "next/font/google";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { CreditsMeter, type SidebarPlan } from "@/components/credits-meter";
@@ -23,6 +23,8 @@ import "./globals.css";
 import { writerOpenTo } from "@/lib/scripts/access";
 
 const dmSans = DM_Sans({ subsets: ["latin"], display: "swap", variable: "--font-sans" });
+// Small labels in the signed-in app (menu sections, table headings); body text stays DM Sans.
+const appFont = Schibsted_Grotesk({ subsets: ["latin"], display: "swap", variable: "--font-app" });
 
 export const metadata: Metadata = {
   title: "Outlier",
@@ -82,8 +84,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const plan: SidebarPlan | undefined = current.isOwner ? "owner" : subscription ? subscription.plan.id : undefined;
 
   return (
-    <html lang="en" className={dmSans.variable}>
-      <body>
+    <html lang="en" className={`${dmSans.variable} ${appFont.variable}`}>
+      <body className="app-body">
         <div className="ambient" aria-hidden="true" />
         <div className="app">
           <aside className="sidebar glass">

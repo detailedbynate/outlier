@@ -19,7 +19,7 @@ import {
   YourChannelSkeleton,
 } from "./dashboard/sections";
 
-/** Signed-in home: a daily command center. Callers must check access first. Uses stored data only (no YouTube quota). */
+/** Signed-in home: the day's numbers for your channel and niches. Callers must check access first. Uses stored data only (no YouTube quota). */
 export async function DashboardView({ current }: { current: CurrentUser }) {
   const services = getServices();
   const userId = current.user.id;
@@ -32,10 +32,6 @@ export async function DashboardView({ current }: { current: CurrentUser }) {
     <div className="dash home">
       <header className="dash-hero home-hero">
         <div className="dash-hero-text">
-          <span className="dash-eyebrow">
-            <span className="dash-live" aria-hidden="true" />
-            Command center
-          </span>
           <h1>Welcome back, {name}</h1>
           <p>{lastVisitAt ? `Here's what moved since you were last here ${timeAgo(lastVisitAt)}.` : "Here's how your channel and your niches are doing."}</p>
         </div>

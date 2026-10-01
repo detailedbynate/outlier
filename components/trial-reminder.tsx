@@ -97,7 +97,7 @@ export function TrialReminder({ planName, endsAt, everyMs, offer }: TrialReminde
 
   return (
     <div className="whats-new-backdrop" data-phase={phase} role="presentation" onClick={close}>
-      <div className="low-credits whats-new trial-reminder" data-urgency={urgency} role="dialog" aria-modal="true" aria-labelledby="trial-reminder-title" onClick={(e) => e.stopPropagation()}>
+      <div className="low-credits whats-new trial-reminder" data-urgency={urgency} role="dialog" aria-modal="true" aria-labelledby="trial-reminder-title" tabIndex={-1} autoFocus onClick={(e) => e.stopPropagation()}>
         <span className="whats-new-badge trial-reminder-badge">
           <ClockIcon size={14} /> {ended ? "Trial over" : `${timeLeft(left)} left`}
         </span>
@@ -128,7 +128,7 @@ export function TrialReminder({ planName, endsAt, everyMs, offer }: TrialReminde
           {offer ? (
             <form action={startSubscription}>
               <input type="hidden" name="planId" value="expert" />
-              <button type="submit" className="low-credits-cta whats-new-cta" autoFocus>
+              <button type="submit" className="low-credits-cta whats-new-cta">
                 Get Expert for {offer.price}
               </button>
             </form>

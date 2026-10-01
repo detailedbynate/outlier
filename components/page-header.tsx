@@ -15,7 +15,7 @@ export function PageHeader({
     <div className="spread" style={{ alignItems: "center" }}>
       <div className="page-header">
         <span className="page-icon">
-          <Icon size={22} />
+          <Icon size={20} />
         </span>
         <div>
           <h1>{title}</h1>

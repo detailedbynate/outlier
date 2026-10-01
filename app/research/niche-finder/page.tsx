@@ -567,7 +567,7 @@ function NicheCard({
           ) : null}
           {metrics ? <MetricGrid metrics={metrics} compact /> : null}
           <Link href={href} className="dash-link">
-            Dig into {name} →
+            Dig into {name}
           </Link>
         </div>
       </details>

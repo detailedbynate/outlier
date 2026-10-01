@@ -11,6 +11,8 @@ export type PaidFeature = "dashboard" | "niche-finder" | "viral" | "analyze" | "
 
 export interface FeatureCopy {
   title: string;
+  /** The paywall's headline: what they get, not that it's locked. */
+  hook: string;
   /** One line on what it does for them. */
   pitch: string;
   /** What's behind the lock, three short lines. */
@@ -20,31 +22,37 @@ export interface FeatureCopy {
 export const PAID_FEATURES: Record<PaidFeature, FeatureCopy> = {
   dashboard: {
     title: "Dashboard",
+    hook: "See how your channel is really doing",
     pitch: "Your channel, your competitors and the niches you're watching, on one page every morning.",
     points: ["Subscriber growth and views per upload for your channel", "You against your competitors, side by side", "Channels heating up in your niche this week"],
   },
   "niche-finder": {
     title: "Niche Finder",
+    hook: "Find a niche before it gets crowded",
     pitch: "Score any niche on demand, growth and competition before you film a single Short.",
     points: ["An opportunity score with what it's made of", "What the breakout uploads have in common", "Save niches and compare them side by side"],
   },
   viral: {
     title: "Viral Videos",
+    hook: "See which Shorts are blowing up right now",
     pitch: "The Shorts pulling far more views than their channel normally gets, as they happen.",
     points: ["Outliers ranked by how far they beat their channel", "Filter by niche, size and how recent", "See the pattern before everyone copies it"],
   },
   analyze: {
     title: "Analyze Video",
+    hook: "Find out why any Short took off",
     pitch: "Paste any Short and see exactly why it worked, measured against its own channel.",
     points: ["Rank, reach and engagement against the channel's usual", "Packaging: title, length, hashtags, posting time", "Views over time and what stands out"],
   },
   tracked: {
     title: "Tracked Channels",
+    hook: "Keep tabs on the channels you learn from",
     pitch: "Keep the channels you care about in one place, refreshed for you.",
     points: ["Growth and uploads for every channel you track", "New breakouts flagged as they land", "Your own library of channels to learn from"],
   },
   competitors: {
     title: "Competitors",
+    hook: "Know the moment a competitor breaks out",
     pitch: "Watch the channels you're up against and know the moment one of them breaks out.",
     points: ["Their uploads, views and growth next to yours", "Alerts when a competitor's video takes off", "Where you're ahead and where you're behind"],
   },

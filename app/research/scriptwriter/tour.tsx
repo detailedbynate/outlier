@@ -239,7 +239,7 @@ export function ScriptTour({ ideaCost, scriptCost }: { ideaCost: number; scriptC
         <div className="sw-tour-dim" aria-hidden="true" />
       )}
 
-      <div className="sw-tour-card" data-centered={box ? undefined : ""} style={cardStyle} key={index}>
+      <div className="sw-tour-card" data-centered={box ? undefined : ""} style={cardStyle} key={index} tabIndex={-1} autoFocus>
         <span className="sw-tour-count">
           {index + 1} of {all.length}
         </span>
@@ -265,7 +265,7 @@ export function ScriptTour({ ideaCost, scriptCost }: { ideaCost: number; scriptC
                 Back
               </button>
             ) : null}
-            <button type="button" className="sw-tour-next" onClick={() => (last ? setOpen(false) : setIndex(index + 1))} autoFocus>
+            <button type="button" className="sw-tour-next" onClick={() => (last ? setOpen(false) : setIndex(index + 1))}>
               {last ? "Start writing" : index === 0 ? "Show me" : "Next"}
             </button>
           </span>
