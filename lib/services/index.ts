@@ -219,9 +219,9 @@ export function getServices(): Services {
     language: config.OUTLIER_LANGUAGE.toLowerCase(),
   });
   const transcriptReader = config.INNERTUBE_INGEST_ENABLED ? lazy(() => createTranscriptReader()) : null;
-  // No live transcript reads from Analyze yet: the reader hasn't returned a transcript in production,
-  // so it would only add seconds of waiting. Stored transcripts are still shown when there are any.
-  const videos = new VideoService(youtube, { videos: repositories.videos, transcripts: repositories.transcripts, reader: null });
+  // A live read is a player request plus one caption download, well under a second; VideoService
+  // still caps it at a few seconds so a busy gate can't hold the page up.
+  const videos = new VideoService(youtube, { videos: repositories.videos, transcripts: repositories.transcripts, reader: transcriptReader });
 
   // Job handlers enqueue follow-up jobs, but the queue needs the registry first: bind late.
   const queueRef: { current?: JobQueue } = {};
