@@ -8,7 +8,12 @@ import { LOW_CREDITS_THRESHOLD } from "@/lib/services/credits-service";
 import { BrandMark, LogOutIcon } from "@/components/icons";
 import { MobileMenuToggle } from "@/components/mobile-menu-toggle";
 import { SidebarNav } from "@/components/sidebar-nav";
+import { TrialReminder, type TrialReminderProps } from "@/components/trial-reminder";
 import { WhatsNew } from "@/components/whats-new";
+import { FREE_PLAN, findPlan } from "@/lib/billing/plans";
+import { priceIdFor } from "@/lib/billing/subscriptions";
+import { offerOpen, reminderEvery, TRIAL_OFFER, type Trial } from "@/lib/billing/trial";
+import { formatPrice } from "@/lib/billing/packs";
 import { shouldShowChangelog } from "@/lib/changelog";
 import { currentChangelogVersion } from "@/lib/changelog-version";
 import { getCurrentUser } from "@/lib/auth/session";
@@ -73,6 +78,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   ]);
   // One popup at a time: the changelog goes first, the credits prompt can wait a page.
   const showChangelog = current.onboardingCompleted && shouldShowChangelog(current.user, changelogVersion);
+  const trialReminder = showChangelog ? null : trialReminderFor(subscription?.trial ?? null);
   const plan: SidebarPlan | undefined = current.isOwner ? "owner" : subscription ? subscription.plan.id : undefined;
 
   return (
@@ -113,11 +119,31 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             {children}
           </main>
           {showChangelog ? <WhatsNew version={changelogVersion} /> : null}
-          {!showChangelog && credits.limit < 1_000_000 && current.moderation.status !== "restricted" ? (
+          {trialReminder ? <TrialReminder {...trialReminder} /> : null}
+          {!showChangelog && !trialReminder && credits.limit < 1_000_000 && current.moderation.status !== "restricted" ? (
             <LowCreditsPrompt remaining={credits.remaining} threshold={LOW_CREDITS_THRESHOLD} month={credits.resetsAt.slice(0, 7)} />
           ) : null}
         </div>
       </body>
     </html>
   );
+}
+
+/** The trial reminder's props, or null when there's nothing to remind them of yet. */
+function trialReminderFor(trial: Trial | null): TrialReminderProps | null {
+  if (!trial) return null;
+  const now = Date.now();
+  const everyMs = reminderEvery(trial, now);
+  if (everyMs === null) return null;
+  const expert = findPlan(TRIAL_OFFER.planId)!;
+  const offer =
+    offerOpen(trial, now) && priceIdFor(expert) !== null
+      ? {
+          price: formatPrice(TRIAL_OFFER.priceCents),
+          was: formatPrice(expert.priceCents),
+          months: TRIAL_OFFER.months,
+          until: new Date(Date.parse(trial.endsAt) + TRIAL_OFFER.graceMs).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        }
+      : null;
+  return { planName: findPlan(trial.planId)!.name, endsAt: trial.endsAt, everyMs, freeCredits: FREE_PLAN.monthlyCredits, offer };
 }

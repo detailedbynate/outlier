@@ -41,7 +41,9 @@ export interface Plan {
 }
 
 /** The launch sale ends at the start of this day (UTC), when Pro goes to its list price. */
-export const SALE_ENDS_AT = Date.UTC(2026, 9, 1);
+export const SALE_ENDS_AT = Date.UTC(2026, 10, 1);
+/** The sale's end date as the pages show it. */
+export const SALE_ENDS_LABEL = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", timeZone: "UTC" }).format(SALE_ENDS_AT);
 
 export const PLANS: readonly Plan[] = [
   {

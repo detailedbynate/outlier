@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import type { AccountRole } from "@/types/database";
 import { PLANS } from "@/lib/billing/plans";
-import { adjustCredits, createAccount, newSignInLink, republishChangelog, setAccountPlan, updateAccount, type AccountFormState, type RepublishState } from "./actions";
+import { adjustCredits, createAccount, newSignInLink, republishChangelog, setAccountPlan, startTrial, updateAccount, type AccountFormState, type RepublishState } from "./actions";
 
 const initial: AccountFormState = { status: "idle", message: null, link: null };
 
@@ -169,6 +169,32 @@ export function PlanForm({ userId, plan }: { userId: string; plan: string }) {
       </select>
       <button type="submit" className="button-ghost button-small" disabled={pending}>
         {pending ? "Saving…" : "Set plan"}
+      </button>
+      <Status state={state} />
+    </form>
+  );
+}
+
+/**
+ * Give an account a free trial of Pro or Expert for a set time. When it runs out
+ * they're back on Free; Set plan → Free ends one early.
+ */
+export function TrialForm({ userId, endsAt }: { userId: string; endsAt: string | null }) {
+  const [state, action, pending] = useActionState(startTrial, initial);
+  return (
+    <form action={action} className="account-edit plan-set trial-set">
+      <input type="hidden" name="userId" value={userId} />
+      <select name="plan" defaultValue="expert" aria-label="Trial plan">
+        <option value="pro">Pro</option>
+        <option value="expert">Expert</option>
+      </select>
+      <input type="number" name="length" min={1} max={90} defaultValue={7} aria-label="Trial length" className="trial-length" />
+      <select name="unit" defaultValue="days" aria-label="Trial length unit">
+        <option value="days">days</option>
+        <option value="hours">hours</option>
+      </select>
+      <button type="submit" className="button-ghost button-small" disabled={pending}>
+        {pending ? "Saving…" : endsAt ? "Restart trial" : "Give trial"}
       </button>
       <Status state={state} />
     </form>

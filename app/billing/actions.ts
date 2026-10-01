@@ -9,6 +9,7 @@ import { CREDIT_TAX_CODE, findPack } from "@/lib/billing/packs";
 import { findPlan } from "@/lib/billing/plans";
 import { priceIdFor } from "@/lib/billing/subscriptions";
 import { getStripe } from "@/lib/billing/stripe";
+import { offerOpen, TRIAL_OFFER } from "@/lib/billing/trial";
 import { getServices } from "@/lib/services";
 
 async function siteUrl(): Promise<string> {
@@ -73,6 +74,8 @@ export async function startSubscription(formData: FormData): Promise<void> {
 
   const base = await siteUrl();
   const existing = await getServices().subscriptions.stateFor(current.user.id);
+  // Someone on a trial, or just out of one, gets Expert at the trial price.
+  const coupon = plan.id === TRIAL_OFFER.planId && offerOpen(existing.trial, Date.now()) ? await trialCoupon() : null;
   let url: string | null = null;
   try {
     const session = await getStripe().checkout.sessions.create({
@@ -82,7 +85,8 @@ export async function startSubscription(formData: FormData): Promise<void> {
       line_items: [{ price, quantity: 1 }],
       // Launch offers and comped accounts are run as Stripe promotion codes, so
       // the discount lives with the subscription instead of in our own pricing.
-      allow_promotion_codes: true,
+      // Stripe takes one or the other: the trial offer, or a code box.
+      ...(coupon ? { discounts: [{ coupon }] } : { allow_promotion_codes: true }),
       client_reference_id: current.user.id,
       ...(existing.stripeCustomerId ? { customer: existing.stripeCustomerId } : { customer_email: current.email || undefined }),
       metadata: { userId: current.user.id, planId: plan.id },
@@ -96,6 +100,35 @@ export async function startSubscription(formData: FormData): Promise<void> {
     logger.error("stripe subscription checkout failed", { userId: current.user.id, plan: plan.id, error });
   }
   redirect(url ?? "/billing?status=error");
+}
+
+/**
+ * The trial offer's coupon: money off Expert for its first few months, then
+ * the normal price. Made in Stripe the first time anyone
+ * takes the offer, so there's nothing to set up by hand. Null if Stripe won't
+ * have it, and checkout goes ahead at the normal price.
+ */
+async function trialCoupon(): Promise<string | null> {
+  const stripe = getStripe();
+  try {
+    return (await stripe.coupons.retrieve(TRIAL_OFFER.couponId)).id;
+  } catch {
+    try {
+      return (
+        await stripe.coupons.create({
+          id: TRIAL_OFFER.couponId,
+          name: "Trial offer",
+          amount_off: TRIAL_OFFER.amountOffCents,
+          currency: "usd",
+          duration: "repeating",
+          duration_in_months: TRIAL_OFFER.months,
+        })
+      ).id;
+    } catch (error) {
+      logger.error("trial coupon unavailable", { error });
+      return null;
+    }
+  }
 }
 
 /**

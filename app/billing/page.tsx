@@ -6,9 +6,10 @@ import { logger } from "@/lib/core/logger";
 import { CREDIT_PACKS, formatPrice } from "@/lib/billing/packs";
 import { billingEnabled, fulfillCheckout, getStripe } from "@/lib/billing/stripe";
 import { getServices } from "@/lib/services";
-import { FREE_PLAN, onSale, PLANS } from "@/lib/billing/plans";
+import { FREE_PLAN, onSale, PLANS, SALE_ENDS_LABEL } from "@/lib/billing/plans";
 import { ZapIcon } from "@/components/icons";
 import { priceCentsFor, sellablePlans, syncSubscription } from "@/lib/billing/subscriptions";
+import { offerOpen, timeLeft, TRIAL_OFFER } from "@/lib/billing/trial";
 import { openBillingPortal, startCheckout, startSubscription } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -53,6 +54,10 @@ export default async function BillingPage({ searchParams }: { searchParams: Sear
   const enabled = billingEnabled();
   const plans = sellablePlans();
   const now = new Date();
+  const trial = subscription.trial;
+  const trialLive = trial !== null && Date.parse(trial.endsAt) > now.getTime();
+  const trialOffer = offerOpen(trial, now.getTime());
+  const fmtEnd = (iso: string) => new Date(iso).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
 
   return (
     <div className="research-page billing-page">
@@ -95,7 +100,11 @@ export default async function BillingPage({ searchParams }: { searchParams: Sear
         <section className="billing-plans-section" aria-label="Plans">
           <h2 className="section-title">Plans</h2>
           <p className="billing-plans-lede">
-            {subscription.plan.priceCents > 0
+            {trial && trialLive
+              ? `You're on a free ${subscription.plan.name} trial until ${fmtEnd(trial.endsAt)} (${timeLeft(Date.parse(trial.endsAt) - now.getTime())} left). After that your account goes back to Free unless you pick a plan.`
+              : trial && trialOffer
+                ? `Your trial ended ${fmtEnd(trial.endsAt)}, so you're on Free. The trial price on Expert is still open for a few more days.`
+                : subscription.plan.priceCents > 0
               ? subscription.cancelAtPeriodEnd
                 ? `Your ${subscription.plan.name} plan ends ${subscription.currentPeriodEnd ? new Date(subscription.currentPeriodEnd).toLocaleDateString("en-US", { dateStyle: "medium" }) : "at the end of this period"}.`
                 : `You're on ${subscription.plan.name}. Change or cancel any time.`
@@ -104,12 +113,15 @@ export default async function BillingPage({ searchParams }: { searchParams: Sear
           <div className="billing-plans">
             {[FREE_PLAN, ...plans].map((plan) => {
               const isCurrent = subscription.plan.id === plan.id;
-              const sale = onSale(plan, now);
+              // A trial isn't paid for yet: its card buys the plan rather than managing it.
+              const manage = isCurrent && !trialLive;
+              const offered = trialOffer && plan.id === TRIAL_OFFER.planId;
+              const sale = onSale(plan, now) && !offered;
               const paid = plan.priceCents > 0;
               return (
                 <form
                   key={plan.id}
-                  action={isCurrent && paid ? openBillingPortal : startSubscription}
+                  action={manage && paid ? openBillingPortal : startSubscription}
                   className="billing-plan"
                   data-plan={plan.id}
                   data-current={isCurrent}
@@ -119,7 +131,15 @@ export default async function BillingPage({ searchParams }: { searchParams: Sear
 
                   <div className="billing-plan-head">
                     <h3>{plan.name}</h3>
-                    {isCurrent ? (
+                    {isCurrent && trialLive ? (
+                      <span className="billing-plan-badge" data-tone="current">
+                        Trial
+                      </span>
+                    ) : offered ? (
+                      <span className="billing-plan-badge" data-tone="offer">
+                        Trial offer
+                      </span>
+                    ) : isCurrent ? (
                       <span className="billing-plan-badge" data-tone="current">
                         Your plan
                       </span>
@@ -139,17 +159,26 @@ export default async function BillingPage({ searchParams }: { searchParams: Sear
                   </div>
 
                   <div className="billing-plan-price">
-                    <strong>{paid ? formatPrice(priceCentsFor(plan, now)) : "Free"}</strong>
+                    <strong>{offered ? formatPrice(TRIAL_OFFER.priceCents) : paid ? formatPrice(priceCentsFor(plan, now)) : "Free"}</strong>
+                    {offered ? <span className="billing-plan-was">{formatPrice(priceCentsFor(plan, now))}</span> : null}
                     {sale ? <span className="billing-plan-was">{formatPrice(plan.listPriceCents!)}</span> : null}
                   </div>
                   <span className="billing-plan-terms">
                     {paid ? "per month, billed monthly" : "no card needed"}
-                    {sale ? ` · launch price until 1 October, then ${formatPrice(plan.listPriceCents!)}` : ""}
+                    {offered ? ` · trial price for your first ${TRIAL_OFFER.months} months, then ${formatPrice(priceCentsFor(plan, now))}` : ""}
+                    {sale ? ` · launch price until ${SALE_ENDS_LABEL}, then ${formatPrice(plan.listPriceCents!)}` : ""}
                   </span>
 
                   {paid || isCurrent ? (
                     <button type="submit" className="billing-plan-cta" disabled={isCurrent && !paid}>
-                      {isCurrent ? (paid ? "Manage plan" : "Your plan") : PLAN_ORDER.get(plan.id)! < PLAN_ORDER.get(subscription.plan.id)! ? `Switch to ${plan.name}` : `Get ${plan.name}`}
+                      {isCurrent && trialLive
+                        ? `Keep ${plan.name}`
+                        : isCurrent
+                          ? paid
+                            ? "Manage plan"
+                            : "Your plan"
+                          : offered
+                            ? `Get ${plan.name} for ${formatPrice(TRIAL_OFFER.priceCents)}` : PLAN_ORDER.get(plan.id)! < PLAN_ORDER.get(subscription.plan.id)! ? `Switch to ${plan.name}` : `Get ${plan.name}`}
                     </button>
                   ) : (
                     <span className="billing-plan-cta is-placeholder">Included with every account</span>

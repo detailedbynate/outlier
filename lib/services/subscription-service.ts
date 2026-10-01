@@ -1,4 +1,5 @@
 import { isEntitled, planOrFree, type Plan, type PlanId } from "@/lib/billing/plans";
+import { TRIAL_STATUS, type Trial } from "@/lib/billing/trial";
 import { createLogger, type Logger } from "@/lib/core/logger";
 import type { SubscriptionRepository } from "@/lib/database/repositories/subscriptions";
 import type { SubscriptionRow } from "@/types/database";
@@ -24,6 +25,8 @@ export interface SubscriptionState {
   stripeCustomerId: string | null;
   /** True once they've ever had a paid plan, so the UI can say "manage" not "upgrade". */
   hasBilling: boolean;
+  /** A hand-given free trial, running or ended (see lib/billing/trial). Null for everyone else. */
+  trial: Trial | null;
 }
 
 /** How long a looked-up plan is reused before asking the database again. */
@@ -45,10 +48,12 @@ export class SubscriptionService {
   private stateOf(row: SubscriptionRow | null): SubscriptionState {
     const free = planOrFree(null);
     if (!row) {
-      return { plan: free, status: "inactive", cancelAtPeriodEnd: false, currentPeriodEnd: null, stripeCustomerId: null, hasBilling: false };
+      return { plan: free, status: "inactive", cancelAtPeriodEnd: false, currentPeriodEnd: null, stripeCustomerId: null, hasBilling: false, trial: null };
     }
     const expired = row.current_period_end !== null && Date.parse(row.current_period_end) < this.now();
-    const entitled = isEntitled(row.status) && !expired;
+    const isTrial = row.status === TRIAL_STATUS && row.current_period_end !== null && (row.plan === "pro" || row.plan === "expert");
+    // A trial is entitled until its end date, then it's Free like any lapsed plan.
+    const entitled = (isEntitled(row.status) || isTrial) && !expired;
     return {
       plan: entitled ? planOrFree(row.plan) : free,
       status: row.status,
@@ -56,6 +61,7 @@ export class SubscriptionService {
       currentPeriodEnd: row.current_period_end,
       stripeCustomerId: row.stripe_customer_id,
       hasBilling: row.stripe_customer_id !== null,
+      trial: isTrial ? { planId: row.plan as Trial["planId"], endsAt: row.current_period_end!, startedAt: row.updated_at ?? null } : null,
     };
   }
 

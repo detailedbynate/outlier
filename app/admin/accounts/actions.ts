@@ -10,6 +10,7 @@ import type { BulkState } from "@/components/bulk-panel";
 import { getServices } from "@/lib/services";
 import { findPlan, type PlanId } from "@/lib/billing/plans";
 import { CHANGELOG_REPUBLISH_EVENT, forgetChangelogVersion } from "@/lib/changelog-version";
+import { MAX_TRIAL_MS, TRIAL_STATUS } from "@/lib/billing/trial";
 
 export interface AccountFormState {
   status: "idle" | "ok" | "error";
@@ -204,5 +205,51 @@ export async function setAccountPlan(_prev: AccountFormState, formData: FormData
   } catch (error) {
     logger.warn("set plan failed", { userId, error });
     return { status: "error", message: isAppError(error) && error.expose ? error.message : "Couldn't change the plan.", link: null };
+  }
+}
+
+/**
+ * Owner only: put an account on a free trial of a paid plan for a set time.
+ * Like Set plan, nothing here talks to Stripe. When the time is up the account
+ * is on Free again without anything having to run; until then it gets reminders
+ * to buy (see lib/billing/trial).
+ */
+export async function startTrial(_prev: AccountFormState, formData: FormData): Promise<AccountFormState> {
+  const current = await requireAdmin();
+  if (!current.isOwner) return { status: "error", message: "Only the owner can give trials.", link: null };
+  const userId = text(formData, "userId");
+  if (!UUID_PATTERN.test(userId)) return { status: "error", message: "Invalid account.", link: null };
+  const plan = findPlan(text(formData, "plan"));
+  if (!plan || (plan.id !== "pro" && plan.id !== "expert")) return { status: "error", message: "Pick Pro or Expert.", link: null };
+  const amount = Number(text(formData, "length"));
+  const unitMs = text(formData, "unit") === "hours" ? 3_600_000 : 86_400_000;
+  const lengthMs = amount * unitMs;
+  if (!Number.isFinite(amount) || amount <= 0 || lengthMs > MAX_TRIAL_MS) return { status: "error", message: "Length must be more than 0 and at most 90 days.", link: null };
+
+  try {
+    const services = getServices();
+    services.subscriptions.invalidate(userId);
+    const existing = await services.subscriptions.stateFor(userId);
+    // Someone already paying keeps what they pay for; a trial would overwrite it.
+    if (existing.plan.priceCents > 0 && !existing.trial) {
+      return { status: "error", message: `They're already paying for ${existing.plan.name}.`, link: null };
+    }
+    const endsAt = new Date(Date.now() + lengthMs);
+    await services.subscriptions.apply({
+      userId,
+      plan: plan.id,
+      status: TRIAL_STATUS,
+      stripeCustomerId: existing.stripeCustomerId,
+      stripeSubscriptionId: null,
+      currentPeriodEnd: endsAt.toISOString(),
+      cancelAtPeriodEnd: false,
+    });
+    logger.info("trial given by admin", { userId, plan: plan.id, endsAt: endsAt.toISOString(), actor: current.user.id });
+    revalidatePath("/admin/accounts");
+    revalidatePath("/", "layout");
+    return { status: "ok", message: `${plan.name} trial until ${endsAt.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" })} UTC.`, link: null };
+  } catch (error) {
+    logger.warn("start trial failed", { userId, error });
+    return { status: "error", message: isAppError(error) && error.expose ? error.message : "Couldn't start the trial.", link: null };
   }
 }

@@ -52,6 +52,12 @@ export const ZapIcon = (p: P) => (
     <path d="M13 2 4 14h7l-1 8 9-12h-7z" />
   </Icon>
 );
+export const ClockIcon = (p: P) => (
+  <Icon {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 7v5l3 2" />
+  </Icon>
+);
 export const EyeIcon = (p: P) => (
   <Icon {...p}>
     <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />

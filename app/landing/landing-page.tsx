@@ -10,7 +10,7 @@ import { Reveal } from "./motion";
 import { ScrollLink } from "./scroll-link";
 import { WaitlistForm } from "./waitlist-form";
 import { formatPrice } from "@/lib/billing/packs";
-import { onSale, PLANS } from "@/lib/billing/plans";
+import { onSale, PLANS, SALE_ENDS_LABEL } from "@/lib/billing/plans";
 import { priceCentsFor, sellablePlans } from "@/lib/billing/subscriptions";
 import { startPublicSubscription } from "./checkout";
 
@@ -110,7 +110,7 @@ function why() {
 function faq(now: Date) {
   const pro = PLANS[1]!;
   const expert = PLANS[2]!;
-  const launch = onSale(pro, now) ? ` Pro is a launch price and goes to ${formatPrice(pro.listPriceCents!)} on 1 October.` : "";
+  const launch = onSale(pro, now) ? ` Pro is a launch price and goes to ${formatPrice(pro.listPriceCents!)} on ${SALE_ENDS_LABEL}.` : "";
   return [
   {
     q: "What is Outlier?",
@@ -223,7 +223,7 @@ function PricingSection() {
                   {sale ? <span className="pricing-was">{formatPrice(plan.listPriceCents!)}</span> : null}
                 </div>
                 {sale || !paid ? (
-                  <span className="pricing-terms">{sale ? `Launch price until 1 October, then ${formatPrice(plan.listPriceCents!)}` : "No card needed"}</span>
+                  <span className="pricing-terms">{sale ? `Launch price until ${SALE_ENDS_LABEL}, then ${formatPrice(plan.listPriceCents!)}` : "No card needed"}</span>
                 ) : null}
                 <div className="pricing-credits">
                   <strong>{plan.monthlyCredits.toLocaleString("en-US")} credits a month</strong>

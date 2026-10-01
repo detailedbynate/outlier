@@ -12,7 +12,7 @@ import { getServices } from "@/lib/services";
 import type { AccountRole } from "@/types/database";
 import { CHANGELOG } from "@/lib/changelog";
 import { CHANGELOG_REPUBLISH_EVENT } from "@/lib/changelog-version";
-import { AdjustCreditsForm, CreateAccountForm, EditAccountForm, NewSignInLinkForm, PlanForm, RepublishChangelogForm } from "./account-forms";
+import { AdjustCreditsForm, CreateAccountForm, EditAccountForm, NewSignInLinkForm, PlanForm, RepublishChangelogForm, TrialForm } from "./account-forms";
 import { moderateAccounts } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -195,7 +195,15 @@ export default async function AccountsPage({ searchParams }: { searchParams: Sea
                           {row.role === "owner" ? null : (
                             <div className="plan-cell">
                               <span className={`badge plan-${plans[i]?.plan.id ?? "free"}`}>{plans[i]?.plan.name ?? "Free"}</span>
+                              {plans[i]?.trial ? (
+                                <div className="stat-note">
+                                  {/* Still on the trial plan means it hasn't run out yet. */}
+                                  {plans[i]!.plan.id === plans[i]!.trial!.planId ? "Trial ends" : "Trial ended"}{" "}
+                                  {new Date(plans[i]!.trial!.endsAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}
+                                </div>
+                              ) : null}
                               {current.isOwner ? <PlanForm userId={row.id} plan={plans[i]?.plan.id ?? "free"} /> : null}
+                              {current.isOwner ? <TrialForm userId={row.id} endsAt={plans[i]?.trial?.endsAt ?? null} /> : null}
                             </div>
                           )}
                         </td>
