@@ -23,7 +23,7 @@ export default function RefundsPage() {
 
       <h2>Free trials</h2>
       <p>
-        A new subscription starts with a 3-day free trial. Cancel any time before it ends and you won&apos;t be charged
+        If you start with a free trial (currently 3 days), cancel any time before it ends and you won&apos;t be charged
         anything. If you don&apos;t cancel, the first month is charged when the trial ends.
       </p>
 

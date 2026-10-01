@@ -49,7 +49,7 @@ export default function TermsPage() {
         receipt.
       </p>
       <p>
-        <strong>Free trials.</strong> A new subscription starts with a free trial of the length shown at checkout (currently
+        <strong>Free trials.</strong> We sometimes offer a free trial of a plan, of the length shown with the offer (currently
         3 days), once per person. You give a payment method when the trial starts. When it ends, the plan&apos;s price is
         charged to that payment method and the subscription renews monthly from then on, unless you cancel before the trial
         ends — in which case you aren&apos;t charged at all. You can cancel from Plans &amp; credits → Manage plan.

@@ -6,10 +6,10 @@ import { requireApprovedUser } from "@/lib/auth/session";
 import { env } from "@/lib/core/env";
 import { logger } from "@/lib/core/logger";
 import { CREDIT_TAX_CODE, findPack } from "@/lib/billing/packs";
-import { FREE_TRIAL_DAYS, findPlan } from "@/lib/billing/plans";
+import { findPlan } from "@/lib/billing/plans";
 import { priceIdFor } from "@/lib/billing/subscriptions";
 import { getStripe } from "@/lib/billing/stripe";
-import { freeTrialEligible, offerOpen, TRIAL_OFFER } from "@/lib/billing/trial";
+import { offerOpen, TRIAL_OFFER } from "@/lib/billing/trial";
 import { getServices } from "@/lib/services";
 
 async function siteUrl(): Promise<string> {
@@ -74,8 +74,6 @@ export async function startSubscription(formData: FormData): Promise<void> {
 
   const base = await siteUrl();
   const existing = await getServices().subscriptions.stateFor(current.user.id);
-  // A free trial for anyone who has never subscribed; Stripe charges when it ends.
-  const freeTrial = freeTrialEligible(existing);
   // Someone on a trial, or just out of one, gets Expert at the trial price.
   const coupon = plan.id === TRIAL_OFFER.planId && offerOpen(existing.trial, Date.now()) ? await trialCoupon() : null;
   let url: string | null = null;
@@ -93,17 +91,7 @@ export async function startSubscription(formData: FormData): Promise<void> {
       ...(existing.stripeCustomerId ? { customer: existing.stripeCustomerId } : { customer_email: current.email || undefined }),
       metadata: { userId: current.user.id, planId: plan.id },
       // Renewals and cancellations arrive with no metadata, so the subscription carries its own.
-      subscription_data: {
-        metadata: { userId: current.user.id, planId: plan.id },
-        ...(freeTrial
-          ? {
-              trial_period_days: FREE_TRIAL_DAYS,
-              // No card on file when the trial ends means no plan, not an unpaid one.
-              trial_settings: { end_behavior: { missing_payment_method: "cancel" } },
-            }
-          : {}),
-      },
-      payment_method_collection: "always",
+      subscription_data: { metadata: { userId: current.user.id, planId: plan.id } },
       success_url: `${base}/billing?status=subscribed&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${base}/billing?status=cancelled`,
     });

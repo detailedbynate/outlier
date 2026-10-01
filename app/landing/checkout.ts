@@ -26,6 +26,7 @@ export async function startPublicSubscription(formData: FormData): Promise<void>
   const plan = findPlan(String(formData.get("planId") ?? ""));
   const price = plan ? priceIdFor(plan) : null;
   if (!plan || !price) redirect("/?checkout=error#pricing");
+  const freeTrial = formData.get("trial") === "1";
 
   const h = await headers();
   const base = await siteUrl(h);
@@ -39,12 +40,16 @@ export async function startPublicSubscription(formData: FormData): Promise<void>
       line_items: [{ price, quantity: 1 }],
       allow_promotion_codes: true,
       metadata: { planId: plan.id },
-      // Everyone subscribing from the landing page is new, so they get the free trial.
       subscription_data: {
         metadata: { planId: plan.id },
-        trial_period_days: FREE_TRIAL_DAYS,
-        // No card on file when the trial ends means no plan, not an unpaid one.
-        trial_settings: { end_behavior: { missing_payment_method: "cancel" } },
+        // The free-trial offer (the popup) asks for it; the plan buttons charge straight away.
+        ...(freeTrial
+          ? {
+              trial_period_days: FREE_TRIAL_DAYS,
+              // No card on file when the trial ends means no plan, not an unpaid one.
+              trial_settings: { end_behavior: { missing_payment_method: "cancel" as const } },
+            }
+          : {}),
       },
       payment_method_collection: "always",
       success_url: `${base}/welcome?session_id={CHECKOUT_SESSION_ID}`,

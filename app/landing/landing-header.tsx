@@ -71,7 +71,7 @@ export function LandingHeader() {
             Sign in
           </Link>
           <ScrollLink to="pricing" className="pill-button pill-button-primary">
-            Start free trial
+            Subscribe now
           </ScrollLink>
         </div>
       </div>

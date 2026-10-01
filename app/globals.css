@@ -13257,3 +13257,65 @@ body.app-body {
   color: #a5a5b0;
   font-size: 12.5px;
 }
+
+/* Landing free-trial offer (app/landing/trial-offer.tsx), built on the paywall dialog. */
+.trial-offer-scrim {
+  z-index: 200;
+}
+
+.trial-offer-plans {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+
+.trial-offer-plans button {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid #2a2a33;
+  border-radius: 10px;
+  background: #15151a;
+  color: #dcdce2;
+  text-align: left;
+  font: inherit;
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.trial-offer-plans button strong {
+  font-size: 14px;
+  color: #fff;
+}
+
+.trial-offer-plans button s {
+  color: #74747e;
+}
+
+.trial-offer-plans button[aria-checked="true"] {
+  border-color: #7c5cf5;
+  background: rgba(124, 92, 245, 0.12);
+}
+
+.trial-offer-plans button:hover {
+  filter: none;
+  border-color: #3a3a44;
+}
+
+.trial-offer-plans button[aria-checked="true"]:hover {
+  border-color: #8b6ef7;
+}
+
+.trial-offer-cta {
+  width: 100%;
+  border: 0;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.trial-offer-cta:hover {
+  filter: none;
+}
