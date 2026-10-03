@@ -300,7 +300,6 @@ export async function LandingPage({ referralCode = null }: { referralCode?: stri
               See what it does
             </ScrollLink>
           </div>
-          <p className="landing-count">From {proPrice()} a month · cancel any time</p>
         </section>
 
         <LaunchVideo />
