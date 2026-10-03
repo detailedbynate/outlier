@@ -13,6 +13,7 @@ import { formatPrice } from "@/lib/billing/packs";
 import { FREE_TRIAL_DAYS, onSale, PLANS, SALE_ENDS_LABEL } from "@/lib/billing/plans";
 import { priceCentsFor, sellablePlans } from "@/lib/billing/subscriptions";
 import { startPublicSubscription } from "./checkout";
+import { LaunchVideo } from "./launch-video";
 import { TrialOffer } from "./trial-offer";
 
 /** Community invite; DISCORD_INVITE_URL overrides it. */
@@ -301,6 +302,8 @@ export async function LandingPage({ referralCode = null }: { referralCode?: stri
           </div>
           <p className="landing-count">From {proPrice()} a month · cancel any time</p>
         </section>
+
+        <LaunchVideo />
 
         <div className="marquee" aria-hidden="true">
           <div className="marquee-track">

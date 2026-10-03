@@ -13319,3 +13319,40 @@ body.app-body {
 .trial-offer-cta:hover {
   filter: none;
 }
+
+/* Landing: the product video under the hero (app/landing/launch-video.tsx). */
+.launch-video {
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto 64px;
+  padding: 0 20px;
+  animation: rise 0.8s var(--ease) 0.4s both;
+}
+
+.launch-video-frame {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #0b0b0e;
+  box-shadow: 0 30px 90px rgba(124, 92, 245, 0.18), 0 10px 30px rgba(0, 0, 0, 0.6);
+}
+
+.launch-video video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+@media (max-width: 640px) {
+  .launch-video {
+    margin-bottom: 40px;
+    padding: 0 16px;
+  }
+
+  .launch-video-frame {
+    border-radius: 12px;
+  }
+}
