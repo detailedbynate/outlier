@@ -10,6 +10,7 @@ import type { EnqueueOptions } from "@/lib/jobs/queue";
 import { refineSubNiches } from "@/lib/niches/refine";
 import { buildNicheReport, focusOnTopic, NICHE_REPORT_VERSION, tokenize, topicKey, type Level, type NicheReport } from "@/lib/niches/analysis";
 import { findBreakouts, findRisingChannels, type Breakout, type RisingChannel } from "@/lib/niches/breakouts";
+import { measureFormats, type FormatStat } from "@/lib/niches/formats";
 import { discoverNiches, type DiscoveredNiche, type DiscoverFormat } from "@/lib/niches/discover";
 import { canonicalNiche } from "@/lib/niches/naming";
 import { findUnderratedNiches, underratedWindow, type NicheCreator, type NicheExample } from "@/lib/niches/underrated";
@@ -162,6 +163,13 @@ function toIdea(row: {
   };
 }
 
+/** The Video ideas tab's library-backed feeds. */
+export interface IdeaFeeds {
+  breakouts: Breakout[];
+  rising: RisingChannel[];
+  formats: FormatStat[];
+}
+
 export class NicheService {
   private readonly log: Logger;
   private readonly config: NicheConfig;
@@ -170,7 +178,7 @@ export class NicheService {
   /** Mining the library is heavy, so the board is computed once per TTL. */
   private underratedCache: { at: number; ideas: NicheIdea[] } | null = null;
   private readonly discoverCache = new Map<DiscoverFormat, { at: number; niches: DiscoveredNiche[] }>();
-  private readonly breakoutCache = new Map<DiscoverFormat, { at: number; breakouts: Breakout[]; rising: RisingChannel[] }>();
+  private readonly ideaCache = new Map<DiscoverFormat, IdeaFeeds & { at: number }>();
 
   constructor(
     private readonly deps: {
@@ -256,12 +264,13 @@ export class NicheService {
 
   /**
    * The last two weeks' uploads from small channels that pulled many times their
-   * subscribers, in categories that pay, and channels under six months old already
-   * doing well in them. Database only, cached per format.
+   * subscribers, in categories that pay; channels under six months old already
+   * doing well in them; and the title formats small channels are winning with this
+   * month. Database only, cached per format.
    */
-  async breakouts(format: DiscoverFormat, options: { now?: Date } = {}): Promise<{ breakouts: Breakout[]; rising: RisingChannel[] }> {
+  async ideaFeeds(format: DiscoverFormat, options: { now?: Date } = {}): Promise<IdeaFeeds> {
     const now = options.now ?? new Date();
-    const cached = this.breakoutCache.get(format);
+    const cached = this.ideaCache.get(format);
     if (cached && now.getTime() - cached.at < this.config.reportTtlMs) return cached;
     try {
       // The wider window is for telling what each channel is about; breakouts themselves are the last 14 days.
@@ -269,12 +278,18 @@ export class NicheService {
       // Shorts views come cheap, so a Short has to beat its channel by more.
       const breakouts = findBreakouts(videos, channels, { now, minViews: format === "shorts" ? 50_000 : 20_000, minLift: format === "shorts" ? 5 : 3 });
       const rising = findRisingChannels(videos, channels, { now, minMedianViews: format === "shorts" ? 20_000 : 5_000 });
-      const result = { at: now.getTime(), breakouts, rising };
-      this.breakoutCache.set(format, result);
+      // Formats are about what works now, so only the last 30 days count.
+      const month = now.getTime() - 30 * 86_400_000;
+      const formats = measureFormats(
+        videos.filter((v) => Date.parse(v.published_at) >= month),
+        channels,
+      );
+      const result = { at: now.getTime(), breakouts, rising, formats };
+      this.ideaCache.set(format, result);
       return result;
     } catch (error) {
-      this.log.warn("breakout search failed", { format, error });
-      return { breakouts: [], rising: [] };
+      this.log.warn("idea feeds failed", { format, error });
+      return { breakouts: [], rising: [], formats: [] };
     }
   }
 

@@ -13522,6 +13522,28 @@ body.app-body {
   white-space: nowrap;
 }
 
+.formats-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  gap: 14px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.formats-list > li {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.formats-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .ideas-columns {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));

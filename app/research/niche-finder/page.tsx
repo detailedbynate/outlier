@@ -24,6 +24,7 @@ import { rpmTierOf, sortDiscovered, type DiscoveredNiche, type DiscoverFormat, t
 import type { RadarNiche } from "@/lib/services/niche-radar-service";
 import { marketOf } from "@/lib/radar/markets";
 import type { Breakout, RisingChannel } from "@/lib/niches/breakouts";
+import type { FormatStat } from "@/lib/niches/formats";
 import type { NicheIdeaRow } from "@/types/database";
 
 export const dynamic = "force-dynamic";
@@ -111,7 +112,7 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
     !result && browsing && view.board !== "library" ? services.radar.list({ limit: 400 }).catch(() => []) : Promise.resolve([]),
     !result && browsing && view.board === "ideas" ? services.radar.ideas({ limit: 30, days: 21, kind: "question", source: "reddit" }).catch(() => []) : Promise.resolve([]),
     !result && browsing && view.board === "ideas" ? services.radar.ideas({ limit: 30, days: 30, source: "stackexchange", orderBy: "views" }).catch(() => []) : Promise.resolve([]),
-    !result && browsing && view.board === "ideas" ? services.niches.breakouts(view.format) : Promise.resolve({ breakouts: [], rising: [] }),
+    !result && browsing && view.board === "ideas" ? services.niches.ideaFeeds(view.format) : Promise.resolve({ breakouts: [], rising: [], formats: [] }),
     !result && browsing && view.board === "ideas" ? services.radar.ideas({ limit: 30, days: 30, source: "comments", kind: "request" }).catch(() => []) : Promise.resolve([]),
     !result && browsing && view.board === "ideas" ? services.radar.ideas({ limit: 20, days: 21, source: "launches" }).catch(() => []) : Promise.resolve([]),
   ]);
@@ -156,7 +157,7 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
       {result ? null : <SavedNiches niches={saved} />}
       {result ? <Report result={result} drill={drill} saved={isSaved(savedList, result.topic)} own={own} /> : null}
       {related.length > 0 ? <IdeaBoard ideas={related} title={`Niches next to ${result!.topic}`} sub="Other researched topics that overlap with this one" /> : null}
-      {result ? null : <DiscoverBoard niches={discoverList} gaps={sortGaps(radarNiches, view)} questions={questions} evergreen={evergreen} breakouts={proof.breakouts} rising={proof.rising} requests={requests} launches={launches} view={view} />}
+      {result ? null : <DiscoverBoard niches={discoverList} gaps={sortGaps(radarNiches, view)} questions={questions} evergreen={evergreen} breakouts={proof.breakouts} rising={proof.rising} formats={proof.formats} requests={requests} launches={launches} view={view} />}
       {result && topNiches.length > 0 ? (
         <IdeaBoard ideas={topNiches} title="Other underrated niches" sub="Mined from every channel Outlier tracks: real demand, room left, and small channels winning. Pick one to dig in." />
       ) : null}
@@ -749,6 +750,7 @@ function DiscoverBoard({
   evergreen,
   breakouts,
   rising,
+  formats,
   requests,
   launches,
   view,
@@ -759,6 +761,7 @@ function DiscoverBoard({
   evergreen: NicheIdeaRow[];
   breakouts: Breakout[];
   rising: RisingChannel[];
+  formats: FormatStat[];
   requests: NicheIdeaRow[];
   launches: NicheIdeaRow[];
   view: View;
@@ -780,7 +783,7 @@ function DiscoverBoard({
       {view.board === "gaps" ? (
         <GapBoard gaps={gaps} />
       ) : view.board === "ideas" ? (
-        <IdeasBoard gaps={gaps} questions={questions} evergreen={evergreen} breakouts={breakouts} rising={rising} requests={requests} launches={launches} />
+        <IdeasBoard gaps={gaps} questions={questions} evergreen={evergreen} breakouts={breakouts} rising={rising} formats={formats} requests={requests} launches={launches} />
       ) : (
         <LibraryBoard niches={niches} view={view} />
       )}
@@ -973,6 +976,7 @@ function IdeasBoard({
   evergreen,
   breakouts,
   rising,
+  formats,
   requests,
   launches,
 }: {
@@ -981,11 +985,12 @@ function IdeasBoard({
   evergreen: NicheIdeaRow[];
   breakouts: Breakout[];
   rising: RisingChannel[];
+  formats: FormatStat[];
   requests: NicheIdeaRow[];
   launches: NicheIdeaRow[];
 }) {
   const withIdeas = gaps.filter((n) => (n.ease?.ideas.length ?? 0) > 0).slice(0, 12);
-  if ([withIdeas, questions, evergreen, breakouts, rising, requests, launches].every((list) => list.length === 0)) return <RadarEmpty />;
+  if ([withIdeas, questions, evergreen, breakouts, rising, formats, requests, launches].every((list) => list.length === 0)) return <RadarEmpty />;
   return (
     <>
       {breakouts.length > 0 ? (
@@ -1043,6 +1048,43 @@ function IdeasBoard({
                 >
                   <span>Best</span> {c.top.title} · {formatCompact(c.top.views)} views
                 </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {formats.length > 0 ? (
+        <div className="dash-panel ideas-breakouts">
+          <h3>Formats working right now</h3>
+          <p className="dash-row-sub">Title formats small channels are winning with this month, against a typical upload, and the paying categories that barely use them yet.</p>
+          <ul className="formats-list">
+            {formats.map((f) => (
+              <li key={f.id}>
+                <div className="formats-head">
+                  <strong>{f.label}</strong>
+                  <span className="niche-score" data-band={f.edge >= 2 ? "high" : f.edge >= 1.3 ? "mid" : "low"}>
+                    {f.edge.toFixed(1)}×
+                  </span>
+                </div>
+                <span className="dash-row-sub">
+                  {f.channels} channels · mostly {f.topCategories.join(", ") || "mixed"}
+                </span>
+                {f.openIn.length > 0 ? (
+                  <span className="dash-row-sub">
+                    Barely used in {f.openIn.join(", ")}. Try: &ldquo;{f.example}&rdquo;
+                  </span>
+                ) : null}
+                {f.best ? (
+                  <a
+                    className="gap-proof"
+                    href={f.best.format === "short" ? `https://www.youtube.com/shorts/${f.best.youtubeVideoId}` : `https://www.youtube.com/watch?v=${f.best.youtubeVideoId}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <span>Best</span> {f.best.title} · {formatCompact(f.best.views)} views
+                    {f.best.subscribers != null ? ` on ${formatCompact(f.best.subscribers)} subs` : ""}
+                  </a>
+                ) : null}
               </li>
             ))}
           </ul>
