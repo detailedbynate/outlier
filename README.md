@@ -307,7 +307,7 @@ The Niche Finder opens on a **Discover** board, so nobody has to know what to se
 
 - **Tracked channels**: every niche in the library (`lib/niches/discover.ts`), per format, scored on RPM (category bands in `lib/niches/revenue.ts`), views, how untapped it is, and how easy it is to make. Cached 6h per format.
 - **Search gaps**: the **Niche Radar** (`lib/radar/`, `NicheRadarService`), for niches the library has no channels for yet.
-- **Video ideas**: breakouts in paying niches (small channels that pulled many times their subscribers in the last two weeks, `lib/niches/breakouts.ts`), AI first-video ideas for the best gaps, videos viewers asked for, new tools to cover first, Stack Exchange questions by views, and Reddit questions from this week.
+- **Video ideas**: breakouts in paying niches (small channels that pulled many times their subscribers in the last two weeks, `lib/niches/breakouts.ts`), new channels already winning (under six months old, typical upload doing well, mid or high RPM), AI first-video ideas for the best gaps, videos viewers asked for, new tools to cover first, Stack Exchange questions by views, and Reddit questions from this week.
 
 The radar runs inside the scraper process, a little each round:
 

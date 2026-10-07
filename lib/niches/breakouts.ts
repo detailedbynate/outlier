@@ -22,6 +22,23 @@ export interface Breakout {
   rpm: [number, number];
   format: "short" | "long_form";
   publishedAt: string;
+  /** The channel's age in days, when known. */
+  channelAgeDays: number | null;
+}
+
+/** A channel under six months old that's already pulling real views in a paying niche. */
+export interface RisingChannel {
+  youtubeChannelId: string;
+  title: string;
+  thumbnailUrl: string | null;
+  subscribers: number | null;
+  ageDays: number;
+  uploads: number;
+  medianViews: number;
+  category: NicheCategory;
+  rpm: [number, number];
+  /** Its best upload in the sample. */
+  top: { youtubeVideoId: string; title: string; views: number; format: "short" | "long_form" };
 }
 
 export interface BreakoutOptions {
@@ -44,6 +61,17 @@ const LOW_PAY: ReadonlySet<NicheCategory> = new Set(["Gaming", "Sports", "Comedy
 const ENTERTAINMENT = /(satisfying|asmr|#viral|#fyp|story ?time|beamng|roblox|fortnite|nintendo|xbox|playstation|garry.?s mod|wwe\b|wrestl|formula ?1|#f1\b|verstappen)/i;
 
 const textOf = (video: NicheVideo) => [video.title, ...video.tags.slice(0, 8)].join(" ");
+
+const ageInDays = (channel: NicheChannel, now: Date): number | null => {
+  const created = channel.published_at ? Date.parse(channel.published_at) : NaN;
+  return Number.isFinite(created) ? Math.max(0, Math.floor((now.getTime() - created) / DAY_MS)) : null;
+};
+
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2;
+}
 
 /**
  * What each channel is about. Labeled channels use their labels; the rest need
@@ -112,8 +140,61 @@ export function findBreakouts(videos: readonly NicheVideo[], channels: ReadonlyM
       rpm,
       format: video.format === "short" ? "short" : "long_form",
       publishedAt: video.published_at,
+      channelAgeDays: ageInDays(channel, now),
     });
   }
   // Pay matters as much as lift: a 10x finance video beats a 40x DIY one.
   return [...best.values()].sort((a, b) => Math.sqrt(b.lift) * b.rpm[0] - Math.sqrt(a.lift) * a.rpm[0]).slice(0, options.limit ?? 12);
+}
+
+/**
+ * Channels started in the last six months whose typical upload already does
+ * well, in categories that pay at least middling RPM ($2+ long-form). One viral
+ * video can be luck; a new channel whose median upload pulls 20K views found a
+ * niche with room in it.
+ */
+export function findRisingChannels(
+  videos: readonly NicheVideo[],
+  channels: ReadonlyMap<string, NicheChannel>,
+  options: { now?: Date; maxAgeDays?: number; minUploads?: number; minMedianViews?: number; minRpm?: number; limit?: number } = {},
+): RisingChannel[] {
+  const now = options.now ?? new Date();
+  const maxAge = options.maxAgeDays ?? 180;
+  const minUploads = options.minUploads ?? 3;
+  const categories = channelCategories(videos, channels, minUploads);
+  const byChannel = new Map<string, NicheVideo[]>();
+  for (const video of videos) {
+    const list = byChannel.get(video.channel_id) ?? [];
+    list.push(video);
+    byChannel.set(video.channel_id, list);
+  }
+  const out: RisingChannel[] = [];
+  for (const [id, uploads] of byChannel) {
+    const channel = channels.get(id);
+    const category = categories.get(id);
+    if (!channel || !category || uploads.length < minUploads) continue;
+    const age = ageInDays(channel, now);
+    if (age === null || age > maxAge) continue;
+    const rpm = rpmFor(category, "long_form");
+    if (rpm[0] < (options.minRpm ?? 2)) continue;
+    const medianViews = median(uploads.map((v) => v.view_count));
+    if (medianViews < (options.minMedianViews ?? 10_000)) continue;
+    // The channel as a whole has to be about something that pays, not one lucky upload's topic.
+    const lowPay = uploads.filter((v) => ENTERTAINMENT.test(textOf(v)) || categoriesIn(textOf(v)).some((c) => LOW_PAY.has(c))).length;
+    if (lowPay * 2 >= uploads.length) continue;
+    const best = uploads.reduce((a, b) => (b.view_count > a.view_count ? b : a));
+    out.push({
+      youtubeChannelId: channel.youtube_channel_id,
+      title: channel.title,
+      thumbnailUrl: channel.thumbnail_url,
+      subscribers: channel.subscriber_count,
+      ageDays: age,
+      uploads: uploads.length,
+      medianViews,
+      category,
+      rpm,
+      top: { youtubeVideoId: best.youtube_video_id, title: best.title, views: best.view_count, format: best.format === "short" ? "short" : "long_form" },
+    });
+  }
+  return out.sort((a, b) => Math.sqrt(b.medianViews) * b.rpm[0] - Math.sqrt(a.medianViews) * a.rpm[0]).slice(0, options.limit ?? 9);
 }

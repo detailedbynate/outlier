@@ -23,7 +23,7 @@ import { TopicInput } from "./topic-input";
 import { rpmTierOf, sortDiscovered, type DiscoveredNiche, type DiscoverFormat, type DiscoverSort } from "@/lib/niches/discover";
 import type { RadarNiche } from "@/lib/services/niche-radar-service";
 import { marketOf } from "@/lib/radar/markets";
-import type { Breakout } from "@/lib/niches/breakouts";
+import type { Breakout, RisingChannel } from "@/lib/niches/breakouts";
 import type { NicheIdeaRow } from "@/types/database";
 
 export const dynamic = "force-dynamic";
@@ -99,7 +99,7 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
     }
   }
   const savedList = readSavedNiches(user.user_metadata);
-  const [popular, allTop, related, saved, own, discovered, radarNiches, questions, evergreen, breakouts, requests, launches] = await Promise.all([
+  const [popular, allTop, related, saved, own, discovered, radarNiches, questions, evergreen, proof, requests, launches] = await Promise.all([
     result ? Promise.resolve([]) : services.niches.popularTopics(8),
     result ? services.niches.topNiches(15) : Promise.resolve([]),
     result ? services.niches.relatedNiches(result.topic, result.report, 9) : Promise.resolve([]),
@@ -111,7 +111,7 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
     !result && browsing && view.board !== "library" ? services.radar.list({ limit: 400 }).catch(() => []) : Promise.resolve([]),
     !result && browsing && view.board === "ideas" ? services.radar.ideas({ limit: 30, days: 21, kind: "question", source: "reddit" }).catch(() => []) : Promise.resolve([]),
     !result && browsing && view.board === "ideas" ? services.radar.ideas({ limit: 30, days: 30, source: "stackexchange", orderBy: "views" }).catch(() => []) : Promise.resolve([]),
-    !result && browsing && view.board === "ideas" ? services.niches.breakouts(view.format) : Promise.resolve([]),
+    !result && browsing && view.board === "ideas" ? services.niches.breakouts(view.format) : Promise.resolve({ breakouts: [], rising: [] }),
     !result && browsing && view.board === "ideas" ? services.radar.ideas({ limit: 30, days: 30, source: "comments", kind: "request" }).catch(() => []) : Promise.resolve([]),
     !result && browsing && view.board === "ideas" ? services.radar.ideas({ limit: 20, days: 21, source: "launches" }).catch(() => []) : Promise.resolve([]),
   ]);
@@ -156,7 +156,7 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
       {result ? null : <SavedNiches niches={saved} />}
       {result ? <Report result={result} drill={drill} saved={isSaved(savedList, result.topic)} own={own} /> : null}
       {related.length > 0 ? <IdeaBoard ideas={related} title={`Niches next to ${result!.topic}`} sub="Other researched topics that overlap with this one" /> : null}
-      {result ? null : <DiscoverBoard niches={discoverList} gaps={sortGaps(radarNiches, view)} questions={questions} evergreen={evergreen} breakouts={breakouts} requests={requests} launches={launches} view={view} />}
+      {result ? null : <DiscoverBoard niches={discoverList} gaps={sortGaps(radarNiches, view)} questions={questions} evergreen={evergreen} breakouts={proof.breakouts} rising={proof.rising} requests={requests} launches={launches} view={view} />}
       {result && topNiches.length > 0 ? (
         <IdeaBoard ideas={topNiches} title="Other underrated niches" sub="Mined from every channel Outlier tracks: real demand, room left, and small channels winning. Pick one to dig in." />
       ) : null}
@@ -748,6 +748,7 @@ function DiscoverBoard({
   questions,
   evergreen,
   breakouts,
+  rising,
   requests,
   launches,
   view,
@@ -757,6 +758,7 @@ function DiscoverBoard({
   questions: NicheIdeaRow[];
   evergreen: NicheIdeaRow[];
   breakouts: Breakout[];
+  rising: RisingChannel[];
   requests: NicheIdeaRow[];
   launches: NicheIdeaRow[];
   view: View;
@@ -778,7 +780,7 @@ function DiscoverBoard({
       {view.board === "gaps" ? (
         <GapBoard gaps={gaps} />
       ) : view.board === "ideas" ? (
-        <IdeasBoard gaps={gaps} questions={questions} evergreen={evergreen} breakouts={breakouts} requests={requests} launches={launches} />
+        <IdeasBoard gaps={gaps} questions={questions} evergreen={evergreen} breakouts={breakouts} rising={rising} requests={requests} launches={launches} />
       ) : (
         <LibraryBoard niches={niches} view={view} />
       )}
@@ -970,6 +972,7 @@ function IdeasBoard({
   questions,
   evergreen,
   breakouts,
+  rising,
   requests,
   launches,
 }: {
@@ -977,11 +980,12 @@ function IdeasBoard({
   questions: NicheIdeaRow[];
   evergreen: NicheIdeaRow[];
   breakouts: Breakout[];
+  rising: RisingChannel[];
   requests: NicheIdeaRow[];
   launches: NicheIdeaRow[];
 }) {
   const withIdeas = gaps.filter((n) => (n.ease?.ideas.length ?? 0) > 0).slice(0, 12);
-  if ([withIdeas, questions, evergreen, breakouts, requests, launches].every((list) => list.length === 0)) return <RadarEmpty />;
+  if ([withIdeas, questions, evergreen, breakouts, rising, requests, launches].every((list) => list.length === 0)) return <RadarEmpty />;
   return (
     <>
       {breakouts.length > 0 ? (
@@ -1006,11 +1010,42 @@ function IdeasBoard({
                   <span className="niche-example-channel">
                     {b.channelTitle}
                     {b.subscribers !== null ? ` · ${formatCompact(b.subscribers)} subs` : ""} · {Math.round(b.lift)}× · {b.category}
+                    {b.channelAgeDays !== null && b.channelAgeDays <= 180 ? ` · channel ${channelAge(b.channelAgeDays)} old` : ""}
                   </span>
                 </span>
               </a>
             ))}
           </div>
+        </div>
+      ) : null}
+      {rising.length > 0 ? (
+        <div className="dash-panel ideas-breakouts">
+          <h3>New channels already winning</h3>
+          <p className="dash-row-sub">Started in the last six months, and their typical upload already does well, in categories with mid or high RPM. A niche with room in it.</p>
+          <ul className="rising-channels">
+            {rising.map((c) => (
+              <li key={c.youtubeChannelId}>
+                <a href={`https://www.youtube.com/channel/${c.youtubeChannelId}`} target="_blank" rel="noreferrer" className="rising-channel">
+                  {c.thumbnailUrl ? <img src={c.thumbnailUrl} alt="" loading="lazy" /> : <span className="rising-channel-blank" />}
+                  <span>
+                    <strong>{c.title}</strong>
+                    <span className="dash-row-sub">
+                      {channelAge(c.ageDays)} old · {c.subscribers !== null ? `${formatCompact(c.subscribers)} subs · ` : ""}
+                      {formatCompact(c.medianViews)} median views · {c.category}
+                    </span>
+                  </span>
+                </a>
+                <a
+                  className="gap-proof"
+                  href={c.top.format === "short" ? `https://www.youtube.com/shorts/${c.top.youtubeVideoId}` : `https://www.youtube.com/watch?v=${c.top.youtubeVideoId}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <span>Best</span> {c.top.title} · {formatCompact(c.top.views)} views
+                </a>
+              </li>
+            ))}
+          </ul>
         </div>
       ) : null}
       <div className="ideas-columns">
@@ -1116,6 +1151,13 @@ function IdeasBoard({
       </div>
     </>
   );
+}
+
+/** "3 weeks", "4 months". */
+function channelAge(days: number): string {
+  if (days < 14) return `${days} day${days === 1 ? "" : "s"}`;
+  if (days < 60) return `${Math.round(days / 7)} weeks`;
+  return `${Math.round(days / 30)} months`;
 }
 
 function band(score: number): "high" | "mid" | "low" {

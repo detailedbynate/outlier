@@ -141,12 +141,13 @@ export class NicheRepository {
       niche_labels: string[];
       quality_flags: string[];
       niche_confidence: number | null;
+      published_at: string | null;
     }[] = [];
     for (let i = 0; i < ids.length; i += 200) {
       const found = unwrap(
         await this.db
           .from("channels")
-          .select("id, youtube_channel_id, title, thumbnail_url, subscriber_count, niche_id, niche_labels, quality_flags, niche_confidence")
+          .select("id, youtube_channel_id, title, thumbnail_url, subscriber_count, niche_id, niche_labels, quality_flags, niche_confidence, published_at")
           .in("id", ids.slice(i, i + 200)),
         "niches.sampleChannels",
       );
@@ -176,6 +177,7 @@ export class NicheRepository {
         title: row.title,
         thumbnail_url: row.thumbnail_url,
         subscriber_count: row.subscriber_count,
+        published_at: row.published_at,
         ...(nicheTerms.length > 0 ? { niche_terms: nicheTerms } : {}),
       });
     }

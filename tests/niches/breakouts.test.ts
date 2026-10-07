@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { NicheChannel, NicheVideo } from "@/lib/niches/analysis";
-import { findBreakouts } from "@/lib/niches/breakouts";
+import { findBreakouts, findRisingChannels } from "@/lib/niches/breakouts";
 
 const NOW = new Date("2026-10-07T00:00:00Z");
 const daysAgo = (d: number) => new Date(NOW.getTime() - d * 86_400_000).toISOString();
@@ -9,8 +9,8 @@ function video(id: string, channel: string, title: string, views: number, publis
   return { id, youtube_video_id: id, channel_id: channel, title, tags: [], format: "long_form", view_count: views, like_count: null, comment_count: null, published_at: published, outlier_score: null };
 }
 
-function channel(id: string, title: string, subscribers: number | null, niche_terms?: string[]): NicheChannel {
-  return { id, youtube_channel_id: id, title, thumbnail_url: null, subscriber_count: subscribers, niche_terms };
+function channel(id: string, title: string, subscribers: number | null, niche_terms?: string[], published_at: string | null = null): NicheChannel {
+  return { id, youtube_channel_id: id, title, thumbnail_url: null, subscriber_count: subscribers, niche_terms, published_at };
 }
 
 describe("breakouts in paying niches", () => {
@@ -74,5 +74,24 @@ describe("breakouts in paying niches", () => {
       { now: NOW },
     );
     expect(found.map((b) => b.youtubeVideoId)).toEqual(["t", "a2"]);
+  });
+});
+
+describe("new channels already winning", () => {
+  it("finds young channels whose typical upload does well in categories that pay", () => {
+    const channels = new Map([
+      ["new", channel("new", "Budget Lab", 8_000, ["budgeting"], daysAgo(60))],
+      ["old", channel("old", "Old Money", 8_000, ["budgeting"], daysAgo(2_000))],
+      ["lucky", channel("lucky", "One Hit", 8_000, ["budgeting"], daysAgo(30))],
+      ["game", channel("game", "Blocky", 8_000, ["minecraft"], daysAgo(30))],
+    ]);
+    const uploads = (ch: string, views: number[]) => views.map((v, i) => video(`${ch}${i}`, ch, `Budget tip ${i}`, v, daysAgo(i + 1)));
+    const found = findRisingChannels(
+      [...uploads("new", [20_000, 15_000, 30_000]), ...uploads("old", [50_000, 50_000, 50_000]), ...uploads("lucky", [900_000, 800, 600]), ...uploads("game", [90_000, 90_000, 90_000])],
+      channels,
+      { now: NOW },
+    );
+    expect(found.map((c) => c.title)).toEqual(["Budget Lab"]);
+    expect(found[0]).toMatchObject({ ageDays: 60, uploads: 3, medianViews: 20_000, category: "Finance & Business", top: { youtubeVideoId: "new2", views: 30_000 } });
   });
 });

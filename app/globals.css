@@ -13477,6 +13477,51 @@ body.app-body {
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 180px), 1fr));
 }
 
+.rising-channels {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  gap: 12px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rising-channels > li {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.rising-channel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.rising-channel img,
+.rising-channel-blank {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--surface-2);
+}
+
+.rising-channel > span {
+  display: grid;
+  min-width: 0;
+}
+
+.rising-channel strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .ideas-columns {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));
