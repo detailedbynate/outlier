@@ -134,6 +134,8 @@ async function main(): Promise<void> {
   const scrapedSearch = new InnerTubeSearch(gate, { lang, location: region });
   // Translated phrases are read with YouTube set to their own language and country, through the same gate.
   const { marketOf } = await import("@/lib/radar/markets");
+  const { InnerTubeComments } = await import("@/lib/innertube/comments");
+  const commentReader = new InnerTubeComments(gate);
   const marketSearch = new Map<string, InstanceType<typeof InnerTubeSearch>>();
   const searchIn = (market: string) => {
     if (market === "en") return scrapedSearch;
@@ -152,6 +154,7 @@ async function main(): Promise<void> {
   const radar = services.radar.withScraping({
     suggest: (q) => suggestGate.run({ label: `suggest:${q.slice(0, 40)}`, cacheKey: `suggest:${lang}:${region}:${q}`, lane: "background" }, () => fetchSuggestions(q, { lang, region })),
     search: (q, market) => searchIn(market).search({ q, type: "video", order: "relevance", maxResults: 20 }, { lane: "background" }),
+    comments: (videoId) => commentReader.top(videoId),
   });
   let radarSeeded = false;
   let librarySeededAt = 0;
@@ -201,9 +204,16 @@ async function main(): Promise<void> {
     }
     if (!collecting) {
       collecting = inBackground("radar collect", async () => {
-        const [reddit, stack, translated] = await Promise.allSettled([radar.collectRedditOnce({ signal }), radar.collectStackOnce({ signal }), radar.translateOnce()]);
+        const [reddit, stack, translated, requests] = await Promise.allSettled([
+          radar.collectRedditOnce({ signal }),
+          radar.collectStackOnce({ signal }),
+          radar.translateOnce(),
+          // Comment pages go through YouTube's gate, so they wait while it's open.
+          gate.state().open ? Promise.resolve(null) : radar.collectRequestsOnce({ signal }),
+        ]);
         const value = (r: PromiseSettledResult<unknown>) => (r.status === "fulfilled" ? r.value : { error: String(r.reason).slice(0, 200) });
-        return value(reddit) || value(stack) || value(translated) ? { reddit: value(reddit), stack: value(stack), translated: value(translated) } : null;
+        const all = { reddit: value(reddit), stack: value(stack), translated: value(translated), requests: value(requests) };
+        return Object.values(all).some(Boolean) ? all : null;
       }).finally(() => {
         collecting = null;
       });

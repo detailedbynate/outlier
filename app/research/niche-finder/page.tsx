@@ -99,7 +99,7 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
     }
   }
   const savedList = readSavedNiches(user.user_metadata);
-  const [popular, allTop, related, saved, own, discovered, radarNiches, questions, evergreen, breakouts] = await Promise.all([
+  const [popular, allTop, related, saved, own, discovered, radarNiches, questions, evergreen, breakouts, requests] = await Promise.all([
     result ? Promise.resolve([]) : services.niches.popularTopics(8),
     result ? services.niches.topNiches(15) : Promise.resolve([]),
     result ? services.niches.relatedNiches(result.topic, result.report, 9) : Promise.resolve([]),
@@ -112,6 +112,7 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
     !result && browsing && view.board === "ideas" ? services.radar.ideas({ limit: 30, days: 21, kind: "question", source: "reddit" }).catch(() => []) : Promise.resolve([]),
     !result && browsing && view.board === "ideas" ? services.radar.ideas({ limit: 30, days: 30, source: "stackexchange", orderBy: "views" }).catch(() => []) : Promise.resolve([]),
     !result && browsing && view.board === "ideas" ? services.niches.breakouts(view.format) : Promise.resolve([]),
+    !result && browsing && view.board === "ideas" ? services.radar.ideas({ limit: 30, days: 30, source: "comments", kind: "request" }).catch(() => []) : Promise.resolve([]),
   ]);
   const discoverList = sortDiscovered(
     discovered.filter((n) => view.rpm === "all" || n.rpmTier === view.rpm),
@@ -154,7 +155,7 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
       {result ? null : <SavedNiches niches={saved} />}
       {result ? <Report result={result} drill={drill} saved={isSaved(savedList, result.topic)} own={own} /> : null}
       {related.length > 0 ? <IdeaBoard ideas={related} title={`Niches next to ${result!.topic}`} sub="Other researched topics that overlap with this one" /> : null}
-      {result ? null : <DiscoverBoard niches={discoverList} gaps={sortGaps(radarNiches, view)} questions={questions} evergreen={evergreen} breakouts={breakouts} view={view} />}
+      {result ? null : <DiscoverBoard niches={discoverList} gaps={sortGaps(radarNiches, view)} questions={questions} evergreen={evergreen} breakouts={breakouts} requests={requests} view={view} />}
       {result && topNiches.length > 0 ? (
         <IdeaBoard ideas={topNiches} title="Other underrated niches" sub="Mined from every channel Outlier tracks: real demand, room left, and small channels winning. Pick one to dig in." />
       ) : null}
@@ -732,7 +733,7 @@ function sortGaps(niches: readonly RadarNiche[], view: View): RadarNiche[] {
 const BOARD_SUB: Record<Board, string> = {
   library: "No search needed. Every niche in the channels Outlier tracks, scored on RPM, views, how untapped it is and how easy it is to make.",
   gaps: "What people type into YouTube search where the results are old, small channels are winning and no giant owns the page, in English and five other languages. Checked around the clock.",
-  ideas: "First videos to make in the most open niches, questions read hundreds of thousands of times on Stack Exchange, and what Reddit is asking this week.",
+  ideas: "Small channels breaking out in paying niches, first videos to make in the most open ones, videos viewers asked for in the comments, questions read hundreds of thousands of times on Stack Exchange, and what Reddit is asking this week.",
 };
 
 /**
@@ -746,6 +747,7 @@ function DiscoverBoard({
   questions,
   evergreen,
   breakouts,
+  requests,
   view,
 }: {
   niches: DiscoveredNiche[];
@@ -753,6 +755,7 @@ function DiscoverBoard({
   questions: NicheIdeaRow[];
   evergreen: NicheIdeaRow[];
   breakouts: Breakout[];
+  requests: NicheIdeaRow[];
   view: View;
 }) {
   return (
@@ -772,7 +775,7 @@ function DiscoverBoard({
       {view.board === "gaps" ? (
         <GapBoard gaps={gaps} />
       ) : view.board === "ideas" ? (
-        <IdeasBoard gaps={gaps} questions={questions} evergreen={evergreen} breakouts={breakouts} />
+        <IdeasBoard gaps={gaps} questions={questions} evergreen={evergreen} breakouts={breakouts} requests={requests} />
       ) : (
         <LibraryBoard niches={niches} view={view} />
       )}
@@ -959,9 +962,21 @@ function GapBoard({ gaps }: { gaps: RadarNiche[] }) {
   );
 }
 
-function IdeasBoard({ gaps, questions, evergreen, breakouts }: { gaps: RadarNiche[]; questions: NicheIdeaRow[]; evergreen: NicheIdeaRow[]; breakouts: Breakout[] }) {
+function IdeasBoard({
+  gaps,
+  questions,
+  evergreen,
+  breakouts,
+  requests,
+}: {
+  gaps: RadarNiche[];
+  questions: NicheIdeaRow[];
+  evergreen: NicheIdeaRow[];
+  breakouts: Breakout[];
+  requests: NicheIdeaRow[];
+}) {
   const withIdeas = gaps.filter((n) => (n.ease?.ideas.length ?? 0) > 0).slice(0, 12);
-  if (withIdeas.length === 0 && questions.length === 0 && evergreen.length === 0 && breakouts.length === 0) return <RadarEmpty />;
+  if (withIdeas.length === 0 && questions.length === 0 && evergreen.length === 0 && breakouts.length === 0 && requests.length === 0) return <RadarEmpty />;
   return (
     <>
       {breakouts.length > 0 ? (
@@ -1011,6 +1026,29 @@ function IdeasBoard({ gaps, questions, evergreen, breakouts }: { gaps: RadarNich
                       <li key={idea}>{idea}</li>
                     ))}
                   </ol>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        {requests.length > 0 ? (
+          <div className="dash-panel ideas-list">
+            <h3>Videos viewers asked for</h3>
+            <ul>
+              {requests.map((r) => (
+                <li key={r.id}>
+                  <a href={r.url} target="_blank" rel="noreferrer">
+                    {r.title}
+                  </a>
+                  <span className="dash-row-sub">
+                    {r.community ? (
+                      <>
+                        <Link href={`/research/niche-finder?topic=${encodeURIComponent(r.community)}`}>{r.community}</Link> ·{" "}
+                      </>
+                    ) : null}
+                    {r.comments > 1 ? `${r.comments} comments asked · ` : ""}
+                    {formatCompact(r.score)} likes
+                  </span>
                 </li>
               ))}
             </ul>

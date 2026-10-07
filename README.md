@@ -319,6 +319,8 @@ The radar runs inside the scraper process, a little each round:
 6. The **score** (`score.ts`) is 25% demand, 25% pay, 30% gap and 20% ease. Phrases scoring 60+ feed `library.grow` as seeds.
 7. **Other languages** (`markets.ts`): once a day the best English phrases (55+) are translated by the AI into German, Japanese, French, Spanish and Portuguese, and each translation is read with YouTube set to that language and country. Pay is scaled by a rough RPM factor per market (German 0.85 of English, Portuguese 0.3). Translations aren't grown through autocomplete or sent to DataForSEO, and only English phrases feed the library.
 
+**Viewer requests** (`requests.ts`, `lib/innertube/comments.ts`): once a day the scraper reads the top comments under the two best videos of the 15 best English gaps (30 requests through the gate), and the AI pulls out the videos people asked for that nobody made.
+
 **Ideas** come from Stack Exchange (`stackexchange.ts`, no key needed, about 100 requests a day; `STACKEXCHANGE_KEY` raises the cap) and Reddit (`reddit.ts`, needs `REDDIT_CLIENT_ID`/`SECRET` for app-only OAuth). Note that Reddit's Data API terms restrict commercial use. The tables are `niche_keywords` and `niche_ideas` (migration `20261007000032_niche_radar.sql`).
 
 ---

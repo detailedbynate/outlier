@@ -7,6 +7,8 @@ import { categoryFor } from "@/lib/niches/revenue";
 import type { DataForSeoClient, Demand } from "@/lib/radar/demand";
 import { rateEase, type EaseRating } from "@/lib/radar/ease";
 import { marketOf, translatePhrases, type MarketCode } from "@/lib/radar/markets";
+import { extractRequests } from "@/lib/radar/requests";
+import type { VideoComment } from "@/lib/innertube/comments";
 import { SUBREDDITS, type RedditClient, type RedditPost } from "@/lib/radar/reddit";
 import { STACK_SITES, type StackExchangeClient } from "@/lib/radar/stackexchange";
 import { priorityOf } from "@/lib/radar/priority";
@@ -29,6 +31,8 @@ import type { YouTubeChannel, YouTubeSearchResult, YouTubeVideo } from "@/types/
  * Exchange adds evergreen questions (with view counts) and its sites' popular
  * tags as seeds. The best English phrases are translated into other markets
  * (markets.ts) and read there, where the same demand often has far less supply.
+ * Comments under the best gaps' top videos give viewer requests: videos people
+ * asked for that nobody has made (requests.ts).
  *
  * Everything that touches YouTube goes through the scraper's gate (the caller
  * passes gated `suggest` and `search`), so the radar shares the scraper's rate
@@ -47,6 +51,8 @@ export interface RadarDeps {
   suggest?: (query: string) => Promise<Suggestion[]>;
   /** Scraped search through the gate, in the phrase's market; never the API's 100-unit search. */
   search?: (query: string, market: MarketCode) => Promise<YouTubeSearchResult[]>;
+  /** A video's top comments, through the gate. */
+  comments?: (videoId: string) => Promise<VideoComment[]>;
   /** Exact stats for the results (1 quota unit per 50 each). */
   youtube?: { getVideos(ids: readonly string[]): Promise<YouTubeVideo[]>; getChannels(ids: readonly string[]): Promise<YouTubeChannel[]> };
   demand?: Pick<DataForSeoClient, "searchVolume"> | null;
@@ -79,6 +85,10 @@ export interface RadarConfig {
   translateBatch: number;
   /** Only English phrases scoring at least this get translated. */
   translateMinScore: number;
+  /** Read viewer requests at most this often. */
+  requestsEveryHours: number;
+  /** Gaps whose top videos' comments are read per sweep (two videos each). */
+  requestNiches: number;
 }
 
 export const DEFAULT_RADAR_CONFIG: RadarConfig = {
@@ -93,6 +103,8 @@ export const DEFAULT_RADAR_CONFIG: RadarConfig = {
   translateEveryHours: 24,
   translateBatch: 25,
   translateMinScore: 55,
+  requestsEveryHours: 24,
+  requestNiches: 15,
 };
 
 /** A phrase ready to show. */
@@ -160,6 +172,7 @@ export class NicheRadarService {
   private readonly log: Logger;
   private readonly config: RadarConfig;
   private lastTranslateAttempt = 0;
+  private lastRequestsAttempt = 0;
 
   constructor(
     private readonly deps: RadarDeps,
@@ -171,7 +184,7 @@ export class NicheRadarService {
   }
 
   /** The same radar with the scraping half attached (the scraper owns the gate's pace). */
-  withScraping(extra: Pick<RadarDeps, "suggest" | "search">): NicheRadarService {
+  withScraping(extra: Pick<RadarDeps, "suggest" | "search" | "comments">): NicheRadarService {
     return new NicheRadarService({ ...this.deps, ...extra }, this.config, this.log);
   }
 
@@ -412,6 +425,63 @@ export class NicheRadarService {
       return { phrases: batch.length, added };
     } catch (error) {
       this.log.warn("radar translation failed", { error });
+      return null;
+    }
+  }
+
+  /**
+   * Viewer requests under the best gaps' top videos, once a day: two comment
+   * pages per niche through the gate, then one model call to pull out the
+   * videos people asked for.
+   */
+  async collectRequestsOnce(options: { signal?: AbortSignal; now?: Date } = {}): Promise<{ niches: number; requests: number } | null> {
+    const { comments, ai } = this.deps;
+    if (!comments || !ai) return null;
+    const now = options.now ?? new Date();
+    const every = this.config.requestsEveryHours * 3_600_000;
+    if (now.getTime() - this.lastRequestsAttempt < every) return null;
+    const last = await this.deps.radar.lastIdeasAt("comments");
+    if (last && now.getTime() - last.getTime() < every) return null;
+    this.lastRequestsAttempt = now.getTime();
+
+    const best = (await this.deps.radar.top({ limit: this.config.requestNiches * 2, minScore: 60, market: "en" }))
+      .filter((r) => ((r.supply as unknown as Supply | null)?.top.length ?? 0) > 0)
+      .slice(0, this.config.requestNiches);
+    const groups: { niche: string; comments: VideoComment[] }[] = [];
+    for (const row of best) {
+      if (options.signal?.aborted) break;
+      const videos = (row.supply as unknown as Supply).top.slice(0, 2);
+      const found: VideoComment[] = [];
+      try {
+        for (const video of videos) found.push(...(await comments(video.id)));
+      } catch (error) {
+        // A refusal trips the gate's breaker; whatever was read so far still counts.
+        this.log.warn("comment read failed", { keyword: row.keyword, error });
+        break;
+      }
+      groups.push({ niche: row.keyword, comments: found });
+    }
+    if (groups.length === 0) return { niches: 0, requests: 0 };
+    try {
+      const requests = await extractRequests(ai, groups);
+      const category = new Map(best.map((r) => [r.keyword, r.category]));
+      const saved = await this.deps.radar.addIdeas(
+        requests.map((r) => ({
+          source: "comments",
+          community: r.niche,
+          title: r.title,
+          url: r.url,
+          score: r.likes,
+          comments: r.asks,
+          kind: "request",
+          category: category.get(r.niche) ?? categoryFor(r.niche),
+          collected_at: now.toISOString(),
+        })),
+      );
+      this.log.info("viewer requests collected", { niches: groups.length, requests: saved });
+      return { niches: groups.length, requests: saved };
+    } catch (error) {
+      this.log.warn("viewer request extraction failed", { error });
       return null;
     }
   }

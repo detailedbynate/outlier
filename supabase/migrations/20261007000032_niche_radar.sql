@@ -47,9 +47,9 @@ create index if not exists niche_keywords_source_idx on public.niche_keywords (s
 
 create table if not exists public.niche_ideas (
   id           uuid primary key default gen_random_uuid(),
-  -- reddit | stackexchange
+  -- reddit | stackexchange | comments
   source       text not null,
-  -- Where it came from, e.g. "r/personalfinance" or "money.stackexchange.com".
+  -- Where it came from, e.g. "r/personalfinance", "money.stackexchange.com", or the niche whose videos' comments asked.
   community    text,
   title        text not null,
   url          text not null unique,
@@ -58,7 +58,7 @@ create table if not exists public.niche_ideas (
   -- Stack Exchange counts views: a question read 200K times is proven search demand.
   views        integer,
   posted_at    timestamptz,
-  -- question | story | discussion
+  -- question | story | discussion | request (a viewer asking for a video)
   kind         text not null default 'discussion',
   category     text,
   collected_at timestamptz not null default now()
