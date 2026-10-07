@@ -9,6 +9,23 @@ const escapePattern = (value: string) => value.replace(/[\\%_*,()"]/g, " ").trim
 /** Channels with these flags don't feed niche analysis: their numbers come from other people's work. */
 const EXCLUDED_FLAGS = new Set(["reupload", "compilation", "spam_or_misleading", "removed"]);
 
+/** Runs `count` calls a few at a time, results in order. A big sample is ~100 requests; one by one that took 15s+. */
+async function inParallel<T>(count: number, run: (index: number) => Promise<T>, width = 8): Promise<T[]> {
+  const results = new Array<T>(count);
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(width, count) }, async () => {
+      while (next < count) {
+        const index = next++;
+        results[index] = await run(index);
+      }
+    }),
+  );
+  return results;
+}
+
+const chunks = <T>(list: readonly T[], size: number): T[][] => Array.from({ length: Math.ceil(list.length / size) }, (_, i) => list.slice(i * size, (i + 1) * size));
+
 export class NicheRepository {
   constructor(private readonly db: DatabaseClient) {}
 
@@ -143,14 +160,17 @@ export class NicheRepository {
       niche_confidence: number | null;
       published_at: string | null;
     }[] = [];
-    for (let i = 0; i < ids.length; i += 200) {
-      const found = unwrap(
+    const idBatches = chunks(ids, 200);
+    const channelBatches = await inParallel(idBatches.length, async (i) =>
+      unwrap(
         await this.db
           .from("channels")
           .select("id, youtube_channel_id, title, thumbnail_url, subscriber_count, niche_id, niche_labels, quality_flags, niche_confidence, published_at")
-          .in("id", ids.slice(i, i + 200)),
+          .in("id", idBatches[i]!),
         "niches.sampleChannels",
-      );
+      ),
+    );
+    for (const found of channelBatches) {
       for (const row of found) {
         if (row.quality_flags.some((flag) => EXCLUDED_FLAGS.has(flag))) continue;
         rows.push(row);
@@ -159,9 +179,9 @@ export class NicheRepository {
     }
 
     const names = new Map<string, string>();
-    const entityList = [...entityIds];
-    for (let i = 0; i < entityList.length; i += 200) {
-      const found = unwrap(await this.db.from("niches").select("id, name, kind").in("id", entityList.slice(i, i + 200)), "niches.entityNames");
+    const entityBatches = chunks([...entityIds], 200);
+    const entities = await inParallel(entityBatches.length, async (i) => unwrap(await this.db.from("niches").select("id, name, kind").in("id", entityBatches[i]!), "niches.entityNames"));
+    for (const found of entities) {
       // Categories are too broad to be a niche term.
       for (const entity of found) if (entity.kind !== "category") names.set(entity.id, entity.name);
     }
@@ -187,23 +207,20 @@ export class NicheRepository {
   /** A slice of the whole library to mine for niches, newest uploads first, optionally one format only. */
   async recentSample(since: Date, limit = 2_000, format?: "short" | "long_form"): Promise<{ videos: NicheVideo[]; channels: Map<string, NicheChannel> }> {
     // PostgREST caps a response at 1000 rows, so page until we have the sample.
-    const rows: Awaited<ReturnType<typeof this.pageOfVideos>> = [];
-    for (let from = 0; from < limit; from += 1_000) {
-      const page = await this.pageOfVideos(since, from, Math.min(from + 999, limit - 1), format);
-      rows.push(...page);
-      if (page.length < 1_000) break;
-    }
+    // Pages are fetched side by side; a short page means the sample ran out there.
+    const pages = await inParallel(Math.ceil(limit / 1_000), (i) => this.pageOfVideos(since, i * 1_000, Math.min(i * 1_000 + 999, limit - 1), format), 5);
+    const end = pages.findIndex((page) => page.length < 1_000);
+    const seen = new Set<string>();
+    // Uploads arriving mid-read shift the pages, so the same video can show up twice.
+    const rows = pages.slice(0, end === -1 ? pages.length : end + 1).flat().filter((row) => !seen.has(row.id) && seen.add(row.id));
     if (rows.length === 0) return { videos: [], channels: new Map() };
 
-    const ids = rows.map((row) => row.id);
     const scores = new Map<string, number>();
-    for (let i = 0; i < ids.length; i += 200) {
-      const perf = unwrap(
-        await this.db.from("video_performance").select("video_id, outlier_score").in("video_id", ids.slice(i, i + 200)),
-        "niches.samplePerformance",
-      );
-      for (const row of perf) if (row.outlier_score !== null) scores.set(row.video_id, Number(row.outlier_score));
-    }
+    const perfBatches = await inParallel(chunks(rows.map((row) => row.id), 200).length, async (i) => {
+      const ids = rows.slice(i * 200, (i + 1) * 200).map((row) => row.id);
+      return unwrap(await this.db.from("video_performance").select("video_id, outlier_score").in("video_id", ids), "niches.samplePerformance");
+    });
+    for (const perf of perfBatches) for (const row of perf) if (row.outlier_score !== null) scores.set(row.video_id, Number(row.outlier_score));
 
     const channels = await this.loadChannels([...new Set(rows.map((row) => row.channel_id))]);
 

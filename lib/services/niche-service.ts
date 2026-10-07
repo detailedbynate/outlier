@@ -264,10 +264,16 @@ export class NicheService {
   async discover(format: DiscoverFormat, options: { now?: Date } = {}): Promise<DiscoveredNiche[]> {
     const now = options.now ?? new Date();
     const cached = this.discoverCache.get(format);
-    if (cached && now.getTime() - cached.at < this.config.reportTtlMs) return cached.niches;
+    const load = () => this.once(`discover:${format}`, () => this.loadDiscover(format, now));
+    if (!cached) return load();
+    // Past its age the old list is still shown at once, while a fresh one is worked out behind it.
+    if (now.getTime() - cached.at >= this.config.reportTtlMs) void load();
+    return cached.niches;
+  }
+
+  private async loadDiscover(format: DiscoverFormat, now: Date): Promise<DiscoveredNiche[]> {
     try {
-      // Each format gets its own sample: the library is mostly Shorts, so a mixed one leaves long-form with almost nothing.
-      const { videos, channels } = await this.deps.niches.recentSample(underratedWindow(now, this.config.sampleDays), 15_000, format === "shorts" ? "short" : "long_form");
+      const { videos, channels } = await this.formatSample(format, now);
       const niches = discoverNiches(videos, channels, format, { now });
       this.discoverCache.set(format, { at: now.getTime(), niches });
       this.log.info("niches discovered", { format, sample: videos.length, found: niches.length });
@@ -289,10 +295,17 @@ export class NicheService {
     const lens = options.lens ?? "gaming";
     const cacheKey = `${format}:${lens}`;
     const cached = this.ideaCache.get(cacheKey);
-    if (cached && now.getTime() - cached.at < this.config.reportTtlMs) return cached;
+    const load = () => this.once(`ideas:${cacheKey}`, () => this.loadIdeaFeeds(format, lens, now));
+    if (!cached) return load();
+    if (now.getTime() - cached.at >= this.config.reportTtlMs) void load();
+    return cached;
+  }
+
+  private async loadIdeaFeeds(format: DiscoverFormat, lens: IdeaLens, now: Date): Promise<IdeaFeeds> {
+    const cacheKey = `${format}:${lens}`;
     try {
       // The wider window is for telling what each channel is about; breakouts themselves are the last 14 days.
-      const { videos, channels } = await this.deps.niches.recentSample(underratedWindow(now, this.config.sampleDays), 15_000, format === "shorts" ? "short" : "long_form");
+      const { videos, channels } = await this.formatSample(format, now);
       // Shorts views come cheap, so a Short has to beat its channel by more.
       const breakouts = findBreakouts(videos, channels, { now, lens, minViews: format === "shorts" ? 50_000 : 20_000, minLift: format === "shorts" ? 5 : 3 });
       const rising = findRisingChannels(videos, channels, { now, lens, minMedianViews: format === "shorts" ? 20_000 : 5_000 });
@@ -311,6 +324,45 @@ export class NicheService {
     } catch (error) {
       this.log.warn("idea feeds failed", { format, error });
       return { breakouts: [], rising: [], formats: [], games: [] };
+    }
+  }
+
+  /**
+   * The last 90 days of one format, shared by the boards: Discover and Video
+   * ideas read the same 15K uploads, so one read serves both for a few minutes.
+   * Each format gets its own sample: the library is mostly Shorts, so a mixed
+   * one leaves long-form with almost nothing.
+   */
+  private formatSample(format: DiscoverFormat, now: Date): ReturnType<NicheService["deps"]["niches"]["recentSample"]> {
+    const hit = this.samples.get(format);
+    if (hit && Math.abs(now.getTime() - hit.at) < 10 * 60_000) return hit.load;
+    const load = this.deps.niches.recentSample(underratedWindow(now, this.config.sampleDays), 15_000, format === "shorts" ? "short" : "long_form");
+    this.samples.set(format, { at: now.getTime(), load });
+    load.catch(() => this.samples.delete(format));
+    return load;
+  }
+
+  private readonly samples = new Map<DiscoverFormat, { at: number; load: ReturnType<NicheService["deps"]["niches"]["recentSample"]> }>();
+  private readonly running = new Map<string, Promise<unknown>>();
+
+  /** One load per key at a time; callers that arrive while it runs share it. */
+  private once<T>(key: string, load: () => Promise<T>): Promise<T> {
+    const running = this.running.get(key) as Promise<T> | undefined;
+    if (running) return running;
+    const started = load().finally(() => this.running.delete(key));
+    this.running.set(key, started);
+    return started;
+  }
+
+  /**
+   * Fills the boards' caches, or refreshes them once they're old, before anyone
+   * opens the page. The cron tick calls it, so a visitor only waits right after
+   * a restart, and only until the next tick.
+   */
+  warm(now = new Date()): void {
+    for (const format of ["shorts", "long_form"] as const) {
+      void this.discover(format, { now });
+      void this.ideaFeeds(format, { now, lens: "gaming" });
     }
   }
 

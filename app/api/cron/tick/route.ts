@@ -14,6 +14,8 @@ const WORK_BUDGET_MS = 40_000;
 export const POST = apiHandler({ auth: "cron" }, async ({ requestId }) => {
   const startedAt = Date.now();
   const services = getServices();
+  // Runs alongside the jobs; the Niche Finder boards are ready before anyone asks.
+  services.niches.warm();
 
   const scheduled = await services.scheduler.tick();
   const requeued = await services.repositories.jobs.requeueStale("15 minutes");
