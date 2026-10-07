@@ -26,6 +26,9 @@ import { marketOf } from "@/lib/radar/markets";
 import type { Breakout, RisingChannel } from "@/lib/niches/breakouts";
 import type { FormatStat } from "@/lib/niches/formats";
 import type { GameStat } from "@/lib/niches/games";
+import { mineFirst, nichePreferences } from "@/lib/niches/personal";
+import { gameAlert, type GameAlert } from "@/lib/niches/alerts";
+import { gameIn } from "@/lib/niches/rule-labeler";
 import type { NicheIdeaRow, NichePickRow } from "@/types/database";
 
 export const dynamic = "force-dynamic";
@@ -87,13 +90,15 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
   // "good niches around fitness" and "fitness" both work; "top niches" browses.
   const { intent, topic } = parseNicheQuery(asked);
   const services = getServices();
+  // Without a choice in the URL, start on what the creator said they make in onboarding.
+  const personal = nichePreferences(await services.onboarding.getPreferences(user.id).catch(() => null));
   const view = {
-    format: (params.format === "long_form" ? "long_form" : "shorts") as DiscoverFormat,
+    format: (params.format === "long_form" || params.format === "shorts" ? params.format : (personal.format ?? "shorts")) as DiscoverFormat,
     rpm: (RPM_FILTERS.some((f) => f.value === params.rpm) ? params.rpm : "all") as RpmFilter,
     sort: (SORTS.find((s) => s.value === params.sort)?.value ?? "best") as DiscoverSort,
     board: (BOARDS.find((b) => b.value === params.board)?.value ?? "library") as Board,
     lang: (LANG_FILTERS.find((l) => l.value === params.lang)?.value ?? "all") as LangFilter,
-    lens: (params.lens === "all" ? "all" : "gaming") as Lens,
+    lens: (params.lens === "all" || params.lens === "gaming" ? params.lens : (personal.lens ?? "gaming")) as Lens,
   };
   const gaming = view.lens === "gaming";
   const browsing = intent !== "research" || !topic;
@@ -130,10 +135,26 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
     ideasOn && gaming ? services.niches.trackRecord() : Promise.resolve(null),
   ]);
   // Every game pays about the same, so the RPM filter only applies to all niches.
-  const discoverList = sortDiscovered(
+  const sorted = sortDiscovered(
     discovered.filter((n) => (gaming ? n.category === "Gaming" : view.rpm === "all" || n.rpmTier === view.rpm)),
     view.sort,
-  ).slice(0, 24);
+  );
+  // On the default sort, niches in the creator's own games lead.
+  const discoverList = (view.sort === "best" ? mineFirst(sorted, personal.games, (n) => gameIn(n.term)) : sorted).slice(0, 24);
+  const mine = gaming ? personal.games : [];
+  // Saved games get what's moved for them: views, breakouts, climbing Steam or Roblox.
+  const savedGames = result ? [] : savedList.filter((n) => gameIn(n.topic));
+  const [followed, climbing] = savedGames.length
+    ? await Promise.all([
+        services.niches.followedGames(savedGames.map((n) => n.topic), view.format),
+        (risingGames.length ? Promise.resolve(risingGames) : services.radar.risingGames({ limit: 60 }).catch(() => [])).then((list) => new Set(list.map((g) => gameIn(g.game.title) ?? g.game.title))),
+      ])
+    : [new Map(), new Set<string>()];
+  const alerts = new Map<string, GameAlert>();
+  for (const n of savedGames) {
+    const alert = gameAlert(followed.get(n.topic), climbing.has(gameIn(n.topic)!));
+    if (alert) alerts.set(n.key, alert);
+  }
   // After a report, keep the exploring going: overlapping niches if we have them, otherwise the best ones we know.
   const topNiches = allTop.filter((idea) => idea.topicKey !== result?.topicKey).slice(0, 9);
   const suggestions = [...new Set([...popular.map((p) => p.topic), ...STARTERS])].slice(0, 10);
@@ -168,10 +189,10 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
       </header>
 
       {error ? <div className="dash-empty">{error}</div> : null}
-      {result ? null : <SavedNiches niches={saved} />}
+      {result ? null : <SavedNiches niches={saved.map((n) => ({ ...n, alert: alerts.get(n.key) ?? null }))} />}
       {result ? <Report result={result} drill={drill} saved={isSaved(savedList, result.topic)} own={own} /> : null}
       {related.length > 0 ? <IdeaBoard ideas={related} title={`Niches next to ${result!.topic}`} sub="Other researched topics that overlap with this one" /> : null}
-      {result ? null : <DiscoverBoard niches={discoverList} gaps={sortGaps(radarNiches, view)} questions={questions} evergreen={evergreen} breakouts={proof.breakouts} rising={proof.rising} formats={proof.formats} games={proof.games} record={record} risingGames={risingGames} requests={requests} launches={launches} view={view} />}
+      {result ? null : <DiscoverBoard niches={discoverList} gaps={sortGaps(radarNiches, view)} questions={questions} evergreen={evergreen} breakouts={mineFirst(proof.breakouts, mine, (b) => b.game)} rising={mineFirst(proof.rising, mine, (c) => c.game)} formats={proof.formats} games={mineFirst(proof.games, mine, (g) => g.game)} mine={mine} record={record} risingGames={risingGames} requests={requests} launches={launches} view={view} />}
       {result && topNiches.length > 0 ? (
         <IdeaBoard ideas={topNiches} title="Other underrated niches" sub="Mined from every channel Outlier tracks: real demand, room left, and small channels winning. Pick one to dig in." />
       ) : null}
@@ -774,6 +795,7 @@ function DiscoverBoard({
   rising,
   formats,
   games,
+  mine,
   record,
   risingGames,
   requests,
@@ -788,6 +810,7 @@ function DiscoverBoard({
   rising: RisingChannel[];
   formats: FormatStat[];
   games: GameStat[];
+  mine: string[];
   record: TrackRecord | null;
   risingGames: RisingGameNiche[];
   requests: NicheIdeaRow[];
@@ -820,6 +843,7 @@ function DiscoverBoard({
           rising={rising}
           formats={formats}
           games={games}
+          mine={mine}
           record={record}
           risingGames={risingGames}
           requests={requests}
@@ -1029,6 +1053,7 @@ function IdeasBoard({
   rising,
   formats,
   games,
+  mine,
   record,
   risingGames,
   requests,
@@ -1042,6 +1067,7 @@ function IdeasBoard({
   rising: RisingChannel[];
   formats: FormatStat[];
   games: GameStat[];
+  mine: string[];
   record: TrackRecord | null;
   risingGames: RisingGameNiche[];
   requests: NicheIdeaRow[];
@@ -1051,7 +1077,7 @@ function IdeasBoard({
   if ([withIdeas, questions, evergreen, breakouts, rising, formats, games, risingGames, requests, launches].every((list) => list.length === 0)) return <RadarEmpty />;
   return (
     <>
-      {games.length > 0 ? <GamesWithRoom games={games} record={record} /> : null}
+      {games.length > 0 ? <GamesWithRoom games={games} mine={mine} record={record} /> : null}
       {risingGames.length > 0 ? <RisingGames games={risingGames} /> : null}
       {breakouts.length > 0 ? (
         <div className="dash-panel ideas-breakouts">
@@ -1272,11 +1298,17 @@ function videoHref(v: { youtubeVideoId: string; format: "short" | "long_form" })
 }
 
 /** Games in the library, ranked on views per upload, how often small channels break out, how crowded, and the trend. */
-function GamesWithRoom({ games, record }: { games: GameStat[]; record: TrackRecord | null }) {
+function GamesWithRoom({ games, mine, record }: { games: GameStat[]; mine: string[]; record: TrackRecord | null }) {
+  const yours = games.filter((g) => mine.includes(g.game)).length;
   return (
     <div className="dash-panel ideas-breakouts">
       <h3>Games with room right now</h3>
       <p className="dash-row-sub">From the last four weeks of uploads Outlier tracks: how many views a typical upload gets, how often channels under 100K break out, and how many channels are already posting.</p>
+      {yours > 0 ? (
+        <p className="dash-row-sub">
+          Games you said you make come first. <Link href="/settings/preferences">Change them</Link>
+        </p>
+      ) : null}
       {record ? <PickRecord record={record} /> : null}
       <ul className="formats-list">
         {games.slice(0, 12).map((g) => (
@@ -1285,6 +1317,7 @@ function GamesWithRoom({ games, record }: { games: GameStat[]; record: TrackReco
               <Link href={`/research/niche-finder?topic=${encodeURIComponent(g.game)}`}>
                 <strong>{g.game}</strong>
               </Link>
+              {mine.includes(g.game) ? <span className="niche-mine">Yours</span> : null}
               <span className="niche-score" data-band={band(g.score)}>
                 {g.score}
               </span>

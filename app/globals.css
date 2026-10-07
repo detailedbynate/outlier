@@ -11760,6 +11760,27 @@ a.dash-row:hover {
   color: #f472b6;
 }
 
+.niche-saved-alert {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.niche-saved-alert[data-dir="up"] {
+  color: #34d399;
+}
+
+.niche-saved-alert[data-dir="down"] {
+  color: #f472b6;
+}
+
+.niche-saved-heating {
+  color: #34d399;
+  font-weight: 600;
+}
+
 .niche-saved-remove {
   position: absolute;
   top: 6px;
@@ -13465,6 +13486,14 @@ body.app-body {
 
 .ideas-breakouts {
   margin-bottom: 14px;
+}
+
+.niche-mine {
+  margin-left: auto;
+  margin-right: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--dash-violet);
 }
 
 .pick-record {

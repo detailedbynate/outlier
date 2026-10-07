@@ -5,6 +5,7 @@ import type { NicheMetrics } from "@/lib/niches/analysis";
 import type { NicheFit } from "@/lib/niches/fit";
 import type { NichePatterns, ScorePartKey, TitleTraitKey, WeekBucket } from "@/lib/niches/insights";
 import type { SavedNiche } from "@/lib/niches/saved";
+import type { GameAlert } from "@/lib/niches/alerts";
 import { toggleSavedNiche } from "./actions";
 
 const shortDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
@@ -307,13 +308,17 @@ export function CompareBox({ topic }: { topic: string }) {
   );
 }
 
-export function SavedNiches({ niches }: { niches: (SavedNiche & { current: number | null })[] }) {
+export function SavedNiches({ niches }: { niches: (SavedNiche & { current: number | null; alert?: GameAlert | null })[] }) {
   if (niches.length === 0) return null;
+  const heating = niches.filter((n) => n.alert?.tone === "up").length;
   return (
     <section className="niche-panel niche-saved" aria-label="Your saved niches">
       <header className="niche-panel-head">
         <h3>Your saved niches</h3>
-        <p>Scores now, and how they&apos;ve moved since you saved them.</p>
+        <p>
+          Scores now, and how they&apos;ve moved since you saved them.
+          {heating > 0 ? <strong className="niche-saved-heating"> {heating === 1 ? "1 is heating up." : `${heating} are heating up.`}</strong> : null}
+        </p>
       </header>
       <ul className="niche-saved-list">
         {niches.map((n) => {
@@ -329,6 +334,11 @@ export function SavedNiches({ niches }: { niches: (SavedNiche & { current: numbe
                 <span className="niche-saved-delta" data-dir={delta > 0 ? "up" : delta < 0 ? "down" : "flat"}>
                   {delta > 0 ? `▲ ${delta}` : delta < 0 ? `▼ ${-delta}` : "No change"}
                 </span>
+                {n.alert ? (
+                  <span className="niche-saved-alert" data-dir={n.alert.tone}>
+                    {n.alert.text}
+                  </span>
+                ) : null}
               </Link>
               <form action={toggleSavedNiche}>
                 <input type="hidden" name="topic" value={n.topic} />

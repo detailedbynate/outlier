@@ -12,6 +12,7 @@ import { buildNicheReport, focusOnTopic, NICHE_REPORT_VERSION, tokenize, topicKe
 import { findBreakouts, findRisingChannels, type Breakout, type IdeaLens, type RisingChannel } from "@/lib/niches/breakouts";
 import { measureFormats, type FormatStat } from "@/lib/niches/formats";
 import { measureGames, type GameStat } from "@/lib/niches/games";
+import { gameIn } from "@/lib/niches/rule-labeler";
 import { choosePicks, judgePick, PICK_SETTLE_DAYS, PICK_WINDOW_DAYS } from "@/lib/niches/picks";
 import type { RadarRepository } from "@/lib/database/repositories/radar";
 import { discoverNiches, type DiscoveredNiche, type DiscoverFormat } from "@/lib/niches/discover";
@@ -190,7 +191,8 @@ export class NicheService {
   /** Mining the library is heavy, so the board is computed once per TTL. */
   private underratedCache: { at: number; ideas: NicheIdea[] } | null = null;
   private readonly discoverCache = new Map<DiscoverFormat, { at: number; niches: DiscoveredNiche[] }>();
-  private readonly ideaCache = new Map<string, IdeaFeeds & { at: number }>();
+  /** `watch` is every game with a few uploads, for saved games outside the top list. */
+  private readonly ideaCache = new Map<string, IdeaFeeds & { at: number; watch: GameStat[] }>();
 
   constructor(
     private readonly deps: {
@@ -302,7 +304,8 @@ export class NicheService {
         { lens },
       );
       const games = lens === "gaming" ? measureGames(videos, channels, { now }) : [];
-      const result = { at: now.getTime(), breakouts, rising, formats, games };
+      const watch = lens === "gaming" ? measureGames(videos, channels, { now, minVideos: 3, minChannels: 2, limit: 2_000 }) : [];
+      const result = { at: now.getTime(), breakouts, rising, formats, games, watch };
       this.ideaCache.set(cacheKey, result);
       return result;
     } catch (error) {
@@ -355,6 +358,18 @@ export class NicheService {
     }
     if (picked || judged) this.log.info("niche picks tracked", { picked, judged });
     return { picked, judged };
+  }
+
+  /** Live numbers for the saved niches that are games, keyed by the saved topic. */
+  async followedGames(topics: readonly string[], format: DiscoverFormat, options: { now?: Date } = {}): Promise<Map<string, GameStat | undefined>> {
+    const named = topics.flatMap((topic) => {
+      const game = gameIn(topic);
+      return game ? [[topic, game] as const] : [];
+    });
+    if (named.length === 0) return new Map();
+    await this.ideaFeeds(format, { now: options.now, lens: "gaming" });
+    const watch = new Map((this.ideaCache.get(`${format}:gaming`)?.watch ?? []).map((g) => [g.game, g]));
+    return new Map(named.map(([topic, game]) => [topic, watch.get(game)]));
   }
 
   /** The judged picks, for the board's track record. */
