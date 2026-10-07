@@ -4,6 +4,9 @@ import type { ChannelRow, ChannelSnapshotRow, ShortsChannelRow, TablesInsert } f
 import type { YouTubeChannel } from "@/types/youtube";
 import { isAboutTopic, type ChannelProfile } from "@/lib/niches/focus";
 
+/** quality_flags entry for a channel YouTube has deleted or terminated. */
+export const REMOVED_FLAG = "removed";
+
 /** Long descriptions are the biggest per-row cost; the first part carries the useful keywords. */
 export const MAX_DESCRIPTION_CHARS = 1000;
 
@@ -276,6 +279,7 @@ export class ChannelRepository {
         .from("channels")
         .select("*")
         .eq("tracked", tracked)
+        .not("quality_flags", "cs", `{${REMOVED_FLAG}}`)
         .or(tracked ? stale(before) : staleUntracked)
         .order("last_synced_at", { ascending: true, nullsFirst: true })
         .limit(limit);
@@ -285,6 +289,7 @@ export class ChannelRepository {
           .from("channels")
           .select("*")
           .eq("tracked", false)
+          .not("quality_flags", "cs", `{${REMOVED_FLAG}}`)
           .gte("last_video_at", active.since.toISOString())
           .or(stale(active.before))
           .order("last_synced_at", { ascending: true, nullsFirst: true })
@@ -479,6 +484,22 @@ export class ChannelRepository {
         .order("created_at", { ascending: false })
         .limit(limit),
       "channels.listForFeaturedCheck",
+    );
+  }
+
+  /**
+   * YouTube says the channel is gone (deleted or terminated). Flag it so the
+   * refresh queue stops handing it out and niche mining leaves it out.
+   */
+  async markRemoved(youtubeChannelId: string, at: Date): Promise<void> {
+    const row = await this.findByYouTubeId(youtubeChannelId);
+    if (!row || row.quality_flags.includes(REMOVED_FLAG)) return;
+    assertOk(
+      await this.db
+        .from("channels")
+        .update({ quality_flags: [...row.quality_flags, REMOVED_FLAG], last_synced_at: at.toISOString() })
+        .eq("youtube_channel_id", youtubeChannelId),
+      "channels.markRemoved",
     );
   }
 

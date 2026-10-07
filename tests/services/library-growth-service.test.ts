@@ -8,6 +8,7 @@ const NOW = new Date("2026-09-16T12:00:00Z");
 
 function setup(options: {
   seeds?: string[];
+  longFormSeeds?: string[];
   counts?: Record<string, number>;
   recent?: string[];
   usedToday?: number;
@@ -36,6 +37,7 @@ function setup(options: {
       usage: { topResources, countSince } as never,
       niches: { channelCountsBySlug: async () => new Map(Object.entries(options.counts ?? {})) } as never,
       seeds: options.seeds ?? ["clash royale", "geometry dash", "sourdough", "pottery"],
+      longFormSeeds: options.longFormSeeds,
       youtube: { getFeaturedChannels } as never,
       channels: {
         listForFeaturedCheck,
@@ -56,7 +58,7 @@ describe("LibraryGrowthService", () => {
       counts: { "clash-royale": 40, "geometry-dash": 2, sourdough: 0 },
       recent: ["Pottery"],
     });
-    expect(await service.plan(NOW)).toEqual(["sourdough", "geometry dash", "clash royale"]);
+    expect((await service.plan(NOW)).map((s) => s.seed)).toEqual(["sourdough", "geometry dash", "clash royale"]);
     expect(topResources).toHaveBeenCalledWith(LIBRARY_GROWTH_EVENT, new Date("2026-09-02T12:00:00Z"), 1_000);
   });
 
@@ -65,8 +67,25 @@ describe("LibraryGrowthService", () => {
     const result = await service.growOnce({ now: NOW });
 
     expect(discoverShortsChannels).toHaveBeenCalledTimes(3);
-    expect(discoverShortsChannels).toHaveBeenNthCalledWith(1, "sourdough", null, NOW, { source: "growth" });
+    expect(discoverShortsChannels).toHaveBeenNthCalledWith(1, "sourdough", null, NOW, { source: "growth", duration: "short" });
     expect(result).toEqual({ searched: ["sourdough", "pottery", "geometry dash"], channelsNew: 24, channelsQueued: 24, featuredChecked: 0, featuredQueued: 0 });
+  });
+
+  it("takes turns between Shorts and long-form searches, reseeding each on its own", async () => {
+    const { service, discoverShortsChannels } = setup({
+      seeds: ["sourdough", "pottery"],
+      longFormSeeds: ["sourdough", "pottery"],
+      counts: { sourdough: 0, pottery: 1 },
+      recent: ["sourdough [long]"],
+    });
+    expect(await service.plan(NOW)).toEqual([
+      { seed: "sourdough", duration: "short" },
+      { seed: "pottery", duration: "long" },
+      { seed: "pottery", duration: "short" },
+    ]);
+    const result = await service.growOnce({ now: NOW });
+    expect(discoverShortsChannels).toHaveBeenNthCalledWith(2, "pottery", null, NOW, { source: "growth", duration: "long" });
+    expect(result.searched).toEqual(["sourdough", "pottery [long]", "pottery"]);
   });
 
   it("respects the daily cap across runs", async () => {

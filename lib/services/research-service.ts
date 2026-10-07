@@ -70,6 +70,9 @@ function startOfUtcDay(now: Date): Date {
 }
 
 /** Research tools: find channels by niche and browse the catalog with filters. */
+/** How a long-form growth search is recorded, so it's reseeded separately from the Shorts search for the same seed. */
+export const longSeedKey = (seed: string) => `${seed} [long]`;
+
 export class ResearchService {
   private readonly log: Logger;
 
@@ -171,7 +174,8 @@ export class ResearchService {
     keyword: string,
     userId: string | null,
     now: Date = new Date(),
-    options: { source?: "user" | "growth" } = {},
+    /** "long" searches 4-20 minute videos instead of Shorts, so the library covers long-form niches too. */
+    options: { source?: "user" | "growth"; duration?: "short" | "long" } = {},
   ): Promise<DiscoveryResult> {
     const q = keyword.trim();
     if (q.length < 2 || q.length > 100) throw new ValidationError("Enter a keyword between 2 and 100 characters.");
@@ -205,7 +209,7 @@ export class ResearchService {
     // hand back the same channels everyone has already seen.
     for (let pass = 0; pass < MAX_SEARCH_PASSES; pass++) {
       const plan = this.searchPass(pass, pageToken, now);
-      const results = await this.deps.youtube.searchVideos({ ...plan, q, videoDuration: "short", relevanceLanguage: quality.language, regionCode: this.config.regionCode, maxResults: 50 });
+      const results = await this.deps.youtube.searchVideos({ ...plan, q, videoDuration: options.duration === "long" ? "medium" : "short", relevanceLanguage: quality.language, regionCode: this.config.regionCode, maxResults: 50 });
       passes += 1;
       pageToken = results.nextPageToken ?? undefined;
 
@@ -245,8 +249,8 @@ export class ResearchService {
       user_id: userId,
       quantity: 1,
       resource_type: "keyword",
-      resource_id: q.slice(0, 100),
-      metadata: { found: ranked.length, new: newIds.length, offTopic, passes, channelIds: seenOrder.slice(0, 50) },
+      resource_id: (options.duration === "long" ? longSeedKey(q) : q).slice(0, 100),
+      metadata: { found: ranked.length, new: newIds.length, offTopic, passes, duration: options.duration ?? "short", channelIds: seenOrder.slice(0, 50) },
     });
 
     // New channels first, then anything we have but haven't refreshed in a week.

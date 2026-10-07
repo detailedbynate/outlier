@@ -6,7 +6,7 @@ import type { NicheRepository } from "@/lib/database/repositories/niches";
 import type { UsageRepository } from "@/lib/database/repositories/usage";
 import { nicheSlug } from "@/lib/niches/labeling";
 import { isQuotaUnavailable } from "@/lib/youtube/quota-manager";
-import { LIBRARY_GROWTH_EVENT, type ResearchService } from "./research-service";
+import { LIBRARY_GROWTH_EVENT, longSeedKey, type ResearchService } from "./research-service";
 
 export interface LibraryGrowthConfig {
   /** Discovery searches per run (each is 100-300 quota units plus channel syncs). */
@@ -36,6 +36,11 @@ export interface GrowthRunResult {
 
 const DAY = 86_400_000;
 
+export interface GrowthSearch {
+  seed: string;
+  duration: "short" | "long";
+}
+
 /**
  * Grows the channel library on a schedule by running Shorts discovery for seed
  * niches the library is thinnest on. Runs in the background quota lane, so it
@@ -50,6 +55,10 @@ export class LibraryGrowthService {
       usage: Pick<UsageRepository, "countSince" | "topResources">;
       niches: Pick<NicheRepository, "channelCountsBySlug">;
       seeds: readonly string[];
+      /** Seeds also searched for long-form videos. Without it, growth is Shorts only. */
+      longFormSeeds?: readonly string[];
+      /** Seeds found at run time (the radar's best phrases), searched in both formats. */
+      extraSeeds?: () => Promise<string[]>;
       youtube: Pick<YouTubeService, "getFeaturedChannels">;
       channels: Pick<ChannelRepository, "listForFeaturedCheck" | "markFeaturedChecked" | "existingIds">;
       enqueue: (type: string, payload: unknown, options?: EnqueueOptions) => Promise<unknown>;
@@ -100,17 +109,32 @@ export class LibraryGrowthService {
     return quotaOut;
   }
 
-  /** Seeds in the order they should be grown: fewest labeled channels first, never-searched before recently searched. */
-  async plan(now: Date): Promise<string[]> {
+  /**
+   * Searches in the order they should run: fewest labeled channels first,
+   * never-searched before recently searched, Shorts and long-form taking turns.
+   */
+  async plan(now: Date): Promise<GrowthSearch[]> {
     const recent = new Set(
       (await this.deps.usage.topResources(LIBRARY_GROWTH_EVENT, new Date(now.getTime() - this.config.reseedDays * DAY), 1_000)).map((k) => k.toLowerCase()),
     );
-    const due = this.deps.seeds.filter((seed) => !recent.has(seed.toLowerCase()));
-    const counts = await this.deps.niches.channelCountsBySlug(due.map(nicheSlug));
-    return due
-      .map((seed, index) => ({ seed, index, channels: counts.get(nicheSlug(seed)) ?? 0 }))
-      .sort((a, b) => a.channels - b.channels || a.index - b.index)
-      .map((entry) => entry.seed);
+    const order = async (seeds: readonly string[], duration: GrowthSearch["duration"]) => {
+      const due = seeds.filter((seed) => !recent.has((duration === "long" ? longSeedKey(seed) : seed).toLowerCase()));
+      const counts = await this.deps.niches.channelCountsBySlug(due.map(nicheSlug));
+      return due
+        .map((seed, index) => ({ seed, index, channels: counts.get(nicheSlug(seed)) ?? 0 }))
+        .sort((a, b) => a.channels - b.channels || a.index - b.index)
+        .map((entry) => ({ seed: entry.seed, duration }));
+    };
+    const extra = (await this.deps.extraSeeds?.().catch(() => [])) ?? [];
+    const shorts = await order([...new Set([...this.deps.seeds, ...extra])], "short");
+    const longSeeds = [...new Set([...(this.deps.longFormSeeds ?? []), ...extra])];
+    const long = longSeeds.length ? await order(longSeeds, "long") : [];
+    const queue: GrowthSearch[] = [];
+    for (let i = 0; i < Math.max(shorts.length, long.length); i++) {
+      if (shorts[i]) queue.push(shorts[i]!);
+      if (long[i]) queue.push(long[i]!);
+    }
+    return queue;
   }
 
   async growOnce(options: { now?: Date; signal?: AbortSignal } = {}): Promise<GrowthRunResult> {
@@ -128,11 +152,11 @@ export class LibraryGrowthService {
     const queue = await this.plan(now);
     if (queue.length === 0) return { ...result, stoppedBy: "no_seeds" };
 
-    for (const seed of queue.slice(0, allowed)) {
+    for (const { seed, duration } of queue.slice(0, allowed)) {
       if (options.signal?.aborted) break;
       try {
-        const found = await this.deps.research.discoverShortsChannels(seed, null, now, { source: "growth" });
-        result.searched.push(seed);
+        const found = await this.deps.research.discoverShortsChannels(seed, null, now, { source: "growth", duration });
+        result.searched.push(duration === "long" ? longSeedKey(seed) : seed);
         result.channelsNew += found.channelsNew;
         result.channelsQueued += found.channelsQueued;
       } catch (error) {

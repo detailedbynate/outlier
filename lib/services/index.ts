@@ -6,6 +6,10 @@ import { emailEnabled, sendEmail } from "@/lib/email/send";
 import { SupabaseAccountProvisioner, SupabaseAuthModeration, SupabaseInviteSender } from "@/lib/auth/invites";
 import { ModerationRepository } from "@/lib/database/repositories/moderation";
 import { NicheRepository } from "@/lib/database/repositories/niches";
+import { RadarRepository } from "@/lib/database/repositories/radar";
+import { DataForSeoClient } from "@/lib/radar/demand";
+import { RedditClient } from "@/lib/radar/reddit";
+import { NicheRadarService } from "./niche-radar-service";
 import { ReferralRepository } from "@/lib/database/repositories/referrals";
 import { SubscriptionRepository } from "@/lib/database/repositories/subscriptions";
 import { SignupInviteRepository } from "@/lib/auth/signup-invites";
@@ -37,7 +41,7 @@ import { TranscriptRepository } from "@/lib/database/repositories/transcripts";
 import { ScriptService } from "./script-service";
 import { TranscriptService } from "./transcript-service";
 import { getAIProviders } from "@/lib/ai/registry";
-import { LIBRARY_SEEDS } from "@/lib/niches/seeds";
+import { HIGH_RPM_SEEDS, LIBRARY_SEEDS, TOPIC_SEEDS } from "@/lib/niches/seeds";
 import { LibraryGrowthService } from "./library-growth-service";
 import { NicheLabelingService } from "./niche-labeling-service";
 import { qualityConfigFrom } from "@/lib/research/quality";
@@ -80,6 +84,7 @@ export interface Services {
   scripts: ScriptService;
   /** Transcript backfill. Driven by the scraper process, which owns the scrape budget. */
   transcripts: TranscriptService;
+  radar: NicheRadarService;
   referrals: ReferralService;
   competitors: CompetitorService;
   moderation: ModerationService;
@@ -111,6 +116,7 @@ export interface Services {
     accounts: AccountRepository;
     moderation: ModerationRepository;
     niches: NicheRepository;
+    radar: RadarRepository;
     referrals: ReferralRepository;
     creditLedger: CreditLedgerRepository;
     subscriptions: SubscriptionRepository;
@@ -189,6 +195,7 @@ export function getServices(): Services {
     savedScripts: lazy(() => new SavedScriptRepository(lazyDb())),
     styleSamples: lazy(() => new StyleSampleRepository(lazyDb())),
     niches: lazy(() => new NicheRepository(lazyDb())),
+    radar: lazy(() => new RadarRepository(lazyDb())),
     competitors: lazy(() => new CompetitorRepository(lazyDb())),
     youtubeCache: lazy(() => new YouTubeCacheRepository(lazyDb())),
   };
@@ -255,8 +262,29 @@ export function getServices(): Services {
     { text, channels: repositories.channels, niches: repositories.niches },
     { batchSize: config.NICHE_LABEL_BATCH_SIZE },
   );
+  // The radar's scraping half (autocomplete, search) is wired up by the scraper, which owns the gate's pace;
+  // here it serves the Niche Finder and hands its best phrases to library growth.
+  const radar = new NicheRadarService({
+    radar: repositories.radar,
+    seeds: [...new Set([...HIGH_RPM_SEEDS, ...TOPIC_SEEDS, ...LIBRARY_SEEDS])],
+    ai: text,
+    demand: config.DATAFORSEO_LOGIN && config.DATAFORSEO_PASSWORD ? new DataForSeoClient({ login: config.DATAFORSEO_LOGIN, password: config.DATAFORSEO_PASSWORD }) : null,
+    reddit: config.REDDIT_CLIENT_ID && config.REDDIT_CLIENT_SECRET ? new RedditClient({ clientId: config.REDDIT_CLIENT_ID, clientSecret: config.REDDIT_CLIENT_SECRET }) : null,
+    youtube,
+  });
   const libraryGrowth = new LibraryGrowthService(
-    { research, usage: repositories.usage, niches: repositories.niches, seeds: LIBRARY_SEEDS, youtube, channels: repositories.channels, enqueue },
+    {
+      research,
+      usage: repositories.usage,
+      niches: repositories.niches,
+      seeds: LIBRARY_SEEDS,
+      longFormSeeds: [...new Set([...HIGH_RPM_SEEDS, ...TOPIC_SEEDS])],
+      // Gaps the radar found get channels pulled in for them, in both formats.
+      extraSeeds: () => radar.growthSeeds(40),
+      youtube,
+      channels: repositories.channels,
+      enqueue,
+    },
     {
       searchesPerRun: config.LIBRARY_GROWTH_SEARCHES_PER_RUN,
       dailySearches: config.LIBRARY_GROWTH_DAILY_SEARCHES,
@@ -311,7 +339,7 @@ export function getServices(): Services {
     { type: MONITOR_VIDEOS_JOB_TYPE, everyHours: 1 },
     { type: MONITOR_CHANNELS_JOB_TYPE, everyHours: 1 },
     { type: NICHE_LABEL_JOB_TYPE, everyHours: 1 },
-    ...(config.LIBRARY_GROWTH_SEARCHES_PER_RUN > 0 || config.LIBRARY_FEATURED_CHECKS_PER_RUN > 0 ? [{ type: LIBRARY_GROWTH_JOB_TYPE, everyHours: 6 }] : []),
+    ...(config.LIBRARY_GROWTH_SEARCHES_PER_RUN > 0 || config.LIBRARY_FEATURED_CHECKS_PER_RUN > 0 ? [{ type: LIBRARY_GROWTH_JOB_TYPE, everyHours: 2 }] : []),
   ]);
 
   const subscriptions = new SubscriptionService(repositories.subscriptions);
@@ -358,6 +386,7 @@ export function getServices(): Services {
       { dailyYoutubeRefreshes: config.NICHE_DAILY_YOUTUBE_REFRESHES, language: quality.language, regionCode },
     ),
     transcripts,
+    radar,
     // Its own provider: scripts are worth a paid model where labeling isn't.
     scripts: new ScriptService({ ai: scriptProvider(config), premiumAi: scriptProvider(config, { premium: true }), basicAi: scriptProvider(config, { claude: false }), saved: repositories.savedScripts, styles: repositories.styleSamples }),
     dashboard: new DashboardService({

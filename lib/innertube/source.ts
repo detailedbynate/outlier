@@ -31,6 +31,13 @@ export interface ChannelUploads {
 }
 
 /** "1,003 videos" / "140,334,066,914 views" → number. Rounded forms ("517M") → approximate number. */
+/**
+ * YouTube's own answers for a channel that's gone. "Removed for violating our
+ * Community Guidelines" and "terminated" used to fall through as failed reads:
+ * a few in a row tripped the breaker and froze the rate ladder at its floor.
+ */
+export const CHANNEL_GONE = /does ?n[o']t exist|not found|unavailable|404|removed|terminated|violat|suspended|no longer available|account (?:has been |was )?(?:closed|deleted)/i;
+
 export function parseCountText(text: string | undefined | null): number | null {
   if (!text) return null;
   const match = /([\d.,]+)\s*([KMB])?/i.exec(text.replace(/ /g, " "));
@@ -89,7 +96,7 @@ export class InnerTubeSource {
     return this.gate.run({ label: `channel:${channelId}`, cacheKey: `channel:${channelId}`, ...this.laneOptions() }, async () => {
       const yt = await this.yt();
       const channel = await yt.getChannel(channelId).catch((error: unknown) => {
-        if (error instanceof Error && /does ?n[o']t exist|not found|unavailable|404/i.test(error.message)) throw new NotFoundError("YouTube channel", channelId);
+        if (error instanceof Error && CHANNEL_GONE.test(error.message)) throw new NotFoundError("YouTube channel", channelId);
         throw error;
       });
       // A page without the channel's own id is a consent wall or a blocked response, not a real channel.

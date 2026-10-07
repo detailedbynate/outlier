@@ -9,6 +9,7 @@ import { videoToRow, type VideoRepository } from "@/lib/database/repositories/vi
 import type { EnqueueOptions } from "@/lib/jobs/queue";
 import { refineSubNiches } from "@/lib/niches/refine";
 import { buildNicheReport, focusOnTopic, NICHE_REPORT_VERSION, tokenize, topicKey, type Level, type NicheReport } from "@/lib/niches/analysis";
+import { discoverNiches, type DiscoveredNiche, type DiscoverFormat } from "@/lib/niches/discover";
 import { canonicalNiche } from "@/lib/niches/naming";
 import { findUnderratedNiches, underratedWindow, type NicheCreator, type NicheExample } from "@/lib/niches/underrated";
 import { isQuotaUnavailable } from "@/lib/youtube/quota-manager";
@@ -167,6 +168,7 @@ export class NicheService {
   private readonly inflight = new Map<string, Promise<NicheResult>>();
   /** Mining the library is heavy, so the board is computed once per TTL. */
   private underratedCache: { at: number; ideas: NicheIdea[] } | null = null;
+  private readonly discoverCache = new Map<DiscoverFormat, { at: number; niches: DiscoveredNiche[] }>();
 
   constructor(
     private readonly deps: {
@@ -225,6 +227,27 @@ export class NicheService {
       return ideas.slice(0, limit);
     } catch (error) {
       this.log.warn("underrated niche mining failed", { error });
+      return [];
+    }
+  }
+
+  /**
+   * Niches ranked by RPM, views, how untapped they are and how easy they are to
+   * make, for one format. Database only and cached per format, like topNiches.
+   */
+  async discover(format: DiscoverFormat, options: { now?: Date } = {}): Promise<DiscoveredNiche[]> {
+    const now = options.now ?? new Date();
+    const cached = this.discoverCache.get(format);
+    if (cached && now.getTime() - cached.at < this.config.reportTtlMs) return cached.niches;
+    try {
+      // Each format gets its own sample: the library is mostly Shorts, so a mixed one leaves long-form with almost nothing.
+      const { videos, channels } = await this.deps.niches.recentSample(underratedWindow(now, this.config.sampleDays), 15_000, format === "shorts" ? "short" : "long_form");
+      const niches = discoverNiches(videos, channels, format, { now });
+      this.discoverCache.set(format, { at: now.getTime(), niches });
+      this.log.info("niches discovered", { format, sample: videos.length, found: niches.length });
+      return niches;
+    } catch (error) {
+      this.log.warn("niche discovery failed", { format, error });
       return [];
     }
   }

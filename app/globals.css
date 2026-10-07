@@ -13356,3 +13356,159 @@ body.app-body {
     border-radius: 12px;
   }
 }
+
+/* Niche Finder: Discover board */
+.discover-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.discover-scores {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 0;
+}
+
+.discover-scores dt {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.discover-scores dd {
+  margin: 2px 0 0;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.discover-bars {
+  display: grid;
+  gap: 5px;
+}
+
+.discover-bar {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.discover-bar i {
+  height: 5px;
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--dash-violet) var(--w), var(--surface-2) var(--w));
+}
+
+.discover-tabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+
+.discover-tabs a {
+  padding: 7px 14px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.discover-tabs a:hover {
+  color: var(--text-primary);
+}
+
+.discover-tabs a[aria-current="page"] {
+  color: var(--text-primary);
+  background: var(--dash-violet);
+}
+
+.discover-card h3 a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.discover-card h3 a:hover {
+  text-decoration: underline;
+}
+
+.gap-proof {
+  display: block;
+  margin-top: auto;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gap-proof span {
+  margin-right: 4px;
+  font-weight: 700;
+  color: var(--dash-violet);
+}
+
+.gap-proof:hover {
+  color: var(--text-primary);
+}
+
+.ideas-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));
+  gap: 14px;
+}
+
+.ideas-list h3 {
+  margin: 0 0 10px;
+  font-size: 15px;
+}
+
+.ideas-list > ul {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ideas-list > ul > li {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ideas-list > ul > li > a {
+  color: var(--text-primary);
+  font-weight: 600;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.ideas-list > ul > li > a:hover {
+  text-decoration: underline;
+}
+
+.ideas-niche {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ideas-list ol {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}

@@ -56,4 +56,16 @@ export const TOPIC_SEEDS = [
   "dating advice", "parenting", "motivation", "stoicism", "self improvement", "public speaking", "mental health",
 ] as const;
 
-export const LIBRARY_SEEDS: readonly string[] = [...GAME_SEEDS, ...TOPIC_SEEDS];
+/**
+ * Niches where a view pays the most (finance, business, software, explainers).
+ * They go first so Discover has high-RPM niches to rank, not just games.
+ */
+export const HIGH_RPM_SEEDS = [
+  "personal finance tips", "budgeting", "credit score", "credit card rewards", "stock market news", "dividend investing", "index funds",
+  "retirement planning", "taxes explained", "insurance explained", "mortgage tips", "crypto news", "real estate tips", "house flipping",
+  "make money online", "business ideas", "entrepreneur", "ecommerce", "marketing tips", "sales tips", "saas", "startup",
+  "ai news", "chatgpt tips", "ai side hustle", "software tutorial", "excel tips", "productivity apps", "tech news", "cybersecurity tips",
+  "legal advice", "lawyer explains", "economics explained", "history explained", "psychology explained", "luxury watches", "car buying tips",
+] as const;
+
+export const LIBRARY_SEEDS: readonly string[] = [...new Set([...HIGH_RPM_SEEDS, ...GAME_SEEDS, ...TOPIC_SEEDS])];

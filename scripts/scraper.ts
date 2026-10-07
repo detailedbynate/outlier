@@ -81,7 +81,8 @@ async function main(): Promise<void> {
   const { getAdminDatabase } = await import("@/lib/database/client");
   const { getServices, ChannelService } = await import("@/lib/services");
   const { runWithQuotaContext } = await import("@/lib/youtube");
-  const { createHybridSource, getGate, InnerTubeBlockedError } = await import("@/lib/innertube");
+  const { createHybridSource, getGate, InnerTubeBlockedError, InnerTubeSearch } = await import("@/lib/innertube");
+  const { fetchSuggestions } = await import("@/lib/radar/suggest");
   const { clampState, decide, DEFAULT_THAW_HOURS, FileRampStore, initialState, parseSteps } = await import("@/lib/innertube/ramp");
 
   const config = env();
@@ -123,6 +124,48 @@ async function main(): Promise<void> {
 
   const skipUntil = new Map<string, number>();
 
+  // Niche Radar: autocomplete and search go through this process's gate, so they
+  // share the ladder's pace and breaker with channel refreshes.
+  const lang = config.OUTLIER_LANGUAGE.toLowerCase();
+  const region = config.OUTLIER_REGION.toUpperCase();
+  const scrapedSearch = new InnerTubeSearch(gate, { lang, location: region });
+  const radar = services.radar.withScraping({
+    suggest: (q) => gate.run({ label: `suggest:${q.slice(0, 40)}`, cacheKey: `suggest:${lang}:${region}:${q}`, lane: "background" }, () => fetchSuggestions(q, { lang, region })),
+    search: (q) => scrapedSearch.search({ q, type: "video", order: "relevance", maxResults: 20 }, { lane: "background" }),
+  });
+  let radarSeeded = false;
+
+  /**
+   * A little radar work each round: grow phrases through autocomplete, read what
+   * ranks for a few, then the API-free extras (search volume, AI ease, Reddit).
+   * Skipped while the gate is paused; a block stops it for the round.
+   */
+  const runRadar = async (): Promise<void> => {
+    if (controller.signal.aborted || gate.state().open) return;
+    const signal = controller.signal;
+    try {
+      await runWithQuotaContext({ lane: "background", operation: "scraper:radar" }, async () => {
+        if (!radarSeeded) {
+          const added = await radar.seed();
+          radarSeeded = true;
+          if (added > 0) logger.info("radar seeded", { added });
+        }
+        const grown = await radar.expandOnce({ maxQueries: config.RADAR_SUGGESTS_PER_ROUND, signal });
+        const supply = await radar.checkSupplyOnce({ limit: config.RADAR_SUPPLY_PER_ROUND, signal });
+        const extras = await Promise.allSettled([
+          radar.enrichDemandOnce({ signal }),
+          radar.rateEaseOnce({ limit: config.RADAR_EASE_PER_ROUND }),
+          radar.collectRedditOnce({ signal }),
+        ]);
+        const [demand, ease, reddit] = extras.map((r) => (r.status === "fulfilled" ? r.value : { error: String(r.reason).slice(0, 200) }));
+        logger.info("scraper radar", { grown, supply, demand, ease, reddit });
+      });
+    } catch (error) {
+      // The radar is a bonus on top of refreshes; a failure here never costs the round.
+      logger.warn("scraper radar pass failed", { error: error instanceof Error ? error.message : String(error) });
+    }
+  };
+
   /**
    * Read what a few of the library's best Shorts say, so the script writer works
    * from real openings instead of titles. Costs scrape slots, not API quota.
@@ -162,6 +205,7 @@ async function main(): Promise<void> {
     for (const [id, until] of skipUntil) if (until < now) skipUntil.delete(id);
     if (due.length === 0) {
       await readTranscripts();
+      await runRadar();
       await sleep(IDLE_WAIT, controller.signal);
       continue;
     }
@@ -181,12 +225,17 @@ async function main(): Promise<void> {
           logger.warn("scraper round cut short", { channelId: channel.youtube_channel_id, error: error.message });
           break;
         }
-        if (isAppError(error) && error.code === "NOT_FOUND") continue;
+        if (isAppError(error) && error.code === "NOT_FOUND") {
+          // Gone for good: don't hand it out again after the next restart.
+          await channelsRepo.markRemoved(channel.youtube_channel_id, new Date()).catch(() => {});
+          continue;
+        }
         logger.warn("scraper refresh failed", { channelId: channel.youtube_channel_id, error });
       }
     }
 
     await readTranscripts();
+    await runRadar();
 
     const state = gate.state();
     const stats = gate.takeStats();

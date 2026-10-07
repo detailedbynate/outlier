@@ -7,7 +7,7 @@ import type { NicheReportRow, NicheRow, TablesInsert } from "@/types/database";
 const escapePattern = (value: string) => value.replace(/[\\%_*,()"]/g, " ").trim();
 
 /** Channels with these flags don't feed niche analysis: their numbers come from other people's work. */
-const EXCLUDED_FLAGS = new Set(["reupload", "compilation", "spam_or_misleading"]);
+const EXCLUDED_FLAGS = new Set(["reupload", "compilation", "spam_or_misleading", "removed"]);
 
 export class NicheRepository {
   constructor(private readonly db: DatabaseClient) {}
@@ -115,16 +115,13 @@ export class NicheRepository {
     );
   }
 
-  private async pageOfVideos(since: Date, from: number, to: number) {
-    return unwrap(
-      await this.db
-        .from("videos")
-        .select("id, youtube_video_id, channel_id, title, tags, format, view_count, like_count, comment_count, published_at, duration_seconds")
-        .gte("published_at", since.toISOString())
-        .order("published_at", { ascending: false })
-        .range(from, to),
-      "niches.recentSample",
-    );
+  private async pageOfVideos(since: Date, from: number, to: number, format?: "short" | "long_form") {
+    let query = this.db
+      .from("videos")
+      .select("id, youtube_video_id, channel_id, title, tags, format, view_count, like_count, comment_count, published_at, duration_seconds")
+      .gte("published_at", since.toISOString());
+    if (format) query = query.eq("format", format);
+    return unwrap(await query.order("published_at", { ascending: false }).range(from, to), "niches.recentSample");
   }
 
   /**
@@ -185,12 +182,12 @@ export class NicheRepository {
     return channels;
   }
 
-  /** A slice of the whole library to mine for niches, newest uploads first. */
-  async recentSample(since: Date, limit = 2_000): Promise<{ videos: NicheVideo[]; channels: Map<string, NicheChannel> }> {
+  /** A slice of the whole library to mine for niches, newest uploads first, optionally one format only. */
+  async recentSample(since: Date, limit = 2_000, format?: "short" | "long_form"): Promise<{ videos: NicheVideo[]; channels: Map<string, NicheChannel> }> {
     // PostgREST caps a response at 1000 rows, so page until we have the sample.
     const rows: Awaited<ReturnType<typeof this.pageOfVideos>> = [];
     for (let from = 0; from < limit; from += 1_000) {
-      const page = await this.pageOfVideos(since, from, Math.min(from + 999, limit - 1));
+      const page = await this.pageOfVideos(since, from, Math.min(from + 999, limit - 1), format);
       rows.push(...page);
       if (page.length < 1_000) break;
     }

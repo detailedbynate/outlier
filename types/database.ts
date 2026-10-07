@@ -245,6 +245,39 @@ export type StyleSampleRow = {
   created_at: string;
 };
 
+export type NicheKeywordRow = {
+  keyword: string;
+  seed: string;
+  source: string;
+  depth: number;
+  suggest_rank: number | null;
+  category: string | null;
+  discovered_at: string;
+  expanded_at: string | null;
+  supply_checked_at: string | null;
+  supply: Json | null;
+  demand_checked_at: string | null;
+  demand: Json | null;
+  ease_checked_at: string | null;
+  ease: Json | null;
+  score: number | null;
+  updated_at: string;
+};
+
+export type NicheIdeaRow = {
+  id: string;
+  source: string;
+  community: string | null;
+  title: string;
+  url: string;
+  score: number;
+  comments: number;
+  posted_at: string | null;
+  kind: string;
+  category: string | null;
+  collected_at: string;
+};
+
 export type SavedScriptRow = {
   id: string;
   user_id: string;
@@ -590,6 +623,8 @@ export type Database = {
       video_transcripts: TableDef<VideoTranscriptRow, "video_id" | "language" | "segments" | "full_text">;
       saved_scripts: TableDef<SavedScriptRow, "user_id" | "topic" | "idea" | "seconds" | "tone" | "script">;
       style_samples: TableDef<StyleSampleRow, "user_id" | "body">;
+      niche_keywords: TableDef<NicheKeywordRow, "keyword" | "seed">;
+      niche_ideas: TableDef<NicheIdeaRow, "source" | "title" | "url">;
       usage_events: TableDef<UsageEventRow, "event_type">;
       credits: TableDef<CreditRow, "workspace_id" | "delta" | "source">;
       waitlist_entries: TableDef<WaitlistEntryRow, "email">;

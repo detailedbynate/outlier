@@ -34,13 +34,16 @@ Environment=INNERTUBE_MAX_CONCURRENT=1
 # YouTube saw from one IP, and left the rate ladder tuning a third of it.
 Environment=INNERTUBE_SHARED_STATE_PATH=/var/lib/outlier-innertube/gate.json
 Environment=SCRAPER_BATCH=20
-# Rate ladder: starts at 4/min, a clean stretch earns the next step, a bot check
+# Rate ladder: starts at 6/min, a clean stretch earns the next step, a bot check
 # settles it one rung below whatever YouTube refused. Set to a single value to pin it.
 #
 # Six hours a rung, not a day: seven rungs at a day each meant a week of running
 # at a fraction of the usable rate before the top was even tried, and a restart
 # or a bad read cost days. A wrong guess is cheap now that a freeze thaws.
-Environment=INNERTUBE_RAMP_STEPS=4,6,9,12,16,20,25
+# Until Oct 2026 it never left the bottom rung: deleted channels counted as
+# failures and tripped the breaker every few hours, which read as a block. With
+# those skipped the top two rungs are new ground; a real block still steps down.
+Environment=INNERTUBE_RAMP_STEPS=6,9,12,16,20,25,30,36
 Environment=INNERTUBE_RAMP_CLEAN_HOURS=6
 Environment=INNERTUBE_RAMP_THAW_HOURS=72
 # /var/lib/outlier-scraper: remembers the ladder position across restarts and deploys.

@@ -80,6 +80,12 @@ export function categoryFor(...names: string[]): NicheCategory | null {
   return null;
 }
 
+/** A category's RPM range for one format. */
+export function rpmFor(category: NicheCategory | null, format: "shorts" | "long_form"): Range {
+  const band = category ? (RPM_BY_CATEGORY[category] ?? DEFAULT_BAND) : DEFAULT_BAND;
+  return format === "shorts" ? band.shorts : band.long;
+}
+
 export interface NicheEarnings {
   category: NicheCategory | null;
   rpm: RpmBand;

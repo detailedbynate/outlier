@@ -10,7 +10,7 @@ import { PAID_FEATURES } from "@/lib/billing/features";
 import { isAppError } from "@/lib/core/errors";
 import { formatCompact, formatPercent, timeAgo } from "@/lib/format";
 import { topicKey, type Level, type NicheMetrics, type SubNiche, type ViralChannel } from "@/lib/niches/analysis";
-import { estimateEarnings, formatMoneyRange, type NicheEarnings } from "@/lib/niches/revenue";
+import { estimateEarnings, formatMoney, formatMoneyRange, type NicheEarnings } from "@/lib/niches/revenue";
 import { getServices } from "@/lib/services";
 import { parseNicheQuery } from "@/lib/niches/query";
 import type { NicheCreator, NicheExample } from "@/lib/niches/examples";
@@ -20,17 +20,41 @@ import { nicheFit, type OwnChannelMonth } from "@/lib/niches/fit";
 import { isSaved, readSavedNiches } from "@/lib/niches/saved";
 import { CompareBox, FitPanel, Patterns, SaveNicheButton, SavedNiches, ScoreBreakdown, TrendChart } from "./insights";
 import { TopicInput } from "./topic-input";
+import { rpmTierOf, sortDiscovered, type DiscoveredNiche, type DiscoverFormat, type DiscoverSort } from "@/lib/niches/discover";
+import type { RadarNiche } from "@/lib/services/niche-radar-service";
+import type { NicheIdeaRow } from "@/types/database";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 export const metadata: Metadata = { title: "Niche Finder · Outlier" };
 
 const STARTERS = ["gaming", "fitness", "cooking", "personal finance", "tech", "beauty"];
-const EXAMPLES = ["good niches around fitness", "underrated niches right now", "what should I post about gaming"];
 const LEVEL_LABEL: Record<Level, string> = { low: "Low", medium: "Medium", high: "High" };
 const FORMAT_LABEL = { shorts: "Shorts", long_form: "Long-form", both: "Both work", unknown: "Not enough data" } as const;
 
-type SearchParams = Promise<{ topic?: string; sub?: string }>;
+type SearchParams = Promise<{ topic?: string; sub?: string; format?: string; rpm?: string; sort?: string; board?: string }>;
+
+const SORTS: { value: DiscoverSort; label: string }[] = [
+  { value: "best", label: "Best overall" },
+  { value: "rpm", label: "Highest RPM" },
+  { value: "views", label: "Most views" },
+  { value: "untapped", label: "Most untapped" },
+  { value: "easy", label: "Easiest to make" },
+];
+const RPM_FILTERS = [
+  { value: "all", label: "Any RPM" },
+  { value: "high", label: "High RPM" },
+  { value: "mid", label: "Mid RPM" },
+  { value: "low", label: "Low RPM" },
+] as const;
+type RpmFilter = (typeof RPM_FILTERS)[number]["value"];
+const BOARDS = [
+  { value: "library", label: "Tracked channels" },
+  { value: "gaps", label: "Search gaps" },
+  { value: "ideas", label: "Video ideas" },
+] as const;
+type Board = (typeof BOARDS)[number]["value"];
+type View = { format: DiscoverFormat; rpm: RpmFilter; sort: DiscoverSort; board: Board };
 
 export default async function NicheFinderPage({ searchParams }: { searchParams: SearchParams }) {
   const current = await requireApprovedUser();
@@ -47,6 +71,13 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
   // "good niches around fitness" and "fitness" both work; "top niches" browses.
   const { intent, topic } = parseNicheQuery(asked);
   const services = getServices();
+  const view = {
+    format: (params.format === "long_form" ? "long_form" : "shorts") as DiscoverFormat,
+    rpm: (RPM_FILTERS.some((f) => f.value === params.rpm) ? params.rpm : "all") as RpmFilter,
+    sort: (SORTS.find((s) => s.value === params.sort)?.value ?? "best") as DiscoverSort,
+    board: (BOARDS.find((b) => b.value === params.board)?.value ?? "library") as Board,
+  };
+  const browsing = intent !== "research" || !topic;
 
   let result: NicheResult | null = null;
   let error: string | null = null;
@@ -59,16 +90,24 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
     }
   }
   const savedList = readSavedNiches(user.user_metadata);
-  const [popular, allTop, related, saved, own] = await Promise.all([
+  const [popular, allTop, related, saved, own, discovered, radarNiches, questions] = await Promise.all([
     result ? Promise.resolve([]) : services.niches.popularTopics(8),
-    services.niches.topNiches(15),
+    result ? services.niches.topNiches(15) : Promise.resolve([]),
     result ? services.niches.relatedNiches(result.topic, result.report, 9) : Promise.resolve([]),
     result ? Promise.resolve([]) : services.niches.savedWithScores(savedList),
     // Only a report needs the creator's own numbers, for "how you'd fit".
     result ? ownChannel(user.id) : Promise.resolve(null),
+    result || view.board !== "library" ? Promise.resolve([]) : services.niches.discover(view.format),
+    // The radar tables arrive with a migration; until they exist these boards show their empty state.
+    !result && browsing && view.board !== "library" ? services.radar.list({ limit: 400 }).catch(() => []) : Promise.resolve([]),
+    !result && browsing && view.board === "ideas" ? services.radar.ideas({ limit: 40, days: 21, kind: "question" }).catch(() => []) : Promise.resolve([]),
   ]);
+  const discoverList = sortDiscovered(
+    discovered.filter((n) => view.rpm === "all" || n.rpmTier === view.rpm),
+    view.sort,
+  ).slice(0, 24);
   // After a report, keep the exploring going: overlapping niches if we have them, otherwise the best ones we know.
-  const topNiches = allTop.filter((idea) => idea.topicKey !== result?.topicKey).slice(0, result ? 9 : 15);
+  const topNiches = allTop.filter((idea) => idea.topicKey !== result?.topicKey).slice(0, 9);
   const suggestions = [...new Set([...popular.map((p) => p.topic), ...STARTERS])].slice(0, 10);
 
   return (
@@ -104,24 +143,9 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
       {result ? null : <SavedNiches niches={saved} />}
       {result ? <Report result={result} drill={drill} saved={isSaved(savedList, result.topic)} own={own} /> : null}
       {related.length > 0 ? <IdeaBoard ideas={related} title={`Niches next to ${result!.topic}`} sub="Other researched topics that overlap with this one" /> : null}
-      {topNiches.length > 0 ? (
-        <IdeaBoard
-          ideas={topNiches}
-          featured={result ? 0 : 3}
-          title={result ? "Other underrated niches" : "Underrated niches right now"}
-          sub="Mined from every channel Outlier tracks: real demand, room left, and small channels winning. Pick one to dig in."
-        />
-      ) : null}
-      {!result && topNiches.length > 0 && topNiches.length < 4 ? (
-        <p className="dash-row-sub niche-ideas-sub">
-          Only {topNiches.length} niche{topNiches.length === 1 ? "" : "s"} clear the bar so far — the list grows as more channels are tracked.
-        </p>
-      ) : null}
-      {!result && topNiches.length === 0 ? (
-        <div className="dash-empty">
-          <strong>Not sure what to search?</strong>
-          <p>Try one of these: {EXAMPLES.map((e) => `“${e}”`).join(", ")}. Any topic works, and the report shows its sub-niches.</p>
-        </div>
+      {result ? null : <DiscoverBoard niches={discoverList} gaps={sortGaps(radarNiches, view)} questions={questions} view={view} />}
+      {result && topNiches.length > 0 ? (
+        <IdeaBoard ideas={topNiches} title="Other underrated niches" sub="Mined from every channel Outlier tracks: real demand, room left, and small channels winning. Pick one to dig in." />
       ) : null}
     </div>
   );
@@ -667,6 +691,273 @@ function ViralChannels({ channels, title }: { channels: ViralChannel[]; title: s
         ))}
       </div>
     </section>
+  );
+}
+
+function discoverHref(view: View, change: Partial<View>) {
+  const next = { ...view, ...change };
+  return `/research/niche-finder?board=${next.board}&format=${next.format}&rpm=${next.rpm}&sort=${next.sort}`;
+}
+
+const RPM_TIER_LABEL = { high: "High RPM", mid: "Mid RPM", low: "Low RPM" } as const;
+
+const GAP_SORT: Record<DiscoverSort, (n: RadarNiche) => number> = {
+  best: (n) => n.score,
+  rpm: (n) => n.parts.pay * 10 + n.score / 100,
+  views: (n) => n.parts.demand * 10 + n.score / 100,
+  untapped: (n) => n.parts.gap * 10 + n.score / 100,
+  easy: (n) => n.parts.ease * 10 + n.score / 100,
+};
+
+/** Radar phrases for the chosen format and RPM, in the chosen order. */
+function sortGaps(niches: readonly RadarNiche[], view: View): RadarNiche[] {
+  return niches
+    .filter((n) => n.format === view.format && (view.rpm === "all" || rpmTierOf(n.rpm, n.format) === view.rpm))
+    .sort((a, b) => GAP_SORT[view.sort](b) - GAP_SORT[view.sort](a))
+    .slice(0, 24);
+}
+
+const BOARD_SUB: Record<Board, string> = {
+  library: "No search needed. Every niche in the channels Outlier tracks, scored on RPM, views, how untapped it is and how easy it is to make.",
+  gaps: "What people type into YouTube search where the results are old, small channels are winning and no giant owns the page. Checked around the clock.",
+  ideas: "First videos to make in the most open niches, and the questions people keep asking on Reddit.",
+};
+
+/**
+ * The browse view: niches found without a search, ranked on what pays, what
+ * gets watched, what's untapped and what's easy to make. Three sources: the
+ * channel library, the search radar, and the ideas both turn up.
+ */
+function DiscoverBoard({ niches, gaps, questions, view }: { niches: DiscoveredNiche[]; gaps: RadarNiche[]; questions: NicheIdeaRow[]; view: View }) {
+  return (
+    <section className="niche-ideas" aria-label="Discover niches">
+      <h2 className="dash-subhead">
+        <CompassIcon size={14} /> Discover niches
+      </h2>
+      <p className="dash-row-sub niche-ideas-sub">{BOARD_SUB[view.board]}</p>
+      <nav className="discover-tabs" aria-label="Where the niches come from">
+        {BOARDS.map((b) => (
+          <Link key={b.value} href={discoverHref(view, { board: b.value })} aria-current={view.board === b.value ? "page" : undefined}>
+            {b.label}
+          </Link>
+        ))}
+      </nav>
+      <Filters view={view} />
+      {view.board === "gaps" ? (
+        <GapBoard gaps={gaps} />
+      ) : view.board === "ideas" ? (
+        <IdeasBoard gaps={gaps} questions={questions} />
+      ) : (
+        <LibraryBoard niches={niches} />
+      )}
+      <p className="dash-row-sub">RPM is an estimate by category from public creator reports; real RPM depends on audience country and season.</p>
+    </section>
+  );
+}
+
+function Filters({ view }: { view: View }) {
+  return (
+    <div className="discover-filters">
+      <div className="dash-topics" role="group" aria-label="Format">
+        {(["shorts", "long_form"] as const).map((f) => (
+          <Link key={f} href={discoverHref(view, { format: f })} className="dash-topic" data-mine={view.format === f}>
+            {f === "shorts" ? "Shorts" : "Long-form"}
+          </Link>
+        ))}
+      </div>
+      <div className="dash-topics" role="group" aria-label="RPM">
+        {RPM_FILTERS.map((f) => (
+          <Link key={f.value} href={discoverHref(view, { rpm: f.value })} className="dash-topic" data-mine={view.rpm === f.value}>
+            {f.label}
+          </Link>
+        ))}
+      </div>
+      <div className="dash-topics" role="group" aria-label="Sort">
+        {SORTS.map((s) => (
+          <Link key={s.value} href={discoverHref(view, { sort: s.value })} className="dash-topic" data-mine={view.sort === s.value}>
+            {s.label}
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function LibraryBoard({ niches }: { niches: DiscoveredNiche[] }) {
+  if (niches.length === 0) {
+    return (
+      <div className="dash-empty">
+        <strong>Nothing clears the bar with these filters yet</strong>
+        <p>Try another RPM level or format. The list grows as more channels are tracked.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="niche-idea-grid">
+      {niches.map((n, i) => (
+        <Link
+          key={n.term}
+          href={`/research/niche-finder?topic=${encodeURIComponent(n.term)}`}
+          className="dash-panel niche-idea discover-card"
+          style={{ "--i": i + 1 } as CSSProperties}
+        >
+          <header className="niche-idea-head">
+            <h3>{n.term}</h3>
+            <span className="niche-score" data-band={band(n.total)}>
+              {n.total}
+            </span>
+          </header>
+          <p className="niche-idea-reason">{n.reason}</p>
+          <dl className="discover-scores">
+            <div><dt>RPM</dt><dd>{formatMoneyRange(n.rpm)}</dd></div>
+            <div><dt>Per 1M views</dt><dd>~{formatMoney(n.perMillion)}</dd></div>
+            <div><dt>Views/day</dt><dd>{formatCompact(Math.round(n.metrics.medianViewsPerDay))}</dd></div>
+          </dl>
+          <div className="discover-bars">
+            {(["rpm", "views", "untapped", "easy"] as const).map((k) => (
+              <div key={k} className="discover-bar">
+                <span>{k === "rpm" ? "RPM" : k === "easy" ? "Easy" : k === "views" ? "Views" : "Untapped"}</span>
+                <i style={{ "--w": `${n.scores[k]}%` } as CSSProperties} />
+              </div>
+            ))}
+          </div>
+          <div className="niche-idea-tags">
+            <span>{RPM_TIER_LABEL[n.rpmTier]}</span>
+            <span>{formatPercent(n.smallChannelViewShare, 0)} views to small channels</span>
+            <span>{n.easeNote}</span>
+          </div>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+function RadarEmpty() {
+  return (
+    <div className="dash-empty">
+      <strong>Nothing here yet with these filters</strong>
+      <p>The radar checks search phrases a few hundred at a time, all day. Try another format or RPM level, or come back later.</p>
+    </div>
+  );
+}
+
+/** Why a search phrase looks open, in one line. */
+function gapReason(n: RadarNiche): string {
+  const s = n.supply;
+  const bits: string[] = [];
+  if (s.recentShare <= 0.2) bits.push(`${formatPercent(1 - s.recentShare, 0)} of results are over 3 months old`);
+  if (s.smallWins > 0) bits.push(`${s.smallWins} small channel${s.smallWins === 1 ? "" : "s"} breaking out`);
+  if (s.bigShare <= 0.1) bits.push("no giant channels ranking");
+  if (bits.length === 0) bits.push(`results get a median ${formatCompact(s.medianViews)} views`);
+  return bits.join(" · ");
+}
+
+const GAP_PART_LABEL = { demand: "Demand", pay: "Pay", gap: "Open", ease: "Easy" } as const;
+
+function GapBoard({ gaps }: { gaps: RadarNiche[] }) {
+  if (gaps.length === 0) return <RadarEmpty />;
+  return (
+    <div className="niche-idea-grid">
+      {gaps.map((n, i) => {
+        const proof = n.supply.top[0];
+        return (
+          <article key={n.keyword} className="dash-panel niche-idea discover-card" style={{ "--i": i + 1 } as CSSProperties}>
+            <header className="niche-idea-head">
+              <h3>
+                <Link href={`/research/niche-finder?topic=${encodeURIComponent(n.keyword)}`}>{n.keyword}</Link>
+              </h3>
+              <span className="niche-score" data-band={band(n.score)}>
+                {n.score}
+              </span>
+            </header>
+            <p className="niche-idea-reason">{gapReason(n)}</p>
+            <dl className="discover-scores">
+              {n.demand?.volume != null ? (
+                <div><dt>Searches/mo</dt><dd>{formatCompact(n.demand.volume)}</dd></div>
+              ) : (
+                <div><dt>Median views</dt><dd>{formatCompact(n.supply.medianViews)}</dd></div>
+              )}
+              {n.demand?.cpc ? (
+                <div><dt>Ad CPC</dt><dd>{formatMoney(n.demand.cpc)}</dd></div>
+              ) : (
+                <div><dt>RPM</dt><dd>{formatMoneyRange(n.rpm)}</dd></div>
+              )}
+              <div><dt>Results age</dt><dd>{Math.round(n.supply.medianAgeDays)}d</dd></div>
+            </dl>
+            <div className="discover-bars">
+              {(["demand", "pay", "gap", "ease"] as const).map((k) => (
+                <div key={k} className="discover-bar">
+                  <span>{GAP_PART_LABEL[k]}</span>
+                  <i style={{ "--w": `${n.parts[k]}%` } as CSSProperties} />
+                </div>
+              ))}
+            </div>
+            {n.ease?.how ? <p className="dash-row-sub">{n.ease.how}</p> : null}
+            <div className="niche-idea-tags">
+              {n.category ? <span>{n.category}</span> : null}
+              {n.ease?.faceless ? <span>Faceless</span> : null}
+              {n.ease?.production.slice(0, 2).map((p) => <span key={p}>{p}</span>)}
+              {n.demand?.trend != null && n.demand.trend > 0.15 ? <span>Searches rising</span> : null}
+            </div>
+            {proof ? (
+              <a className="gap-proof" href={`https://www.youtube.com/watch?v=${proof.id}`} target="_blank" rel="noreferrer">
+                <span>Proof</span> {proof.title} · {formatCompact(proof.views)} views
+                {proof.subscribers != null ? ` on ${formatCompact(proof.subscribers)} subs` : ""}
+              </a>
+            ) : null}
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+function IdeasBoard({ gaps, questions }: { gaps: RadarNiche[]; questions: NicheIdeaRow[] }) {
+  const withIdeas = gaps.filter((n) => (n.ease?.ideas.length ?? 0) > 0).slice(0, 12);
+  if (withIdeas.length === 0 && questions.length === 0) return <RadarEmpty />;
+  return (
+    <div className="ideas-columns">
+      {withIdeas.length > 0 ? (
+        <div className="dash-panel ideas-list">
+          <h3>First videos to make</h3>
+          <ul>
+            {withIdeas.map((n) => (
+              <li key={n.keyword}>
+                <Link href={`/research/niche-finder?topic=${encodeURIComponent(n.keyword)}`} className="ideas-niche">
+                  {n.keyword}
+                  <span className="niche-score" data-band={band(n.score)}>
+                    {n.score}
+                  </span>
+                </Link>
+                <ol>
+                  {n.ease!.ideas.map((idea) => (
+                    <li key={idea}>{idea}</li>
+                  ))}
+                </ol>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {questions.length > 0 ? (
+        <div className="dash-panel ideas-list">
+          <h3>Questions people keep asking</h3>
+          <ul>
+            {questions.map((q) => (
+              <li key={q.id}>
+                <a href={q.url} target="_blank" rel="noreferrer">
+                  {q.title}
+                </a>
+                <span className="dash-row-sub">
+                  {q.community ? `r/${q.community} · ` : ""}
+                  {formatCompact(q.score)} upvotes · {formatCompact(q.comments)} comments
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </div>
   );
 }
 

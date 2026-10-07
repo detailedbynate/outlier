@@ -187,15 +187,29 @@ const serverEnvSchema = z.object({
   NICHE_LABEL_BATCH_SIZE: z.coerce.number().int().min(1).max(50).default(20),
   /** Channels labeled per hourly run. */
   NICHE_LABEL_MAX_PER_RUN: z.coerce.number().int().min(0).max(5_000).default(200),
-  /** Library growth: discovery searches per run (runs every 6h) and per UTC day. 0 turns growth off. */
-  LIBRARY_GROWTH_SEARCHES_PER_RUN: z.coerce.number().int().min(0).max(50).default(3),
-  LIBRARY_GROWTH_DAILY_SEARCHES: z.coerce.number().int().min(0).max(500).default(12),
+  /**
+   * Library growth: discovery searches per run (runs every 2h) and per UTC day. 0 turns growth off.
+   * Search is scraped (free) and only falls back to the 100-unit API search when the gate is busy,
+   * inside the background quota lane, so these can sit well above the old API-era 3/12.
+   */
+  LIBRARY_GROWTH_SEARCHES_PER_RUN: z.coerce.number().int().min(0).max(50).default(4),
+  LIBRARY_GROWTH_DAILY_SEARCHES: z.coerce.number().int().min(0).max(500).default(48),
   /** Days before a seed niche is searched again. */
   LIBRARY_GROWTH_RESEED_DAYS: z.coerce.number().int().min(1).max(365).default(14),
   /** Growth through channels creators feature: checks per run (1 unit each), new creators queued per run, and the size cap for channels it follows. */
   LIBRARY_FEATURED_CHECKS_PER_RUN: z.coerce.number().int().min(0).max(2_000).default(60),
   LIBRARY_FEATURED_NEW_PER_RUN: z.coerce.number().int().min(0).max(2_000).default(80),
   LIBRARY_FEATURED_MAX_SUBSCRIBERS: z.coerce.number().int().min(1_000).default(1_000_000),
+  /** Niche Radar (runs inside the scraper, through its gate): autocomplete requests, phrases whose results are read, and AI ease ratings per round. 0 turns a part off. */
+  RADAR_SUGGESTS_PER_ROUND: z.coerce.number().int().min(0).max(500).default(40),
+  RADAR_SUPPLY_PER_ROUND: z.coerce.number().int().min(0).max(100).default(6),
+  RADAR_EASE_PER_ROUND: z.coerce.number().int().min(0).max(50).default(12),
+  /** Google search volume and CPC for radar phrases (dataforseo.com). Off without both. */
+  DATAFORSEO_LOGIN: z.string().trim().min(1).optional(),
+  DATAFORSEO_PASSWORD: z.string().trim().min(1).optional(),
+  /** Reddit app-only OAuth (a free "script" app at reddit.com/prefs/apps) for idea mining. Off without both. */
+  REDDIT_CLIENT_ID: z.string().trim().min(1).optional(),
+  REDDIT_CLIENT_SECRET: z.string().trim().min(1).optional(),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
