@@ -37,7 +37,7 @@ export class RadarRepository {
         .lte("depth", maxDepth)
         // Seeds always grow; deeper phrases only when they sit near the top of autocomplete,
         // or the tree multiplies into millions of long-tail phrases nobody searches.
-        .or("depth.eq.0,source.eq.reddit,suggest_rank.lte.2")
+        .or("depth.eq.0,source.in.(reddit,rising),suggest_rank.lte.2")
         .order("depth", { ascending: true })
         .order("suggest_rank", { ascending: true, nullsFirst: true })
         .limit(limit),
@@ -45,9 +45,28 @@ export class RadarRepository {
     );
   }
 
-  /** Phrases whose search results to read next: never-checked first, then the stalest. */
-  async dueForSupply(staleBefore: Date, limit: number): Promise<NicheKeywordRow[]> {
+  /** Seeds whose autocomplete was last swept before `before`: sweeping again is how new searches show up. */
+  async dueForResweep(before: Date, limit: number): Promise<NicheKeywordRow[]> {
     return unwrap(
+      await this.db
+        .from("niche_keywords")
+        .select("*")
+        .eq("depth", 0)
+        .lt("expanded_at", before.toISOString())
+        .order("expanded_at", { ascending: true })
+        .limit(limit),
+      "niche_keywords.dueForResweep",
+    );
+  }
+
+  /** Phrases whose search results to read next: new searches first, then never-checked, then the stalest. */
+  async dueForSupply(staleBefore: Date, limit: number): Promise<NicheKeywordRow[]> {
+    const rising = unwrap(
+      await this.db.from("niche_keywords").select("*").eq("source", "rising").is("supply_checked_at", null).order("suggest_rank", { ascending: true, nullsFirst: false }).limit(limit),
+      "niche_keywords.dueForSupply.rising",
+    );
+    if (rising.length >= limit) return rising;
+    const rest = unwrap(
       await this.db
         .from("niche_keywords")
         .select("*")
@@ -58,6 +77,8 @@ export class RadarRepository {
         .limit(limit),
       "niche_keywords.dueForSupply",
     );
+    const taken = new Set(rising.map((r) => r.keyword));
+    return [...rising, ...rest.filter((r) => !taken.has(r.keyword))].slice(0, limit);
   }
 
   async dueForDemand(staleBefore: Date, limit: number): Promise<NicheKeywordRow[]> {

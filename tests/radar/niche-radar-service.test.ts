@@ -73,9 +73,39 @@ describe("NicheRadarService", () => {
     expect(await service.expandOnce({ maxQueries: 40, now: NOW })).toMatchObject({ queries: 32, expanded: 1 });
   });
 
+  it("sweeps a seed again a week later and marks what's new as rising, checked first", async () => {
+    const radar = memoryRadar();
+    let week = 1;
+    const suggest = vi.fn(async (q: string) =>
+      q === "roth ira" ? [{ phrase: "roth ira explained", rank: 0 }, ...(week === 2 ? [{ phrase: "roth ira new limits", rank: 1 }] : [])] : [],
+    );
+    const service = new NicheRadarService({ radar, seeds: ["roth ira"], suggest, search: async () => [], youtube: fakeYouTube() }, {}, createLogger());
+    await service.seed();
+    expect(await service.expandOnce({ maxQueries: 40, now: NOW })).toMatchObject({ added: 1, rising: 0 });
+    // Within the week the seed isn't swept again.
+    expect(await service.expandOnce({ maxQueries: 40, now: new Date(NOW.getTime() + 3 * 86_400_000) })).toMatchObject({ rising: 0 });
+
+    week = 2;
+    const later = new Date(NOW.getTime() + 8 * 86_400_000);
+    expect(await service.expandOnce({ maxQueries: 40, now: later })).toMatchObject({ expanded: 1, added: 1, rising: 1 });
+    expect(radar.rows.get("roth ira new limits")).toMatchObject({ source: "rising", depth: 1 });
+    // The phrase from the first sweep keeps its source.
+    expect(radar.rows.get("roth ira explained")!.source).toBe("autocomplete");
+    const next = await radar.dueForSupply(later, 1);
+    expect(next[0]!.keyword).toBe("roth ira new limits");
+  });
+
+  it("adds library niches as seeds, once each", async () => {
+    const radar = memoryRadar();
+    const service = new NicheRadarService({ radar, seeds: [] }, {}, createLogger());
+    expect(await service.addSeeds(["Roblox Horror", "roblox horror", "ai"], "library")).toBe(1);
+    expect(radar.rows.get("roblox horror")).toMatchObject({ depth: 0, source: "library" });
+    expect(await service.addSeeds(["roblox horror"], "library")).toBe(0);
+  });
+
   it("does nothing without its scraping half", async () => {
     const service = new NicheRadarService({ radar: memoryRadar(), seeds: [] }, {}, createLogger());
-    expect(await service.expandOnce({ maxQueries: 10 })).toEqual({ queries: 0, added: 0, expanded: 0 });
+    expect(await service.expandOnce({ maxQueries: 10 })).toEqual({ queries: 0, added: 0, expanded: 0, rising: 0 });
     expect(await service.checkSupplyOnce({ limit: 5 })).toEqual({ checked: 0, empty: 0 });
     expect(await service.collectRedditOnce()).toBeNull();
     expect(await service.enrichDemandOnce()).toEqual({ enriched: 0 });

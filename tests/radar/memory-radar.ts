@@ -26,10 +26,19 @@ export function memoryRadar(): RadarDeps["radar"] & { rows: Map<string, NicheKey
     },
     dueForExpansion: async (maxDepth, limit) =>
       all()
-        .filter((r) => !r.expanded_at && r.depth <= maxDepth && (r.depth === 0 || r.source === "reddit" || (r.suggest_rank ?? 99) <= 2))
+        .filter((r) => !r.expanded_at && r.depth <= maxDepth && (r.depth === 0 || r.source === "reddit" || r.source === "rising" || (r.suggest_rank ?? 99) <= 2))
         .sort((a, b) => a.depth - b.depth)
         .slice(0, limit),
-    dueForSupply: async (staleBefore, limit) => all().filter((r) => !r.supply_checked_at || new Date(r.supply_checked_at) < staleBefore).sort((a, b) => a.depth - b.depth).slice(0, limit),
+    dueForResweep: async (before, limit) =>
+      all()
+        .filter((r) => r.depth === 0 && r.expanded_at && new Date(r.expanded_at) < before)
+        .sort((a, b) => a.expanded_at!.localeCompare(b.expanded_at!))
+        .slice(0, limit),
+    dueForSupply: async (staleBefore, limit) =>
+      all()
+        .filter((r) => !r.supply_checked_at || new Date(r.supply_checked_at) < staleBefore)
+        .sort((a, b) => Number(b.source === "rising" && !b.supply_checked_at) - Number(a.source === "rising" && !a.supply_checked_at) || a.depth - b.depth)
+        .slice(0, limit),
     dueForDemand: async (staleBefore, limit) =>
       all().filter((r) => r.supply_checked_at && (!r.demand_checked_at || new Date(r.demand_checked_at) < staleBefore)).sort(byScore).slice(0, limit),
     dueForEase: async (limit, minScore = 0) => all().filter((r) => r.supply_checked_at && !r.ease_checked_at && (r.score ?? -1) >= minScore).sort(byScore).slice(0, limit),

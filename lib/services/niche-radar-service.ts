@@ -35,7 +35,7 @@ const DAY = 86_400_000;
 export interface RadarDeps {
   radar: Pick<
     RadarRepository,
-    "countKeywords" | "addKeywords" | "dueForExpansion" | "dueForSupply" | "dueForDemand" | "dueForEase" | "update" | "markExpanded" | "top" | "addIdeas" | "ideas" | "lastIdeasAt" | "get"
+    "countKeywords" | "addKeywords" | "dueForExpansion" | "dueForResweep" | "dueForSupply" | "dueForDemand" | "dueForEase" | "update" | "markExpanded" | "top" | "addIdeas" | "ideas" | "lastIdeasAt" | "get"
   >;
   /** Autocomplete through the gate. */
   suggest?: (query: string) => Promise<Suggestion[]>;
@@ -62,6 +62,8 @@ export interface RadarConfig {
   redditEveryHours: number;
   /** Only phrases scoring at least this (before the AI rating) get one. */
   easeMinScore: number;
+  /** Sweep each seed's autocomplete again after this many days; whatever is new since is a rising search. */
+  resweepDays: number;
 }
 
 export const DEFAULT_RADAR_CONFIG: RadarConfig = {
@@ -71,6 +73,7 @@ export const DEFAULT_RADAR_CONFIG: RadarConfig = {
   maxKeywords: 60_000,
   redditEveryHours: 12,
   easeMinScore: 50,
+  resweepDays: 7,
 };
 
 /** A phrase ready to show. */
@@ -94,7 +97,7 @@ export function toRadarNiche(row: NicheKeywordRow): RadarNiche | null {
   const demand = row.demand as unknown as Demand | null;
   const ease = row.ease as unknown as EaseRating | null;
   const category = (row.category as NicheCategory | null) ?? categoryFor(row.keyword);
-  const scored = scoreRadar({ keyword: row.keyword, depth: row.depth, suggestRank: row.suggest_rank, category, supply, demand, ease });
+  const scored = scoreRadar({ keyword: row.keyword, depth: row.depth, suggestRank: row.suggest_rank, category, supply, demand, ease, rising: row.source === "rising" });
   if (!scored || !supply) return null;
   return {
     keyword: row.keyword,
@@ -134,27 +137,40 @@ export class NicheRadarService {
 
   /** Make sure every seed is on the list. Cheap: existing phrases are left alone. */
   async seed(): Promise<number> {
-    const rows = this.deps.seeds.map((seed) => {
-      const keyword = normalizeKeyword(seed);
-      return { keyword, seed: keyword, source: "seed", depth: 0, category: categoryFor(keyword) };
-    });
+    return this.addSeeds(this.deps.seeds, "seed");
+  }
+
+  /**
+   * More starting points: the library's best niches ("library") are topics already
+   * proven on YouTube, and growing them through autocomplete finds the searches
+   * around them nobody has made videos for yet.
+   */
+  async addSeeds(terms: readonly string[], source: string): Promise<number> {
+    const rows = [...new Set(terms.map(normalizeKeyword))]
+      .filter((keyword) => keyword.length >= 3)
+      .map((keyword) => ({ keyword, seed: keyword, source, depth: 0, category: categoryFor(keyword) }));
     return this.deps.radar.addKeywords(rows);
   }
 
   /** Grow phrases through autocomplete. Spends at most about `maxQueries` requests. */
-  async expandOnce(options: { maxQueries: number; signal?: AbortSignal; now?: Date }): Promise<{ queries: number; added: number; expanded: number }> {
+  async expandOnce(options: { maxQueries: number; signal?: AbortSignal; now?: Date }): Promise<{ queries: number; added: number; expanded: number; rising: number }> {
     const suggest = this.deps.suggest;
-    const result = { queries: 0, added: 0, expanded: 0 };
+    const result = { queries: 0, added: 0, expanded: 0, rising: 0 };
     if (!suggest || options.maxQueries <= 0) return result;
-    if ((await this.deps.radar.countKeywords()) >= this.config.maxKeywords) return result;
+    const now = options.now ?? new Date();
 
-    const due = await this.deps.radar.dueForExpansion(this.config.maxDepth - 1, 10);
+    // One seed a round is swept again: phrases that weren't in its autocomplete last
+    // time are searches that just started, where nobody has caught up yet.
+    const resweep = await this.deps.radar.dueForResweep(new Date(now.getTime() - this.config.resweepDays * DAY), 1);
+    const full = (await this.deps.radar.countKeywords()) >= this.config.maxKeywords;
+    const due = [...resweep, ...(full ? [] : await this.deps.radar.dueForExpansion(this.config.maxDepth - 1, 10))];
     const done: string[] = [];
     for (const row of due) {
       const queries = expansionQueries(row.keyword, row.depth);
       // Always finish a phrase once started (half-expanded phrases would never be revisited),
       // but don't start one the round's budget can't cover - unless it's the first.
       if (options.signal?.aborted || (result.queries > 0 && result.queries + queries.length > options.maxQueries)) break;
+      const again = row.expanded_at !== null;
       const found = new Map<string, TablesInsert<"niche_keywords">>();
       for (const query of queries) {
         if (options.signal?.aborted) break;
@@ -164,7 +180,7 @@ export class NicheRadarService {
           found.set(s.phrase, {
             keyword: s.phrase,
             seed: row.seed,
-            source: "autocomplete",
+            source: again ? "rising" : "autocomplete",
             depth: row.depth + 1,
             suggest_rank: s.rank,
             category: categoryFor(s.phrase) ?? row.category,
@@ -172,10 +188,12 @@ export class NicheRadarService {
         }
       }
       if (options.signal?.aborted) break;
-      result.added += await this.deps.radar.addKeywords([...found.values()]);
+      const added = await this.deps.radar.addKeywords([...found.values()]);
+      result.added += added;
+      if (again) result.rising += added;
       done.push(row.keyword);
     }
-    await this.deps.radar.markExpanded(done, options.now ?? new Date());
+    await this.deps.radar.markExpanded(done, now);
     result.expanded = done.length;
     return result;
   }

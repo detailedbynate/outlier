@@ -853,6 +853,7 @@ function gapReason(n: RadarNiche): string {
 }
 
 const GAP_PART_LABEL = { demand: "Demand", pay: "Pay", gap: "Open", ease: "Easy" } as const;
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function GapBoard({ gaps }: { gaps: RadarNiche[] }) {
   if (gaps.length === 0) return <RadarEmpty />;
@@ -894,10 +895,12 @@ function GapBoard({ gaps }: { gaps: RadarNiche[] }) {
             </div>
             {n.ease?.how ? <p className="dash-row-sub">{n.ease.how}</p> : null}
             <div className="niche-idea-tags">
+              {n.source === "rising" ? <span data-tone="new">New in search</span> : null}
               {n.category ? <span>{n.category}</span> : null}
               {n.ease?.faceless ? <span>Faceless</span> : null}
               {n.ease?.production.slice(0, 2).map((p) => <span key={p}>{p}</span>)}
               {n.demand?.trend != null && n.demand.trend > 0.15 ? <span>Searches rising</span> : null}
+              {n.demand?.peakMonth ? <span>Peaks in {MONTHS[n.demand.peakMonth - 1]}</span> : null}
             </div>
             {proof ? (
               <a className="gap-proof" href={`https://www.youtube.com/watch?v=${proof.id}`} target="_blank" rel="noreferrer">

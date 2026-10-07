@@ -13512,3 +13512,8 @@ body.app-body {
   font-size: 13px;
   color: var(--text-secondary);
 }
+
+.niche-idea-tags span[data-tone="new"] {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--dash-violet) 35%, transparent);
+}

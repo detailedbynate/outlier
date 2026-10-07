@@ -83,6 +83,7 @@ async function main(): Promise<void> {
   const { runWithQuotaContext } = await import("@/lib/youtube");
   const { createHybridSource, getGate, InnerTubeBlockedError, InnerTubeSearch } = await import("@/lib/innertube");
   const { fetchSuggestions } = await import("@/lib/radar/suggest");
+  const { sortDiscovered } = await import("@/lib/niches/discover");
   const { clampState, decide, DEFAULT_THAW_HOURS, FileRampStore, initialState, parseSteps } = await import("@/lib/innertube/ramp");
 
   const config = env();
@@ -134,6 +135,7 @@ async function main(): Promise<void> {
     search: (q) => scrapedSearch.search({ q, type: "video", order: "relevance", maxResults: 20 }, { lane: "background" }),
   });
   let radarSeeded = false;
+  let librarySeededAt = 0;
 
   /**
    * A little radar work each round: grow phrases through autocomplete, read what
@@ -149,6 +151,15 @@ async function main(): Promise<void> {
           const added = await radar.seed();
           radarSeeded = true;
           if (added > 0) logger.info("radar seeded", { added });
+        }
+        // Once a day the library's best niches become seeds too: proven topics whose
+        // searches the radar then combs for openings.
+        if (Date.now() - librarySeededAt > 86_400_000) {
+          librarySeededAt = Date.now();
+          const boards = await Promise.all([services.niches.discover("shorts"), services.niches.discover("long_form")]);
+          const terms = boards.flatMap((board) => sortDiscovered(board, "best").slice(0, 40).map((n) => n.term));
+          const added = await radar.addSeeds(terms, "library");
+          if (added > 0) logger.info("radar seeded from library", { added });
         }
         const grown = await radar.expandOnce({ maxQueries: config.RADAR_SUGGESTS_PER_ROUND, signal });
         const supply = await radar.checkSupplyOnce({ limit: config.RADAR_SUPPLY_PER_ROUND, signal });

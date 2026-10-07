@@ -132,4 +132,9 @@ describe("radar score", () => {
     expect(rich.total).toBeGreaterThan(cheap.total);
     expect(rich.format).toBe("long_form");
   });
+
+  it("lifts a phrase that only just appeared in autocomplete", () => {
+    const base = { keyword: "roth ira new limits", depth: 1, suggestRank: 1, category: null, supply, demand: null, ease: null };
+    expect(scoreRadar({ ...base, rising: true })!.total).toBeGreaterThan(scoreRadar(base)!.total);
+  });
 });

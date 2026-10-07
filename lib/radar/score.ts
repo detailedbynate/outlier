@@ -8,7 +8,8 @@
  *   gap     - old results, small channels winning, no giants (supply.ts);
  *   ease    - the AI rating when there is one, otherwise the keyword heuristic.
  *
- * A rising trend adds a little on top. A phrase without a supply check isn't
+ * A rising trend adds a little on top, and so does a phrase that only just
+ * appeared in autocomplete (new demand that supply hasn't caught up with). A phrase without a supply check isn't
  * scored at all: the gap is the point.
  */
 
@@ -27,6 +28,8 @@ export interface RadarSignals {
   supply: Supply | null;
   demand: Demand | null;
   ease: EaseRating | null;
+  /** First seen in a re-sweep of autocomplete: a search that just started. */
+  rising?: boolean;
 }
 
 export interface RadarScore {
@@ -66,7 +69,11 @@ export function scoreRadar(s: RadarSignals): RadarScore | null {
   }
 
   const ease = s.ease ? s.ease.ease / 100 : easeFor(s.keyword, category, format, s.supply.medianMinutes).score;
-  const gap = s.supply.gap;
+  let gap = s.supply.gap;
+  if (s.rising) {
+    demand = clamp01(demand + 0.1);
+    gap = clamp01(gap + 0.1);
+  }
 
   const parts = { demand: Math.round(demand * 100), pay: Math.round(pay * 100), gap: Math.round(gap * 100), ease: Math.round(ease * 100) };
   const total = Math.round(0.25 * parts.demand + 0.25 * parts.pay + 0.3 * parts.gap + 0.2 * parts.ease);
