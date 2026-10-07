@@ -180,6 +180,7 @@ export class NicheRepository {
       niche_labels: string[];
       quality_flags: string[];
       niche_confidence: number | null;
+      niche_category: string | null;
       published_at: string | null;
     }[] = [];
     const idBatches = chunks(ids, 200);
@@ -187,7 +188,7 @@ export class NicheRepository {
       unwrap(
         await this.db
           .from("channels")
-          .select("id, youtube_channel_id, title, thumbnail_url, subscriber_count, niche_id, niche_labels, quality_flags, niche_confidence, published_at")
+          .select("id, youtube_channel_id, title, thumbnail_url, subscriber_count, niche_id, niche_labels, quality_flags, niche_confidence, niche_category, published_at")
           .in("id", idBatches[i]!),
         "niches.sampleChannels",
       ),
@@ -221,6 +222,7 @@ export class NicheRepository {
         subscriber_count: row.subscriber_count,
         published_at: row.published_at,
         ...(nicheTerms.length > 0 ? { niche_terms: nicheTerms } : {}),
+        ...(confident && row.niche_category ? { category: row.niche_category } : {}),
       });
     }
     return channels;

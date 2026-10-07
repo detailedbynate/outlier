@@ -6,7 +6,7 @@
  * niche can be open in one format and saturated in the other.
  */
 
-import type { NicheCategory } from "./labeling";
+import { NICHE_CATEGORIES, type NicheCategory } from "./labeling";
 import { topicAliases, type NicheChannel, type NicheVideo } from "./analysis";
 import { normalizeName } from "./naming";
 import { categoryFor, rpmFor } from "./revenue";
@@ -200,10 +200,10 @@ export function scoreNiche(
   niche: UnderratedNiche,
   format: DiscoverFormat,
   videos: readonly NicheVideo[],
-  context: { channels?: ReadonlyMap<string, NicheChannel>; now?: Date; weightOf?: (publishedAt: string) => number } = {},
+  context: { channels?: ReadonlyMap<string, NicheChannel>; now?: Date; weightOf?: (publishedAt: string) => number; category?: NicheCategory | null } = {},
 ): DiscoveredNiche {
   const now = context.now ?? new Date();
-  const category = categoryFor(niche.term);
+  const category = context.category ?? categoryFor(niche.term);
   const rpm = rpmFor(category, format, niche.term);
   const mid = (rpm[0] + rpm[1]) / 2;
   const minutes = format === "long_form" ? median(videos.flatMap((v) => (v.duration_seconds ? [v.duration_seconds / 60] : []))) : null;
@@ -284,11 +284,14 @@ export function discoverNiches(
   const now = options.now ?? new Date();
   const slice = videos.filter((v) => (format === "shorts" ? v.format === "short" : v.format === "long_form"));
   // Long-form gets fewer views per upload than Shorts; don't hold it to the Shorts bar.
-  // Mine wide, then keep only names Outlier knows the category of: that drops title
-  // words like "hero" or "david" and gives every niche a real RPM band.
-  const mined = findUnderratedNiches(slice, channels, { max: options.max ?? 250, now, minViewsPerDay: format === "shorts" ? 300 : 100 }).filter(
-    (niche) => categoryFor(niche.term) !== null,
-  );
+  // Mine wide, then keep only names with a known category: that drops title words
+  // like "hero" or "david" and gives every niche a real RPM band.
+  const categories = new Map<string, NicheCategory>();
+  const mined = findUnderratedNiches(slice, channels, { max: options.max ?? 250, now, minViewsPerDay: format === "shorts" ? 300 : 100 }).filter((niche) => {
+    const category = categoryFor(niche.term) ?? channelCategory(niche, slice, channels);
+    if (category) categories.set(niche.term, category);
+    return category !== null;
+  });
   // Titles and tags normalized once: every niche is matched against all of them.
   const texts = slice.map((v) => {
     const spaced = ` ${normalizeName([v.title, ...v.tags.slice(0, 30)].join(" "))} `;
@@ -300,14 +303,58 @@ export function discoverNiches(
     const squashed = phrases.map((p) => p.replace(/ /g, "")).filter((p) => p.length >= 5);
     return slice.filter((_, i) => phrases.some((p) => texts[i]!.spaced.includes(` ${p} `)) || squashed.some((p) => texts[i]!.squashed.includes(p)));
   };
-  // Hashtags like "allinmlbb" mine the same videos as "Mobile Legends": keep the best-named one.
-  const kept: { niche: UnderratedNiche; ids: Set<string> }[] = [];
-  for (const niche of mined) {
+  // Hashtags like "allinmlbb" mine the same videos as "Mobile Legends": keep the best-named one,
+  // which is a name the dictionary knows over one that only borrowed its channels' subject.
+  const known = (n: UnderratedNiche) => categoryFor(n.term) !== null;
+  const ranked = [...mined].sort((a, b) => Number(known(b)) - Number(known(a)));
+  const kept: { niche: UnderratedNiche; ids: Set<string>; videos: NicheVideo[]; videoIds: Set<string> }[] = [];
+  for (const niche of ranked) {
     const ids = new Set(niche.examples.map((e) => e.youtubeVideoId));
-    const twin = kept.find((k) => sameNiche(k.niche, niche, k.ids, ids));
-    if (!twin) kept.push({ niche, ids });
+    const videos = byTerm(niche.term);
+    const videoIds = new Set(videos.map((v) => v.id));
+    const twin = kept.find((k) => sameNiche(k.niche, niche, k.ids, ids) || mostlyShared(k.videoIds, videoIds));
+    if (!twin) kept.push({ niche, ids, videos, videoIds });
   }
-  return kept.map(({ niche }) => scoreNiche(niche, format, byTerm(niche.term), { channels, now, weightOf: options.weightOf }));
+  // Back in the miner's order.
+  kept.sort((a, b) => mined.indexOf(a.niche) - mined.indexOf(b.niche));
+  return kept.map(({ niche, videos }) => scoreNiche(niche, format, videos, { channels, now, weightOf: options.weightOf, category: categories.get(niche.term) }));
+}
+
+/** Most of the smaller set's uploads are in the bigger one: the same niche under two names. */
+function mostlyShared(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
+  const [small, big] = a.size <= b.size ? [a, b] : [b, a];
+  if (small.size < 3) return false;
+  let shared = 0;
+  for (const id of small) if (big.has(id)) shared += 1;
+  // Hashtag twins share nearly everything; Elden Ring and Dark Souls share a lot and are still two niches.
+  return shared / small.size >= 0.85;
+}
+
+/** Labeled channels a niche needs before their subject can stand in for its own. */
+const MIN_LABELED_CHANNELS = 3;
+
+/**
+ * A niche the dictionary doesn't know ("Arc Raiders", "Comic Dub") takes the
+ * subject of the channels making it, when most of them agree. Only names: a
+ * lone word like "dragon" or "broken" could be anything, so it needs to be a
+ * channel's own label, or more than one word.
+ */
+function channelCategory(niche: UnderratedNiche, videos: readonly NicheVideo[], channels: ReadonlyMap<string, NicheChannel>): NicheCategory | null {
+  const key = normalizeName(niche.term);
+  const ids = new Set(videos.filter((v) => normalizeName(v.title).includes(key) || v.tags.some((t) => normalizeName(t) === key)).map((v) => v.channel_id));
+  const labeledHere = [...ids].flatMap((id) => channels.get(id)?.niche_terms ?? []).some((t) => normalizeName(t) === key);
+  if (!key.includes(" ") && !labeledHere) return null;
+  const counts = new Map<string, number>();
+  let labeled = 0;
+  for (const id of ids) {
+    const category = channels.get(id)?.category;
+    if (!category || category === "Other") continue;
+    labeled += 1;
+    counts.set(category, (counts.get(category) ?? 0) + 1);
+  }
+  if (labeled < MIN_LABELED_CHANNELS) return null;
+  const [top, count] = [...counts].sort((a, b) => b[1] - a[1])[0]!;
+  return count / labeled >= 0.6 && (NICHE_CATEGORIES as readonly string[]).includes(top) ? (top as NicheCategory) : null;
 }
 
 /** Two mined terms describing the same set of videos. */

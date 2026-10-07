@@ -35,6 +35,8 @@ export interface NicheChannel {
   niche_terms?: string[];
   /** When the channel was created, when known. */
   published_at?: string | null;
+  /** The channel's subject (a NicheCategory), when it's been labeled with confidence. */
+  category?: string | null;
 }
 
 export type Level = "low" | "medium" | "high";

@@ -183,6 +183,13 @@ export interface IdeaFeeds {
   games: GameStat[];
 }
 
+/**
+ * Uploads per format the boards mine. At 15K, terms with a real following
+ * fell short of the few videos and channels a niche needs; 40K nearly doubled
+ * what turned up (about all of long-form, half of Shorts).
+ */
+const SAMPLE_SIZE = 40_000;
+
 export class NicheService {
   private readonly log: Logger;
   private readonly config: NicheConfig;
@@ -329,14 +336,14 @@ export class NicheService {
 
   /**
    * The last 90 days of one format, shared by the boards: Discover and Video
-   * ideas read the same 15K uploads, so one read serves both for a few minutes.
+   * ideas read the same 40K uploads, so one read serves both for a few minutes.
    * Each format gets its own sample: the library is mostly Shorts, so a mixed
    * one leaves long-form with almost nothing.
    */
   private formatSample(format: DiscoverFormat, now: Date): ReturnType<NicheService["deps"]["niches"]["recentSample"]> {
     const hit = this.samples.get(format);
     if (hit && Math.abs(now.getTime() - hit.at) < 10 * 60_000) return hit.load;
-    const load = this.deps.niches.recentSample(underratedWindow(now, this.config.sampleDays), 15_000, format === "shorts" ? "short" : "long_form", { spread: true });
+    const load = this.deps.niches.recentSample(underratedWindow(now, this.config.sampleDays), SAMPLE_SIZE, format === "shorts" ? "short" : "long_form", { spread: true });
     this.samples.set(format, { at: now.getTime(), load });
     load.catch(() => this.samples.delete(format));
     return load;

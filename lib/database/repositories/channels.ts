@@ -324,17 +324,32 @@ export class ChannelRepository {
       uploads: { title: string; tags: string[] }[];
     })[]
   > {
-    const channels = unwrap(
-      await this.db
-        .from("channels")
-        .select("id, title, description, keywords, topic_categories, subscriber_count, niche_labeled_at")
-        // With an AI provider, channels the free rules weren't sure about get another look.
-        .or(options.includeUnsureRuleLabels ? "niche_labeled_at.is.null,and(niche_label_model.eq.rules-v1,niche_confidence.lt.0.6)" : "niche_labeled_at.is.null")
-        .order("niche_labeled_at", { ascending: true, nullsFirst: true })
-        .order("created_at", { ascending: true })
-        .limit(limit * 2),
-      "channels.listUnlabeled",
-    );
+    // Channels whose uploads were never stored can't be labeled and stay unlabeled, so page
+    // past them: 643 of those at the front once stalled every run at zero for nine days.
+    const found: Awaited<ReturnType<ChannelRepository["listUnlabeled"]>> = [];
+    const pageSize = limit * 2;
+    for (let page = 0; page < 10 && found.length < limit; page++) {
+      const channels = unwrap(
+        await this.db
+          .from("channels")
+          .select("id, title, description, keywords, topic_categories, subscriber_count, niche_labeled_at")
+          // With an AI provider, channels the free rules weren't sure about get another look.
+          .or(options.includeUnsureRuleLabels ? "niche_labeled_at.is.null,and(niche_label_model.eq.rules-v1,niche_confidence.lt.0.6)" : "niche_labeled_at.is.null")
+          .order("niche_labeled_at", { ascending: true, nullsFirst: true })
+          .order("created_at", { ascending: true })
+          .range(page * pageSize, page * pageSize + pageSize - 1),
+        "channels.listUnlabeled",
+      );
+      found.push(...(await this.withUploads(channels)));
+      if (channels.length < pageSize) break;
+    }
+    return found.slice(0, limit);
+  }
+
+  /** Recent titles, tags and uploads for labeling; channels with no stored uploads are left out. */
+  private async withUploads(
+    channels: Pick<ChannelRow, "id" | "title" | "description" | "keywords" | "topic_categories" | "subscriber_count" | "niche_labeled_at">[],
+  ): Promise<Awaited<ReturnType<ChannelRepository["listUnlabeled"]>>> {
     if (channels.length === 0) return [];
 
     // Chunked: hundreds of ids in one filter overflow the request URL limit.
@@ -371,8 +386,7 @@ export class ChannelRepository {
         if (!entry || entry.titles.length === 0) return [];
         const recentTags = [...entry.tags.entries()].sort((a, b) => b[1] - a[1]).map(([tag]) => tag);
         return [{ ...channel, recentTitles: entry.titles, recentTags, uploads: entry.uploads }];
-      })
-      .slice(0, limit);
+      });
   }
 
   async saveNicheLabel(
