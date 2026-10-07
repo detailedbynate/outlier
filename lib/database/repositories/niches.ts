@@ -132,13 +132,23 @@ export class NicheRepository {
     );
   }
 
-  private async pageOfVideos(since: Date, from: number, to: number, format?: "short" | "long_form") {
+  private async pageOfVideos(since: Date, until: Date | null, from: number, to: number, format: "short" | "long_form" | undefined, order: "published_at" | "id") {
     let query = this.db
       .from("videos")
       .select("id, youtube_video_id, channel_id, title, tags, format, view_count, like_count, comment_count, published_at, duration_seconds")
       .gte("published_at", since.toISOString());
+    if (until) query = query.lt("published_at", until.toISOString());
     if (format) query = query.eq("format", format);
-    return unwrap(await query.order("published_at", { ascending: false }).range(from, to), "niches.recentSample");
+    return unwrap(await query.order(order, { ascending: order === "id" }).range(from, to), "niches.recentSample");
+  }
+
+  /** Up to `limit` uploads from one window, starting `offset` in. PostgREST caps a response at 1000 rows, so pages go side by side. */
+  private async rowsIn(since: Date, until: Date | null, limit: number, format: "short" | "long_form" | undefined, order: "published_at" | "id", offset = 0) {
+    if (limit <= 0) return [];
+    const pages = await inParallel(Math.ceil(limit / 1_000), (i) => this.pageOfVideos(since, until, offset + i * 1_000, offset + Math.min(i * 1_000 + 999, limit - 1), format, order), 3);
+    // A short page means the window ran out there.
+    const end = pages.findIndex((page) => page.length < 1_000);
+    return pages.slice(0, end === -1 ? pages.length : end + 1).flat();
   }
 
   /**
@@ -204,15 +214,40 @@ export class NicheRepository {
     return channels;
   }
 
-  /** A slice of the whole library to mine for niches, newest uploads first, optionally one format only. */
-  async recentSample(since: Date, limit = 2_000, format?: "short" | "long_form"): Promise<{ videos: NicheVideo[]; channels: Map<string, NicheChannel> }> {
-    // PostgREST caps a response at 1000 rows, so page until we have the sample.
-    // Pages are fetched side by side; a short page means the sample ran out there.
-    const pages = await inParallel(Math.ceil(limit / 1_000), (i) => this.pageOfVideos(since, i * 1_000, Math.min(i * 1_000 + 999, limit - 1), format), 5);
-    const end = pages.findIndex((page) => page.length < 1_000);
+  /**
+   * A slice of the whole library to mine for niches, optionally one format only.
+   * Newest uploads first by default. With `spread`, the window is cut into equal
+   * slices and each gives an even share: the library takes in thousands of Shorts
+   * a day, so the newest 15K were only the last week, mostly too young to have
+   * their views yet. Inside a slice rows go by id, a random UUID, so the pick is
+   * effectively random but the same every time.
+   */
+  async recentSample(
+    since: Date,
+    limit = 2_000,
+    format?: "short" | "long_form",
+    options: { until?: Date; spread?: boolean } = {},
+  ): Promise<{ videos: NicheVideo[]; channels: Map<string, NicheChannel> }> {
+    const until = options.until ?? null;
+    let raw: Awaited<ReturnType<typeof this.rowsIn>>;
+    if (options.spread) {
+      const SLICES = 6;
+      const start = since.getTime();
+      const width = ((until ?? new Date()).getTime() - start) / SLICES;
+      const bounds = Array.from({ length: SLICES }, (_, i) => [new Date(start + i * width), new Date(start + (i + 1) * width)] as const);
+      const share = Math.ceil(limit / SLICES);
+      const first = await Promise.all(bounds.map(([from, to]) => this.rowsIn(from, to, share, format, "id")));
+      // Slices from before the library grew come back short; their share goes to the full ones.
+      const left = limit - first.reduce((n, rows) => n + rows.length, 0);
+      const full = first.flatMap((rows, i) => (rows.length >= share ? [i] : []));
+      const more = left > 0 && full.length > 0 ? await Promise.all(full.map((i) => this.rowsIn(bounds[i]![0], bounds[i]![1], Math.ceil(left / full.length), format, "id", share))) : [];
+      raw = [...first.flat(), ...more.flat()];
+    } else {
+      raw = await this.rowsIn(since, until, limit, format, "published_at");
+    }
     const seen = new Set<string>();
     // Uploads arriving mid-read shift the pages, so the same video can show up twice.
-    const rows = pages.slice(0, end === -1 ? pages.length : end + 1).flat().filter((row) => !seen.has(row.id) && seen.add(row.id));
+    const rows = raw.filter((row) => !seen.has(row.id) && seen.add(row.id));
     if (rows.length === 0) return { videos: [], channels: new Map() };
 
     const scores = new Map<string, number>();

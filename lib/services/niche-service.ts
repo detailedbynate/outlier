@@ -229,7 +229,7 @@ export class NicheService {
     if (cached && now.getTime() - cached.at < this.config.reportTtlMs) return cached.ideas.slice(0, limit);
 
     try {
-      const { videos, channels } = await this.deps.niches.recentSample(underratedWindow(now, this.config.sampleDays), 2_000);
+      const { videos, channels } = await this.deps.niches.recentSample(underratedWindow(now, this.config.sampleDays), 2_000, undefined, { spread: true });
       const ideas = findUnderratedNiches(videos, channels, { max: Math.max(limit, 12), now }).map((niche) => ({
         topic: niche.term,
         topicKey: topicKey(niche.term),
@@ -336,7 +336,7 @@ export class NicheService {
   private formatSample(format: DiscoverFormat, now: Date): ReturnType<NicheService["deps"]["niches"]["recentSample"]> {
     const hit = this.samples.get(format);
     if (hit && Math.abs(now.getTime() - hit.at) < 10 * 60_000) return hit.load;
-    const load = this.deps.niches.recentSample(underratedWindow(now, this.config.sampleDays), 15_000, format === "shorts" ? "short" : "long_form");
+    const load = this.deps.niches.recentSample(underratedWindow(now, this.config.sampleDays), 15_000, format === "shorts" ? "short" : "long_form", { spread: true });
     this.samples.set(format, { at: now.getTime(), load });
     load.catch(() => this.samples.delete(format));
     return load;
@@ -389,7 +389,7 @@ export class NicheService {
       const [pickedOn, format] = key.split("|") as [string, string];
       const start = new Date(`${pickedOn}T00:00:00Z`);
       const end = new Date(start.getTime() + PICK_WINDOW_DAYS * 86_400_000);
-      const { videos, channels } = await this.deps.niches.recentSample(start, 20_000, format === "shorts" ? "short" : "long_form");
+      const { videos, channels } = await this.deps.niches.recentSample(start, 20_000, format === "shorts" ? "short" : "long_form", { until: end, spread: true });
       const after = new Map(measureGames(videos, channels, { now: end, days: PICK_WINDOW_DAYS, minVideos: 1, minChannels: 1, limit: 10_000 }).map((g) => [g.game, g]));
       for (const pick of rows) {
         const verdict = judgePick(after.get(pick.name));
