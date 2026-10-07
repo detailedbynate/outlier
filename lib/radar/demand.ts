@@ -6,7 +6,7 @@
  * phrase's CPC ranks niches within a category ("credit card churning" vs
  * "budgeting"), which the per-category RPM table can't.
  *
- * One request covers up to 1,000 phrases for a few cents. Off unless
+ * One request covers up to 1,000 phrases for $0.09, whatever the count. Off unless
  * DATAFORSEO_LOGIN and DATAFORSEO_PASSWORD are set.
  */
 
@@ -63,8 +63,10 @@ function peakOf(monthly: readonly MonthlySearch[] | null): number | null {
 
 export function parseDemand(body: unknown): Map<string, Demand> {
   const out = new Map<string, Demand>();
-  const tasks = (body as { tasks?: { status_code?: number; result?: ResultRow[] | null }[] })?.tasks ?? [];
+  const tasks = (body as { tasks?: { status_code?: number; status_message?: string; result?: ResultRow[] | null }[] })?.tasks ?? [];
   for (const task of tasks) {
+    // An empty balance (40200) still answers 200; failing here keeps the phrases due instead of stamping them checked.
+    if (task.status_code !== undefined && task.status_code !== 20000) throw new Error(`DataForSEO task failed (${task.status_code} ${task.status_message ?? ""})`.trim());
     for (const row of task.result ?? []) {
       if (!row?.keyword) continue;
       const { trend, peakMonth } = trendOf(row.monthly_searches);

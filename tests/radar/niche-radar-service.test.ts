@@ -103,6 +103,28 @@ describe("NicheRadarService", () => {
     expect(await service.addSeeds(["roblox horror"], "library")).toBe(0);
   });
 
+  it("only asks for demand with a full request, at most once a day", async () => {
+    const radar = memoryRadar();
+    const searchVolume = vi.fn(async (keywords: readonly string[]) => new Map(keywords.map((k) => [k, { volume: 100, cpc: 1, competition: 10, trend: null, peakMonth: null, source: "dataforseo" as const }])));
+    const service = new NicheRadarService({ radar, seeds: [], demand: { searchVolume } }, { demandMinBatch: 3 }, createLogger());
+    const checked = (keyword: string, market = "en") => radar.addKeywords([{ keyword, seed: keyword, market, supply_checked_at: NOW.toISOString() }]);
+    await checked("roth ira");
+    await checked("roth ira steuern", "de");
+    await checked("hsa explained");
+    // Two English phrases due: a request would be half empty.
+    expect(await service.enrichDemandOnce({ now: NOW })).toEqual({ enriched: 0 });
+    expect(searchVolume).not.toHaveBeenCalled();
+
+    await checked("ira vs 401k");
+    expect(await service.enrichDemandOnce({ now: NOW })).toEqual({ enriched: 3 });
+    expect(searchVolume.mock.calls[0]![0]).not.toContain("roth ira steuern");
+
+    await Promise.all(["a b c", "d e f", "g h i"].map((k) => checked(k)));
+    expect(await service.enrichDemandOnce({ now: new Date(NOW.getTime() + 3_600_000) })).toEqual({ enriched: 0 });
+    expect(await service.enrichDemandOnce({ now: new Date(NOW.getTime() + 25 * 3_600_000) })).toEqual({ enriched: 3 });
+    expect(searchVolume).toHaveBeenCalledTimes(2);
+  });
+
   it("does nothing without its scraping half", async () => {
     const service = new NicheRadarService({ radar: memoryRadar(), seeds: [] }, {}, createLogger());
     expect(await service.expandOnce({ maxQueries: 10 })).toEqual({ queries: 0, added: 0, expanded: 0, rising: 0 });

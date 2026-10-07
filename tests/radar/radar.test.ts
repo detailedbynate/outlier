@@ -81,6 +81,10 @@ describe("demand", () => {
     expect(parsed.get("roth ira")).toEqual({ volume: 90_500, cpc: 4.57, competition: 40, trend: 0.5, peakMonth: null, source: "dataforseo" });
   });
 
+  it("fails on an empty balance instead of reading it as no data", () => {
+    expect(() => parseDemand({ tasks: [{ status_code: 40200, status_message: "Payment Required.", result: null }] })).toThrow(/40200/);
+  });
+
   it("needs a year of history for a trend", () => {
     expect(trendOf(monthly(1, 1).slice(0, 6)).trend).toBeNull();
   });

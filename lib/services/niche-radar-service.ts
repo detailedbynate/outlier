@@ -71,6 +71,10 @@ export interface RadarConfig {
   supplyRefreshDays: number;
   /** Re-fetch search volume and CPC after this many days. */
   demandRefreshDays: number;
+  /** Ask DataForSEO at most this often. Each request costs the same up to 1,000 phrases. */
+  demandEveryHours: number;
+  /** Wait until this many phrases are due, so no request goes out half empty. */
+  demandMinBatch: number;
   /** Autocomplete hops from a seed. */
   maxDepth: number;
   /** Stop growing the phrase list here. */
@@ -99,7 +103,9 @@ export interface RadarConfig {
 
 export const DEFAULT_RADAR_CONFIG: RadarConfig = {
   supplyRefreshDays: 30,
-  demandRefreshDays: 30,
+  demandRefreshDays: 180,
+  demandEveryHours: 24,
+  demandMinBatch: 1_000,
   maxDepth: 2,
   maxKeywords: 60_000,
   redditEveryHours: 12,
@@ -178,6 +184,7 @@ function withPriority(row: KeywordInsert): KeywordInsert {
 export class NicheRadarService {
   private readonly log: Logger;
   private readonly config: RadarConfig;
+  private lastDemandAttempt = 0;
   private lastTranslateAttempt = 0;
   private lastRequestsAttempt = 0;
   private lastLaunchesAttempt = 0;
@@ -288,13 +295,14 @@ export class NicheRadarService {
   async enrichDemandOnce(options: { limit?: number; signal?: AbortSignal; now?: Date } = {}): Promise<{ enriched: number }> {
     if (!this.deps.demand) return { enriched: 0 };
     const now = options.now ?? new Date();
-    const due = await this.deps.radar.dueForDemand(new Date(now.getTime() - this.config.demandRefreshDays * DAY), options.limit ?? 1_000);
-    // Under a hundred isn't worth a request yet.
-    if (due.length < Math.min(100, options.limit ?? 100)) return { enriched: 0 };
-    // Volume and CPC are asked for the US market, so other languages' phrases just get a timestamp.
-    const english = due.filter((r) => (r.market ?? "en") === "en");
+    if (now.getTime() - this.lastDemandAttempt < this.config.demandEveryHours * 3_600_000) return { enriched: 0 };
+    const limit = options.limit ?? 1_000;
+    const due = await this.deps.radar.dueForDemand(new Date(now.getTime() - this.config.demandRefreshDays * DAY), limit);
+    // Every request costs the same, so it waits for a full one.
+    if (due.length < Math.min(this.config.demandMinBatch, limit)) return { enriched: 0 };
+    this.lastDemandAttempt = now.getTime();
     const demand = await this.deps.demand.searchVolume(
-      english.map((r) => r.keyword),
+      due.map((r) => r.keyword),
       options.signal,
     );
     let enriched = 0;

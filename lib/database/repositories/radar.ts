@@ -80,6 +80,8 @@ export class RadarRepository {
         .from("niche_keywords")
         .select("*")
         .not("supply_checked_at", "is", null)
+        // Volume and CPC are asked for the US market only.
+        .eq("market", "en")
         .or(`demand_checked_at.is.null,demand_checked_at.lt.${staleBefore.toISOString()}`)
         .order("score", { ascending: false, nullsFirst: false })
         .limit(limit),
