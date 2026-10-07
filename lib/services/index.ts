@@ -386,6 +386,7 @@ export function getServices(): Services {
         storage,
         enqueue,
         ai: text,
+        picks: repositories.radar,
         // Haiku alone, not a free fallback chain: this runs while someone waits for the page.
         namer: config.ANTHROPIC_API_KEY ? new AnthropicTextProvider({ apiKey: config.ANTHROPIC_API_KEY, model: "claude-haiku-4-5" }) : null,
       },

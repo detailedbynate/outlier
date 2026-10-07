@@ -1,7 +1,7 @@
 import "server-only";
 import type { DatabaseClient } from "@/lib/database/client";
 import { assertOk, unwrap } from "@/lib/database/errors";
-import type { NicheIdeaRow, NicheKeywordRow, TablesInsert } from "@/types/database";
+import type { NicheIdeaRow, NicheKeywordRow, NichePickRow, TablesInsert, TablesUpdate } from "@/types/database";
 
 /** Search phrases the Niche Radar tracks, and the Reddit posts it collects as ideas. */
 export class RadarRepository {
@@ -172,6 +172,41 @@ export class RadarRepository {
     if (options.source) query = query.eq("source", options.source);
     if (options.category) query = query.eq("category", options.category);
     return unwrap(await query.order(options.orderBy ?? "score", { ascending: false, nullsFirst: false }).limit(options.limit), "niche_ideas.list");
+  }
+
+  /** A week's picks; picking the same week again changes nothing. */
+  async addPicks(rows: TablesInsert<"niche_picks">[]): Promise<number> {
+    if (rows.length === 0) return 0;
+    const saved = unwrap(
+      await this.db.from("niche_picks").upsert(rows, { onConflict: "picked_on,kind,name,format", ignoreDuplicates: true }).select("id"),
+      "niche_picks.add",
+    );
+    return saved.length;
+  }
+
+  async lastPickedOn(): Promise<string | null> {
+    const rows = unwrap(await this.db.from("niche_picks").select("picked_on").order("picked_on", { ascending: false }).limit(1), "niche_picks.last");
+    return rows[0]?.picked_on ?? null;
+  }
+
+  /** Unjudged picks made on or before this date. */
+  async duePicks(pickedBy: string, limit: number): Promise<NichePickRow[]> {
+    return unwrap(
+      await this.db.from("niche_picks").select("*").is("scored_at", null).lte("picked_on", pickedBy).order("picked_on").limit(limit),
+      "niche_picks.due",
+    );
+  }
+
+  async updatePick(id: string, patch: TablesUpdate<"niche_picks">): Promise<void> {
+    assertOk(await this.db.from("niche_picks").update(patch).eq("id", id), "niche_picks.update");
+  }
+
+  /** Judged picks, newest first (judged without a verdict too, so they can be left out). */
+  async judgedPicks(limit: number): Promise<NichePickRow[]> {
+    return unwrap(
+      await this.db.from("niche_picks").select("*").not("scored_at", "is", null).not("hit", "is", null).order("picked_on", { ascending: false }).limit(limit),
+      "niche_picks.judged",
+    );
   }
 
   async lastIdeasAt(source?: string): Promise<Date | null> {

@@ -284,6 +284,20 @@ export type NicheIdeaRow = {
   collected_at: string;
 };
 
+export type NichePickRow = {
+  id: string;
+  picked_on: string;
+  kind: string;
+  name: string;
+  format: string;
+  score: number;
+  baseline: Json;
+  outcome: Json | null;
+  hit: boolean | null;
+  scored_at: string | null;
+  created_at: string;
+};
+
 export type SavedScriptRow = {
   id: string;
   user_id: string;
@@ -631,6 +645,7 @@ export type Database = {
       style_samples: TableDef<StyleSampleRow, "user_id" | "body">;
       niche_keywords: TableDef<NicheKeywordRow, "keyword" | "seed">;
       niche_ideas: TableDef<NicheIdeaRow, "source" | "title" | "url">;
+      niche_picks: TableDef<NichePickRow, "picked_on" | "name" | "format" | "score">;
       usage_events: TableDef<UsageEventRow, "event_type">;
       credits: TableDef<CreditRow, "workspace_id" | "delta" | "source">;
       waitlist_entries: TableDef<WaitlistEntryRow, "email">;

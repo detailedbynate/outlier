@@ -14,7 +14,7 @@ import { estimateEarnings, formatMoney, formatMoneyRange, type NicheEarnings } f
 import { getServices } from "@/lib/services";
 import { parseNicheQuery } from "@/lib/niches/query";
 import type { NicheCreator, NicheExample } from "@/lib/niches/examples";
-import { reasonFor, type NicheIdea, type NicheResult } from "@/lib/services/niche-service";
+import { reasonFor, type NicheIdea, type NicheResult, type TrackRecord } from "@/lib/services/niche-service";
 import { asUser } from "@/lib/youtube/quota-context";
 import { nicheFit, type OwnChannelMonth } from "@/lib/niches/fit";
 import { isSaved, readSavedNiches } from "@/lib/niches/saved";
@@ -26,7 +26,7 @@ import { marketOf } from "@/lib/radar/markets";
 import type { Breakout, RisingChannel } from "@/lib/niches/breakouts";
 import type { FormatStat } from "@/lib/niches/formats";
 import type { GameStat } from "@/lib/niches/games";
-import type { NicheIdeaRow } from "@/types/database";
+import type { NicheIdeaRow, NichePickRow } from "@/types/database";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -110,7 +110,7 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
   }
   const savedList = readSavedNiches(user.user_metadata);
   const ideasOn = !result && browsing && view.board === "ideas";
-  const [popular, allTop, related, saved, own, discovered, radarNiches, questions, evergreen, proof, requests, launches, risingGames] = await Promise.all([
+  const [popular, allTop, related, saved, own, discovered, radarNiches, questions, evergreen, proof, requests, launches, risingGames, record] = await Promise.all([
     result ? Promise.resolve([]) : services.niches.popularTopics(8),
     result ? services.niches.topNiches(15) : Promise.resolve([]),
     result ? services.niches.relatedNiches(result.topic, result.report, 9) : Promise.resolve([]),
@@ -127,6 +127,7 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
     ideasOn ? services.radar.ideas({ limit: 30, days: 30, source: "comments", kind: "request", category: gaming ? "Gaming" : null }).catch(() => []) : Promise.resolve([]),
     ideasOn && !gaming ? services.radar.ideas({ limit: 20, days: 21, source: "launches" }).catch(() => []) : Promise.resolve([]),
     ideasOn && gaming ? services.radar.risingGames({ limit: 18 }).catch(() => []) : Promise.resolve([]),
+    ideasOn && gaming ? services.niches.trackRecord() : Promise.resolve(null),
   ]);
   // Every game pays about the same, so the RPM filter only applies to all niches.
   const discoverList = sortDiscovered(
@@ -170,7 +171,7 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
       {result ? null : <SavedNiches niches={saved} />}
       {result ? <Report result={result} drill={drill} saved={isSaved(savedList, result.topic)} own={own} /> : null}
       {related.length > 0 ? <IdeaBoard ideas={related} title={`Niches next to ${result!.topic}`} sub="Other researched topics that overlap with this one" /> : null}
-      {result ? null : <DiscoverBoard niches={discoverList} gaps={sortGaps(radarNiches, view)} questions={questions} evergreen={evergreen} breakouts={proof.breakouts} rising={proof.rising} formats={proof.formats} games={proof.games} risingGames={risingGames} requests={requests} launches={launches} view={view} />}
+      {result ? null : <DiscoverBoard niches={discoverList} gaps={sortGaps(radarNiches, view)} questions={questions} evergreen={evergreen} breakouts={proof.breakouts} rising={proof.rising} formats={proof.formats} games={proof.games} record={record} risingGames={risingGames} requests={requests} launches={launches} view={view} />}
       {result && topNiches.length > 0 ? (
         <IdeaBoard ideas={topNiches} title="Other underrated niches" sub="Mined from every channel Outlier tracks: real demand, room left, and small channels winning. Pick one to dig in." />
       ) : null}
@@ -773,6 +774,7 @@ function DiscoverBoard({
   rising,
   formats,
   games,
+  record,
   risingGames,
   requests,
   launches,
@@ -786,6 +788,7 @@ function DiscoverBoard({
   rising: RisingChannel[];
   formats: FormatStat[];
   games: GameStat[];
+  record: TrackRecord | null;
   risingGames: RisingGameNiche[];
   requests: NicheIdeaRow[];
   launches: NicheIdeaRow[];
@@ -817,6 +820,7 @@ function DiscoverBoard({
           rising={rising}
           formats={formats}
           games={games}
+          record={record}
           risingGames={risingGames}
           requests={requests}
           launches={launches}
@@ -1025,6 +1029,7 @@ function IdeasBoard({
   rising,
   formats,
   games,
+  record,
   risingGames,
   requests,
   launches,
@@ -1037,6 +1042,7 @@ function IdeasBoard({
   rising: RisingChannel[];
   formats: FormatStat[];
   games: GameStat[];
+  record: TrackRecord | null;
   risingGames: RisingGameNiche[];
   requests: NicheIdeaRow[];
   launches: NicheIdeaRow[];
@@ -1045,7 +1051,7 @@ function IdeasBoard({
   if ([withIdeas, questions, evergreen, breakouts, rising, formats, games, risingGames, requests, launches].every((list) => list.length === 0)) return <RadarEmpty />;
   return (
     <>
-      {games.length > 0 ? <GamesWithRoom games={games} /> : null}
+      {games.length > 0 ? <GamesWithRoom games={games} record={record} /> : null}
       {risingGames.length > 0 ? <RisingGames games={risingGames} /> : null}
       {breakouts.length > 0 ? (
         <div className="dash-panel ideas-breakouts">
@@ -1266,11 +1272,12 @@ function videoHref(v: { youtubeVideoId: string; format: "short" | "long_form" })
 }
 
 /** Games in the library, ranked on views per upload, how often small channels break out, how crowded, and the trend. */
-function GamesWithRoom({ games }: { games: GameStat[] }) {
+function GamesWithRoom({ games, record }: { games: GameStat[]; record: TrackRecord | null }) {
   return (
     <div className="dash-panel ideas-breakouts">
       <h3>Games with room right now</h3>
       <p className="dash-row-sub">From the last four weeks of uploads Outlier tracks: how many views a typical upload gets, how often channels under 100K break out, and how many channels are already posting.</p>
+      {record ? <PickRecord record={record} /> : null}
       <ul className="formats-list">
         {games.slice(0, 12).map((g) => (
           <li key={g.game}>
@@ -1300,6 +1307,33 @@ function GamesWithRoom({ games }: { games: GameStat[] }) {
       </ul>
     </div>
   );
+}
+
+/** How past picks did: the top five each week, checked against the month after. */
+function PickRecord({ record }: { record: TrackRecord }) {
+  if (record.judged === 0) {
+    return <p className="dash-row-sub">Outlier saves its top picks every week and checks a month later whether small channels that posted them broke out. First results in about five weeks.</p>;
+  }
+  return (
+    <details className="pick-record">
+      <summary>
+        Track record: <strong>{record.hits} of the last {record.judged}</strong> picks kept breaking out for small channels the month after
+      </summary>
+      <ul>
+        {record.picks.map((p) => (
+          <li key={p.id}>
+            <span data-hit={p.hit ? "yes" : "no"}>{p.hit ? "Hit" : "Miss"}</span> {p.name} ({p.format === "shorts" ? "Shorts" : "long-form"}, picked {p.picked_on}) · {pickOutcome(p)}
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
+function pickOutcome(pick: NichePickRow): string {
+  const after = pick.outcome as { breakoutRate?: number; smallUploads?: number } | null;
+  if (!after?.smallUploads) return "no verdict";
+  return `${formatPercent(after.breakoutRate ?? 0, 0)} of ${after.smallUploads} small-channel uploads broke out`;
 }
 
 const RISING_REASON: Record<string, string> = {

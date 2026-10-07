@@ -17,6 +17,8 @@ export interface GameStat {
   channels: number;
   /** Channels under 100K subscribers posting it. */
   smallChannels: number;
+  /** Their uploads, which the breakout rate is taken over. */
+  smallUploads: number;
   /** Channels under six months old posting it. */
   newChannels: number;
   medianViews: number;
@@ -53,7 +55,8 @@ export function measureGames(
   const byGame = new Map<string, { video: NicheVideo; channel: NicheChannel }[]>();
   for (const video of videos) {
     const published = Date.parse(video.published_at);
-    if (!(published >= since)) continue;
+    // Uploads after `now` are left out, so a past window can be measured later.
+    if (!(published >= since) || published > now.getTime()) continue;
     const channel = channels.get(video.channel_id);
     if (!channel) continue;
     const text = `${video.title} ${video.tags.slice(0, 8).join(" ")}`;
@@ -96,6 +99,7 @@ export function measureGames(
       videos: rows.length,
       channels: channelIds.size,
       smallChannels: new Set(small.map((r) => r.channel.id)).size,
+      smallUploads: small.length,
       newChannels,
       medianViews,
       breakoutRate: Math.round(breakoutRate * 100) / 100,

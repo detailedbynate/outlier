@@ -13467,6 +13467,38 @@ body.app-body {
   margin-bottom: 14px;
 }
 
+.pick-record {
+  margin: 8px 0 4px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.pick-record summary {
+  cursor: pointer;
+}
+
+.pick-record strong {
+  color: var(--text-primary);
+}
+
+.pick-record ul {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.pick-record li span {
+  margin-right: 4px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.pick-record li span[data-hit="yes"] {
+  color: var(--dash-violet);
+}
+
 .ideas-breakouts h3 {
   margin: 0 0 4px;
   font-size: 15px;

@@ -12,12 +12,14 @@ import { buildNicheReport, focusOnTopic, NICHE_REPORT_VERSION, tokenize, topicKe
 import { findBreakouts, findRisingChannels, type Breakout, type IdeaLens, type RisingChannel } from "@/lib/niches/breakouts";
 import { measureFormats, type FormatStat } from "@/lib/niches/formats";
 import { measureGames, type GameStat } from "@/lib/niches/games";
+import { choosePicks, judgePick, PICK_SETTLE_DAYS, PICK_WINDOW_DAYS } from "@/lib/niches/picks";
+import type { RadarRepository } from "@/lib/database/repositories/radar";
 import { discoverNiches, type DiscoveredNiche, type DiscoverFormat } from "@/lib/niches/discover";
 import { canonicalNiche } from "@/lib/niches/naming";
 import { findUnderratedNiches, underratedWindow, type NicheCreator, type NicheExample } from "@/lib/niches/underrated";
 import { isQuotaUnavailable } from "@/lib/youtube/quota-manager";
 import type { YouTubeService } from "@/lib/youtube/service";
-import type { Json } from "@/types/database";
+import type { Json, NichePickRow } from "@/types/database";
 import type { YouTubeVideo } from "@/types/youtube";
 import type { CreditsService } from "./credits-service";
 import type { StorageBudgetService } from "./storage-budget-service";
@@ -164,6 +166,13 @@ function toIdea(row: {
   };
 }
 
+/** How the weekly game picks turned out. */
+export interface TrackRecord {
+  judged: number;
+  hits: number;
+  picks: NichePickRow[];
+}
+
 /** The Video ideas tab's library-backed feeds. */
 export interface IdeaFeeds {
   breakouts: Breakout[];
@@ -197,6 +206,8 @@ export class NicheService {
       ai?: Pick<TextProvider, "generateObject"> | null;
       /** A fast model that drops junk sub-niche names and fixes the rest. Without it, mined names are shown as they are. */
       namer?: Pick<TextProvider, "generateObject"> | null;
+      /** Where the weekly picks and their outcomes are kept. Without it there's no track record. */
+      picks?: Pick<RadarRepository, "addPicks" | "lastPickedOn" | "duePicks" | "updatePick" | "judgedPicks"> | null;
     },
     config: Partial<NicheConfig> = {},
     logger?: Logger,
@@ -298,6 +309,58 @@ export class NicheService {
       this.log.warn("idea feeds failed", { format, error });
       return { breakouts: [], rising: [], formats: [], games: [] };
     }
+  }
+
+  private lastPicksAttempt = 0;
+
+  /**
+   * Once a day: judge the picks whose month is up, and write down this week's
+   * top games for each format if the week has none yet. Runs in the scraper.
+   */
+  async trackPicksOnce(options: { now?: Date } = {}): Promise<{ picked: number; judged: number } | null> {
+    const picks = this.deps.picks;
+    if (!picks) return null;
+    const now = options.now ?? new Date();
+    if (now.getTime() - this.lastPicksAttempt < 24 * 3_600_000) return null;
+    this.lastPicksAttempt = now.getTime();
+    const day = (date: Date) => date.toISOString().slice(0, 10);
+
+    let judged = 0;
+    const due = await picks.duePicks(day(new Date(now.getTime() - (PICK_WINDOW_DAYS + PICK_SETTLE_DAYS) * 86_400_000)), 40);
+    // One library read per pick date and format: the month after the pick, measured as of its last day.
+    const groups = new Map<string, NichePickRow[]>();
+    for (const pick of due) groups.set(`${pick.picked_on}|${pick.format}`, [...(groups.get(`${pick.picked_on}|${pick.format}`) ?? []), pick]);
+    for (const [key, rows] of groups) {
+      const [pickedOn, format] = key.split("|") as [string, string];
+      const start = new Date(`${pickedOn}T00:00:00Z`);
+      const end = new Date(start.getTime() + PICK_WINDOW_DAYS * 86_400_000);
+      const { videos, channels } = await this.deps.niches.recentSample(start, 20_000, format === "shorts" ? "short" : "long_form");
+      const after = new Map(measureGames(videos, channels, { now: end, days: PICK_WINDOW_DAYS, minVideos: 1, minChannels: 1, limit: 10_000 }).map((g) => [g.game, g]));
+      for (const pick of rows) {
+        const verdict = judgePick(after.get(pick.name));
+        await picks.updatePick(pick.id, { outcome: (verdict?.outcome ?? null) as Json, hit: verdict?.hit ?? null, scored_at: now.toISOString() });
+        judged += 1;
+      }
+    }
+
+    let picked = 0;
+    const last = await picks.lastPickedOn();
+    if (!last || now.getTime() - Date.parse(`${last}T00:00:00Z`) >= 7 * 86_400_000) {
+      for (const format of ["shorts", "long_form"] as const) {
+        const { games } = await this.ideaFeeds(format, { now, lens: "gaming" });
+        picked += await picks.addPicks(
+          choosePicks(games, format).map((p) => ({ picked_on: day(now), kind: "game", name: p.name, format: p.format, score: p.score, baseline: p.baseline as unknown as Json })),
+        );
+      }
+    }
+    if (picked || judged) this.log.info("niche picks tracked", { picked, judged });
+    return { picked, judged };
+  }
+
+  /** The judged picks, for the board's track record. */
+  async trackRecord(limit = 40): Promise<TrackRecord> {
+    const rows = (await this.deps.picks?.judgedPicks(limit).catch(() => [])) ?? [];
+    return { judged: rows.length, hits: rows.filter((r) => r.hit).length, picks: rows };
   }
 
   /**
