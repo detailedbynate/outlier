@@ -10,7 +10,7 @@ import { PAID_FEATURES } from "@/lib/billing/features";
 import { isAppError } from "@/lib/core/errors";
 import { formatCompact, formatPercent, timeAgo } from "@/lib/format";
 import { topicKey, type Level, type NicheMetrics, type SubNiche, type ViralChannel } from "@/lib/niches/analysis";
-import { estimateEarnings, formatMoney, formatMoneyRange, type NicheEarnings } from "@/lib/niches/revenue";
+import { estimateEarnings, formatMoney, formatMoneyRange, gameAudience, type NicheEarnings } from "@/lib/niches/revenue";
 import { getServices } from "@/lib/services";
 import { parseNicheQuery } from "@/lib/niches/query";
 import type { NicheCreator, NicheExample } from "@/lib/niches/examples";
@@ -20,6 +20,7 @@ import { nicheFit, type OwnChannelMonth } from "@/lib/niches/fit";
 import { isSaved, readSavedNiches } from "@/lib/niches/saved";
 import { CompareBox, FitPanel, Patterns, SaveNicheButton, SavedNiches, ScoreBreakdown, TrendChart } from "./insights";
 import { TopicInput } from "./topic-input";
+import { BoardBody, BoardNav, NavLink } from "./board-nav";
 import { rpmTierOf, sortDiscovered, type DiscoveredNiche, type DiscoverFormat, type DiscoverSort } from "@/lib/niches/discover";
 import type { RadarNiche, RisingGameNiche } from "@/lib/services/niche-radar-service";
 import { marketOf } from "@/lib/radar/markets";
@@ -134,9 +135,8 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
     ideasOn && gaming ? services.radar.risingGames({ limit: 18 }).catch(() => []) : Promise.resolve([]),
     ideasOn && gaming ? services.niches.trackRecord() : Promise.resolve(null),
   ]);
-  // Every game pays about the same, so the RPM filter only applies to all niches.
   const sorted = sortDiscovered(
-    discovered.filter((n) => (gaming ? n.category === "Gaming" : view.rpm === "all" || n.rpmTier === view.rpm)),
+    discovered.filter((n) => (!gaming || n.category === "Gaming") && (view.rpm === "all" || rpmTierIn(view.lens, n.rpmTier, n.term) === view.rpm)),
     view.sort,
   );
   // On the default sort, niches in the creator's own games lead.
@@ -749,6 +749,12 @@ function discoverHref(view: View, change: Partial<View>) {
 }
 
 const RPM_TIER_LABEL = { high: "High RPM", mid: "Mid RPM", low: "Low RPM" } as const;
+/** Every game sits low next to finance, so inside gaming the tiers are about who watches. */
+const GAME_TIER = { older: "high", typical: "mid", young: "low" } as const;
+const GAME_TIER_LABEL = { high: "Older audience, higher RPM", mid: "Typical gaming RPM", low: "Young audience, lower RPM" } as const;
+function rpmTierIn(lens: Lens, tier: "high" | "mid" | "low", term: string): "high" | "mid" | "low" {
+  return lens === "gaming" ? GAME_TIER[gameAudience(term)] : tier;
+}
 
 const GAP_SORT: Record<DiscoverSort, (n: RadarNiche) => number> = {
   best: (n) => n.score,
@@ -762,7 +768,7 @@ const GAP_SORT: Record<DiscoverSort, (n: RadarNiche) => number> = {
 function sortGaps(niches: readonly RadarNiche[], view: View): RadarNiche[] {
   const gaming = view.lens === "gaming";
   return niches
-    .filter((n) => n.format === view.format && (gaming ? n.category === "Gaming" : view.rpm === "all" || rpmTierOf(n.rpm, n.format) === view.rpm))
+    .filter((n) => n.format === view.format && (!gaming || n.category === "Gaming") && (view.rpm === "all" || rpmTierIn(view.lens, rpmTierOf(n.rpm, n.format), n.keyword) === view.rpm))
     .filter((n) => view.lang === "all" || (view.lang === "en") === (n.market === "en"))
     .sort((a, b) => GAP_SORT[view.sort](b) - GAP_SORT[view.sort](a))
     .slice(0, 24);
@@ -823,14 +829,16 @@ function DiscoverBoard({
         <CompassIcon size={14} /> Discover niches
       </h2>
       <p className="dash-row-sub niche-ideas-sub">{BOARD_SUB[view.lens][view.board]}</p>
+      <BoardNav>
       <nav className="discover-tabs" aria-label="Where the niches come from">
         {BOARDS.map((b) => (
-          <Link key={b.value} href={discoverHref(view, { board: b.value })} aria-current={view.board === b.value ? "page" : undefined}>
+          <NavLink key={b.value} href={discoverHref(view, { board: b.value })} active={view.board === b.value} group={BOARDS.map((o) => discoverHref(view, { board: o.value }))} current>
             {b.label}
-          </Link>
+          </NavLink>
         ))}
       </nav>
       <Filters view={view} />
+      <BoardBody>
       {view.board === "gaps" ? (
         <GapBoard gaps={gaps} />
       ) : view.board === "ideas" ? (
@@ -852,7 +860,12 @@ function DiscoverBoard({
       ) : (
         <LibraryBoard niches={niches} view={view} />
       )}
-      {view.lens === "all" ? <p className="dash-row-sub">RPM is an estimate by category from public creator reports; real RPM depends on audience country and season.</p> : null}
+      </BoardBody>
+      </BoardNav>
+      <p className="dash-row-sub">
+        RPM is what a creator keeps per 1,000 views, estimated from public creator reports. Shorts pay far less per view than long-form (cents per 1,000), so compare them by earnings per 1M views.
+        {view.lens === "gaming" ? " In gaming it depends most on who watches: kid-heavy games pay least, strategy, sims and PC games the most." : " Real RPM also depends on audience country and season."}
+      </p>
     </section>
   );
 }
@@ -862,41 +875,39 @@ function Filters({ view }: { view: View }) {
     <div className="discover-filters">
       <div className="dash-topics" role="group" aria-label="Niches">
         {LENSES.map((l) => (
-          <Link key={l.value} href={discoverHref(view, { lens: l.value })} className="dash-topic" data-mine={view.lens === l.value}>
+          <NavLink key={l.value} href={discoverHref(view, { lens: l.value })} className="dash-topic" active={view.lens === l.value} group={LENSES.map((o) => discoverHref(view, { lens: o.value }))}>
             {l.label}
-          </Link>
+          </NavLink>
         ))}
       </div>
       <div className="dash-topics" role="group" aria-label="Format">
         {(["shorts", "long_form"] as const).map((f) => (
-          <Link key={f} href={discoverHref(view, { format: f })} className="dash-topic" data-mine={view.format === f}>
+          <NavLink key={f} href={discoverHref(view, { format: f })} className="dash-topic" active={view.format === f} group={(["shorts", "long_form"] as const).map((o) => discoverHref(view, { format: o }))}>
             {f === "shorts" ? "Shorts" : "Long-form"}
-          </Link>
+          </NavLink>
         ))}
       </div>
-      {view.lens === "all" ? (
-        <div className="dash-topics" role="group" aria-label="RPM">
-          {RPM_FILTERS.map((f) => (
-            <Link key={f.value} href={discoverHref(view, { rpm: f.value })} className="dash-topic" data-mine={view.rpm === f.value}>
-              {f.label}
-            </Link>
-          ))}
-        </div>
-      ) : null}
+      <div className="dash-topics" role="group" aria-label="RPM">
+        {RPM_FILTERS.map((f) => (
+          <NavLink key={f.value} href={discoverHref(view, { rpm: f.value })} className="dash-topic" active={view.rpm === f.value} group={RPM_FILTERS.map((o) => discoverHref(view, { rpm: o.value }))}>
+            {f.label}
+          </NavLink>
+        ))}
+      </div>
       {view.board === "gaps" ? (
         <div className="dash-topics" role="group" aria-label="Language">
           {LANG_FILTERS.map((l) => (
-            <Link key={l.value} href={discoverHref(view, { lang: l.value })} className="dash-topic" data-mine={view.lang === l.value}>
+            <NavLink key={l.value} href={discoverHref(view, { lang: l.value })} className="dash-topic" active={view.lang === l.value} group={LANG_FILTERS.map((o) => discoverHref(view, { lang: o.value }))}>
               {l.label}
-            </Link>
+            </NavLink>
           ))}
         </div>
       ) : null}
       <div className="dash-topics" role="group" aria-label="Sort">
-        {SORTS.filter((s) => view.lens === "all" || s.value !== "rpm").map((s) => (
-          <Link key={s.value} href={discoverHref(view, { sort: s.value })} className="dash-topic" data-mine={view.sort === s.value}>
+        {SORTS.map((s) => (
+          <NavLink key={s.value} href={discoverHref(view, { sort: s.value })} className="dash-topic" active={view.sort === s.value} group={SORTS.map((o) => discoverHref(view, { sort: o.value }))}>
             {s.label}
-          </Link>
+          </NavLink>
         ))}
       </div>
     </div>
@@ -932,9 +943,9 @@ function LibraryBoard({ niches, view }: { niches: DiscoveredNiche[]; view: View 
           </header>
           <p className="niche-idea-reason">{n.reason}</p>
           <dl className="discover-scores">
-            <div><dt>RPM</dt><dd>{formatMoneyRange(n.rpm)}</dd></div>
+            <div><dt>Views/video</dt><dd>{formatCompact(Math.round(n.metrics.medianViews))}</dd></div>
             <div><dt>Per 1M views</dt><dd>~{formatMoney(n.perMillion)}</dd></div>
-            <div><dt>Views/day</dt><dd>{formatCompact(Math.round(n.metrics.medianViewsPerDay))}</dd></div>
+            <div><dt>RPM per 1K</dt><dd>{formatMoneyRange(n.rpm)}</dd></div>
           </dl>
           <div className="discover-bars">
             {(["rpm", "views", "untapped", "easy"] as const).map((k) => (
@@ -945,7 +956,7 @@ function LibraryBoard({ niches, view }: { niches: DiscoveredNiche[]; view: View 
             ))}
           </div>
           <div className="niche-idea-tags">
-            <span>{RPM_TIER_LABEL[n.rpmTier]}</span>
+            <span>{view.lens === "gaming" ? GAME_TIER_LABEL[rpmTierIn("gaming", n.rpmTier, n.term)] : RPM_TIER_LABEL[n.rpmTier]}</span>
             <span>{formatPercent(n.smallChannelViewShare, 0)} views to small channels</span>
             <span>{n.easeNote}</span>
           </div>
@@ -1009,7 +1020,7 @@ function GapBoard({ gaps }: { gaps: RadarNiche[] }) {
               {n.demand?.cpc ? (
                 <div><dt>Ad CPC</dt><dd>{formatMoney(n.demand.cpc)}</dd></div>
               ) : (
-                <div><dt>RPM</dt><dd>{formatMoneyRange(n.rpm)}</dd></div>
+                <div><dt>RPM per 1K</dt><dd>{formatMoneyRange(n.rpm)}</dd></div>
               )}
               <div><dt>Results age</dt><dd>{Math.round(n.supply.medianAgeDays)}d</dd></div>
             </dl>

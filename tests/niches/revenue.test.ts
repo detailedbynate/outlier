@@ -47,3 +47,17 @@ describe("niche earnings", () => {
     expect(formatMoneyRange([1200, 3000])).toBe("$1.2K–$3.0K");
   });
 });
+
+describe("gaming RPM by audience", () => {
+  it("pays more for older audiences and less for kid-heavy games", async () => {
+    const { gameAudience, rpmFor } = await import("@/lib/niches/revenue");
+    expect(gameAudience("cities skylines 2")).toBe("older");
+    expect(gameAudience("roblox horror")).toBe("young");
+    expect(gameAudience("elden ring")).toBe("typical");
+    expect(rpmFor("Gaming", "long_form", "chess openings")).toEqual([2, 8]);
+    expect(rpmFor("Gaming", "long_form", "elden ring")).toEqual([1, 4]);
+    expect(rpmFor("Gaming", "shorts", "minecraft")).toEqual([0.012, 0.036]);
+    // Without a name it's the plain gaming band.
+    expect(rpmFor("Gaming", "shorts")).toEqual([0.02, 0.06]);
+  });
+});

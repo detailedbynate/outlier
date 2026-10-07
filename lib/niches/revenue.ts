@@ -97,9 +97,32 @@ export function categoriesIn(text: string): NicheCategory[] {
 }
 
 /** A category's RPM range for one format. */
-export function rpmFor(category: NicheCategory | null, format: "shorts" | "long_form"): Range {
-  const band = category ? (RPM_BY_CATEGORY[category] ?? DEFAULT_BAND) : DEFAULT_BAND;
+export function rpmFor(category: NicheCategory | null, format: "shorts" | "long_form", term?: string): Range {
+  const band = category === "Gaming" && term ? gamingBand(term) : category ? (RPM_BY_CATEGORY[category] ?? DEFAULT_BAND) : DEFAULT_BAND;
   return format === "shorts" ? band.shorts : band.long;
+}
+
+/**
+ * Inside gaming, RPM follows the audience. Games played mostly by kids pay the
+ * least (much of it is made-for-kids, with no personalised ads); strategy,
+ * simulators, chess and PC hardware have older viewers advertisers pay more for.
+ */
+const OLDER_AUDIENCE =
+  /\b(chess|poker|flight sim|microsoft flight|msfs|cities[: ]+skylines|factorio|satisfactory|civilization|civ (?:v|vi|vii|[5-7])\b|total war|hearts of iron|crusader kings|stellaris|europa universalis|eve online|star citizen|sim ?racing|iracing|assetto corsa|euro truck|american truck|farming simulator|tarkov|arma\b|dcs world|war thunder|world of tanks|anno \d|rimworld|kerbal|planet coaster|football manager|f1 2\d|gran turismo|pc build|gaming pc|graphics cards?|gpu\b|steam deck)/i;
+const YOUNG_AUDIENCE =
+  /\b(roblox|minecraft|fortnite|among us|toca|gacha|brawl stars|subway surfers|geometry dash|five nights|fnaf|poppy playtime|skibidi|piggy|adopt me|blox fruits|bedwars|pet simulator|garten of banban|rainbow friends|stumble guys|murder mystery|brookhaven|bloxburg|dress to impress|grow a garden|steal a brainrot|99 nights)/i;
+
+export type GameAudience = "older" | "typical" | "young";
+
+export function gameAudience(term: string): GameAudience {
+  return OLDER_AUDIENCE.test(term) ? "older" : YOUNG_AUDIENCE.test(term) ? "young" : "typical";
+}
+
+function gamingBand(term: string): RpmBand {
+  const base = RPM_BY_CATEGORY.Gaming!;
+  const factor = { older: 2, typical: 1, young: 0.6 }[gameAudience(term)];
+  const scale = ([low, high]: Range, places: number): Range => [Number((low * factor).toFixed(places)), Number((high * factor).toFixed(places))];
+  return { long: scale(base.long, 2), shorts: scale(base.shorts, 3) };
 }
 
 export interface NicheEarnings {
@@ -126,7 +149,7 @@ export function estimateEarnings(
 ): NicheEarnings | null {
   if (!monthlyViews) return null;
   const category = categoryFor(...names);
-  const rpm = category ? (RPM_BY_CATEGORY[category] ?? DEFAULT_BAND) : DEFAULT_BAND;
+  const rpm = category === "Gaming" ? gamingBand(names.join(" ")) : category ? (RPM_BY_CATEGORY[category] ?? DEFAULT_BAND) : DEFAULT_BAND;
   const blendedRpm = mix(rpm, monthlyViews.shortsShare);
   return {
     category,

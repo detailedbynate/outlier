@@ -13496,6 +13496,17 @@ body.app-body {
   color: var(--dash-violet);
 }
 
+.board-body {
+  transition: opacity 0.15s ease;
+}
+
+/* Waits a beat before dimming, so a quick switch doesn't flicker. */
+.board-body[data-pending="true"] {
+  opacity: 0.45;
+  pointer-events: none;
+  transition-delay: 80ms;
+}
+
 .pick-record {
   margin: 8px 0 4px;
   font-size: 13px;

@@ -51,7 +51,7 @@ export function scoreRadar(s: RadarSignals): RadarScore | null {
   const format = s.supply.shortsShare >= 0.5 ? "shorts" : "long_form";
   const category = s.category ?? categoryFor(s.keyword);
   const factor = s.rpmFactor ?? 1;
-  const rpm = rpmFor(category, format).map((n) => Math.round(n * factor * 100) / 100) as [number, number];
+  const rpm = rpmFor(category, format, s.keyword).map((n) => Math.round(n * factor * 1000) / 1000) as [number, number];
 
   // Demand: real search volume beats autocomplete position, and views on the ranking videos back either up.
   const views = clamp01(Math.log10(s.supply.medianViews + 1) / 6);

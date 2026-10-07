@@ -114,7 +114,7 @@ function median(values: number[]): number | null {
 /** Score one mined niche for a format. */
 export function scoreNiche(niche: UnderratedNiche, format: DiscoverFormat, videos: readonly NicheVideo[]): DiscoveredNiche {
   const category = categoryFor(niche.term);
-  const rpm = rpmFor(category, format);
+  const rpm = rpmFor(category, format, niche.term);
   const mid = (rpm[0] + rpm[1]) / 2;
   const minutes = format === "long_form" ? median(videos.flatMap((v) => (v.duration_seconds ? [v.duration_seconds / 60] : []))) : null;
   const ease = easeFor(niche.term, category, format, minutes);
