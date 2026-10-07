@@ -62,6 +62,10 @@ export function memoryRadar(): RadarDeps["radar"] & { rows: Map<string, NicheKey
       const mine = all().filter((r) => r.source === source).map((r) => r.discovered_at).sort();
       return mine.length ? new Date(mine[mine.length - 1]!) : null;
     },
+    lastDemandAt: async () => {
+      const at = all().map((r) => r.demand_checked_at).filter((d): d is string => !!d).sort();
+      return at.length ? new Date(at[at.length - 1]!) : null;
+    },
     get: async (keyword) => rows.get(keyword) ?? null,
     addIdeas: async (insert) => {
       for (const r of insert) ideaRows.push({ id: String(ideaRows.length), community: null, score: 0, comments: 0, views: null, posted_at: null, kind: "discussion", category: null, collected_at: new Date().toISOString(), ...r } as NicheIdeaRow);

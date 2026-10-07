@@ -103,7 +103,7 @@ describe("NicheRadarService", () => {
     expect(await service.addSeeds(["roblox horror"], "library")).toBe(0);
   });
 
-  it("only asks for demand with a full request, at most once a day", async () => {
+  it("only asks for demand with a full request, at most once a week", async () => {
     const radar = memoryRadar();
     const searchVolume = vi.fn(async (keywords: readonly string[]) => new Map(keywords.map((k) => [k, { volume: 100, cpc: 1, competition: 10, trend: null, peakMonth: null, source: "dataforseo" as const }])));
     const service = new NicheRadarService({ radar, seeds: [], demand: { searchVolume } }, { demandMinBatch: 3 }, createLogger());
@@ -120,8 +120,12 @@ describe("NicheRadarService", () => {
     expect(searchVolume.mock.calls[0]![0]).not.toContain("roth ira steuern");
 
     await Promise.all(["a b c", "d e f", "g h i"].map((k) => checked(k)));
-    expect(await service.enrichDemandOnce({ now: new Date(NOW.getTime() + 3_600_000) })).toEqual({ enriched: 0 });
-    expect(await service.enrichDemandOnce({ now: new Date(NOW.getTime() + 25 * 3_600_000) })).toEqual({ enriched: 3 });
+    const days = (n: number) => new Date(NOW.getTime() + n * 86_400_000);
+    expect(await service.enrichDemandOnce({ now: days(3) })).toEqual({ enriched: 0 });
+    // A restart (a fresh service) still keeps the pace, from the saved check times.
+    const restarted = new NicheRadarService({ radar, seeds: [], demand: { searchVolume } }, { demandMinBatch: 3 }, createLogger());
+    expect(await restarted.enrichDemandOnce({ now: days(3) })).toEqual({ enriched: 0 });
+    expect(await restarted.enrichDemandOnce({ now: days(8) })).toEqual({ enriched: 3 });
     expect(searchVolume).toHaveBeenCalledTimes(2);
   });
 

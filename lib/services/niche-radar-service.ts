@@ -47,7 +47,7 @@ const DAY = 86_400_000;
 export interface RadarDeps {
   radar: Pick<
     RadarRepository,
-    "countKeywords" | "addKeywords" | "dueForExpansion" | "dueForResweep" | "dueForSupply" | "dueForDemand" | "dueForEase" | "update" | "markExpanded" | "top" | "addIdeas" | "ideas" | "lastIdeasAt" | "get" | "seededFrom" | "lastAddedAt"
+    "countKeywords" | "addKeywords" | "dueForExpansion" | "dueForResweep" | "dueForSupply" | "dueForDemand" | "dueForEase" | "update" | "markExpanded" | "top" | "addIdeas" | "ideas" | "lastIdeasAt" | "get" | "seededFrom" | "lastAddedAt" | "lastDemandAt"
   >;
   /** Autocomplete through the gate. */
   suggest?: (query: string) => Promise<Suggestion[]>;
@@ -104,7 +104,8 @@ export interface RadarConfig {
 export const DEFAULT_RADAR_CONFIG: RadarConfig = {
   supplyRefreshDays: 30,
   demandRefreshDays: 180,
-  demandEveryHours: 24,
+  // The $1 starter credit is 11 requests: weekly spreads it over about two and a half months.
+  demandEveryHours: 7 * 24,
   demandMinBatch: 1_000,
   maxDepth: 2,
   maxKeywords: 60_000,
@@ -295,7 +296,11 @@ export class NicheRadarService {
   async enrichDemandOnce(options: { limit?: number; signal?: AbortSignal; now?: Date } = {}): Promise<{ enriched: number }> {
     if (!this.deps.demand) return { enriched: 0 };
     const now = options.now ?? new Date();
-    if (now.getTime() - this.lastDemandAttempt < this.config.demandEveryHours * 3_600_000) return { enriched: 0 };
+    const every = this.config.demandEveryHours * 3_600_000;
+    if (now.getTime() - this.lastDemandAttempt < every) return { enriched: 0 };
+    // The saved time keeps the pace across restarts (every deploy restarts the scraper).
+    const last = await this.deps.radar.lastDemandAt();
+    if (last && now.getTime() - last.getTime() < every) return { enriched: 0 };
     const limit = options.limit ?? 1_000;
     const due = await this.deps.radar.dueForDemand(new Date(now.getTime() - this.config.demandRefreshDays * DAY), limit);
     // Every request costs the same, so it waits for a full one.

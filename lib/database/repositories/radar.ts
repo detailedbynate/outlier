@@ -140,6 +140,15 @@ export class RadarRepository {
     return rows[0] ? new Date(rows[0].discovered_at) : null;
   }
 
+  /** When search volume was last asked for, so the pace survives restarts. */
+  async lastDemandAt(): Promise<Date | null> {
+    const rows = unwrap(
+      await this.db.from("niche_keywords").select("demand_checked_at").not("demand_checked_at", "is", null).order("demand_checked_at", { ascending: false }).limit(1),
+      "niche_keywords.lastDemand",
+    );
+    return rows[0]?.demand_checked_at ? new Date(rows[0].demand_checked_at) : null;
+  }
+
   async get(keyword: string): Promise<NicheKeywordRow | null> {
     const rows = unwrap(await this.db.from("niche_keywords").select("*").eq("keyword", keyword).limit(1), "niche_keywords.get");
     return rows[0] ?? null;
