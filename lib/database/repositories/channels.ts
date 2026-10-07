@@ -487,18 +487,24 @@ export class ChannelRepository {
    * Channels whose featured channels haven't been checked yet: confidently labeled
    * and not already huge, newest first, so growth follows creators in real niches.
    */
+  /**
+   * Channels whose featured channels haven't been read yet, newest first. Channels
+   * outside gaming go first: creators feature their own kind, and the library is
+   * already mostly games, so following gaming channels only adds more of them.
+   */
   async listForFeaturedCheck(limit: number, maxSubscribers: number): Promise<Pick<ChannelRow, "id" | "youtube_channel_id">[]> {
-    return unwrap(
-      await this.db
+    const due = (gaming: boolean, count: number) => {
+      const query = this.db
         .from("channels")
         .select("id, youtube_channel_id")
         .is("featured_checked_at", null)
         .gte("niche_confidence", 0.6)
-        .or(`subscriber_count.is.null,subscriber_count.lt.${Math.floor(maxSubscribers)}`)
-        .order("created_at", { ascending: false })
-        .limit(limit),
-      "channels.listForFeaturedCheck",
-    );
+        .or(`subscriber_count.is.null,subscriber_count.lt.${Math.floor(maxSubscribers)}`);
+      return (gaming ? query.eq("niche_category", "Gaming") : query.neq("niche_category", "Gaming")).order("created_at", { ascending: false }).limit(count);
+    };
+    const other = unwrap(await due(false, limit), "channels.listForFeaturedCheck");
+    if (other.length >= limit) return other;
+    return [...other, ...unwrap(await due(true, limit - other.length), "channels.listForFeaturedCheck")];
   }
 
   /**

@@ -143,10 +143,30 @@ describe("LibraryGrowthService", () => {
       sources: [{ id: "src-1", youtube_channel_id: "UCsource1xxxxxxxxxxxxxxx" }, { id: "src-2", youtube_channel_id: "UCsource2xxxxxxxxxxxxxxx" }],
       featured: { UCsource1xxxxxxxxxxxxxxx: new QuotaUnavailableError("background", NOW, "lane") },
     });
-    expect(await outOfQuota.service.growOnce({ now: NOW })).toMatchObject({ stoppedBy: "quota", featuredChecked: 0 });
-    // Searches cost 100 units: don't attempt them once quota is gone.
-    expect(outOfQuota.discoverShortsChannels).not.toHaveBeenCalled();
+    expect(await outOfQuota.service.growOnce({ now: NOW })).toMatchObject({ stoppedBy: "quota", featuredChecked: 0, searched: ["clash royale", "geometry dash", "sourdough"] });
+    expect(outOfQuota.getFeaturedChannels).toHaveBeenCalledTimes(1);
     expect(outOfQuota.markFeaturedChecked).toHaveBeenCalledWith([], NOW);
+  });
+
+  it("searches before following featured channels, and skips featured once quota is gone", async () => {
+    const order: string[] = [];
+    const { service, getFeaturedChannels } = setup({
+      sources: [{ id: "src-1", youtube_channel_id: "UCsource1xxxxxxxxxxxxxxx" }],
+      discover: async (keyword) => {
+        order.push(keyword);
+        if (keyword === "geometry dash") throw new QuotaUnavailableError("background", NOW, "lane");
+        return { keyword, channelsFound: 1, channelsNew: 1, channelsQueued: 1, alreadyFresh: 0, searchesLeftToday: 0, searchPasses: 1 };
+      },
+    });
+    expect(await service.growOnce({ now: NOW })).toMatchObject({ stoppedBy: "quota", searched: ["clash royale"], featuredChecked: 0 });
+    expect(order).toEqual(["clash royale", "geometry dash"]);
+    // Featured lookups cost quota too: none once it's gone.
+    expect(getFeaturedChannels).not.toHaveBeenCalled();
+  });
+
+  it("still follows featured channels when the day's searches are used up", async () => {
+    const { service } = setup({ usedToday: 12, sources: [{ id: "src-1", youtube_channel_id: "UCsource1xxxxxxxxxxxxxxx" }], featured: { UCsource1xxxxxxxxxxxxxxx: ["UCnewxxxxxxxxxxxxxxxxxxx"] } });
+    expect(await service.growOnce({ now: NOW })).toMatchObject({ stoppedBy: "daily_cap", featuredChecked: 1, featuredQueued: 1 });
   });
 
   it("doesn't retry channels whose featured list can't be read", async () => {

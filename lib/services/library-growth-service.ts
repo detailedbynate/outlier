@@ -141,34 +141,39 @@ export class LibraryGrowthService {
     const now = options.now ?? new Date();
     const result: GrowthRunResult = { searched: [], channelsNew: 0, channelsQueued: 0, featuredChecked: 0, featuredQueued: 0 };
 
-    // Featured channels first: at 1 unit a channel it finds far more creators per unit than search.
+    // Searches first, featured channels with the time left. Featured links find more creators
+    // per unit, but they lead to whatever the library already has the most of (games). Run
+    // first, they used up the tick's whole budget and the subject searches stopped happening.
+    const stoppedBy = await this.search(result, now, options.signal);
+    if (stoppedBy === "quota") return { ...result, stoppedBy };
     if (await this.followFeatured(result, now, options.signal)) return { ...result, stoppedBy: "quota" };
 
+    this.log.info("library growth run", { ...result, ...(stoppedBy ? { stoppedBy } : {}) });
+    return stoppedBy ? { ...result, stoppedBy } : result;
+  }
+
+  /** Discovery searches for the seeds the library is thinnest on. */
+  private async search(result: GrowthRunResult, now: Date, signal?: AbortSignal): Promise<GrowthRunResult["stoppedBy"]> {
     const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
     const usedToday = await this.deps.usage.countSince(LIBRARY_GROWTH_EVENT, today);
     const allowed = Math.min(this.config.searchesPerRun, this.config.dailySearches - usedToday);
-    if (allowed <= 0) return { ...result, stoppedBy: "daily_cap" };
+    if (allowed <= 0) return "daily_cap";
 
     const queue = await this.plan(now);
-    if (queue.length === 0) return { ...result, stoppedBy: "no_seeds" };
+    if (queue.length === 0) return "no_seeds";
 
     for (const { seed, duration } of queue.slice(0, allowed)) {
-      if (options.signal?.aborted) break;
+      if (signal?.aborted) break;
       try {
         const found = await this.deps.research.discoverShortsChannels(seed, null, now, { source: "growth", duration });
         result.searched.push(duration === "long" ? longSeedKey(seed) : seed);
         result.channelsNew += found.channelsNew;
         result.channelsQueued += found.channelsQueued;
       } catch (error) {
-        if (isQuotaUnavailable(error)) {
-          result.stoppedBy = "quota";
-          break;
-        }
+        if (isQuotaUnavailable(error)) return "quota";
         this.log.warn("library growth search failed", { seed, error });
       }
     }
-
-    this.log.info("library growth run", { ...result });
-    return result;
+    return undefined;
   }
 }
