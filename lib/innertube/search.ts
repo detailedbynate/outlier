@@ -106,7 +106,9 @@ export class InnerTubeSearch {
     const type = params.type === "video" && params.videoDuration === "short" ? "shorts" : params.type;
     const limit = params.maxResults ?? 25;
     // Filters are part of the key: the same words with a different sort are a different search.
-    const cacheKey = `search:${type}:${prioritize}:${uploadDate}:${duration}:${params.q.toLowerCase()}`;
+    // So is the market: the same words searched from Germany are a different page.
+    const locale = this.locale.lang === "en" && this.locale.location === "US" ? "" : `${this.locale.lang}-${this.locale.location}:`;
+    const cacheKey = `search:${locale}${type}:${prioritize}:${uploadDate}:${duration}:${params.q.toLowerCase()}`;
 
     const parse = params.type === "video" ? videoResults : channelResults;
     const run = <T>(label: string, fn: () => Promise<T>, key?: string, maxWaitMs = options.maxWaitMs) =>

@@ -15,8 +15,10 @@ create table if not exists public.niche_keywords (
   keyword           text primary key,
   -- The seed topic this phrase grew from.
   seed              text not null,
-  -- seed | autocomplete | reddit
+  -- seed | autocomplete | rising | reddit | stackexchange | translation
   source            text not null default 'autocomplete',
+  -- Search language (lib/radar/markets.ts): translations of English phrases are read in their own market.
+  market            text not null default 'en',
   -- 0 for seeds, +1 per autocomplete hop.
   depth             smallint not null default 0,
   -- Position in YouTube's suggestions (0 = first), a free demand signal.
@@ -41,6 +43,7 @@ create index if not exists niche_keywords_expand_idx on public.niche_keywords (d
 create index if not exists niche_keywords_supply_idx on public.niche_keywords (supply_checked_at nulls first, priority desc);
 create index if not exists niche_keywords_demand_idx on public.niche_keywords (demand_checked_at nulls first);
 create index if not exists niche_keywords_score_idx on public.niche_keywords (score desc nulls last);
+create index if not exists niche_keywords_source_idx on public.niche_keywords (source, seed);
 
 create table if not exists public.niche_ideas (
   id           uuid primary key default gen_random_uuid(),

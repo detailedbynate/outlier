@@ -17,7 +17,7 @@ export function memoryRadar(): RadarDeps["radar"] & { rows: Map<string, NicheKey
         if (rows.has(r.keyword)) continue;
         rows.set(r.keyword, {
           source: "autocomplete", depth: 0, suggest_rank: null, category: null, discovered_at: new Date().toISOString(), expanded_at: null,
-          supply_checked_at: null, supply: null, demand_checked_at: null, demand: null, ease_checked_at: null, ease: null, score: null, priority: 0,
+          supply_checked_at: null, supply: null, demand_checked_at: null, demand: null, ease_checked_at: null, ease: null, score: null, priority: 0, market: "en",
           updated_at: new Date().toISOString(), ...r,
         } as NicheKeywordRow);
         added += 1;
@@ -52,8 +52,16 @@ export function memoryRadar(): RadarDeps["radar"] & { rows: Map<string, NicheKey
         if (row) row.expanded_at = at.toISOString();
       }
     },
-    top: async ({ limit, minScore, category }) =>
-      all().filter((r) => r.score !== null && (minScore === undefined || r.score >= minScore) && (!category || r.category === category)).sort(byScore).slice(0, limit),
+    top: async ({ limit, minScore, category, market }) =>
+      all()
+        .filter((r) => r.score !== null && (minScore === undefined || r.score >= minScore) && (!category || r.category === category) && (!market || r.market === market))
+        .sort(byScore)
+        .slice(0, limit),
+    seededFrom: async (source, seeds) => new Set(all().filter((r) => r.source === source && seeds.includes(r.seed)).map((r) => r.seed)),
+    lastAddedAt: async (source) => {
+      const mine = all().filter((r) => r.source === source).map((r) => r.discovered_at).sort();
+      return mine.length ? new Date(mine[mine.length - 1]!) : null;
+    },
     get: async (keyword) => rows.get(keyword) ?? null,
     addIdeas: async (insert) => {
       for (const r of insert) ideaRows.push({ id: String(ideaRows.length), community: null, score: 0, comments: 0, views: null, posted_at: null, kind: "discussion", category: null, collected_at: new Date().toISOString(), ...r } as NicheIdeaRow);

@@ -30,6 +30,8 @@ export interface RadarSignals {
   ease: EaseRating | null;
   /** First seen in a re-sweep of autocomplete: a search that just started. */
   rising?: boolean;
+  /** RPM next to English audiences (markets.ts); 1 for English. */
+  rpmFactor?: number;
 }
 
 export interface RadarScore {
@@ -48,7 +50,8 @@ export function scoreRadar(s: RadarSignals): RadarScore | null {
   if (s.ease?.coherent === false) return null;
   const format = s.supply.shortsShare >= 0.5 ? "shorts" : "long_form";
   const category = s.category ?? categoryFor(s.keyword);
-  const rpm = rpmFor(category, format);
+  const factor = s.rpmFactor ?? 1;
+  const rpm = rpmFor(category, format).map((n) => Math.round(n * factor * 100) / 100) as [number, number];
 
   // Demand: real search volume beats autocomplete position, and views on the ranking videos back either up.
   const views = clamp01(Math.log10(s.supply.medianViews + 1) / 6);

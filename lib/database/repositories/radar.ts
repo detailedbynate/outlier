@@ -115,11 +115,27 @@ export class RadarRepository {
     assertOk(await this.db.from("niche_keywords").update({ expanded_at: at.toISOString() }).in("keyword", keywords), "niche_keywords.markExpanded");
   }
 
-  async top(options: { limit: number; minScore?: number; category?: string | null }): Promise<NicheKeywordRow[]> {
+  async top(options: { limit: number; minScore?: number; category?: string | null; market?: string }): Promise<NicheKeywordRow[]> {
     let query = this.db.from("niche_keywords").select("*").not("score", "is", null);
     if (options.minScore !== undefined) query = query.gte("score", options.minScore);
+    if (options.market) query = query.eq("market", options.market);
     if (options.category) query = query.eq("category", options.category);
     return unwrap(await query.order("score", { ascending: false }).limit(options.limit), "niche_keywords.top");
+  }
+
+  /** Which of these phrases have already been seeds for a source (e.g. already translated). */
+  async seededFrom(source: string, seeds: readonly string[]): Promise<Set<string>> {
+    if (seeds.length === 0) return new Set();
+    const rows = unwrap(await this.db.from("niche_keywords").select("seed").eq("source", source).in("seed", [...seeds]), "niche_keywords.seededFrom");
+    return new Set(rows.map((r) => r.seed));
+  }
+
+  async lastAddedAt(source: string): Promise<Date | null> {
+    const rows = unwrap(
+      await this.db.from("niche_keywords").select("discovered_at").eq("source", source).order("discovered_at", { ascending: false }).limit(1),
+      "niche_keywords.lastAdded",
+    );
+    return rows[0] ? new Date(rows[0].discovered_at) : null;
   }
 
   async get(keyword: string): Promise<NicheKeywordRow | null> {

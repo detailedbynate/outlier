@@ -263,6 +263,8 @@ export type NicheKeywordRow = {
   score: number | null;
   /** Which unchecked phrases to read first (priority.ts). */
   priority: number;
+  /** Search language (lib/radar/markets.ts). */
+  market: string;
   updated_at: string;
 };
 

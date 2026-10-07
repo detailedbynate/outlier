@@ -307,7 +307,7 @@ The Niche Finder opens on a **Discover** board, so nobody has to know what to se
 
 - **Tracked channels**: every niche in the library (`lib/niches/discover.ts`), per format, scored on RPM (category bands in `lib/niches/revenue.ts`), views, how untapped it is, and how easy it is to make. Cached 6h per format.
 - **Search gaps**: the **Niche Radar** (`lib/radar/`, `NicheRadarService`), for niches the library has no channels for yet.
-- **Video ideas**: AI first-video ideas for the best gaps, Stack Exchange questions by views, and Reddit questions from this week.
+- **Video ideas**: breakouts in paying niches (small channels that pulled many times their subscribers in the last two weeks, `lib/niches/breakouts.ts`), AI first-video ideas for the best gaps, Stack Exchange questions by views, and Reddit questions from this week.
 
 The radar runs inside the scraper process, a little each round:
 
@@ -317,6 +317,7 @@ The radar runs inside the scraper process, a little each round:
 4. **Demand and pay** (`demand.ts`) come from Google search volume, CPC and the 12-month trend via DataForSEO, if `DATAFORSEO_LOGIN`/`PASSWORD` are set. Phrases are batched by 100 or more.
 5. **Ease** (`ease.ts`) is an AI rating of what it takes to make the videos ranking for the phrase, with three first-video ideas. Only phrases scoring 50+ are rated.
 6. The **score** (`score.ts`) is 25% demand, 25% pay, 30% gap and 20% ease. Phrases scoring 60+ feed `library.grow` as seeds.
+7. **Other languages** (`markets.ts`): once a day the best English phrases (55+) are translated by the AI into German, Japanese, French, Spanish and Portuguese, and each translation is read with YouTube set to that language and country. Pay is scaled by a rough RPM factor per market (German 0.85 of English, Portuguese 0.3). Translations aren't grown through autocomplete or sent to DataForSEO, and only English phrases feed the library.
 
 **Ideas** come from Stack Exchange (`stackexchange.ts`, no key needed, about 100 requests a day; `STACKEXCHANGE_KEY` raises the cap) and Reddit (`reddit.ts`, needs `REDDIT_CLIENT_ID`/`SECRET` for app-only OAuth). Note that Reddit's Data API terms restrict commercial use. The tables are `niche_keywords` and `niche_ideas` (migration `20261007000032_niche_radar.sql`).
 

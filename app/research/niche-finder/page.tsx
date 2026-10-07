@@ -22,6 +22,7 @@ import { CompareBox, FitPanel, Patterns, SaveNicheButton, SavedNiches, ScoreBrea
 import { TopicInput } from "./topic-input";
 import { rpmTierOf, sortDiscovered, type DiscoveredNiche, type DiscoverFormat, type DiscoverSort } from "@/lib/niches/discover";
 import type { RadarNiche } from "@/lib/services/niche-radar-service";
+import { marketOf } from "@/lib/radar/markets";
 import type { Breakout } from "@/lib/niches/breakouts";
 import type { NicheIdeaRow } from "@/types/database";
 
@@ -33,7 +34,7 @@ const STARTERS = ["gaming", "fitness", "cooking", "personal finance", "tech", "b
 const LEVEL_LABEL: Record<Level, string> = { low: "Low", medium: "Medium", high: "High" };
 const FORMAT_LABEL = { shorts: "Shorts", long_form: "Long-form", both: "Both work", unknown: "Not enough data" } as const;
 
-type SearchParams = Promise<{ topic?: string; sub?: string; format?: string; rpm?: string; sort?: string; board?: string }>;
+type SearchParams = Promise<{ topic?: string; sub?: string; format?: string; rpm?: string; sort?: string; board?: string; lang?: string }>;
 
 const SORTS: { value: DiscoverSort; label: string }[] = [
   { value: "best", label: "Best overall" },
@@ -49,13 +50,19 @@ const RPM_FILTERS = [
   { value: "low", label: "Low RPM" },
 ] as const;
 type RpmFilter = (typeof RPM_FILTERS)[number]["value"];
+const LANG_FILTERS = [
+  { value: "all", label: "Any language" },
+  { value: "en", label: "English" },
+  { value: "other", label: "Other languages" },
+] as const;
+type LangFilter = (typeof LANG_FILTERS)[number]["value"];
 const BOARDS = [
   { value: "library", label: "Tracked channels" },
   { value: "gaps", label: "Search gaps" },
   { value: "ideas", label: "Video ideas" },
 ] as const;
 type Board = (typeof BOARDS)[number]["value"];
-type View = { format: DiscoverFormat; rpm: RpmFilter; sort: DiscoverSort; board: Board };
+type View = { format: DiscoverFormat; rpm: RpmFilter; sort: DiscoverSort; board: Board; lang: LangFilter };
 
 export default async function NicheFinderPage({ searchParams }: { searchParams: SearchParams }) {
   const current = await requireApprovedUser();
@@ -77,6 +84,7 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
     rpm: (RPM_FILTERS.some((f) => f.value === params.rpm) ? params.rpm : "all") as RpmFilter,
     sort: (SORTS.find((s) => s.value === params.sort)?.value ?? "best") as DiscoverSort,
     board: (BOARDS.find((b) => b.value === params.board)?.value ?? "library") as Board,
+    lang: (LANG_FILTERS.find((l) => l.value === params.lang)?.value ?? "all") as LangFilter,
   };
   const browsing = intent !== "research" || !topic;
 
@@ -699,7 +707,7 @@ function ViralChannels({ channels, title }: { channels: ViralChannel[]; title: s
 
 function discoverHref(view: View, change: Partial<View>) {
   const next = { ...view, ...change };
-  return `/research/niche-finder?board=${next.board}&format=${next.format}&rpm=${next.rpm}&sort=${next.sort}`;
+  return `/research/niche-finder?board=${next.board}&format=${next.format}&rpm=${next.rpm}&sort=${next.sort}&lang=${next.lang}`;
 }
 
 const RPM_TIER_LABEL = { high: "High RPM", mid: "Mid RPM", low: "Low RPM" } as const;
@@ -716,13 +724,14 @@ const GAP_SORT: Record<DiscoverSort, (n: RadarNiche) => number> = {
 function sortGaps(niches: readonly RadarNiche[], view: View): RadarNiche[] {
   return niches
     .filter((n) => n.format === view.format && (view.rpm === "all" || rpmTierOf(n.rpm, n.format) === view.rpm))
+    .filter((n) => view.lang === "all" || (view.lang === "en") === (n.market === "en"))
     .sort((a, b) => GAP_SORT[view.sort](b) - GAP_SORT[view.sort](a))
     .slice(0, 24);
 }
 
 const BOARD_SUB: Record<Board, string> = {
   library: "No search needed. Every niche in the channels Outlier tracks, scored on RPM, views, how untapped it is and how easy it is to make.",
-  gaps: "What people type into YouTube search where the results are old, small channels are winning and no giant owns the page. Checked around the clock.",
+  gaps: "What people type into YouTube search where the results are old, small channels are winning and no giant owns the page, in English and five other languages. Checked around the clock.",
   ideas: "First videos to make in the most open niches, questions read hundreds of thousands of times on Stack Exchange, and what Reddit is asking this week.",
 };
 
@@ -789,6 +798,15 @@ function Filters({ view }: { view: View }) {
           </Link>
         ))}
       </div>
+      {view.board === "gaps" ? (
+        <div className="dash-topics" role="group" aria-label="Language">
+          {LANG_FILTERS.map((l) => (
+            <Link key={l.value} href={discoverHref(view, { lang: l.value })} className="dash-topic" data-mine={view.lang === l.value}>
+              {l.label}
+            </Link>
+          ))}
+        </div>
+      ) : null}
       <div className="dash-topics" role="group" aria-label="Sort">
         {SORTS.map((s) => (
           <Link key={s.value} href={discoverHref(view, { sort: s.value })} className="dash-topic" data-mine={view.sort === s.value}>
@@ -892,6 +910,11 @@ function GapBoard({ gaps }: { gaps: RadarNiche[] }) {
               </span>
             </header>
             <p className="niche-idea-reason">{gapReason(n)}</p>
+            {n.market !== "en" ? (
+              <p className="dash-row-sub">
+                {marketOf(n.market).label} for &ldquo;{n.seed}&rdquo;, searched from YouTube {marketOf(n.market).location}
+              </p>
+            ) : null}
             <dl className="discover-scores">
               {n.demand?.volume != null ? (
                 <div><dt>Searches/mo</dt><dd>{formatCompact(n.demand.volume)}</dd></div>
@@ -916,6 +939,7 @@ function GapBoard({ gaps }: { gaps: RadarNiche[] }) {
             {n.ease?.how ? <p className="dash-row-sub">{n.ease.how}</p> : null}
             <div className="niche-idea-tags">
               {n.source === "rising" ? <span data-tone="new">New in search</span> : null}
+              {n.market !== "en" ? <span data-tone="new">{marketOf(n.market).label}</span> : null}
               {n.category ? <span>{n.category}</span> : null}
               {n.ease?.faceless ? <span>Faceless</span> : null}
               {n.ease?.production.slice(0, 2).map((p) => <span key={p}>{p}</span>)}

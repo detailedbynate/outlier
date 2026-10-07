@@ -132,13 +132,26 @@ async function main(): Promise<void> {
   const lang = config.OUTLIER_LANGUAGE.toLowerCase();
   const region = config.OUTLIER_REGION.toUpperCase();
   const scrapedSearch = new InnerTubeSearch(gate, { lang, location: region });
+  // Translated phrases are read with YouTube set to their own language and country, through the same gate.
+  const { marketOf } = await import("@/lib/radar/markets");
+  const marketSearch = new Map<string, InstanceType<typeof InnerTubeSearch>>();
+  const searchIn = (market: string) => {
+    if (market === "en") return scrapedSearch;
+    let client = marketSearch.get(market);
+    if (!client) {
+      const m = marketOf(market);
+      client = new InnerTubeSearch(gate, { lang: m.lang, location: m.location });
+      marketSearch.set(market, client);
+    }
+    return client;
+  };
   const suggestGate = new InnerTubeGate(
     { requestsPerMinute: config.RADAR_SUGGESTS_PER_MINUTE, maxConcurrent: 1, cacheTtlMs: 6 * 3_600_000, maxCacheEntries: 2_000 },
     { logger: logger.child({ module: "radar.suggest" }) },
   );
   const radar = services.radar.withScraping({
     suggest: (q) => suggestGate.run({ label: `suggest:${q.slice(0, 40)}`, cacheKey: `suggest:${lang}:${region}:${q}`, lane: "background" }, () => fetchSuggestions(q, { lang, region })),
-    search: (q) => scrapedSearch.search({ q, type: "video", order: "relevance", maxResults: 20 }, { lane: "background" }),
+    search: (q, market) => searchIn(market).search({ q, type: "video", order: "relevance", maxResults: 20 }, { lane: "background" }),
   });
   let radarSeeded = false;
   let librarySeededAt = 0;
@@ -188,9 +201,9 @@ async function main(): Promise<void> {
     }
     if (!collecting) {
       collecting = inBackground("radar collect", async () => {
-        const [reddit, stack] = await Promise.allSettled([radar.collectRedditOnce({ signal }), radar.collectStackOnce({ signal })]);
+        const [reddit, stack, translated] = await Promise.allSettled([radar.collectRedditOnce({ signal }), radar.collectStackOnce({ signal }), radar.translateOnce()]);
         const value = (r: PromiseSettledResult<unknown>) => (r.status === "fulfilled" ? r.value : { error: String(r.reason).slice(0, 200) });
-        return value(reddit) || value(stack) ? { reddit: value(reddit), stack: value(stack) } : null;
+        return value(reddit) || value(stack) || value(translated) ? { reddit: value(reddit), stack: value(stack), translated: value(translated) } : null;
       }).finally(() => {
         collecting = null;
       });

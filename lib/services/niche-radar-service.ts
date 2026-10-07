@@ -6,6 +6,7 @@ import type { NicheCategory } from "@/lib/niches/labeling";
 import { categoryFor } from "@/lib/niches/revenue";
 import type { DataForSeoClient, Demand } from "@/lib/radar/demand";
 import { rateEase, type EaseRating } from "@/lib/radar/ease";
+import { marketOf, translatePhrases, type MarketCode } from "@/lib/radar/markets";
 import { SUBREDDITS, type RedditClient, type RedditPost } from "@/lib/radar/reddit";
 import { STACK_SITES, type StackExchangeClient } from "@/lib/radar/stackexchange";
 import { priorityOf } from "@/lib/radar/priority";
@@ -26,7 +27,8 @@ import type { YouTubeChannel, YouTubeSearchResult, YouTubeVideo } from "@/types/
  *
  * Reddit adds phrases and video ideas from high-paying communities; Stack
  * Exchange adds evergreen questions (with view counts) and its sites' popular
- * tags as seeds.
+ * tags as seeds. The best English phrases are translated into other markets
+ * (markets.ts) and read there, where the same demand often has far less supply.
  *
  * Everything that touches YouTube goes through the scraper's gate (the caller
  * passes gated `suggest` and `search`), so the radar shares the scraper's rate
@@ -39,12 +41,12 @@ const DAY = 86_400_000;
 export interface RadarDeps {
   radar: Pick<
     RadarRepository,
-    "countKeywords" | "addKeywords" | "dueForExpansion" | "dueForResweep" | "dueForSupply" | "dueForDemand" | "dueForEase" | "update" | "markExpanded" | "top" | "addIdeas" | "ideas" | "lastIdeasAt" | "get"
+    "countKeywords" | "addKeywords" | "dueForExpansion" | "dueForResweep" | "dueForSupply" | "dueForDemand" | "dueForEase" | "update" | "markExpanded" | "top" | "addIdeas" | "ideas" | "lastIdeasAt" | "get" | "seededFrom" | "lastAddedAt"
   >;
   /** Autocomplete through the gate. */
   suggest?: (query: string) => Promise<Suggestion[]>;
-  /** Scraped search through the gate; never the API's 100-unit search. */
-  search?: (query: string) => Promise<YouTubeSearchResult[]>;
+  /** Scraped search through the gate, in the phrase's market; never the API's 100-unit search. */
+  search?: (query: string, market: MarketCode) => Promise<YouTubeSearchResult[]>;
   /** Exact stats for the results (1 quota unit per 50 each). */
   youtube?: { getVideos(ids: readonly string[]): Promise<YouTubeVideo[]>; getChannels(ids: readonly string[]): Promise<YouTubeChannel[]> };
   demand?: Pick<DataForSeoClient, "searchVolume"> | null;
@@ -71,6 +73,12 @@ export interface RadarConfig {
   resweepDays: number;
   /** Collect Stack Exchange at most this often. */
   stackEveryHours: number;
+  /** Translate the best English phrases at most this often. */
+  translateEveryHours: number;
+  /** English phrases per translation batch (each becomes up to five). */
+  translateBatch: number;
+  /** Only English phrases scoring at least this get translated. */
+  translateMinScore: number;
 }
 
 export const DEFAULT_RADAR_CONFIG: RadarConfig = {
@@ -82,6 +90,9 @@ export const DEFAULT_RADAR_CONFIG: RadarConfig = {
   easeMinScore: 50,
   resweepDays: 7,
   stackEveryHours: 24,
+  translateEveryHours: 24,
+  translateBatch: 25,
+  translateMinScore: 55,
 };
 
 /** A phrase ready to show. */
@@ -89,6 +100,8 @@ export interface RadarNiche {
   keyword: string;
   seed: string;
   source: string;
+  /** Search language; translations keep the English phrase they came from in `seed`. */
+  market: MarketCode;
   category: NicheCategory | null;
   score: number;
   parts: RadarScore["parts"];
@@ -105,12 +118,24 @@ export function toRadarNiche(row: NicheKeywordRow): RadarNiche | null {
   const demand = row.demand as unknown as Demand | null;
   const ease = row.ease as unknown as EaseRating | null;
   const category = (row.category as NicheCategory | null) ?? categoryFor(row.keyword);
-  const scored = scoreRadar({ keyword: row.keyword, depth: row.depth, suggestRank: row.suggest_rank, category, supply, demand, ease, rising: row.source === "rising" });
+  const market = (row.market ?? "en") as MarketCode;
+  const scored = scoreRadar({
+    keyword: row.keyword,
+    depth: row.depth,
+    suggestRank: row.suggest_rank,
+    category,
+    supply,
+    demand,
+    ease,
+    rising: row.source === "rising",
+    rpmFactor: marketOf(market).rpmFactor,
+  });
   if (!scored || !supply) return null;
   return {
     keyword: row.keyword,
     seed: row.seed,
     source: row.source,
+    market,
     category,
     score: scored.total,
     parts: scored.parts,
@@ -134,6 +159,7 @@ function withPriority(row: KeywordInsert): KeywordInsert {
 export class NicheRadarService {
   private readonly log: Logger;
   private readonly config: RadarConfig;
+  private lastTranslateAttempt = 0;
 
   constructor(
     private readonly deps: RadarDeps,
@@ -225,7 +251,7 @@ export class NicheRadarService {
     const due = await this.deps.radar.dueForSupply(new Date(now.getTime() - this.config.supplyRefreshDays * DAY), options.limit);
     for (const row of due) {
       if (options.signal?.aborted) break;
-      const found = await search(row.keyword);
+      const found = await search(row.keyword, (row.market ?? "en") as MarketCode);
       const ids = [...new Set(found.filter((r) => r.kind === "video" || !r.kind).map((r) => r.id))].slice(0, 20);
       const videos = ids.length ? await youtube.getVideos(ids) : [];
       const channels = videos.length ? await youtube.getChannels([...new Set(videos.map((v) => v.channelId))]) : [];
@@ -244,8 +270,10 @@ export class NicheRadarService {
     const due = await this.deps.radar.dueForDemand(new Date(now.getTime() - this.config.demandRefreshDays * DAY), options.limit ?? 1_000);
     // Under a hundred isn't worth a request yet.
     if (due.length < Math.min(100, options.limit ?? 100)) return { enriched: 0 };
+    // Volume and CPC are asked for the US market, so other languages' phrases just get a timestamp.
+    const english = due.filter((r) => (r.market ?? "en") === "en");
     const demand = await this.deps.demand.searchVolume(
-      due.map((r) => r.keyword),
+      english.map((r) => r.keyword),
       options.signal,
     );
     let enriched = 0;
@@ -341,6 +369,53 @@ export class NicheRadarService {
     return { questions: saved, seeds };
   }
 
+  /**
+   * The best English phrases, translated into the other markets once a day. Each
+   * translation is its own phrase, read in its own language and country; it isn't
+   * grown through autocomplete (that's English-only), so it starts at the deepest level.
+   */
+  async translateOnce(options: { now?: Date } = {}): Promise<{ phrases: number; added: number } | null> {
+    if (!this.deps.ai) return null;
+    const now = options.now ?? new Date();
+    const every = this.config.translateEveryHours * 3_600_000;
+    // The attempt clock covers batches that added nothing (every translation already known), which leave no row to date.
+    if (now.getTime() - this.lastTranslateAttempt < every) return null;
+    const last = await this.deps.radar.lastAddedAt("translation");
+    if (last && now.getTime() - last.getTime() < every) return null;
+    this.lastTranslateAttempt = now.getTime();
+    const best = await this.deps.radar.top({ limit: this.config.translateBatch * 4, minScore: this.config.translateMinScore, market: "en" });
+    const done = await this.deps.radar.seededFrom(
+      "translation",
+      best.map((r) => r.keyword),
+    );
+    const batch = best.filter((r) => !done.has(r.keyword)).slice(0, this.config.translateBatch);
+    if (batch.length === 0) return null;
+    const byKeyword = new Map(batch.map((r) => [r.keyword, r]));
+    try {
+      const translations = await translatePhrases(
+        this.deps.ai,
+        batch.map((r) => r.keyword),
+      );
+      const rows = translations.map((t) =>
+        withPriority({
+          keyword: t.phrase,
+          seed: t.english,
+          source: "translation",
+          market: t.market,
+          depth: this.config.maxDepth,
+          category: byKeyword.get(t.english)?.category ?? categoryFor(t.english),
+          discovered_at: now.toISOString(),
+        }),
+      );
+      const added = await this.deps.radar.addKeywords(rows);
+      this.log.info("radar phrases translated", { phrases: batch.length, added });
+      return { phrases: batch.length, added };
+    } catch (error) {
+      this.log.warn("radar translation failed", { error });
+      return null;
+    }
+  }
+
   /** Turn the week's most-discussed posts into searchable niche phrases (AI), and add the new ones. */
   private async phrasesFromPosts(posts: readonly RedditPost[]): Promise<number> {
     if (!this.deps.ai || posts.length === 0) return 0;
@@ -404,7 +479,8 @@ export class NicheRadarService {
 
   /** Phrases good enough to grow the channel library around. */
   async growthSeeds(limit: number): Promise<string[]> {
-    const rows = await this.deps.radar.top({ limit, minScore: 60 }).catch(() => []);
+    // The library grows through English searches.
+    const rows = await this.deps.radar.top({ limit, minScore: 60, market: "en" }).catch(() => []);
     return rows.map((r) => r.keyword);
   }
 }
