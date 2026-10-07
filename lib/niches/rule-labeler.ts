@@ -90,6 +90,24 @@ function matchDictionary(input: RuleLabelInput): Match[] {
   return matches.sort((a, b) => b.score - a.score);
 }
 
+const GAMES = COMPILED.filter((c) => c.entry.kind === "game");
+
+/**
+ * The game one title (plus tags) is about, by the dictionary: the game inside a
+ * platform wins ("Blox Fruits" over "Roblox"), then the longest phrase.
+ */
+export function gameIn(text: string): string | null {
+  const haystack = padded(text);
+  let best: { name: string; within?: string; length: number } | null = null;
+  for (const { entry, phrases } of GAMES) {
+    const found = phrases.filter((phrase) => contains(haystack, phrase));
+    if (found.length === 0) continue;
+    const length = Math.max(...found.map((p) => p.length));
+    if (!best || entry.within === best.name || (best.within !== entry.name && length > best.length)) best = { name: entry.name, within: entry.within, length };
+  }
+  return best?.name ?? null;
+}
+
 /**
  * The most specific strong match: "Blox Fruits" over "Roblox", "Pokémon GO" over
  * "Pokémon", when the specific one covers most of what the broad one does.

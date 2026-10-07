@@ -129,6 +129,27 @@ describe("NicheRadarService", () => {
     expect(searchVolume).toHaveBeenCalledTimes(2);
   });
 
+  it("turns rising games into seeds and ideas, once a day", async () => {
+    const radar = memoryRadar();
+    const games = vi.fn(async () => [
+      { platform: "roblox" as const, name: "Huss Valley", url: "https://www.roblox.com/games/8", players: 88_000, reason: "up-and-coming" as const, rank: null, lastWeekRank: null },
+      { platform: "steam" as const, name: "Ready or Not", url: "https://store.steampowered.com/app/2", players: 40_000, reason: "climbing" as const, rank: 20, lastWeekRank: 45 },
+    ]);
+    const service = new NicheRadarService({ radar, seeds: [], games }, {}, createLogger());
+    expect(await service.collectGamesOnce({ now: NOW })).toEqual({ games: 2, seeds: 2 });
+    expect(radar.rows.get("huss valley roblox")).toMatchObject({ source: "game", depth: 0, category: "Gaming" });
+    expect(radar.ideaRows.find((r) => r.title === "Ready or Not")).toMatchObject({ source: "games", kind: "climbing", comments: 25, score: 40_000 });
+    expect(await service.collectGamesOnce({ now: new Date(NOW.getTime() + 3_600_000) })).toBeNull();
+    expect(games).toHaveBeenCalledTimes(1);
+
+    // Once YouTube has been checked for a game, it shows with its gap.
+    const listed = await service.risingGames({ now: NOW });
+    expect(listed.map((g) => [g.game.title, g.phrase, g.niche])).toEqual([
+      ["Huss Valley", "huss valley roblox", null],
+      ["Ready or Not", "ready or not", null],
+    ]);
+  });
+
   it("does nothing without its scraping half", async () => {
     const service = new NicheRadarService({ radar: memoryRadar(), seeds: [] }, {}, createLogger());
     expect(await service.expandOnce({ maxQueries: 10 })).toEqual({ queries: 0, added: 0, expanded: 0, rising: 0 });

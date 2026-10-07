@@ -46,7 +46,7 @@ describe("formats working right now", () => {
 
     const [ranking, ...rest] = measureFormats(videos, channels);
     expect(rest).toHaveLength(0);
-    expect(ranking).toMatchObject({ id: "ranking", videos: 24, channels: 6, medianLift: 5, edge: 5, topCategories: ["Gaming"] });
+    expect(ranking).toMatchObject({ id: "ranking", videos: 24, channels: 6, medianLift: 5, edge: 5, topIn: ["Gaming"] });
     expect(ranking!.openIn).toContain("Finance & Business");
     expect(ranking!.best).toMatchObject({ views: 50_000 });
   });

@@ -1,5 +1,6 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 /**
@@ -16,7 +17,13 @@ const STEPS = [
   { label: "Almost there, big niches take a little longer", after: 20_000 },
 ];
 
+/** The report steps only while a topic is being researched; just opening the page needs no explaining. */
 export function NicheLoading() {
+  const researching = Boolean(useSearchParams().get("topic")?.trim());
+  return researching ? <ReportSteps /> : null;
+}
+
+function ReportSteps() {
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {

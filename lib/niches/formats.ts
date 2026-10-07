@@ -1,12 +1,17 @@
 import type { NicheChannel, NicheVideo } from "./analysis";
 import { categoryFor, rpmFor } from "./revenue";
 import type { NicheCategory } from "./labeling";
+import type { IdeaLens } from "./breakouts";
+import { gameIn } from "./rule-labeler";
 
 /**
  * Formats working right now: title templates small channels are breaking out
  * with ("Ranking the best…", "Every … explained", "… vs … speed test"),
  * measured across the whole library. A format that works in gaming and hasn't
  * reached finance yet is a ready-made first video for a finance channel.
+ *
+ * Through the gaming lens the same comparison runs between games: iceberg
+ * videos that work in Minecraft and nobody has made for Blox Fruits yet.
  */
 
 interface FormatDef {
@@ -51,10 +56,10 @@ export interface FormatStat {
   medianLift: number;
   /** Next to the sample's median lift: 2 means twice as good as a typical upload. */
   edge: number;
-  /** Where it's used most. */
-  topCategories: NicheCategory[];
-  /** Paying categories (long-form RPM $3+) where almost nobody uses it yet. */
-  openIn: NicheCategory[];
+  /** Where it's used most: categories, or games through the gaming lens. */
+  topIn: string[];
+  /** Where almost nobody uses it yet: paying categories (long-form RPM $3+), or popular games. */
+  openIn: string[];
   best: { youtubeVideoId: string; title: string; channelTitle: string; views: number; subscribers: number | null; format: "short" | "long_form" } | null;
 }
 
@@ -70,16 +75,24 @@ function median(values: number[]): number {
 export function measureFormats(
   videos: readonly NicheVideo[],
   channels: ReadonlyMap<string, NicheChannel>,
-  options: { maxSubscribers?: number; minVideos?: number; minChannels?: number; limit?: number } = {},
+  options: { maxSubscribers?: number; minVideos?: number; minChannels?: number; limit?: number; lens?: IdeaLens } = {},
 ): FormatStat[] {
   const maxSubs = options.maxSubscribers ?? 250_000;
+  const gaming = options.lens === "gaming";
   const rows = videos.flatMap((video) => {
     const channel = channels.get(video.channel_id);
     if (!channel || (channel.subscriber_count !== null && channel.subscriber_count > maxSubs)) return [];
     const category = channel.niche_terms?.length ? categoryFor(...channel.niche_terms) : categoryFor(video.title);
-    return [{ video, channel, category, lift: video.view_count / Math.max(channel.subscriber_count ?? 0, 1_000) }];
+    if (gaming && category !== "Gaming") return [];
+    // Through the gaming lens, "where" is the game rather than the category.
+    const where: string | null = gaming ? (gameIn(`${video.title} ${video.tags.slice(0, 8).join(" ")}`) ?? (channel.niche_terms?.length ? gameIn(channel.niche_terms.join(" ")) : null)) : category;
+    return [{ video, channel, category, where, lift: video.view_count / Math.max(channel.subscriber_count ?? 0, 1_000) }];
   });
   const baseline = median(rows.map((r) => r.lift)) || 1;
+  // Games big enough in the sample to say a format is missing from them.
+  const shareOf = new Map<string, number>();
+  for (const r of rows) if (r.where) shareOf.set(r.where, (shareOf.get(r.where) ?? 0) + 1);
+  const bigGames = gaming ? [...shareOf].filter(([, n]) => n / rows.length >= 0.01 && n >= 20).sort((a, b) => b[1] - a[1]).slice(0, 25).map(([g]) => g) : [];
 
   const stats: FormatStat[] = [];
   for (const format of FORMATS) {
@@ -87,12 +100,17 @@ export function measureFormats(
     const channelIds = new Set(using.map((r) => r.video.channel_id));
     if (using.length < (options.minVideos ?? 15) || channelIds.size < (options.minChannels ?? 5)) continue;
     const medianLift = median(using.map((r) => r.lift));
-    const byCategory = new Map<NicheCategory, number>();
-    for (const r of using) if (r.category) byCategory.set(r.category, (byCategory.get(r.category) ?? 0) + 1);
-    const topCategories = [...byCategory].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([c]) => c);
-    // "Open" is relative: under 5% of this format's uses, while the category is a real part of the library.
-    const libraryShare = (c: NicheCategory) => rows.filter((r) => r.category === c).length / rows.length;
-    const openIn = PAYING.filter((c) => (byCategory.get(c) ?? 0) / using.length < 0.05 && libraryShare(c) >= 0.01 && rpmFor(c, "long_form")[0] >= 3);
+    const byWhere = new Map<string, number>();
+    for (const r of using) if (r.where) byWhere.set(r.where, (byWhere.get(r.where) ?? 0) + 1);
+    const topIn = [...byWhere].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([c]) => c);
+    // "Open" is relative: under 5% of this format's uses, while the category (or game) is a real part of the library.
+    const libraryShare = (c: string) => (shareOf.get(c) ?? 0) / rows.length;
+    const rare = (c: string) => (byWhere.get(c) ?? 0) / using.length < 0.05;
+    // A game is open when it uses the format at under a third of gaming's overall rate.
+    const rate = using.length / rows.length;
+    const openIn = gaming
+      ? bigGames.filter((g) => !topIn.includes(g) && (byWhere.get(g) ?? 0) / (shareOf.get(g) ?? 1) < rate / 3).slice(0, 4)
+      : PAYING.filter((c: NicheCategory) => rare(c) && libraryShare(c) >= 0.01 && rpmFor(c, "long_form")[0] >= 3);
     const top = [...using].sort((a, b) => b.lift - a.lift || b.video.view_count - a.video.view_count)[0];
     stats.push({
       id: format.id,
@@ -102,7 +120,7 @@ export function measureFormats(
       channels: channelIds.size,
       medianLift: Math.round(medianLift * 100) / 100,
       edge: Math.round((medianLift / baseline) * 100) / 100,
-      topCategories,
+      topIn,
       openIn,
       best: top
         ? {

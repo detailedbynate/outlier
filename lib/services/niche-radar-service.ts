@@ -8,6 +8,7 @@ import type { DataForSeoClient, Demand } from "@/lib/radar/demand";
 import { rateEase, type EaseRating } from "@/lib/radar/ease";
 import { marketOf, translatePhrases, type MarketCode } from "@/lib/radar/markets";
 import { extractRequests } from "@/lib/radar/requests";
+import { gameSearchPhrase, type RisingGame } from "@/lib/radar/games";
 import { launchPhrases, type Launch } from "@/lib/radar/launches";
 import type { VideoComment } from "@/lib/innertube/comments";
 import { SUBREDDITS, type RedditClient, type RedditPost } from "@/lib/radar/reddit";
@@ -47,7 +48,7 @@ const DAY = 86_400_000;
 export interface RadarDeps {
   radar: Pick<
     RadarRepository,
-    "countKeywords" | "addKeywords" | "dueForExpansion" | "dueForResweep" | "dueForSupply" | "dueForDemand" | "dueForEase" | "update" | "markExpanded" | "top" | "addIdeas" | "ideas" | "lastIdeasAt" | "get" | "seededFrom" | "lastAddedAt" | "lastDemandAt"
+    "countKeywords" | "addKeywords" | "dueForExpansion" | "dueForResweep" | "dueForSupply" | "dueForDemand" | "dueForEase" | "update" | "markExpanded" | "top" | "addIdeas" | "ideas" | "lastIdeasAt" | "get" | "getMany" | "seededFrom" | "lastAddedAt" | "lastDemandAt"
   >;
   /** Autocomplete through the gate. */
   suggest?: (query: string) => Promise<Suggestion[]>;
@@ -62,6 +63,8 @@ export interface RadarDeps {
   stackexchange?: Pick<StackExchangeClient, "sweep"> | null;
   /** This week's Show HN posts and rising GitHub repos. */
   launches?: ((options: { signal?: AbortSignal; now?: Date }) => Promise<Launch[]>) | null;
+  /** Games entering Steam's most-played chart and Roblox's Up-and-Coming and Trending sorts. */
+  games?: ((options: { signal?: AbortSignal }) => Promise<RisingGame[]>) | null;
   ai?: Pick<TextProvider, "generateObject"> | null;
   seeds: readonly string[];
 }
@@ -99,6 +102,8 @@ export interface RadarConfig {
   requestNiches: number;
   /** Read new launches at most this often. */
   launchesEveryHours: number;
+  /** Read rising games at most this often. */
+  gamesEveryHours: number;
 }
 
 export const DEFAULT_RADAR_CONFIG: RadarConfig = {
@@ -119,7 +124,16 @@ export const DEFAULT_RADAR_CONFIG: RadarConfig = {
   requestsEveryHours: 24,
   requestNiches: 15,
   launchesEveryHours: 7 * 24,
+  gamesEveryHours: 24,
 };
+
+/** A rising game, with what YouTube looks like for it once the radar has checked. */
+export interface RisingGameNiche {
+  game: NicheIdeaRow;
+  /** What people search for it. */
+  phrase: string;
+  niche: RadarNiche | null;
+}
 
 /** A phrase ready to show. */
 export interface RadarNiche {
@@ -189,6 +203,7 @@ export class NicheRadarService {
   private lastTranslateAttempt = 0;
   private lastRequestsAttempt = 0;
   private lastLaunchesAttempt = 0;
+  private lastGamesAttempt = 0;
 
   constructor(
     private readonly deps: RadarDeps,
@@ -547,6 +562,52 @@ export class NicheRadarService {
     }
   }
 
+  /**
+   * Rising games, once a day: each becomes a seed (grown through autocomplete into
+   * "huss valley tips", "huss valley secrets") and an idea row with its player count.
+   * Seeds are checked first (priority.ts), so within a day the board shows whether
+   * YouTube has caught up with the game yet.
+   */
+  async collectGamesOnce(options: { signal?: AbortSignal; now?: Date } = {}): Promise<{ games: number; seeds: number } | null> {
+    const { games } = this.deps;
+    if (!games) return null;
+    const now = options.now ?? new Date();
+    const every = this.config.gamesEveryHours * 3_600_000;
+    if (now.getTime() - this.lastGamesAttempt < every) return null;
+    const last = await this.deps.radar.lastIdeasAt("games");
+    if (last && now.getTime() - last.getTime() < every) return null;
+    this.lastGamesAttempt = now.getTime();
+    try {
+      const found = (await games({ signal: options.signal })).filter((g) => gameSearchPhrase(g).length >= 3);
+      const seeds = await this.deps.radar.addKeywords(
+        found.map((g) => {
+          const keyword = gameSearchPhrase(g);
+          return withPriority({ keyword, seed: keyword, source: "game", depth: 0, category: "Gaming" });
+        }),
+      );
+      await this.deps.radar.addIdeas(
+        found.map((g) => ({
+          source: "games",
+          community: g.platform,
+          title: g.name,
+          url: g.url,
+          score: g.players,
+          // Places climbed on Steam's chart this week.
+          comments: g.rank !== null && g.lastWeekRank !== null ? g.lastWeekRank - g.rank : 0,
+          views: g.players,
+          kind: g.reason,
+          category: "Gaming",
+          collected_at: now.toISOString(),
+        })),
+      );
+      this.log.info("rising games collected", { games: found.length, seeds });
+      return { games: found.length, seeds };
+    } catch (error) {
+      this.log.warn("rising games failed", { error });
+      return null;
+    }
+  }
+
   /** Turn the week's most-discussed posts into searchable niche phrases (AI), and add the new ones. */
   private async phrasesFromPosts(posts: readonly RedditPost[]): Promise<number> {
     if (!this.deps.ai || posts.length === 0) return 0;
@@ -594,6 +655,18 @@ export class NicheRadarService {
     });
   }
 
+  /** This week's rising games: checked ones with the most room first, then the rest by players. */
+  async risingGames(options: { limit?: number; now?: Date } = {}): Promise<RisingGameNiche[]> {
+    // Each sweep refreshes a game's row, so three days covers the current lists.
+    const rows = await this.ideas({ source: "games", days: 3, limit: 150, now: options.now });
+    const phrases = rows.map((g) => gameSearchPhrase({ platform: g.community === "roblox" ? "roblox" : "steam", name: g.title }));
+    const checked = new Map((await this.deps.radar.getMany(phrases)).map((r) => [r.keyword, toRadarNiche(r)]));
+    return rows
+      .map((game, i) => ({ game, phrase: phrases[i]!, niche: checked.get(phrases[i]!) ?? null }))
+      .sort((a, b) => (b.niche?.score ?? -1) - (a.niche?.score ?? -1) || b.game.score - a.game.score)
+      .slice(0, options.limit ?? 18);
+  }
+
   async ideas(
     options: { limit?: number; days?: number; kind?: string; source?: string; category?: string | null; orderBy?: "score" | "views"; now?: Date } = {},
   ): Promise<NicheIdeaRow[]> {
@@ -611,8 +684,13 @@ export class NicheRadarService {
   /** Phrases good enough to grow the channel library around. */
   async growthSeeds(limit: number): Promise<string[]> {
     // The library grows through English searches.
-    const rows = await this.deps.radar.top({ limit, minScore: 60, market: "en" }).catch(() => []);
-    return rows.map((r) => r.keyword);
+    const [rows, games] = await Promise.all([
+      this.deps.radar.top({ limit, minScore: 60, market: "en" }).catch(() => []),
+      // This week's rising games, so the channels already covering them get tracked too.
+      this.deps.radar.ideas({ limit: 15, since: new Date(Date.now() - 7 * DAY), source: "games" }).catch(() => []),
+    ]);
+    const fromGames = games.map((g) => gameSearchPhrase({ platform: g.community === "roblox" ? "roblox" : "steam", name: g.title }));
+    return [...new Set([...fromGames, ...rows.map((r) => r.keyword)])];
   }
 }
 

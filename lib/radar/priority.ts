@@ -22,10 +22,12 @@ const clamp01 = (n: number) => Math.min(Math.max(n, 0), 1);
 export function priorityOf(input: PriorityInput): number {
   const category = (input.category as NicheCategory | null) ?? categoryFor(input.keyword);
   const [low, high] = rpmFor(category, "long_form");
-  // Long-form RPM from $0.8 to $20 on a log scale: finance and tech near 1, gaming near 0.
-  const pay = clamp01(Math.log10((low + high) / 2 / 0.8) / Math.log10(20 / 0.8));
+  // Long-form RPM from $0.8 to $20 on a log scale: finance and tech near 1. Gaming is
+  // what most users come for, so it isn't pushed to the back for paying little.
+  const pay = category === "Gaming" ? 0.8 : clamp01(Math.log10((low + high) / 2 / 0.8) / Math.log10(20 / 0.8));
   const rank = input.suggestRank === null ? 0.5 : clamp01(1 - input.suggestRank / 10);
   const shallow = input.depth <= 1 ? 1 : 0.6;
-  const fresh = input.source === "rising" ? 1 : 0;
+  // New searches, and games that just started climbing the charts.
+  const fresh = input.source === "rising" || input.source === "game" ? 1 : 0;
   return Math.round(100 * (0.45 * pay + 0.25 * rank * shallow + 0.3 * fresh));
 }

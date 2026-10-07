@@ -1,13 +1,20 @@
 import type { NicheChannel, NicheVideo } from "./analysis";
 import type { NicheCategory } from "./labeling";
 import { categoriesIn, categoryFor, rpmFor } from "./revenue";
+import { gameIn } from "./rule-labeler";
 
 /**
  * Breakouts in paying niches: recent uploads from small channels that pulled
  * many times their subscriber count, in categories where a view is worth
  * something. A gaming Short with 2M views on a 5K channel is common; a Roth IRA
  * explainer doing 200K on a 3K channel is a niche telling you it's open.
+ *
+ * The gaming lens turns that around for gaming creators: only gaming, ranked on
+ * views and lift (every game pays about the same), each tagged with its game.
  */
+
+/** "paying": categories where a view is worth more. "gaming": gaming only, ranked on views. */
+export type IdeaLens = "paying" | "gaming";
 
 export interface Breakout {
   youtubeVideoId: string;
@@ -24,6 +31,8 @@ export interface Breakout {
   publishedAt: string;
   /** The channel's age in days, when known. */
   channelAgeDays: number | null;
+  /** The game it's about, when the dictionary knows it. */
+  game: string | null;
 }
 
 /** A channel under six months old that's already pulling real views in a paying niche. */
@@ -37,6 +46,7 @@ export interface RisingChannel {
   medianViews: number;
   category: NicheCategory;
   rpm: [number, number];
+  game: string | null;
   /** Its best upload in the sample. */
   top: { youtubeVideoId: string; title: string; views: number; format: "short" | "long_form" };
 }
@@ -52,6 +62,7 @@ export interface BreakoutOptions {
   /** Uploads an unlabeled channel needs in the sample before its topic is trusted. */
   minUploads?: number;
   limit?: number;
+  lens?: IdeaLens;
 }
 
 const DAY_MS = 86_400_000;
@@ -61,6 +72,19 @@ const LOW_PAY: ReadonlySet<NicheCategory> = new Set(["Gaming", "Sports", "Comedy
 const ENTERTAINMENT = /(satisfying|asmr|#viral|#fyp|story ?time|beamng|roblox|fortnite|nintendo|xbox|playstation|garry.?s mod|wwe\b|wrestl|formula ?1|#f1\b|verstappen)/i;
 
 const textOf = (video: NicheVideo) => [video.title, ...video.tags.slice(0, 8)].join(" ");
+
+/** Fits the lens: gaming only for gaming, and paying (and not entertainment in disguise) otherwise. */
+function fits(lens: IdeaLens, category: NicheCategory, rpm: [number, number], minRpm: number, text: string): boolean {
+  // A gaming channel's movie video isn't a gaming breakout: the video has to read as gaming, or at least as nothing else.
+  if (lens === "gaming") {
+    const said = categoriesIn(text);
+    return category === "Gaming" && (said.length === 0 || said.includes("Gaming") || gameIn(text) !== null);
+  }
+  return rpm[0] >= minRpm && !ENTERTAINMENT.test(text) && !categoriesIn(text).some((c) => LOW_PAY.has(c));
+}
+
+/** The video's game, else the channel's. */
+const gameOf = (text: string, channel: NicheChannel) => gameIn(text) ?? (channel.niche_terms?.length ? gameIn(channel.niche_terms.join(" ")) : null);
 
 const ageInDays = (channel: NicheChannel, now: Date): number | null => {
   const created = channel.published_at ? Date.parse(channel.published_at) : NaN;
@@ -110,6 +134,7 @@ export function findBreakouts(videos: readonly NicheVideo[], channels: ReadonlyM
   const minViews = options.minViews ?? 20_000;
   const minLift = options.minLift ?? 3;
   const minRpm = options.minRpm ?? 3;
+  const lens = options.lens ?? "paying";
 
   const categories = channelCategories(videos, channels, options.minUploads ?? 3);
   const best = new Map<string, Breakout>();
@@ -123,9 +148,8 @@ export function findBreakouts(videos: readonly NicheVideo[], channels: ReadonlyM
     const lift = video.view_count / Math.max(subscribers ?? 0, 1_000);
     if (lift < minLift) continue;
     const rpm = rpmFor(category, "long_form");
-    if (rpm[0] < minRpm) continue;
     const text = textOf(video);
-    if (ENTERTAINMENT.test(text) || categoriesIn(text).some((c) => LOW_PAY.has(c))) continue;
+    if (!fits(lens, category, rpm, minRpm, text)) continue;
     // One per channel, so a single hot channel doesn't fill the feed.
     const current = best.get(video.channel_id);
     if (current && current.lift >= lift) continue;
@@ -141,10 +165,12 @@ export function findBreakouts(videos: readonly NicheVideo[], channels: ReadonlyM
       format: video.format === "short" ? "short" : "long_form",
       publishedAt: video.published_at,
       channelAgeDays: ageInDays(channel, now),
+      game: gameOf(text, channel),
     });
   }
-  // Pay matters as much as lift: a 10x finance video beats a 40x DIY one.
-  return [...best.values()].sort((a, b) => Math.sqrt(b.lift) * b.rpm[0] - Math.sqrt(a.lift) * a.rpm[0]).slice(0, options.limit ?? 12);
+  // Pay matters as much as lift: a 10x finance video beats a 40x DIY one. In gaming, views do.
+  const weight = (b: Breakout) => Math.sqrt(b.lift) * (lens === "gaming" ? Math.log10(b.views) : b.rpm[0]);
+  return [...best.values()].sort((a, b) => weight(b) - weight(a)).slice(0, options.limit ?? 12);
 }
 
 /**
@@ -156,9 +182,10 @@ export function findBreakouts(videos: readonly NicheVideo[], channels: ReadonlyM
 export function findRisingChannels(
   videos: readonly NicheVideo[],
   channels: ReadonlyMap<string, NicheChannel>,
-  options: { now?: Date; maxAgeDays?: number; minUploads?: number; minMedianViews?: number; minRpm?: number; limit?: number } = {},
+  options: { now?: Date; maxAgeDays?: number; minUploads?: number; minMedianViews?: number; minRpm?: number; limit?: number; lens?: IdeaLens } = {},
 ): RisingChannel[] {
   const now = options.now ?? new Date();
+  const lens = options.lens ?? "paying";
   const maxAge = options.maxAgeDays ?? 180;
   const minUploads = options.minUploads ?? 3;
   const categories = channelCategories(videos, channels, minUploads);
@@ -176,12 +203,12 @@ export function findRisingChannels(
     const age = ageInDays(channel, now);
     if (age === null || age > maxAge) continue;
     const rpm = rpmFor(category, "long_form");
-    if (rpm[0] < (options.minRpm ?? 2)) continue;
+    if (lens === "gaming" ? category !== "Gaming" : rpm[0] < (options.minRpm ?? 2)) continue;
     const medianViews = median(uploads.map((v) => v.view_count));
     if (medianViews < (options.minMedianViews ?? 10_000)) continue;
     // The channel as a whole has to be about something that pays, not one lucky upload's topic.
     const lowPay = uploads.filter((v) => ENTERTAINMENT.test(textOf(v)) || categoriesIn(textOf(v)).some((c) => LOW_PAY.has(c))).length;
-    if (lowPay * 2 >= uploads.length) continue;
+    if (lens === "paying" && lowPay * 2 >= uploads.length) continue;
     const best = uploads.reduce((a, b) => (b.view_count > a.view_count ? b : a));
     out.push({
       youtubeChannelId: channel.youtube_channel_id,
@@ -193,8 +220,16 @@ export function findRisingChannels(
       medianViews,
       category,
       rpm,
+      game: mostCommon(uploads.map((v) => gameOf(textOf(v), channel))),
       top: { youtubeVideoId: best.youtube_video_id, title: best.title, views: best.view_count, format: best.format === "short" ? "short" : "long_form" },
     });
   }
-  return out.sort((a, b) => Math.sqrt(b.medianViews) * b.rpm[0] - Math.sqrt(a.medianViews) * a.rpm[0]).slice(0, options.limit ?? 9);
+  const weight = (c: RisingChannel) => Math.sqrt(c.medianViews) * (lens === "gaming" ? 1 : c.rpm[0]);
+  return out.sort((a, b) => weight(b) - weight(a)).slice(0, options.limit ?? 9);
+}
+
+function mostCommon(values: (string | null)[]): string | null {
+  const counts = new Map<string, number>();
+  for (const v of values) if (v) counts.set(v, (counts.get(v) ?? 0) + 1);
+  return [...counts].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 }

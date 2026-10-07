@@ -21,10 +21,11 @@ import { isSaved, readSavedNiches } from "@/lib/niches/saved";
 import { CompareBox, FitPanel, Patterns, SaveNicheButton, SavedNiches, ScoreBreakdown, TrendChart } from "./insights";
 import { TopicInput } from "./topic-input";
 import { rpmTierOf, sortDiscovered, type DiscoveredNiche, type DiscoverFormat, type DiscoverSort } from "@/lib/niches/discover";
-import type { RadarNiche } from "@/lib/services/niche-radar-service";
+import type { RadarNiche, RisingGameNiche } from "@/lib/services/niche-radar-service";
 import { marketOf } from "@/lib/radar/markets";
 import type { Breakout, RisingChannel } from "@/lib/niches/breakouts";
 import type { FormatStat } from "@/lib/niches/formats";
+import type { GameStat } from "@/lib/niches/games";
 import type { NicheIdeaRow } from "@/types/database";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +36,7 @@ const STARTERS = ["gaming", "fitness", "cooking", "personal finance", "tech", "b
 const LEVEL_LABEL: Record<Level, string> = { low: "Low", medium: "Medium", high: "High" };
 const FORMAT_LABEL = { shorts: "Shorts", long_form: "Long-form", both: "Both work", unknown: "Not enough data" } as const;
 
-type SearchParams = Promise<{ topic?: string; sub?: string; format?: string; rpm?: string; sort?: string; board?: string; lang?: string }>;
+type SearchParams = Promise<{ topic?: string; sub?: string; format?: string; rpm?: string; sort?: string; board?: string; lang?: string; lens?: string }>;
 
 const SORTS: { value: DiscoverSort; label: string }[] = [
   { value: "best", label: "Best overall" },
@@ -63,7 +64,13 @@ const BOARDS = [
   { value: "ideas", label: "Video ideas" },
 ] as const;
 type Board = (typeof BOARDS)[number]["value"];
-type View = { format: DiscoverFormat; rpm: RpmFilter; sort: DiscoverSort; board: Board; lang: LangFilter };
+/** Most people come for gaming niches, so that's where the boards start. */
+const LENSES = [
+  { value: "gaming", label: "Gaming" },
+  { value: "all", label: "All niches" },
+] as const;
+type Lens = (typeof LENSES)[number]["value"];
+type View = { format: DiscoverFormat; rpm: RpmFilter; sort: DiscoverSort; board: Board; lang: LangFilter; lens: Lens };
 
 export default async function NicheFinderPage({ searchParams }: { searchParams: SearchParams }) {
   const current = await requireApprovedUser();
@@ -86,7 +93,9 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
     sort: (SORTS.find((s) => s.value === params.sort)?.value ?? "best") as DiscoverSort,
     board: (BOARDS.find((b) => b.value === params.board)?.value ?? "library") as Board,
     lang: (LANG_FILTERS.find((l) => l.value === params.lang)?.value ?? "all") as LangFilter,
+    lens: (params.lens === "all" ? "all" : "gaming") as Lens,
   };
+  const gaming = view.lens === "gaming";
   const browsing = intent !== "research" || !topic;
 
   let result: NicheResult | null = null;
@@ -100,7 +109,8 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
     }
   }
   const savedList = readSavedNiches(user.user_metadata);
-  const [popular, allTop, related, saved, own, discovered, radarNiches, questions, evergreen, proof, requests, launches] = await Promise.all([
+  const ideasOn = !result && browsing && view.board === "ideas";
+  const [popular, allTop, related, saved, own, discovered, radarNiches, questions, evergreen, proof, requests, launches, risingGames] = await Promise.all([
     result ? Promise.resolve([]) : services.niches.popularTopics(8),
     result ? services.niches.topNiches(15) : Promise.resolve([]),
     result ? services.niches.relatedNiches(result.topic, result.report, 9) : Promise.resolve([]),
@@ -109,15 +119,18 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
     result ? ownChannel(user.id) : Promise.resolve(null),
     result || view.board !== "library" ? Promise.resolve([]) : services.niches.discover(view.format),
     // The radar tables arrive with a migration; until they exist these boards show their empty state.
-    !result && browsing && view.board !== "library" ? services.radar.list({ limit: 400 }).catch(() => []) : Promise.resolve([]),
-    !result && browsing && view.board === "ideas" ? services.radar.ideas({ limit: 30, days: 21, kind: "question", source: "reddit" }).catch(() => []) : Promise.resolve([]),
-    !result && browsing && view.board === "ideas" ? services.radar.ideas({ limit: 30, days: 30, source: "stackexchange", orderBy: "views" }).catch(() => []) : Promise.resolve([]),
-    !result && browsing && view.board === "ideas" ? services.niches.ideaFeeds(view.format) : Promise.resolve({ breakouts: [], rising: [], formats: [] }),
-    !result && browsing && view.board === "ideas" ? services.radar.ideas({ limit: 30, days: 30, source: "comments", kind: "request" }).catch(() => []) : Promise.resolve([]),
-    !result && browsing && view.board === "ideas" ? services.radar.ideas({ limit: 20, days: 21, source: "launches" }).catch(() => []) : Promise.resolve([]),
+    !result && browsing && view.board !== "library" ? services.radar.list({ limit: 400, category: gaming ? "Gaming" : null }).catch(() => []) : Promise.resolve([]),
+    // Reddit and Stack Exchange are read for paying topics; neither covers games.
+    ideasOn && !gaming ? services.radar.ideas({ limit: 30, days: 21, kind: "question", source: "reddit" }).catch(() => []) : Promise.resolve([]),
+    ideasOn && !gaming ? services.radar.ideas({ limit: 30, days: 30, source: "stackexchange", orderBy: "views" }).catch(() => []) : Promise.resolve([]),
+    ideasOn ? services.niches.ideaFeeds(view.format, { lens: gaming ? "gaming" : "paying" }) : Promise.resolve({ breakouts: [], rising: [], formats: [], games: [] }),
+    ideasOn ? services.radar.ideas({ limit: 30, days: 30, source: "comments", kind: "request", category: gaming ? "Gaming" : null }).catch(() => []) : Promise.resolve([]),
+    ideasOn && !gaming ? services.radar.ideas({ limit: 20, days: 21, source: "launches" }).catch(() => []) : Promise.resolve([]),
+    ideasOn && gaming ? services.radar.risingGames({ limit: 18 }).catch(() => []) : Promise.resolve([]),
   ]);
+  // Every game pays about the same, so the RPM filter only applies to all niches.
   const discoverList = sortDiscovered(
-    discovered.filter((n) => view.rpm === "all" || n.rpmTier === view.rpm),
+    discovered.filter((n) => (gaming ? n.category === "Gaming" : view.rpm === "all" || n.rpmTier === view.rpm)),
     view.sort,
   ).slice(0, 24);
   // After a report, keep the exploring going: overlapping niches if we have them, otherwise the best ones we know.
@@ -157,7 +170,7 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
       {result ? null : <SavedNiches niches={saved} />}
       {result ? <Report result={result} drill={drill} saved={isSaved(savedList, result.topic)} own={own} /> : null}
       {related.length > 0 ? <IdeaBoard ideas={related} title={`Niches next to ${result!.topic}`} sub="Other researched topics that overlap with this one" /> : null}
-      {result ? null : <DiscoverBoard niches={discoverList} gaps={sortGaps(radarNiches, view)} questions={questions} evergreen={evergreen} breakouts={proof.breakouts} rising={proof.rising} formats={proof.formats} requests={requests} launches={launches} view={view} />}
+      {result ? null : <DiscoverBoard niches={discoverList} gaps={sortGaps(radarNiches, view)} questions={questions} evergreen={evergreen} breakouts={proof.breakouts} rising={proof.rising} formats={proof.formats} games={proof.games} risingGames={risingGames} requests={requests} launches={launches} view={view} />}
       {result && topNiches.length > 0 ? (
         <IdeaBoard ideas={topNiches} title="Other underrated niches" sub="Mined from every channel Outlier tracks: real demand, room left, and small channels winning. Pick one to dig in." />
       ) : null}
@@ -710,7 +723,7 @@ function ViralChannels({ channels, title }: { channels: ViralChannel[]; title: s
 
 function discoverHref(view: View, change: Partial<View>) {
   const next = { ...view, ...change };
-  return `/research/niche-finder?board=${next.board}&format=${next.format}&rpm=${next.rpm}&sort=${next.sort}&lang=${next.lang}`;
+  return `/research/niche-finder?board=${next.board}&lens=${next.lens}&format=${next.format}&rpm=${next.rpm}&sort=${next.sort}&lang=${next.lang}`;
 }
 
 const RPM_TIER_LABEL = { high: "High RPM", mid: "Mid RPM", low: "Low RPM" } as const;
@@ -725,17 +738,25 @@ const GAP_SORT: Record<DiscoverSort, (n: RadarNiche) => number> = {
 
 /** Radar phrases for the chosen format and RPM, in the chosen order. */
 function sortGaps(niches: readonly RadarNiche[], view: View): RadarNiche[] {
+  const gaming = view.lens === "gaming";
   return niches
-    .filter((n) => n.format === view.format && (view.rpm === "all" || rpmTierOf(n.rpm, n.format) === view.rpm))
+    .filter((n) => n.format === view.format && (gaming ? n.category === "Gaming" : view.rpm === "all" || rpmTierOf(n.rpm, n.format) === view.rpm))
     .filter((n) => view.lang === "all" || (view.lang === "en") === (n.market === "en"))
     .sort((a, b) => GAP_SORT[view.sort](b) - GAP_SORT[view.sort](a))
     .slice(0, 24);
 }
 
-const BOARD_SUB: Record<Board, string> = {
-  library: "No search needed. Every niche in the channels Outlier tracks, scored on RPM, views, how untapped it is and how easy it is to make.",
-  gaps: "What people type into YouTube search where the results are old, small channels are winning and no giant owns the page, in English and five other languages. Checked around the clock.",
-  ideas: "Small channels breaking out in paying niches, first videos to make in the most open ones, videos viewers asked for in the comments, questions read hundreds of thousands of times on Stack Exchange, and what Reddit is asking this week.",
+const BOARD_SUB: Record<Lens, Record<Board, string>> = {
+  gaming: {
+    library: "No search needed. Every game and gaming niche in the channels Outlier tracks, scored on views, how untapped it is and how easy it is to make.",
+    gaps: "Gaming searches on YouTube where the results are old, small channels are winning and no giant owns the page. Checked around the clock, including games that just started trending.",
+    ideas: "Games with room for a new channel, games blowing up on Steam and Roblox before YouTube catches up, small gaming channels breaking out, and the formats working right now.",
+  },
+  all: {
+    library: "No search needed. Every niche in the channels Outlier tracks, scored on RPM, views, how untapped it is and how easy it is to make.",
+    gaps: "What people type into YouTube search where the results are old, small channels are winning and no giant owns the page, in English and five other languages. Checked around the clock.",
+    ideas: "Small channels breaking out in paying niches, first videos to make in the most open ones, videos viewers asked for in the comments, questions read hundreds of thousands of times on Stack Exchange, and what Reddit is asking this week.",
+  },
 };
 
 /**
@@ -751,6 +772,8 @@ function DiscoverBoard({
   breakouts,
   rising,
   formats,
+  games,
+  risingGames,
   requests,
   launches,
   view,
@@ -762,6 +785,8 @@ function DiscoverBoard({
   breakouts: Breakout[];
   rising: RisingChannel[];
   formats: FormatStat[];
+  games: GameStat[];
+  risingGames: RisingGameNiche[];
   requests: NicheIdeaRow[];
   launches: NicheIdeaRow[];
   view: View;
@@ -771,7 +796,7 @@ function DiscoverBoard({
       <h2 className="dash-subhead">
         <CompassIcon size={14} /> Discover niches
       </h2>
-      <p className="dash-row-sub niche-ideas-sub">{BOARD_SUB[view.board]}</p>
+      <p className="dash-row-sub niche-ideas-sub">{BOARD_SUB[view.lens][view.board]}</p>
       <nav className="discover-tabs" aria-label="Where the niches come from">
         {BOARDS.map((b) => (
           <Link key={b.value} href={discoverHref(view, { board: b.value })} aria-current={view.board === b.value ? "page" : undefined}>
@@ -783,11 +808,23 @@ function DiscoverBoard({
       {view.board === "gaps" ? (
         <GapBoard gaps={gaps} />
       ) : view.board === "ideas" ? (
-        <IdeasBoard gaps={gaps} questions={questions} evergreen={evergreen} breakouts={breakouts} rising={rising} formats={formats} requests={requests} launches={launches} />
+        <IdeasBoard
+          gaming={view.lens === "gaming"}
+          gaps={gaps}
+          questions={questions}
+          evergreen={evergreen}
+          breakouts={breakouts}
+          rising={rising}
+          formats={formats}
+          games={games}
+          risingGames={risingGames}
+          requests={requests}
+          launches={launches}
+        />
       ) : (
         <LibraryBoard niches={niches} view={view} />
       )}
-      <p className="dash-row-sub">RPM is an estimate by category from public creator reports; real RPM depends on audience country and season.</p>
+      {view.lens === "all" ? <p className="dash-row-sub">RPM is an estimate by category from public creator reports; real RPM depends on audience country and season.</p> : null}
     </section>
   );
 }
@@ -795,6 +832,13 @@ function DiscoverBoard({
 function Filters({ view }: { view: View }) {
   return (
     <div className="discover-filters">
+      <div className="dash-topics" role="group" aria-label="Niches">
+        {LENSES.map((l) => (
+          <Link key={l.value} href={discoverHref(view, { lens: l.value })} className="dash-topic" data-mine={view.lens === l.value}>
+            {l.label}
+          </Link>
+        ))}
+      </div>
       <div className="dash-topics" role="group" aria-label="Format">
         {(["shorts", "long_form"] as const).map((f) => (
           <Link key={f} href={discoverHref(view, { format: f })} className="dash-topic" data-mine={view.format === f}>
@@ -802,13 +846,15 @@ function Filters({ view }: { view: View }) {
           </Link>
         ))}
       </div>
-      <div className="dash-topics" role="group" aria-label="RPM">
-        {RPM_FILTERS.map((f) => (
-          <Link key={f.value} href={discoverHref(view, { rpm: f.value })} className="dash-topic" data-mine={view.rpm === f.value}>
-            {f.label}
-          </Link>
-        ))}
-      </div>
+      {view.lens === "all" ? (
+        <div className="dash-topics" role="group" aria-label="RPM">
+          {RPM_FILTERS.map((f) => (
+            <Link key={f.value} href={discoverHref(view, { rpm: f.value })} className="dash-topic" data-mine={view.rpm === f.value}>
+              {f.label}
+            </Link>
+          ))}
+        </div>
+      ) : null}
       {view.board === "gaps" ? (
         <div className="dash-topics" role="group" aria-label="Language">
           {LANG_FILTERS.map((l) => (
@@ -819,7 +865,7 @@ function Filters({ view }: { view: View }) {
         </div>
       ) : null}
       <div className="dash-topics" role="group" aria-label="Sort">
-        {SORTS.map((s) => (
+        {SORTS.filter((s) => view.lens === "all" || s.value !== "rpm").map((s) => (
           <Link key={s.value} href={discoverHref(view, { sort: s.value })} className="dash-topic" data-mine={view.sort === s.value}>
             {s.label}
           </Link>
@@ -971,32 +1017,44 @@ function GapBoard({ gaps }: { gaps: RadarNiche[] }) {
 }
 
 function IdeasBoard({
+  gaming,
   gaps,
   questions,
   evergreen,
   breakouts,
   rising,
   formats,
+  games,
+  risingGames,
   requests,
   launches,
 }: {
+  gaming: boolean;
   gaps: RadarNiche[];
   questions: NicheIdeaRow[];
   evergreen: NicheIdeaRow[];
   breakouts: Breakout[];
   rising: RisingChannel[];
   formats: FormatStat[];
+  games: GameStat[];
+  risingGames: RisingGameNiche[];
   requests: NicheIdeaRow[];
   launches: NicheIdeaRow[];
 }) {
   const withIdeas = gaps.filter((n) => (n.ease?.ideas.length ?? 0) > 0).slice(0, 12);
-  if ([withIdeas, questions, evergreen, breakouts, rising, formats, requests, launches].every((list) => list.length === 0)) return <RadarEmpty />;
+  if ([withIdeas, questions, evergreen, breakouts, rising, formats, games, risingGames, requests, launches].every((list) => list.length === 0)) return <RadarEmpty />;
   return (
     <>
+      {games.length > 0 ? <GamesWithRoom games={games} /> : null}
+      {risingGames.length > 0 ? <RisingGames games={risingGames} /> : null}
       {breakouts.length > 0 ? (
         <div className="dash-panel ideas-breakouts">
-          <h3>Breakouts in paying niches</h3>
-          <p className="dash-row-sub">Small channels that pulled many times their subscribers in the last two weeks, in categories that pay well.</p>
+          <h3>{gaming ? "Small gaming channels breaking out" : "Breakouts in paying niches"}</h3>
+          <p className="dash-row-sub">
+            {gaming
+              ? "Uploads from channels under 100K that pulled many times their subscriber count in the last two weeks, and the game each one is about."
+              : "Small channels that pulled many times their subscribers in the last two weeks, in categories that pay well."}
+          </p>
           <div className="niche-examples">
             {breakouts.map((b) => (
               <a
@@ -1014,7 +1072,7 @@ function IdeasBoard({
                   <span className="niche-example-title">{b.title}</span>
                   <span className="niche-example-channel">
                     {b.channelTitle}
-                    {b.subscribers !== null ? ` · ${formatCompact(b.subscribers)} subs` : ""} · {Math.round(b.lift)}× · {b.category}
+                    {b.subscribers !== null ? ` · ${formatCompact(b.subscribers)} subs` : ""} · {Math.round(b.lift)}× · {gaming ? (b.game ?? "Gaming") : b.category}
                     {b.channelAgeDays !== null && b.channelAgeDays <= 180 ? ` · channel ${channelAge(b.channelAgeDays)} old` : ""}
                   </span>
                 </span>
@@ -1026,7 +1084,11 @@ function IdeasBoard({
       {rising.length > 0 ? (
         <div className="dash-panel ideas-breakouts">
           <h3>New channels already winning</h3>
-          <p className="dash-row-sub">Started in the last six months, and their typical upload already does well, in categories with mid or high RPM. A niche with room in it.</p>
+          <p className="dash-row-sub">
+            {gaming
+              ? "Gaming channels started in the last six months whose typical upload already does well. The game they picked still has room."
+              : "Started in the last six months, and their typical upload already does well, in categories with mid or high RPM. A niche with room in it."}
+          </p>
           <ul className="rising-channels">
             {rising.map((c) => (
               <li key={c.youtubeChannelId}>
@@ -1036,7 +1098,7 @@ function IdeasBoard({
                     <strong>{c.title}</strong>
                     <span className="dash-row-sub">
                       {channelAge(c.ageDays)} old · {c.subscribers !== null ? `${formatCompact(c.subscribers)} subs · ` : ""}
-                      {formatCompact(c.medianViews)} median views · {c.category}
+                      {formatCompact(c.medianViews)} median views · {gaming ? (c.game ?? "Gaming") : c.category}
                     </span>
                   </span>
                 </a>
@@ -1056,7 +1118,11 @@ function IdeasBoard({
       {formats.length > 0 ? (
         <div className="dash-panel ideas-breakouts">
           <h3>Formats working right now</h3>
-          <p className="dash-row-sub">Title formats small channels are winning with this month, against a typical upload, and the paying categories that barely use them yet.</p>
+          <p className="dash-row-sub">
+            {gaming
+              ? "Title formats small gaming channels are winning with this month, against a typical gaming upload, and the big games where almost nobody uses them yet."
+              : "Title formats small channels are winning with this month, against a typical upload, and the paying categories that barely use them yet."}
+          </p>
           <ul className="formats-list">
             {formats.map((f) => (
               <li key={f.id}>
@@ -1067,11 +1133,11 @@ function IdeasBoard({
                   </span>
                 </div>
                 <span className="dash-row-sub">
-                  {f.channels} channels · mostly {f.topCategories.join(", ") || "mixed"}
+                  {f.channels} channels · mostly {f.topIn.join(", ") || "mixed"}
                 </span>
                 {f.openIn.length > 0 ? (
                   <span className="dash-row-sub">
-                    Barely used in {f.openIn.join(", ")}. Try: &ldquo;{f.example}&rdquo;
+                    Barely used in {f.openIn.join(", ")}.{gaming ? null : <> Try: &ldquo;{f.example}&rdquo;</>}
                   </span>
                 ) : null}
                 {f.best ? (
@@ -1192,6 +1258,88 @@ function IdeasBoard({
         ) : null}
       </div>
     </>
+  );
+}
+
+function videoHref(v: { youtubeVideoId: string; format: "short" | "long_form" }): string {
+  return v.format === "short" ? `https://www.youtube.com/shorts/${v.youtubeVideoId}` : `https://www.youtube.com/watch?v=${v.youtubeVideoId}`;
+}
+
+/** Games in the library, ranked on views per upload, how often small channels break out, how crowded, and the trend. */
+function GamesWithRoom({ games }: { games: GameStat[] }) {
+  return (
+    <div className="dash-panel ideas-breakouts">
+      <h3>Games with room right now</h3>
+      <p className="dash-row-sub">From the last four weeks of uploads Outlier tracks: how many views a typical upload gets, how often channels under 100K break out, and how many channels are already posting.</p>
+      <ul className="formats-list">
+        {games.slice(0, 12).map((g) => (
+          <li key={g.game}>
+            <div className="formats-head">
+              <Link href={`/research/niche-finder?topic=${encodeURIComponent(g.game)}`}>
+                <strong>{g.game}</strong>
+              </Link>
+              <span className="niche-score" data-band={band(g.score)}>
+                {g.score}
+              </span>
+            </div>
+            <span className="dash-row-sub">
+              {formatCompact(Math.round(g.medianViews))} median views · {formatPercent(g.breakoutRate, 0)} of small-channel uploads break out
+            </span>
+            <span className="dash-row-sub">
+              {g.channels} channels posting{g.newChannels > 0 ? `, ${g.newChannels} new this year` : ""}
+              {g.momentum !== null && Math.abs(g.momentum) >= 0.2 ? ` · views ${g.momentum > 0 ? "up" : "down"} ${formatPercent(Math.abs(g.momentum), 0)} in two weeks` : ""}
+            </span>
+            {g.best ? (
+              <a className="gap-proof" href={videoHref(g.best)} target="_blank" rel="noreferrer">
+                <span>Best</span> {g.best.title} · {formatCompact(g.best.views)} views
+                {g.best.subscribers != null ? ` on ${formatCompact(g.best.subscribers)} subs` : ""}
+              </a>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+const RISING_REASON: Record<string, string> = {
+  new: "New in Steam's top 100",
+  climbing: "Climbing Steam's top 100",
+  "up-and-coming": "Roblox Up-and-Coming",
+  trending: "Trending on Roblox",
+};
+
+/** Games taking off on Steam and Roblox, and whether YouTube has caught up yet. */
+function RisingGames({ games }: { games: RisingGameNiche[] }) {
+  return (
+    <div className="dash-panel ideas-breakouts">
+      <h3>Games blowing up before YouTube catches up</h3>
+      <p className="dash-row-sub">Pulled from Steam&rsquo;s most-played chart and Roblox&rsquo;s Up-and-Coming and Trending lists every day, then checked on YouTube search. Old results and small channels ranking mean nobody owns it yet.</p>
+      <ul className="formats-list">
+        {games.map(({ game, phrase, niche }) => (
+          <li key={game.url}>
+            <div className="formats-head">
+              <Link href={`/research/niche-finder?topic=${encodeURIComponent(phrase)}`}>
+                <strong>{game.title}</strong>
+              </Link>
+              {niche ? (
+                <span className="niche-score" data-band={band(niche.score)}>
+                  {niche.score}
+                </span>
+              ) : null}
+            </div>
+            <span className="dash-row-sub">
+              {RISING_REASON[game.kind] ?? game.kind}
+              {game.kind === "climbing" && game.comments > 0 ? ` (up ${game.comments})` : ""} · {formatCompact(game.score)} {game.community === "roblox" ? "playing now" : "peak players"}
+            </span>
+            <span className="dash-row-sub">{niche ? `On YouTube: ${gapReason(niche)}` : "Checking YouTube for this one soon"}</span>
+            <a className="gap-proof" href={game.url} target="_blank" rel="noreferrer">
+              <span>{game.community === "roblox" ? "Roblox" : "Steam"}</span> {game.title}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

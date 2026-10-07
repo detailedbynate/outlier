@@ -10,6 +10,7 @@ import { RadarRepository } from "@/lib/database/repositories/radar";
 import { DataForSeoClient } from "@/lib/radar/demand";
 import { RedditClient } from "@/lib/radar/reddit";
 import { StackExchangeClient } from "@/lib/radar/stackexchange";
+import { fetchRisingGames } from "@/lib/radar/games";
 import { fetchLaunches } from "@/lib/radar/launches";
 import { NicheRadarService } from "./niche-radar-service";
 import { ReferralRepository } from "@/lib/database/repositories/referrals";
@@ -43,7 +44,7 @@ import { TranscriptRepository } from "@/lib/database/repositories/transcripts";
 import { ScriptService } from "./script-service";
 import { TranscriptService } from "./transcript-service";
 import { getAIProviders } from "@/lib/ai/registry";
-import { HIGH_RPM_SEEDS, LIBRARY_SEEDS, RADAR_SEEDS, TOPIC_SEEDS } from "@/lib/niches/seeds";
+import { GAME_SEEDS, HIGH_RPM_SEEDS, LIBRARY_SEEDS, RADAR_SEEDS, TOPIC_SEEDS } from "@/lib/niches/seeds";
 import { LibraryGrowthService } from "./library-growth-service";
 import { NicheLabelingService } from "./niche-labeling-service";
 import { qualityConfigFrom } from "@/lib/research/quality";
@@ -274,6 +275,7 @@ export function getServices(): Services {
     reddit: config.REDDIT_CLIENT_ID && config.REDDIT_CLIENT_SECRET ? new RedditClient({ clientId: config.REDDIT_CLIENT_ID, clientSecret: config.REDDIT_CLIENT_SECRET }) : null,
     stackexchange: new StackExchangeClient({ key: config.STACKEXCHANGE_KEY ?? null }),
     launches: (options) => fetchLaunches(options),
+    games: (options) => fetchRisingGames(options),
     youtube,
   });
   const libraryGrowth = new LibraryGrowthService(
@@ -282,7 +284,7 @@ export function getServices(): Services {
       usage: repositories.usage,
       niches: repositories.niches,
       seeds: LIBRARY_SEEDS,
-      longFormSeeds: [...new Set([...HIGH_RPM_SEEDS, ...TOPIC_SEEDS])],
+      longFormSeeds: [...new Set([...GAME_SEEDS, ...HIGH_RPM_SEEDS, ...TOPIC_SEEDS])],
       // Gaps the radar found get channels pulled in for them, in both formats.
       extraSeeds: () => radar.growthSeeds(40),
       youtube,

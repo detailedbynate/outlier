@@ -149,6 +149,11 @@ export class RadarRepository {
     return rows[0]?.demand_checked_at ? new Date(rows[0].demand_checked_at) : null;
   }
 
+  async getMany(keywords: readonly string[]): Promise<NicheKeywordRow[]> {
+    if (keywords.length === 0) return [];
+    return unwrap(await this.db.from("niche_keywords").select("*").in("keyword", [...new Set(keywords)]), "niche_keywords.getMany");
+  }
+
   async get(keyword: string): Promise<NicheKeywordRow | null> {
     const rows = unwrap(await this.db.from("niche_keywords").select("*").eq("keyword", keyword).limit(1), "niche_keywords.get");
     return rows[0] ?? null;

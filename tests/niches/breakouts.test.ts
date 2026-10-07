@@ -95,3 +95,40 @@ describe("new channels already winning", () => {
     expect(found[0]).toMatchObject({ ageDays: 60, uploads: 3, medianViews: 20_000, category: "Finance & Business", top: { youtubeVideoId: "new2", views: 30_000 } });
   });
 });
+
+describe("the gaming lens", () => {
+  const channels = new Map([
+    ["fin", channel("fin", "Money Notes", 4_000, ["roth ira"])],
+    ["mc", channel("mc", "Blocky", 3_000, ["minecraft"])],
+    ["bf", channel("bf", "Fruit Hunter", 6_000, ["roblox", "blox fruits"])],
+    ["mario", channel("mario", "Plumber Zone", 3_000, ["super mario"])],
+    ["fresh", channel("fresh", "New Blocks", 9_000, ["minecraft"], daysAgo(60))],
+  ]);
+
+  it("keeps gaming only, ranks on views, and names the game", () => {
+    const found = findBreakouts(
+      [
+        video("a", "fin", "Roth IRA mistakes nobody tells you", 80_000),
+        video("b", "mc", "Minecraft but every block is TNT", 900_000),
+        video("c", "bf", "Blox Fruits update 25 secrets", 400_000),
+        // A gaming channel's movie video isn't a gaming breakout.
+        video("d", "mario", "The dumbest moment in every Star Wars movie", 500_000),
+      ],
+      channels,
+      { now: NOW, lens: "gaming" },
+    );
+    expect(found.map((b) => [b.youtubeVideoId, b.game])).toEqual([
+      ["b", "Minecraft"],
+      ["c", "Blox Fruits"],
+    ]);
+  });
+
+  it("finds new gaming channels and the game they picked", () => {
+    const uploads = [1, 2, 3, 4].map((i) => video(`n${i}`, "fresh", `Minecraft hardcore day ${i}`, 60_000));
+    const found = findRisingChannels(uploads, channels, { now: NOW, lens: "gaming" });
+    expect(found).toHaveLength(1);
+    expect(found[0]).toMatchObject({ title: "New Blocks", game: "Minecraft" });
+    // The paying lens leaves it out.
+    expect(findRisingChannels(uploads, channels, { now: NOW })).toHaveLength(0);
+  });
+});

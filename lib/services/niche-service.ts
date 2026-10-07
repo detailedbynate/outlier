@@ -9,8 +9,9 @@ import { videoToRow, type VideoRepository } from "@/lib/database/repositories/vi
 import type { EnqueueOptions } from "@/lib/jobs/queue";
 import { refineSubNiches } from "@/lib/niches/refine";
 import { buildNicheReport, focusOnTopic, NICHE_REPORT_VERSION, tokenize, topicKey, type Level, type NicheReport } from "@/lib/niches/analysis";
-import { findBreakouts, findRisingChannels, type Breakout, type RisingChannel } from "@/lib/niches/breakouts";
+import { findBreakouts, findRisingChannels, type Breakout, type IdeaLens, type RisingChannel } from "@/lib/niches/breakouts";
 import { measureFormats, type FormatStat } from "@/lib/niches/formats";
+import { measureGames, type GameStat } from "@/lib/niches/games";
 import { discoverNiches, type DiscoveredNiche, type DiscoverFormat } from "@/lib/niches/discover";
 import { canonicalNiche } from "@/lib/niches/naming";
 import { findUnderratedNiches, underratedWindow, type NicheCreator, type NicheExample } from "@/lib/niches/underrated";
@@ -168,6 +169,8 @@ export interface IdeaFeeds {
   breakouts: Breakout[];
   rising: RisingChannel[];
   formats: FormatStat[];
+  /** Games with room (gaming lens only). */
+  games: GameStat[];
 }
 
 export class NicheService {
@@ -178,7 +181,7 @@ export class NicheService {
   /** Mining the library is heavy, so the board is computed once per TTL. */
   private underratedCache: { at: number; ideas: NicheIdea[] } | null = null;
   private readonly discoverCache = new Map<DiscoverFormat, { at: number; niches: DiscoveredNiche[] }>();
-  private readonly ideaCache = new Map<DiscoverFormat, IdeaFeeds & { at: number }>();
+  private readonly ideaCache = new Map<string, IdeaFeeds & { at: number }>();
 
   constructor(
     private readonly deps: {
@@ -268,28 +271,32 @@ export class NicheService {
    * doing well in them; and the title formats small channels are winning with this
    * month. Database only, cached per format.
    */
-  async ideaFeeds(format: DiscoverFormat, options: { now?: Date } = {}): Promise<IdeaFeeds> {
+  async ideaFeeds(format: DiscoverFormat, options: { now?: Date; lens?: IdeaLens } = {}): Promise<IdeaFeeds> {
     const now = options.now ?? new Date();
-    const cached = this.ideaCache.get(format);
+    const lens = options.lens ?? "gaming";
+    const cacheKey = `${format}:${lens}`;
+    const cached = this.ideaCache.get(cacheKey);
     if (cached && now.getTime() - cached.at < this.config.reportTtlMs) return cached;
     try {
       // The wider window is for telling what each channel is about; breakouts themselves are the last 14 days.
       const { videos, channels } = await this.deps.niches.recentSample(underratedWindow(now, this.config.sampleDays), 15_000, format === "shorts" ? "short" : "long_form");
       // Shorts views come cheap, so a Short has to beat its channel by more.
-      const breakouts = findBreakouts(videos, channels, { now, minViews: format === "shorts" ? 50_000 : 20_000, minLift: format === "shorts" ? 5 : 3 });
-      const rising = findRisingChannels(videos, channels, { now, minMedianViews: format === "shorts" ? 20_000 : 5_000 });
+      const breakouts = findBreakouts(videos, channels, { now, lens, minViews: format === "shorts" ? 50_000 : 20_000, minLift: format === "shorts" ? 5 : 3 });
+      const rising = findRisingChannels(videos, channels, { now, lens, minMedianViews: format === "shorts" ? 20_000 : 5_000 });
       // Formats are about what works now, so only the last 30 days count.
       const month = now.getTime() - 30 * 86_400_000;
       const formats = measureFormats(
         videos.filter((v) => Date.parse(v.published_at) >= month),
         channels,
+        { lens },
       );
-      const result = { at: now.getTime(), breakouts, rising, formats };
-      this.ideaCache.set(format, result);
+      const games = lens === "gaming" ? measureGames(videos, channels, { now }) : [];
+      const result = { at: now.getTime(), breakouts, rising, formats, games };
+      this.ideaCache.set(cacheKey, result);
       return result;
     } catch (error) {
       this.log.warn("idea feeds failed", { format, error });
-      return { breakouts: [], rising: [], formats: [] };
+      return { breakouts: [], rising: [], formats: [], games: [] };
     }
   }
 

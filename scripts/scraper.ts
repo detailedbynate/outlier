@@ -204,16 +204,17 @@ async function main(): Promise<void> {
     }
     if (!collecting) {
       collecting = inBackground("radar collect", async () => {
-        const [reddit, stack, translated, launches, requests] = await Promise.allSettled([
+        const [reddit, stack, translated, launches, requests, games] = await Promise.allSettled([
           radar.collectRedditOnce({ signal }),
           radar.collectStackOnce({ signal }),
           radar.translateOnce(),
           radar.collectLaunchesOnce({ signal }),
           // Comment pages go through YouTube's gate, so they wait while it's open.
           gate.state().open ? Promise.resolve(null) : radar.collectRequestsOnce({ signal }),
+          radar.collectGamesOnce({ signal }),
         ]);
         const value = (r: PromiseSettledResult<unknown>) => (r.status === "fulfilled" ? r.value : { error: String(r.reason).slice(0, 200) });
-        const all = { reddit: value(reddit), stack: value(stack), translated: value(translated), launches: value(launches), requests: value(requests) };
+        const all = { reddit: value(reddit), stack: value(stack), translated: value(translated), launches: value(launches), requests: value(requests), games: value(games) };
         return Object.values(all).some(Boolean) ? all : null;
       }).finally(() => {
         collecting = null;

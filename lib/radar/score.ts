@@ -81,6 +81,10 @@ export function scoreRadar(s: RadarSignals): RadarScore | null {
   }
 
   const parts = { demand: Math.round(demand * 100), pay: Math.round(pay * 100), gap: Math.round(gap * 100), ease: Math.round(ease * 100) };
-  const total = Math.round(0.25 * parts.demand + 0.25 * parts.pay + 0.3 * parts.gap + 0.2 * parts.ease);
+  // Gaming is judged on views and room, not RPM: every game pays about the same, so pay would only sink them all.
+  const total =
+    category === "Gaming"
+      ? Math.round(0.35 * parts.demand + 0.4 * parts.gap + 0.25 * parts.ease)
+      : Math.round(0.25 * parts.demand + 0.25 * parts.pay + 0.3 * parts.gap + 0.2 * parts.ease);
   return { total, parts, rpm, format };
 }

@@ -67,6 +67,7 @@ export function memoryRadar(): RadarDeps["radar"] & { rows: Map<string, NicheKey
       return at.length ? new Date(at[at.length - 1]!) : null;
     },
     get: async (keyword) => rows.get(keyword) ?? null,
+    getMany: async (keywords) => keywords.flatMap((k) => (rows.has(k) ? [rows.get(k)!] : [])),
     addIdeas: async (insert) => {
       for (const r of insert) ideaRows.push({ id: String(ideaRows.length), community: null, score: 0, comments: 0, views: null, posted_at: null, kind: "discussion", category: null, collected_at: new Date().toISOString(), ...r } as NicheIdeaRow);
       return insert.length;
