@@ -142,6 +142,18 @@ export class NicheRepository {
     return unwrap(await query.order(order, { ascending: order === "id" }).range(from, to), "niches.recentSample");
   }
 
+  /** How many uploads of a format the library holds from one window. */
+  async countVideos(since: Date, until: Date, format: "short" | "long_form"): Promise<number> {
+    const { count, error } = await this.db
+      .from("videos")
+      .select("id", { count: "exact", head: true })
+      .eq("format", format)
+      .gte("published_at", since.toISOString())
+      .lt("published_at", until.toISOString());
+    if (error) throw error;
+    return count ?? 0;
+  }
+
   /** Up to `limit` uploads from one window, starting `offset` in. PostgREST caps a response at 1000 rows, so pages go side by side. */
   private async rowsIn(since: Date, until: Date | null, limit: number, format: "short" | "long_form" | undefined, order: "published_at" | "id", offset = 0) {
     if (limit <= 0) return [];

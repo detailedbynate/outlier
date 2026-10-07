@@ -15,7 +15,7 @@ import { measureGames, type GameStat } from "@/lib/niches/games";
 import { gameIn } from "@/lib/niches/rule-labeler";
 import { choosePicks, judgePick, PICK_SETTLE_DAYS, PICK_WINDOW_DAYS } from "@/lib/niches/picks";
 import type { RadarRepository } from "@/lib/database/repositories/radar";
-import { discoverNiches, type DiscoveredNiche, type DiscoverFormat } from "@/lib/niches/discover";
+import { discoverNiches, libraryWeights, type DiscoveredNiche, type DiscoverFormat } from "@/lib/niches/discover";
 import { canonicalNiche } from "@/lib/niches/naming";
 import { findUnderratedNiches, underratedWindow, type NicheCreator, type NicheExample } from "@/lib/niches/underrated";
 import { isQuotaUnavailable } from "@/lib/youtube/quota-manager";
@@ -196,7 +196,7 @@ export class NicheService {
 
   constructor(
     private readonly deps: {
-      niches: Pick<NicheRepository, "getReport" | "currentScores" | "saveReport" | "claimRefresh" | "releaseClaim" | "topicSample" | "popularTopics" | "recentReports" | "recentSample">;
+      niches: Pick<NicheRepository, "getReport" | "currentScores" | "saveReport" | "claimRefresh" | "releaseClaim" | "topicSample" | "popularTopics" | "recentReports" | "recentSample"> & Partial<Pick<NicheRepository, "countVideos">>;
       youtube: Pick<YouTubeService, "searchVideos" | "getChannels">;
       channels: Pick<ChannelRepository, "upsertMany">;
       videos: Pick<VideoRepository, "upsertMany">;
@@ -273,8 +273,8 @@ export class NicheService {
 
   private async loadDiscover(format: DiscoverFormat, now: Date): Promise<DiscoveredNiche[]> {
     try {
-      const { videos, channels } = await this.formatSample(format, now);
-      const niches = discoverNiches(videos, channels, format, { now });
+      const [{ videos, channels }, weightOf] = await Promise.all([this.formatSample(format, now), this.libraryWeights(format, now)]);
+      const niches = discoverNiches(videos, channels, format, { now, weightOf });
       this.discoverCache.set(format, { at: now.getTime(), niches });
       this.log.info("niches discovered", { format, sample: videos.length, found: niches.length });
       return niches;
@@ -340,6 +340,30 @@ export class NicheService {
     this.samples.set(format, { at: now.getTime(), load });
     load.catch(() => this.samples.delete(format));
     return load;
+  }
+
+  /**
+   * How many library uploads each sampled one stands for, so a niche's audience
+   * can be sized from the sample. Without counts every upload stands for itself.
+   */
+  private async libraryWeights(format: DiscoverFormat, now: Date): Promise<((publishedAt: string) => number) | undefined> {
+    const count = this.deps.niches.countVideos?.bind(this.deps.niches);
+    if (!count) return undefined;
+    try {
+      const SLICES = 6;
+      const start = underratedWindow(now, this.config.sampleDays).getTime();
+      const width = (now.getTime() - start) / SLICES;
+      const bounds = Array.from({ length: SLICES }, (_, i) => ({ from: new Date(start + i * width), to: new Date(start + (i + 1) * width) }));
+      const fmt = format === "shorts" ? "short" : "long_form";
+      const [{ videos }, counts] = await Promise.all([this.formatSample(format, now), Promise.all(bounds.map((b) => count(b.from, b.to, fmt)))]);
+      return libraryWeights(
+        videos,
+        bounds.map((b, i) => ({ ...b, count: counts[i]! })),
+      );
+    } catch (error) {
+      this.log.warn("library counts failed, sizing audiences from the sample alone", { format, error });
+      return undefined;
+    }
   }
 
   private readonly samples = new Map<DiscoverFormat, { at: number; load: ReturnType<NicheService["deps"]["niches"]["recentSample"]> }>();

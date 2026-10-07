@@ -21,7 +21,7 @@ import { isSaved, readSavedNiches } from "@/lib/niches/saved";
 import { CompareBox, FitPanel, Patterns, SaveNicheButton, SavedNiches, ScoreBreakdown, TrendChart } from "./insights";
 import { TopicInput } from "./topic-input";
 import { BoardBody, BoardNav, NavLink } from "./board-nav";
-import { rpmTierOf, sortDiscovered, type DiscoveredNiche, type DiscoverFormat, type DiscoverSort } from "@/lib/niches/discover";
+import { allRoundScores, rpmTierOf, sortDiscovered, type DiscoveredNiche, type DiscoverFormat, type DiscoverSort } from "@/lib/niches/discover";
 import type { RadarNiche, RisingGameNiche } from "@/lib/services/niche-radar-service";
 import { marketOf } from "@/lib/radar/markets";
 import type { Breakout, RisingChannel } from "@/lib/niches/breakouts";
@@ -43,11 +43,13 @@ const FORMAT_LABEL = { shorts: "Shorts", long_form: "Long-form", both: "Both wor
 type SearchParams = Promise<{ topic?: string; sub?: string; format?: string; rpm?: string; sort?: string; board?: string; lang?: string; lens?: string }>;
 
 const SORTS: { value: DiscoverSort; label: string }[] = [
-  { value: "best", label: "Best overall" },
-  { value: "rpm", label: "Highest RPM" },
-  { value: "views", label: "Most views" },
+  { value: "bets", label: "Best bets" },
+  { value: "best", label: "Highest score" },
+  { value: "audience", label: "Biggest audience" },
+  { value: "views", label: "Most views per video" },
+  { value: "easy", label: "Easiest to start" },
   { value: "untapped", label: "Most untapped" },
-  { value: "easy", label: "Easiest to make" },
+  { value: "rpm", label: "Highest RPM" },
 ];
 const RPM_FILTERS = [
   { value: "all", label: "Any RPM" },
@@ -96,7 +98,7 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
   const view = {
     format: (params.format === "long_form" || params.format === "shorts" ? params.format : (personal.format ?? "shorts")) as DiscoverFormat,
     rpm: (RPM_FILTERS.some((f) => f.value === params.rpm) ? params.rpm : "all") as RpmFilter,
-    sort: (SORTS.find((s) => s.value === params.sort)?.value ?? "best") as DiscoverSort,
+    sort: (SORTS.find((s) => s.value === params.sort)?.value ?? "bets") as DiscoverSort,
     board: (BOARDS.find((b) => b.value === params.board)?.value ?? "library") as Board,
     lang: (LANG_FILTERS.find((l) => l.value === params.lang)?.value ?? "all") as LangFilter,
     lens: (params.lens === "all" || params.lens === "gaming" ? params.lens : (personal.lens ?? "gaming")) as Lens,
@@ -135,12 +137,12 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
     ideasOn && gaming ? services.radar.risingGames({ limit: 18 }).catch(() => []) : Promise.resolve([]),
     ideasOn && gaming ? services.niches.trackRecord() : Promise.resolve(null),
   ]);
-  const sorted = sortDiscovered(
-    discovered.filter((n) => (!gaming || n.category === "Gaming") && (view.rpm === "all" || rpmTierIn(view.lens, n.rpmTier, n.term) === view.rpm)),
-    view.sort,
-  );
+  const shown = discovered.filter((n) => (!gaming || n.category === "Gaming") && (view.rpm === "all" || rpmTierIn(view.lens, n.rpmTier, n.term) === view.rpm));
+  const sorted = sortDiscovered(shown, view.sort);
+  // Strong on everything next to the rest of what's shown.
+  const allRound = new Set([...allRoundScores(shown)].flatMap(([n, r]) => (r.weakest >= 0.5 ? [n.term] : [])));
   // On the default sort, niches in the creator's own games lead.
-  const discoverList = (view.sort === "best" ? mineFirst(sorted, personal.games, (n) => gameIn(n.term)) : sorted).slice(0, 24);
+  const discoverList = (view.sort === "bets" ? mineFirst(sorted, personal.games, (n) => gameIn(n.term)) : sorted).slice(0, 24);
   const mine = gaming ? personal.games : [];
   // Saved games get what's moved for them: views, breakouts, climbing Steam or Roblox.
   const savedGames = result ? [] : savedList.filter((n) => gameIn(n.topic));
@@ -192,7 +194,7 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
       {result ? null : <SavedNiches niches={saved.map((n) => ({ ...n, alert: alerts.get(n.key) ?? null }))} />}
       {result ? <Report result={result} drill={drill} saved={isSaved(savedList, result.topic)} own={own} /> : null}
       {related.length > 0 ? <IdeaBoard ideas={related} title={`Niches next to ${result!.topic}`} sub="Other researched topics that overlap with this one" /> : null}
-      {result ? null : <DiscoverBoard niches={discoverList} gaps={sortGaps(radarNiches, view)} questions={questions} evergreen={evergreen} breakouts={mineFirst(proof.breakouts, mine, (b) => b.game)} rising={mineFirst(proof.rising, mine, (c) => c.game)} formats={proof.formats} games={mineFirst(proof.games, mine, (g) => g.game)} mine={mine} record={record} risingGames={risingGames} requests={requests} launches={launches} view={view} />}
+      {result ? null : <DiscoverBoard niches={discoverList} allRound={allRound} gaps={sortGaps(radarNiches, view)} questions={questions} evergreen={evergreen} breakouts={mineFirst(proof.breakouts, mine, (b) => b.game)} rising={mineFirst(proof.rising, mine, (c) => c.game)} formats={proof.formats} games={mineFirst(proof.games, mine, (g) => g.game)} mine={mine} record={record} risingGames={risingGames} requests={requests} launches={launches} view={view} />}
       {result && topNiches.length > 0 ? (
         <IdeaBoard ideas={topNiches} title="Other underrated niches" sub="Mined from every channel Outlier tracks: real demand, room left, and small channels winning. Pick one to dig in." />
       ) : null}
@@ -757,7 +759,10 @@ function rpmTierIn(lens: Lens, tier: "high" | "mid" | "low", term: string): "hig
 }
 
 const GAP_SORT: Record<DiscoverSort, (n: RadarNiche) => number> = {
+  // Weakest of demand, openness and ease; pay breaks ties, as on the library board.
+  bets: (n) => 0.8 * Math.min(n.parts.demand, n.parts.gap, n.parts.ease) + 0.2 * n.parts.pay + n.score / 100,
   best: (n) => n.score,
+  audience: (n) => n.parts.demand * 10 + n.score / 100,
   rpm: (n) => n.parts.pay * 10 + n.score / 100,
   views: (n) => n.parts.demand * 10 + n.score / 100,
   untapped: (n) => n.parts.gap * 10 + n.score / 100,
@@ -776,12 +781,12 @@ function sortGaps(niches: readonly RadarNiche[], view: View): RadarNiche[] {
 
 const BOARD_SUB: Record<Lens, Record<Board, string>> = {
   gaming: {
-    library: "No search needed. Every game and gaming niche in the channels Outlier tracks, scored on views, how untapped it is and how easy it is to make.",
+    library: "No search needed. Every game and gaming niche in the channels Outlier tracks, scored on audience size, views per video, how untapped it is and how new channels are doing there. Best bets are strong on all of them.",
     gaps: "Gaming searches on YouTube where the results are old, small channels are winning and no giant owns the page. Checked around the clock, including games that just started trending.",
     ideas: "Games with room for a new channel, games blowing up on Steam and Roblox before YouTube catches up, small gaming channels breaking out, and the formats working right now.",
   },
   all: {
-    library: "No search needed. Every niche in the channels Outlier tracks, scored on RPM, views, how untapped it is and how easy it is to make.",
+    library: "No search needed. Every niche in the channels Outlier tracks, scored on audience size, views per video, how untapped it is, how new channels are doing there and RPM. Best bets are strong on all of them.",
     gaps: "What people type into YouTube search where the results are old, small channels are winning and no giant owns the page, in English and five other languages. Checked around the clock.",
     ideas: "Small channels breaking out in paying niches, first videos to make in the most open ones, videos viewers asked for in the comments, questions read hundreds of thousands of times on Stack Exchange, and what Reddit is asking this week.",
   },
@@ -794,6 +799,7 @@ const BOARD_SUB: Record<Lens, Record<Board, string>> = {
  */
 function DiscoverBoard({
   niches,
+  allRound,
   gaps,
   questions,
   evergreen,
@@ -809,6 +815,7 @@ function DiscoverBoard({
   view,
 }: {
   niches: DiscoveredNiche[];
+  allRound: ReadonlySet<string>;
   gaps: RadarNiche[];
   questions: NicheIdeaRow[];
   evergreen: NicheIdeaRow[];
@@ -858,7 +865,7 @@ function DiscoverBoard({
           launches={launches}
         />
       ) : (
-        <LibraryBoard niches={niches} view={view} />
+        <LibraryBoard niches={niches} allRound={allRound} view={view} />
       )}
       </BoardBody>
       </BoardNav>
@@ -914,7 +921,7 @@ function Filters({ view }: { view: View }) {
   );
 }
 
-function LibraryBoard({ niches, view }: { niches: DiscoveredNiche[]; view: View }) {
+function LibraryBoard({ niches, allRound, view }: { niches: DiscoveredNiche[]; allRound: ReadonlySet<string>; view: View }) {
   if (niches.length === 0) {
     return (
       <div className="dash-empty">
@@ -942,20 +949,31 @@ function LibraryBoard({ niches, view }: { niches: DiscoveredNiche[]; view: View 
             </span>
           </header>
           <p className="niche-idea-reason">{n.reason}</p>
+          {n.startNote ? (
+            <p className="discover-start">
+              <strong>{n.startNote}</strong>
+              <span>
+                Typical best upload {formatCompact(n.newcomers.medianBest)}
+                {n.newcomers.best ? ` · top: ${n.newcomers.best.channelTitle}, ${n.newcomers.best.channelMonths} mo old, ${formatCompact(n.newcomers.best.views)}` : ""}
+              </span>
+            </p>
+          ) : null}
           <dl className="discover-scores">
+            <div title="Views a month on recent uploads across the channels Outlier tracks"><dt>Audience/mo</dt><dd>{formatCompact(n.monthlyViews)}</dd></div>
             <div><dt>Views/video</dt><dd>{formatCompact(Math.round(n.metrics.medianViews))}</dd></div>
             <div><dt>Per 1M views</dt><dd>~{formatMoney(n.perMillion)}</dd></div>
             <div><dt>RPM per 1K</dt><dd>{formatMoneyRange(n.rpm)}</dd></div>
           </dl>
           <div className="discover-bars">
-            {(["rpm", "views", "untapped", "easy"] as const).map((k) => (
+            {(["audience", "views", "untapped", "easy", "rpm"] as const).map((k) => (
               <div key={k} className="discover-bar">
-                <span>{k === "rpm" ? "RPM" : k === "easy" ? "Easy" : k === "views" ? "Views" : "Untapped"}</span>
+                <span>{BAR_LABEL[k]}</span>
                 <i style={{ "--w": `${n.scores[k]}%` } as CSSProperties} />
               </div>
             ))}
           </div>
           <div className="niche-idea-tags">
+            {allRound.has(n.term) ? <span data-tone="new">Strong all round</span> : null}
             <span>{view.lens === "gaming" ? GAME_TIER_LABEL[rpmTierIn("gaming", n.rpmTier, n.term)] : RPM_TIER_LABEL[n.rpmTier]}</span>
             <span>{formatPercent(n.smallChannelViewShare, 0)} views to small channels</span>
             <span>{n.easeNote}</span>
@@ -965,6 +983,8 @@ function LibraryBoard({ niches, view }: { niches: DiscoveredNiche[]; view: View 
     </div>
   );
 }
+
+const BAR_LABEL = { audience: "Audience", views: "Views", untapped: "Untapped", easy: "Easy start", rpm: "RPM" } as const;
 
 function RadarEmpty() {
   return (

@@ -13386,9 +13386,22 @@ body.app-body {
   margin-bottom: 14px;
 }
 
+.discover-start {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.discover-start strong {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
 .discover-scores {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 8px;
   margin: 0;
 }
@@ -13411,7 +13424,7 @@ body.app-body {
 
 .discover-bar {
   display: grid;
-  grid-template-columns: 64px 1fr;
+  grid-template-columns: 72px 1fr;
   align-items: center;
   gap: 8px;
   font-size: 11px;
