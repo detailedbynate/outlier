@@ -12,6 +12,12 @@ export const easeSchema = z.object({
   niches: z.array(
     z.object({
       keyword: z.string(),
+      /**
+       * False when the phrase isn't a topic: two unrelated things glued together by
+       * autocomplete ("roth ira call of duty") or one creator's name. Those look
+       * like gaps (nothing relevant ranks) but aren't niches.
+       */
+      coherent: z.boolean(),
       /** 0-100: 100 = one person with a laptop can make it today. */
       ease: z.number(),
       faceless: z.boolean(),
@@ -37,6 +43,7 @@ export interface EaseInput {
 const SYSTEM = `You rate YouTube niches for Outlier, a research tool for new creators.
 
 For each niche you get the search phrase and the titles of videos that rank for it. Judge what it takes to make videos like these:
+- coherent: false if the phrase isn't one topic someone would want a video about: two unrelated things stuck together ("roth ira call of duty", "hvac teen titans"), a single creator's or celebrity's name, or gibberish. True otherwise, including narrow or unusual angles ("roth ira for teenagers", "excel formulas for nurses").
 - ease: 0-100. 90+ = faceless, scriptable, one person with a laptop (voiceover over stock or screen footage, AI visuals, text stories, explainers). 50-70 = needs some skill or gear (gameplay capture, simple filming at home, light animation). Under 40 = needs travel, hands-on builds, expensive gear, a crew, credentials or real-world access.
 - faceless: can it be done well without showing a face?
 - production: 2-4 short tags for what it needs.

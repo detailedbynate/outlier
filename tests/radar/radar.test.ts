@@ -133,6 +133,13 @@ describe("radar score", () => {
     expect(rich.format).toBe("long_form");
   });
 
+  it("drops phrases the AI says aren't one topic", () => {
+    const base = { keyword: "roth ira call of duty", depth: 1, suggestRank: 4, category: null, supply, demand: null };
+    const ease = { keyword: base.keyword, coherent: false, ease: 90, faceless: true, production: [], how: "", ideas: [] };
+    expect(scoreRadar({ ...base, ease })).toBeNull();
+    expect(scoreRadar({ ...base, ease: { ...ease, coherent: true } })).not.toBeNull();
+  });
+
   it("lifts a phrase that only just appeared in autocomplete", () => {
     const base = { keyword: "roth ira new limits", depth: 1, suggestRank: 1, category: null, supply, demand: null, ease: null };
     expect(scoreRadar({ ...base, rising: true })!.total).toBeGreaterThan(scoreRadar(base)!.total);

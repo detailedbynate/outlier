@@ -44,6 +44,8 @@ const clamp01 = (n: number) => Math.min(Math.max(n, 0), 1);
 
 export function scoreRadar(s: RadarSignals): RadarScore | null {
   if (!s.supply || s.supply.results === 0) return null;
+  // Autocomplete glue ("roth ira call of duty") and names: nothing relevant ranks, so they'd look wide open.
+  if (s.ease?.coherent === false) return null;
   const format = s.supply.shortsShare >= 0.5 ? "shorts" : "long_form";
   const category = s.category ?? categoryFor(s.keyword);
   const rpm = rpmFor(category, format);
