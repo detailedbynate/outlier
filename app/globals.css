@@ -13463,6 +13463,20 @@ body.app-body {
   color: var(--text-primary);
 }
 
+.ideas-breakouts {
+  margin-bottom: 14px;
+}
+
+.ideas-breakouts h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+
+.ideas-breakouts .niche-examples {
+  margin-top: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 180px), 1fr));
+}
+
 .ideas-columns {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));

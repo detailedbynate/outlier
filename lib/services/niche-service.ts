@@ -9,6 +9,7 @@ import { videoToRow, type VideoRepository } from "@/lib/database/repositories/vi
 import type { EnqueueOptions } from "@/lib/jobs/queue";
 import { refineSubNiches } from "@/lib/niches/refine";
 import { buildNicheReport, focusOnTopic, NICHE_REPORT_VERSION, tokenize, topicKey, type Level, type NicheReport } from "@/lib/niches/analysis";
+import { findBreakouts, type Breakout } from "@/lib/niches/breakouts";
 import { discoverNiches, type DiscoveredNiche, type DiscoverFormat } from "@/lib/niches/discover";
 import { canonicalNiche } from "@/lib/niches/naming";
 import { findUnderratedNiches, underratedWindow, type NicheCreator, type NicheExample } from "@/lib/niches/underrated";
@@ -169,6 +170,7 @@ export class NicheService {
   /** Mining the library is heavy, so the board is computed once per TTL. */
   private underratedCache: { at: number; ideas: NicheIdea[] } | null = null;
   private readonly discoverCache = new Map<DiscoverFormat, { at: number; niches: DiscoveredNiche[] }>();
+  private readonly breakoutCache = new Map<DiscoverFormat, { at: number; breakouts: Breakout[] }>();
 
   constructor(
     private readonly deps: {
@@ -248,6 +250,27 @@ export class NicheService {
       return niches;
     } catch (error) {
       this.log.warn("niche discovery failed", { format, error });
+      return [];
+    }
+  }
+
+  /**
+   * The last two weeks' uploads from small channels that pulled many times their
+   * subscribers, in categories that pay. Database only, cached per format.
+   */
+  async breakouts(format: DiscoverFormat, options: { now?: Date } = {}): Promise<Breakout[]> {
+    const now = options.now ?? new Date();
+    const cached = this.breakoutCache.get(format);
+    if (cached && now.getTime() - cached.at < this.config.reportTtlMs) return cached.breakouts;
+    try {
+      // The wider window is for telling what each channel is about; breakouts themselves are the last 14 days.
+      const { videos, channels } = await this.deps.niches.recentSample(underratedWindow(now, this.config.sampleDays), 15_000, format === "shorts" ? "short" : "long_form");
+      // Shorts views come cheap, so a Short has to beat its channel by more.
+      const breakouts = findBreakouts(videos, channels, { now, minViews: format === "shorts" ? 50_000 : 20_000, minLift: format === "shorts" ? 5 : 3 });
+      this.breakoutCache.set(format, { at: now.getTime(), breakouts });
+      return breakouts;
+    } catch (error) {
+      this.log.warn("breakout search failed", { format, error });
       return [];
     }
   }

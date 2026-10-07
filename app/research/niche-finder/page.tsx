@@ -22,6 +22,7 @@ import { CompareBox, FitPanel, Patterns, SaveNicheButton, SavedNiches, ScoreBrea
 import { TopicInput } from "./topic-input";
 import { rpmTierOf, sortDiscovered, type DiscoveredNiche, type DiscoverFormat, type DiscoverSort } from "@/lib/niches/discover";
 import type { RadarNiche } from "@/lib/services/niche-radar-service";
+import type { Breakout } from "@/lib/niches/breakouts";
 import type { NicheIdeaRow } from "@/types/database";
 
 export const dynamic = "force-dynamic";
@@ -90,7 +91,7 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
     }
   }
   const savedList = readSavedNiches(user.user_metadata);
-  const [popular, allTop, related, saved, own, discovered, radarNiches, questions, evergreen] = await Promise.all([
+  const [popular, allTop, related, saved, own, discovered, radarNiches, questions, evergreen, breakouts] = await Promise.all([
     result ? Promise.resolve([]) : services.niches.popularTopics(8),
     result ? services.niches.topNiches(15) : Promise.resolve([]),
     result ? services.niches.relatedNiches(result.topic, result.report, 9) : Promise.resolve([]),
@@ -102,6 +103,7 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
     !result && browsing && view.board !== "library" ? services.radar.list({ limit: 400 }).catch(() => []) : Promise.resolve([]),
     !result && browsing && view.board === "ideas" ? services.radar.ideas({ limit: 30, days: 21, kind: "question", source: "reddit" }).catch(() => []) : Promise.resolve([]),
     !result && browsing && view.board === "ideas" ? services.radar.ideas({ limit: 30, days: 30, source: "stackexchange", orderBy: "views" }).catch(() => []) : Promise.resolve([]),
+    !result && browsing && view.board === "ideas" ? services.niches.breakouts(view.format) : Promise.resolve([]),
   ]);
   const discoverList = sortDiscovered(
     discovered.filter((n) => view.rpm === "all" || n.rpmTier === view.rpm),
@@ -144,7 +146,7 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
       {result ? null : <SavedNiches niches={saved} />}
       {result ? <Report result={result} drill={drill} saved={isSaved(savedList, result.topic)} own={own} /> : null}
       {related.length > 0 ? <IdeaBoard ideas={related} title={`Niches next to ${result!.topic}`} sub="Other researched topics that overlap with this one" /> : null}
-      {result ? null : <DiscoverBoard niches={discoverList} gaps={sortGaps(radarNiches, view)} questions={questions} evergreen={evergreen} view={view} />}
+      {result ? null : <DiscoverBoard niches={discoverList} gaps={sortGaps(radarNiches, view)} questions={questions} evergreen={evergreen} breakouts={breakouts} view={view} />}
       {result && topNiches.length > 0 ? (
         <IdeaBoard ideas={topNiches} title="Other underrated niches" sub="Mined from every channel Outlier tracks: real demand, room left, and small channels winning. Pick one to dig in." />
       ) : null}
@@ -734,12 +736,14 @@ function DiscoverBoard({
   gaps,
   questions,
   evergreen,
+  breakouts,
   view,
 }: {
   niches: DiscoveredNiche[];
   gaps: RadarNiche[];
   questions: NicheIdeaRow[];
   evergreen: NicheIdeaRow[];
+  breakouts: Breakout[];
   view: View;
 }) {
   return (
@@ -759,7 +763,7 @@ function DiscoverBoard({
       {view.board === "gaps" ? (
         <GapBoard gaps={gaps} />
       ) : view.board === "ideas" ? (
-        <IdeasBoard gaps={gaps} questions={questions} evergreen={evergreen} />
+        <IdeasBoard gaps={gaps} questions={questions} evergreen={evergreen} breakouts={breakouts} />
       ) : (
         <LibraryBoard niches={niches} view={view} />
       )}
@@ -931,70 +935,101 @@ function GapBoard({ gaps }: { gaps: RadarNiche[] }) {
   );
 }
 
-function IdeasBoard({ gaps, questions, evergreen }: { gaps: RadarNiche[]; questions: NicheIdeaRow[]; evergreen: NicheIdeaRow[] }) {
+function IdeasBoard({ gaps, questions, evergreen, breakouts }: { gaps: RadarNiche[]; questions: NicheIdeaRow[]; evergreen: NicheIdeaRow[]; breakouts: Breakout[] }) {
   const withIdeas = gaps.filter((n) => (n.ease?.ideas.length ?? 0) > 0).slice(0, 12);
-  if (withIdeas.length === 0 && questions.length === 0 && evergreen.length === 0) return <RadarEmpty />;
+  if (withIdeas.length === 0 && questions.length === 0 && evergreen.length === 0 && breakouts.length === 0) return <RadarEmpty />;
   return (
-    <div className="ideas-columns">
-      {withIdeas.length > 0 ? (
-        <div className="dash-panel ideas-list">
-          <h3>First videos to make</h3>
-          <ul>
-            {withIdeas.map((n) => (
-              <li key={n.keyword}>
-                <Link href={`/research/niche-finder?topic=${encodeURIComponent(n.keyword)}`} className="ideas-niche">
-                  {n.keyword}
-                  <span className="niche-score" data-band={band(n.score)}>
-                    {n.score}
+    <>
+      {breakouts.length > 0 ? (
+        <div className="dash-panel ideas-breakouts">
+          <h3>Breakouts in paying niches</h3>
+          <p className="dash-row-sub">Small channels that pulled many times their subscribers in the last two weeks, in categories that pay well.</p>
+          <div className="niche-examples">
+            {breakouts.map((b) => (
+              <a
+                key={b.youtubeVideoId}
+                href={b.format === "short" ? `https://www.youtube.com/shorts/${b.youtubeVideoId}` : `https://www.youtube.com/watch?v=${b.youtubeVideoId}`}
+                target="_blank"
+                rel="noreferrer"
+                className="niche-example"
+              >
+                <span className="niche-example-thumb">
+                  <img src={`https://i.ytimg.com/vi/${b.youtubeVideoId}/hqdefault.jpg`} alt="" loading="lazy" />
+                  <span className="niche-example-views">{formatCompact(b.views)} views</span>
+                </span>
+                <span className="niche-example-text">
+                  <span className="niche-example-title">{b.title}</span>
+                  <span className="niche-example-channel">
+                    {b.channelTitle}
+                    {b.subscribers !== null ? ` · ${formatCompact(b.subscribers)} subs` : ""} · {Math.round(b.lift)}× · {b.category}
                   </span>
-                </Link>
-                <ol>
-                  {n.ease!.ideas.map((idea) => (
-                    <li key={idea}>{idea}</li>
-                  ))}
-                </ol>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-      {evergreen.length > 0 ? (
-        <div className="dash-panel ideas-list">
-          <h3>Questions people search for</h3>
-          <ul>
-            {evergreen.map((q) => (
-              <li key={q.id}>
-                <a href={q.url} target="_blank" rel="noreferrer">
-                  {q.title}
-                </a>
-                <span className="dash-row-sub">
-                  {q.views != null ? `${formatCompact(q.views)} views · ` : ""}
-                  {q.community ?? "Stack Exchange"}
                 </span>
-              </li>
+              </a>
             ))}
-          </ul>
+          </div>
         </div>
       ) : null}
-      {questions.length > 0 ? (
-        <div className="dash-panel ideas-list">
-          <h3>Asked on Reddit this week</h3>
-          <ul>
-            {questions.map((q) => (
-              <li key={q.id}>
-                <a href={q.url} target="_blank" rel="noreferrer">
-                  {q.title}
-                </a>
-                <span className="dash-row-sub">
-                  {q.community ? `r/${q.community} · ` : ""}
-                  {formatCompact(q.score)} upvotes · {formatCompact(q.comments)} comments
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-    </div>
+      <div className="ideas-columns">
+        {withIdeas.length > 0 ? (
+          <div className="dash-panel ideas-list">
+            <h3>First videos to make</h3>
+            <ul>
+              {withIdeas.map((n) => (
+                <li key={n.keyword}>
+                  <Link href={`/research/niche-finder?topic=${encodeURIComponent(n.keyword)}`} className="ideas-niche">
+                    {n.keyword}
+                    <span className="niche-score" data-band={band(n.score)}>
+                      {n.score}
+                    </span>
+                  </Link>
+                  <ol>
+                    {n.ease!.ideas.map((idea) => (
+                      <li key={idea}>{idea}</li>
+                    ))}
+                  </ol>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        {evergreen.length > 0 ? (
+          <div className="dash-panel ideas-list">
+            <h3>Questions people search for</h3>
+            <ul>
+              {evergreen.map((q) => (
+                <li key={q.id}>
+                  <a href={q.url} target="_blank" rel="noreferrer">
+                    {q.title}
+                  </a>
+                  <span className="dash-row-sub">
+                    {q.views != null ? `${formatCompact(q.views)} views · ` : ""}
+                    {q.community ?? "Stack Exchange"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        {questions.length > 0 ? (
+          <div className="dash-panel ideas-list">
+            <h3>Asked on Reddit this week</h3>
+            <ul>
+              {questions.map((q) => (
+                <li key={q.id}>
+                  <a href={q.url} target="_blank" rel="noreferrer">
+                    {q.title}
+                  </a>
+                  <span className="dash-row-sub">
+                    {q.community ? `r/${q.community} · ` : ""}
+                    {formatCompact(q.score)} upvotes · {formatCompact(q.comments)} comments
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+      </div>
+    </>
   );
 }
 

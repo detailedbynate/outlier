@@ -90,6 +90,12 @@ export function categoryFor(...names: string[]): NicheCategory | null {
   return null;
 }
 
+/** Every category whose telltale words appear in the text, in hint order. */
+export function categoriesIn(text: string): NicheCategory[] {
+  const lower = text.toLowerCase();
+  return CATEGORY_HINTS.filter(([pattern]) => pattern.test(lower)).map(([, category]) => category);
+}
+
 /** A category's RPM range for one format. */
 export function rpmFor(category: NicheCategory | null, format: "shorts" | "long_form"): Range {
   const band = category ? (RPM_BY_CATEGORY[category] ?? DEFAULT_BAND) : DEFAULT_BAND;
