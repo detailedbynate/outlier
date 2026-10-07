@@ -18,7 +18,7 @@ import {
 } from "@/components/icons";
 import type { ActivityItem } from "@/lib/analytics/dashboard";
 import { formatCompact, formatMultiplier, formatPercent, timeAgo } from "@/lib/format";
-import { syncOwnChannel } from "@/lib/onboarding/own-channel";
+import { refreshOwnChannelIfStale, syncOwnChannel } from "@/lib/onboarding/own-channel";
 import { getServices } from "@/lib/services";
 import type { ChannelSummary } from "@/lib/services/dashboard-service";
 import type { SavedNiche } from "@/lib/niches/saved";
@@ -401,6 +401,8 @@ function KeyNumbers({ own, channelMedian }: { own: ChannelSummary; channelMedian
 export async function YourChannelSection({ userId, ownChannel }: { userId: string; ownChannel: string | null }) {
   const data = await loadYourChannels(userId, ownChannel);
   const own = data.own;
+  // Keeps "last upload" current: re-reads the channel when it's a few hours old (throttled inside).
+  if (own) after(() => refreshOwnChannelIfStale(userId, own.channel));
 
   if (!own) {
     const pending = data.ownPending;

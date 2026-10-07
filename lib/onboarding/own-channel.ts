@@ -27,3 +27,16 @@ export async function syncOwnChannel(userId: string, identifier: string): Promis
     logger.warn("own channel sync failed", { userId, identifier, error });
   }
 }
+
+/** How old the creator's own channel can get before a dashboard visit re-reads it. */
+const OWN_CHANNEL_FRESH_MS = 3 * 3_600_000;
+
+/**
+ * Re-reads the creator's channel when its uploads are a few hours old. The
+ * daily-refresh mark shares a flag with following, so it can lapse when nobody
+ * follows the channel; this keeps "last upload" true whenever they look.
+ */
+export async function refreshOwnChannelIfStale(userId: string, channel: { youtube_channel_id: string; last_synced_at: string | null }, now = new Date()): Promise<void> {
+  const synced = channel.last_synced_at ? Date.parse(channel.last_synced_at) : 0;
+  if (now.getTime() - synced > OWN_CHANNEL_FRESH_MS) await syncOwnChannel(userId, channel.youtube_channel_id);
+}
