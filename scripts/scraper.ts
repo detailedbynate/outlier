@@ -198,7 +198,9 @@ async function main(): Promise<void> {
     if (gate.state().open) return;
     try {
       await runWithQuotaContext({ lane: "background", operation: "scraper:radar" }, async () => {
-        const supply = await radar.checkSupplyOnce({ limit: config.RADAR_SUPPLY_PER_ROUND, signal });
+        // Reading results costs a scrape slot each, so it grows with the rate the ladder has earned.
+        const supplyLimit = config.RADAR_SUPPLY_PER_ROUND > 0 ? Math.max(config.RADAR_SUPPLY_PER_ROUND, Math.floor(gate.requestsPerMinute / 2)) : 0;
+        const supply = await radar.checkSupplyOnce({ limit: supplyLimit, signal });
         const extras = await Promise.allSettled([radar.enrichDemandOnce({ signal }), radar.rateEaseOnce({ limit: config.RADAR_EASE_PER_ROUND })]);
         const [demand, ease] = extras.map((r) => (r.status === "fulfilled" ? r.value : { error: String(r.reason).slice(0, 200) }));
         logger.info("scraper radar", { supply, demand, ease, suggest: suggestGate.state().open ? "paused" : "running" });

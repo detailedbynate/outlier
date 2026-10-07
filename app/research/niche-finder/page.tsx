@@ -761,7 +761,7 @@ function DiscoverBoard({
       ) : view.board === "ideas" ? (
         <IdeasBoard gaps={gaps} questions={questions} evergreen={evergreen} />
       ) : (
-        <LibraryBoard niches={niches} />
+        <LibraryBoard niches={niches} view={view} />
       )}
       <p className="dash-row-sub">RPM is an estimate by category from public creator reports; real RPM depends on audience country and season.</p>
     </section>
@@ -796,12 +796,15 @@ function Filters({ view }: { view: View }) {
   );
 }
 
-function LibraryBoard({ niches }: { niches: DiscoveredNiche[] }) {
+function LibraryBoard({ niches, view }: { niches: DiscoveredNiche[]; view: View }) {
   if (niches.length === 0) {
     return (
       <div className="dash-empty">
         <strong>Nothing clears the bar with these filters yet</strong>
-        <p>Try another RPM level or format. The list grows as more channels are tracked.</p>
+        <p>
+          The list grows as more channels are tracked. Meanwhile, <Link href={discoverHref(view, { board: "gaps" })}>search gaps</Link> covers niches
+          nobody tracks yet.
+        </p>
       </div>
     );
   }

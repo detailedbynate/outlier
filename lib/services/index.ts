@@ -42,7 +42,7 @@ import { TranscriptRepository } from "@/lib/database/repositories/transcripts";
 import { ScriptService } from "./script-service";
 import { TranscriptService } from "./transcript-service";
 import { getAIProviders } from "@/lib/ai/registry";
-import { HIGH_RPM_SEEDS, LIBRARY_SEEDS, TOPIC_SEEDS } from "@/lib/niches/seeds";
+import { HIGH_RPM_SEEDS, LIBRARY_SEEDS, RADAR_SEEDS, TOPIC_SEEDS } from "@/lib/niches/seeds";
 import { LibraryGrowthService } from "./library-growth-service";
 import { NicheLabelingService } from "./niche-labeling-service";
 import { qualityConfigFrom } from "@/lib/research/quality";
@@ -267,7 +267,7 @@ export function getServices(): Services {
   // here it serves the Niche Finder and hands its best phrases to library growth.
   const radar = new NicheRadarService({
     radar: repositories.radar,
-    seeds: [...new Set([...HIGH_RPM_SEEDS, ...TOPIC_SEEDS, ...LIBRARY_SEEDS])],
+    seeds: [...new Set([...HIGH_RPM_SEEDS, ...RADAR_SEEDS, ...TOPIC_SEEDS, ...LIBRARY_SEEDS])],
     ai: text,
     demand: config.DATAFORSEO_LOGIN && config.DATAFORSEO_PASSWORD ? new DataForSeoClient({ login: config.DATAFORSEO_LOGIN, password: config.DATAFORSEO_PASSWORD }) : null,
     reddit: config.REDDIT_CLIENT_ID && config.REDDIT_CLIENT_SECRET ? new RedditClient({ clientId: config.REDDIT_CLIENT_ID, clientSecret: config.REDDIT_CLIENT_SECRET }) : null,

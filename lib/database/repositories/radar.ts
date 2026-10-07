@@ -39,6 +39,7 @@ export class RadarRepository {
         // or the tree multiplies into millions of long-tail phrases nobody searches.
         .or("depth.eq.0,source.in.(reddit,rising),suggest_rank.lte.2")
         .order("depth", { ascending: true })
+        .order("priority", { ascending: false })
         .order("suggest_rank", { ascending: true, nullsFirst: true })
         .limit(limit),
       "niche_keywords.dueForExpansion",

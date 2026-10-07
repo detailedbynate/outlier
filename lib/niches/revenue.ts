@@ -44,19 +44,29 @@ const RPM_BY_CATEGORY: Partial<Record<NicheCategory, RpmBand>> = {
 
 const DEFAULT_BAND: RpmBand = { long: [1.5, 4], shorts: [0.03, 0.07] };
 
-/** Words that give a category away when the dictionary doesn't know the topic. */
+/**
+ * Words that give a category away when the dictionary doesn't know the topic.
+ * First match wins, so the paying categories go first and ambiguous words are
+ * spelled out in context ("python tutorial", not "python": that one's a snake).
+ */
 const CATEGORY_HINTS: [RegExp, NicheCategory][] = [
-  [/\b(financ|invest|stock|crypto|money|budget|tax|real estate|business|side hustle|passive income|trading|credit)/, "Finance & Business"],
-  [/\b(tech|ai\b|phone|iphone|android|laptop|pc build|coding|programming|software|gadget|science|space|physics)/, "Science & Tech"],
-  [/\b(history|explain|learn|study|language|math|psycholog|philosoph|educat|facts?)\b/, "Education & Explainers"],
-  [/\b(fitness|gym|workout|diet|health|nutrition|yoga|running|weight loss|bodybuild|calisthenic)/, "Fitness & Health"],
+  [
+    /\b(financ|invest|stock|crypto|money|budget|tax|real estate|business|side hustle|passive income|trading|credit|insurance|ira\b|401k|hsa\b|savings|loans?\b|debt|mortgage|refinanc|heloc|rental|landlord|property|airbnb|reits?\b|treasur|bonds\b|options trading|covered calls?|dividend|fire movement|frugal|llc\b|bookkeep|accounting|estate planning|wills and trusts|social security|medicare|annuit|identity theft|points and miles|airline miles|marketing|seo\b|google ads|facebook ads|affiliate|print on demand|etsy|shopify|kdp\b|dropship|ecommerce|digital products|cold email|lead gen|copywrit|branding|linkedin|resume|job interview|job search|remote jobs?|salary|career|freelanc|entrepreneur|startup|saas|sales\b|econom|housing market|legal|lawyer|attorney|tenant|small claims|immigration law|home ?buy|first time buyer|retire|house flip|balance transfer|amazon fba|fba\b)/,
+    "Finance & Business",
+  ],
+  [
+    /\b(tech|ai\b|phone|iphone|android|laptop|pc build|coding|programming|software|gadget|science|space|physics|excel|spreadsheet|google sheets|power bi|sql\b|python (?:tutorial|automation|script|code|coding|programming|for)|no code|zapier|notion\b|obsidian (?:notes|vault|app|plugins?)|canva|photoshop|davinci|premiere pro|wordpress|web hosting|website|vpn\b|password manager|home network|router|wifi|windows (?:1[01]|tips|pc|laptop)|macbook|macos|mac (?:tips|apps)|chrome extensions?|chatgpt|gpt\b|claude ai|llm|prompt engineering|aws\b|azure|cloud computing|comptia|it career|cyber|linux|automation|productivity apps?)/,
+    "Science & Tech",
+  ],
+  [/\b(history|explain|learn|study|language|math|psycholog|philosoph|educat|facts?\b|geopolitic|supply chain|military|ancient|architect|engineer|how it'?s made|aviation|trucking|logistics|documentar|true crime|cold cases?|unsolved|serial killers?|missing persons?|myster)/, "Education & Explainers"],
+  [/\b(fitness|gym|workout|diet|health|nutrition|yoga|running|weight loss|bodybuild|calisthenic|supplement|blood sugar|diabet|longevity|sleep (?:science|tips|hygiene|apnea)|dermatolog|physical therap|back pain|posture|stretch|nurs(?:e|ing)|doctor|medical|pharmac|dental|teeth)/, "Fitness & Health"],
   [/\b(car|cars|truck|motorcycle|detailing|mechanic|ev|tesla)\b/, "Cars & Vehicles"],
-  [/\b(makeup|beauty|skincare|fashion|outfit|hair|nails)/, "Beauty & Fashion"],
-  [/\b(travel|camping|hiking|fishing|hunting|outdoor)/, "Travel & Outdoors"],
+  [/\b(makeup|beauty|skincare|fashion|outfit|hair|nails|luxury|watches\b|wristwatch)/, "Beauty & Fashion"],
+  [/\b(travel|camping|hiking|fishing|hunting|outdoor|cruise|digital nomad|moving abroad|expat|airport|flights?\b)/, "Travel & Outdoors"],
   [/\b(cook|recipe|food|baking|bbq|meal)/, "Food & Cooking"],
-  [/\b(diy|craft|woodwork|home|garden|renovat|cleaning)/, "DIY, Crafts & Home"],
+  [/\b(diy|craft|woodwork|home|garden|renovat|cleaning|plumb|hvac|roof|solar|heat pump|lawn|pest control|electrical|wiring|drywall|insulation)/, "DIY, Crafts & Home"],
   [/\b(game|gaming|minecraft|roblox|fortnite|gta|pokemon|monsters|speedrun|esports)/, "Gaming"],
-  [/\b(football|soccer|nba|basketball|nfl|sports?|boxing|ufc|golf|tennis)/, "Sports"],
+  [/\b(football|soccer|nba|basketball|nfl|sports?|boxing|ufc|golf|tennis|surf)/, "Sports"],
   [/\b(dog|cat|pet|animal|puppy|kitten)/, "Animals & Pets"],
   [/\b(music|song|dance|guitar|piano|singing|rap)/, "Music & Dance"],
   [/\b(comedy|skit|prank|funny|meme)/, "Comedy & Skits"],

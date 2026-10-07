@@ -27,7 +27,7 @@ export function memoryRadar(): RadarDeps["radar"] & { rows: Map<string, NicheKey
     dueForExpansion: async (maxDepth, limit) =>
       all()
         .filter((r) => !r.expanded_at && r.depth <= maxDepth && (r.depth === 0 || r.source === "reddit" || r.source === "rising" || (r.suggest_rank ?? 99) <= 2))
-        .sort((a, b) => a.depth - b.depth)
+        .sort((a, b) => a.depth - b.depth || (b.priority ?? 0) - (a.priority ?? 0))
         .slice(0, limit),
     dueForResweep: async (before, limit) =>
       all()

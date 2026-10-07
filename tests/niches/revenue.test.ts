@@ -9,6 +9,20 @@ describe("niche earnings", () => {
     expect(categoryFor("qwerty")).toBeNull();
   });
 
+  it("knows the paying sub-niches by their words, and not the look-alikes", () => {
+    expect(categoryFor("roth ira")).toBe("Finance & Business");
+    expect(categoryFor("first time home buyer")).toBe("Finance & Business");
+    expect(categoryFor("pet insurance")).toBe("Finance & Business");
+    expect(categoryFor("excel formulas")).toBe("Science & Tech");
+    expect(categoryFor("python automation")).toBe("Science & Tech");
+    expect(categoryFor("psychology explained")).toBe("Education & Explainers");
+    expect(categoryFor("hvac")).toBe("DIY, Crafts & Home");
+    expect(categoryFor("back pain")).toBe("Fitness & Health");
+    expect(categoryFor("python snake care")).not.toBe("Science & Tech");
+    expect(categoryFor("minecraft obsidian farm")).toBe("Gaming");
+    expect(categoryFor("james bond movie")).not.toBe("Finance & Business");
+  });
+
   it("blends Shorts and long-form RPM by where the views come from", () => {
     const allShorts = estimateEarnings({ typical: 1_000_000, top: 10_000_000, shortsShare: 1 }, "personal finance")!;
     expect(allShorts.category).toBe("Finance & Business");

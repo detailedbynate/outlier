@@ -69,3 +69,37 @@ export const HIGH_RPM_SEEDS = [
 ] as const;
 
 export const LIBRARY_SEEDS: readonly string[] = [...new Set([...HIGH_RPM_SEEDS, ...GAME_SEEDS, ...TOPIC_SEEDS])];
+
+/**
+ * Radar-only starting points: specific, mostly faceless sub-niches where views
+ * pay well. Autocomplete is cheap enough to comb all of them; library growth
+ * keeps to the shorter lists above because its searches cost more.
+ */
+export const RADAR_SEEDS = [
+  // Personal finance
+  "roth ira", "401k", "hsa account", "high yield savings", "credit card churning", "balance transfer", "debt payoff", "student loans",
+  "car insurance", "life insurance", "home insurance", "health insurance", "first time home buyer", "refinance", "heloc", "rental property",
+  "property management", "airbnb hosting", "reits", "treasury bills", "options trading", "covered calls", "passive income", "fire movement",
+  "frugal living", "tax deductions", "small business taxes", "llc", "bookkeeping", "estate planning", "wills and trusts", "social security",
+  "medicare", "annuities", "credit repair", "identity theft", "points and miles", "airline miles",
+  // Business and careers
+  "email marketing", "seo", "google ads", "facebook ads", "affiliate marketing", "print on demand", "etsy shop", "shopify", "amazon kdp",
+  "digital products", "cold email", "lead generation", "copywriting", "personal branding", "linkedin tips", "resume tips",
+  "job interview tips", "salary negotiation", "remote jobs", "it career", "comptia",
+  // Software and AI
+  "excel formulas", "google sheets", "power bi", "sql tutorial", "python automation", "no code", "zapier", "notion", "obsidian",
+  "canva tutorial", "photoshop tutorial", "davinci resolve", "premiere pro", "wordpress", "web hosting", "vpn", "password manager",
+  "home network", "windows tips", "mac tips", "android tips", "chrome extensions", "ai image generator", "ai video", "chatgpt prompts",
+  "claude ai", "local llm", "ai agents", "aws",
+  // Law and health
+  "tenant rights", "small claims court", "immigration law", "medical billing", "nursing", "sleep science", "nutrition science",
+  "supplements", "gut health", "blood sugar", "longevity", "dermatologist", "physical therapy", "back pain",
+  // Home and cars
+  "home renovation", "hvac", "plumbing repair", "electrical diy", "roofing", "solar panels", "heat pump", "lawn care", "pest control",
+  "home security", "car maintenance", "ev charging", "used cars",
+  // Explainers
+  "geopolitics", "supply chain", "military history", "ancient history", "architecture", "engineering explained", "how it's made",
+  "aviation", "trucking industry", "housing market",
+  // Travel and pets
+  "travel hacks", "cruise tips", "budget travel", "digital nomad", "moving abroad", "pet insurance", "dog food",
+] as const;
