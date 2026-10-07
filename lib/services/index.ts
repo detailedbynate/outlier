@@ -10,6 +10,7 @@ import { RadarRepository } from "@/lib/database/repositories/radar";
 import { DataForSeoClient } from "@/lib/radar/demand";
 import { RedditClient } from "@/lib/radar/reddit";
 import { StackExchangeClient } from "@/lib/radar/stackexchange";
+import { fetchLaunches } from "@/lib/radar/launches";
 import { NicheRadarService } from "./niche-radar-service";
 import { ReferralRepository } from "@/lib/database/repositories/referrals";
 import { SubscriptionRepository } from "@/lib/database/repositories/subscriptions";
@@ -272,6 +273,7 @@ export function getServices(): Services {
     demand: config.DATAFORSEO_LOGIN && config.DATAFORSEO_PASSWORD ? new DataForSeoClient({ login: config.DATAFORSEO_LOGIN, password: config.DATAFORSEO_PASSWORD }) : null,
     reddit: config.REDDIT_CLIENT_ID && config.REDDIT_CLIENT_SECRET ? new RedditClient({ clientId: config.REDDIT_CLIENT_ID, clientSecret: config.REDDIT_CLIENT_SECRET }) : null,
     stackexchange: new StackExchangeClient({ key: config.STACKEXCHANGE_KEY ?? null }),
+    launches: (options) => fetchLaunches(options),
     youtube,
   });
   const libraryGrowth = new LibraryGrowthService(

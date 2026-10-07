@@ -15,7 +15,7 @@ create table if not exists public.niche_keywords (
   keyword           text primary key,
   -- The seed topic this phrase grew from.
   seed              text not null,
-  -- seed | autocomplete | rising | reddit | stackexchange | translation
+  -- seed | autocomplete | rising | reddit | stackexchange | translation | launch
   source            text not null default 'autocomplete',
   -- Search language (lib/radar/markets.ts): translations of English phrases are read in their own market.
   market            text not null default 'en',
@@ -47,7 +47,7 @@ create index if not exists niche_keywords_source_idx on public.niche_keywords (s
 
 create table if not exists public.niche_ideas (
   id           uuid primary key default gen_random_uuid(),
-  -- reddit | stackexchange | comments
+  -- reddit | stackexchange | comments | launches
   source       text not null,
   -- Where it came from, e.g. "r/personalfinance", "money.stackexchange.com", or the niche whose videos' comments asked.
   community    text,
@@ -58,7 +58,7 @@ create table if not exists public.niche_ideas (
   -- Stack Exchange counts views: a question read 200K times is proven search demand.
   views        integer,
   posted_at    timestamptz,
-  -- question | story | discussion | request (a viewer asking for a video)
+  -- question | story | discussion | request (a viewer asking for a video) | launch (a new tool)
   kind         text not null default 'discussion',
   category     text,
   collected_at timestamptz not null default now()

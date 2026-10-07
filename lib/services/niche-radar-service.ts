@@ -8,6 +8,7 @@ import type { DataForSeoClient, Demand } from "@/lib/radar/demand";
 import { rateEase, type EaseRating } from "@/lib/radar/ease";
 import { marketOf, translatePhrases, type MarketCode } from "@/lib/radar/markets";
 import { extractRequests } from "@/lib/radar/requests";
+import { launchPhrases, type Launch } from "@/lib/radar/launches";
 import type { VideoComment } from "@/lib/innertube/comments";
 import { SUBREDDITS, type RedditClient, type RedditPost } from "@/lib/radar/reddit";
 import { STACK_SITES, type StackExchangeClient } from "@/lib/radar/stackexchange";
@@ -32,7 +33,8 @@ import type { YouTubeChannel, YouTubeSearchResult, YouTubeVideo } from "@/types/
  * tags as seeds. The best English phrases are translated into other markets
  * (markets.ts) and read there, where the same demand often has far less supply.
  * Comments under the best gaps' top videos give viewer requests: videos people
- * asked for that nobody has made (requests.ts).
+ * asked for that nobody has made (requests.ts). New tools taking off on Hacker
+ * News and GitHub become tutorial phrases before anyone has made the videos (launches.ts).
  *
  * Everything that touches YouTube goes through the scraper's gate (the caller
  * passes gated `suggest` and `search`), so the radar shares the scraper's rate
@@ -58,6 +60,8 @@ export interface RadarDeps {
   demand?: Pick<DataForSeoClient, "searchVolume"> | null;
   reddit?: Pick<RedditClient, "sweep"> | null;
   stackexchange?: Pick<StackExchangeClient, "sweep"> | null;
+  /** This week's Show HN posts and rising GitHub repos. */
+  launches?: ((options: { signal?: AbortSignal; now?: Date }) => Promise<Launch[]>) | null;
   ai?: Pick<TextProvider, "generateObject"> | null;
   seeds: readonly string[];
 }
@@ -89,6 +93,8 @@ export interface RadarConfig {
   requestsEveryHours: number;
   /** Gaps whose top videos' comments are read per sweep (two videos each). */
   requestNiches: number;
+  /** Read new launches at most this often. */
+  launchesEveryHours: number;
 }
 
 export const DEFAULT_RADAR_CONFIG: RadarConfig = {
@@ -105,6 +111,7 @@ export const DEFAULT_RADAR_CONFIG: RadarConfig = {
   translateMinScore: 55,
   requestsEveryHours: 24,
   requestNiches: 15,
+  launchesEveryHours: 7 * 24,
 };
 
 /** A phrase ready to show. */
@@ -173,6 +180,7 @@ export class NicheRadarService {
   private readonly config: RadarConfig;
   private lastTranslateAttempt = 0;
   private lastRequestsAttempt = 0;
+  private lastLaunchesAttempt = 0;
 
   constructor(
     private readonly deps: RadarDeps,
@@ -482,6 +490,46 @@ export class NicheRadarService {
       return { niches: groups.length, requests: saved };
     } catch (error) {
       this.log.warn("viewer request extraction failed", { error });
+      return null;
+    }
+  }
+
+  /**
+   * New tools, once a week: the AI keeps the launches ordinary people will want
+   * tutorials for, and each becomes a phrase (grown a little through autocomplete,
+   * like Reddit's) and an idea linking back to the launch.
+   */
+  async collectLaunchesOnce(options: { signal?: AbortSignal; now?: Date } = {}): Promise<{ launches: number; phrases: number } | null> {
+    const { launches, ai } = this.deps;
+    if (!launches || !ai) return null;
+    const now = options.now ?? new Date();
+    const every = this.config.launchesEveryHours * 3_600_000;
+    if (now.getTime() - this.lastLaunchesAttempt < every) return null;
+    const last = await this.deps.radar.lastIdeasAt("launches");
+    if (last && now.getTime() - last.getTime() < every) return null;
+    this.lastLaunchesAttempt = now.getTime();
+    try {
+      const found = await launches({ signal: options.signal, now });
+      const picked = await launchPhrases(ai, found);
+      const phrases = await this.deps.radar.addKeywords(
+        picked.map((p) => withPriority({ keyword: p.phrase, seed: p.name.toLowerCase().slice(0, 80), source: "launch", depth: 1, category: "Science & Tech" })),
+      );
+      await this.deps.radar.addIdeas(
+        picked.map((p) => ({
+          source: "launches",
+          community: p.phrase,
+          title: p.name,
+          url: p.url,
+          score: p.score,
+          kind: "launch",
+          category: "Science & Tech",
+          collected_at: now.toISOString(),
+        })),
+      );
+      this.log.info("launches collected", { launches: found.length, picked: picked.length, phrases });
+      return { launches: found.length, phrases };
+    } catch (error) {
+      this.log.warn("launch collection failed", { error });
       return null;
     }
   }
