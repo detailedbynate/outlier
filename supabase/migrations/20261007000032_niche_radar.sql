@@ -32,24 +32,28 @@ create table if not exists public.niche_keywords (
   ease              jsonb,
   -- 0-100, recomputed whenever a signal lands.
   score             numeric,
+  -- Which unchecked phrases to read first: pay, autocomplete position, new searches.
+  priority          smallint not null default 0,
   updated_at        timestamptz not null default now()
 );
 
 create index if not exists niche_keywords_expand_idx on public.niche_keywords (depth, expanded_at nulls first);
-create index if not exists niche_keywords_supply_idx on public.niche_keywords (supply_checked_at nulls first);
+create index if not exists niche_keywords_supply_idx on public.niche_keywords (supply_checked_at nulls first, priority desc);
 create index if not exists niche_keywords_demand_idx on public.niche_keywords (demand_checked_at nulls first);
 create index if not exists niche_keywords_score_idx on public.niche_keywords (score desc nulls last);
 
 create table if not exists public.niche_ideas (
   id           uuid primary key default gen_random_uuid(),
-  -- reddit
+  -- reddit | stackexchange
   source       text not null,
-  -- Where it came from, e.g. "r/personalfinance".
+  -- Where it came from, e.g. "r/personalfinance" or "money.stackexchange.com".
   community    text,
   title        text not null,
   url          text not null unique,
   score        integer not null default 0,
   comments     integer not null default 0,
+  -- Stack Exchange counts views: a question read 200K times is proven search demand.
+  views        integer,
   posted_at    timestamptz,
   -- question | story | discussion
   kind         text not null default 'discussion',
@@ -59,6 +63,7 @@ create table if not exists public.niche_ideas (
 
 create index if not exists niche_ideas_recent_idx on public.niche_ideas (collected_at desc);
 create index if not exists niche_ideas_category_idx on public.niche_ideas (category, score desc);
+create index if not exists niche_ideas_source_idx on public.niche_ideas (source, collected_at desc);
 
 alter table public.niche_keywords enable row level security;
 alter table public.niche_ideas enable row level security;

@@ -200,8 +200,14 @@ const serverEnvSchema = z.object({
   LIBRARY_FEATURED_CHECKS_PER_RUN: z.coerce.number().int().min(0).max(2_000).default(60),
   LIBRARY_FEATURED_NEW_PER_RUN: z.coerce.number().int().min(0).max(2_000).default(80),
   LIBRARY_FEATURED_MAX_SUBSCRIBERS: z.coerce.number().int().min(1_000).default(1_000_000),
-  /** Niche Radar (runs inside the scraper, through its gate): autocomplete requests, phrases whose results are read, and AI ease ratings per round. 0 turns a part off. */
-  RADAR_SUGGESTS_PER_ROUND: z.coerce.number().int().min(0).max(500).default(40),
+  /**
+   * Niche Radar (runs inside the scraper): autocomplete requests, phrases whose
+   * results are read, and AI ease ratings per round. 0 turns a part off. Results
+   * are read through the scraper's gate; autocomplete is a different Google host
+   * and gets its own pace and breaker (RADAR_SUGGESTS_PER_MINUTE).
+   */
+  RADAR_SUGGESTS_PER_ROUND: z.coerce.number().int().min(0).max(1_000).default(100),
+  RADAR_SUGGESTS_PER_MINUTE: z.coerce.number().min(1).max(120).default(20),
   RADAR_SUPPLY_PER_ROUND: z.coerce.number().int().min(0).max(100).default(6),
   RADAR_EASE_PER_ROUND: z.coerce.number().int().min(0).max(50).default(12),
   /** Google search volume and CPC for radar phrases (dataforseo.com). Off without both. */
@@ -210,6 +216,8 @@ const serverEnvSchema = z.object({
   /** Reddit app-only OAuth (a free "script" app at reddit.com/prefs/apps) for idea mining. Off without both. */
   REDDIT_CLIENT_ID: z.string().trim().min(1).optional(),
   REDDIT_CLIENT_SECRET: z.string().trim().min(1).optional(),
+  /** Stack Exchange works without a key (300 requests/day per IP); a free key (stackapps.com) raises that to 10,000. */
+  STACKEXCHANGE_KEY: z.string().trim().min(1).optional(),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;

@@ -7,6 +7,8 @@ import { categoryFor } from "@/lib/niches/revenue";
 import type { DataForSeoClient, Demand } from "@/lib/radar/demand";
 import { rateEase, type EaseRating } from "@/lib/radar/ease";
 import { SUBREDDITS, type RedditClient, type RedditPost } from "@/lib/radar/reddit";
+import { STACK_SITES, type StackExchangeClient } from "@/lib/radar/stackexchange";
+import { priorityOf } from "@/lib/radar/priority";
 import { scoreRadar, type RadarScore } from "@/lib/radar/score";
 import { expansionQueries, isUsefulPhrase, normalizeKeyword, type Suggestion } from "@/lib/radar/suggest";
 import { measureSupply, type Supply } from "@/lib/radar/supply";
@@ -22,7 +24,9 @@ import type { YouTubeChannel, YouTubeSearchResult, YouTubeVideo } from "@/types/
  *         → ease: can one person make it, and three first videos (AI)
  *         → score, and the best phrases go back to library growth as seeds.
  *
- * Reddit adds phrases and video ideas from high-paying communities.
+ * Reddit adds phrases and video ideas from high-paying communities; Stack
+ * Exchange adds evergreen questions (with view counts) and its sites' popular
+ * tags as seeds.
  *
  * Everything that touches YouTube goes through the scraper's gate (the caller
  * passes gated `suggest` and `search`), so the radar shares the scraper's rate
@@ -45,6 +49,7 @@ export interface RadarDeps {
   youtube?: { getVideos(ids: readonly string[]): Promise<YouTubeVideo[]>; getChannels(ids: readonly string[]): Promise<YouTubeChannel[]> };
   demand?: Pick<DataForSeoClient, "searchVolume"> | null;
   reddit?: Pick<RedditClient, "sweep"> | null;
+  stackexchange?: Pick<StackExchangeClient, "sweep"> | null;
   ai?: Pick<TextProvider, "generateObject"> | null;
   seeds: readonly string[];
 }
@@ -64,6 +69,8 @@ export interface RadarConfig {
   easeMinScore: number;
   /** Sweep each seed's autocomplete again after this many days; whatever is new since is a rising search. */
   resweepDays: number;
+  /** Collect Stack Exchange at most this often. */
+  stackEveryHours: number;
 }
 
 export const DEFAULT_RADAR_CONFIG: RadarConfig = {
@@ -74,6 +81,7 @@ export const DEFAULT_RADAR_CONFIG: RadarConfig = {
   redditEveryHours: 12,
   easeMinScore: 50,
   resweepDays: 7,
+  stackEveryHours: 24,
 };
 
 /** A phrase ready to show. */
@@ -117,6 +125,12 @@ export function toRadarNiche(row: NicheKeywordRow): RadarNiche | null {
 
 const json = (value: unknown) => value as Json;
 
+type KeywordInsert = TablesInsert<"niche_keywords">;
+
+function withPriority(row: KeywordInsert): KeywordInsert {
+  return { ...row, priority: priorityOf({ keyword: row.keyword, category: row.category ?? null, source: row.source ?? "autocomplete", depth: row.depth ?? 0, suggestRank: row.suggest_rank ?? null }) };
+}
+
 export class NicheRadarService {
   private readonly log: Logger;
   private readonly config: RadarConfig;
@@ -145,10 +159,10 @@ export class NicheRadarService {
    * proven on YouTube, and growing them through autocomplete finds the searches
    * around them nobody has made videos for yet.
    */
-  async addSeeds(terms: readonly string[], source: string): Promise<number> {
+  async addSeeds(terms: readonly string[], source: string, category: NicheCategory | null = null): Promise<number> {
     const rows = [...new Set(terms.map(normalizeKeyword))]
       .filter((keyword) => keyword.length >= 3)
-      .map((keyword) => ({ keyword, seed: keyword, source, depth: 0, category: categoryFor(keyword) }));
+      .map((keyword) => withPriority({ keyword, seed: keyword, source, depth: 0, category: categoryFor(keyword) ?? category }));
     return this.deps.radar.addKeywords(rows);
   }
 
@@ -159,32 +173,36 @@ export class NicheRadarService {
     if (!suggest || options.maxQueries <= 0) return result;
     const now = options.now ?? new Date();
 
-    // One seed a round is swept again: phrases that weren't in its autocomplete last
-    // time are searches that just started, where nobody has caught up yet.
-    const resweep = await this.deps.radar.dueForResweep(new Date(now.getTime() - this.config.resweepDays * DAY), 1);
+    // A couple of seeds a round are swept again, lightly: phrases that weren't in their
+    // autocomplete last time are searches that just started, where nobody has caught up yet.
+    const resweep = await this.deps.radar.dueForResweep(new Date(now.getTime() - this.config.resweepDays * DAY), 2);
     const full = (await this.deps.radar.countKeywords()) >= this.config.maxKeywords;
     const due = [...resweep, ...(full ? [] : await this.deps.radar.dueForExpansion(this.config.maxDepth - 1, 10))];
     const done: string[] = [];
     for (const row of due) {
-      const queries = expansionQueries(row.keyword, row.depth);
+      const again = row.expanded_at !== null;
+      // New searches surface at the top of the base suggestions, so a re-sweep skips the a-z pass.
+      const queries = expansionQueries(row.keyword, again ? 1 : row.depth);
       // Always finish a phrase once started (half-expanded phrases would never be revisited),
       // but don't start one the round's budget can't cover - unless it's the first.
       if (options.signal?.aborted || (result.queries > 0 && result.queries + queries.length > options.maxQueries)) break;
-      const again = row.expanded_at !== null;
       const found = new Map<string, TablesInsert<"niche_keywords">>();
       for (const query of queries) {
         if (options.signal?.aborted) break;
         result.queries += 1;
         for (const s of await suggest(query)) {
           if (!isUsefulPhrase(s.phrase, row.keyword) || found.has(s.phrase)) continue;
-          found.set(s.phrase, {
-            keyword: s.phrase,
-            seed: row.seed,
-            source: again ? "rising" : "autocomplete",
-            depth: row.depth + 1,
-            suggest_rank: s.rank,
-            category: categoryFor(s.phrase) ?? row.category,
-          });
+          found.set(
+            s.phrase,
+            withPriority({
+              keyword: s.phrase,
+              seed: row.seed,
+              source: again ? "rising" : "autocomplete",
+              depth: row.depth + 1,
+              suggest_rank: s.rank,
+              category: categoryFor(s.phrase) ?? row.category,
+            }),
+          );
         }
       }
       if (options.signal?.aborted) break;
@@ -268,7 +286,7 @@ export class NicheRadarService {
   async collectRedditOnce(options: { signal?: AbortSignal; now?: Date } = {}): Promise<{ posts: number; phrases: number } | null> {
     if (!this.deps.reddit) return null;
     const now = options.now ?? new Date();
-    const last = await this.deps.radar.lastIdeasAt();
+    const last = await this.deps.radar.lastIdeasAt("reddit");
     if (last && now.getTime() - last.getTime() < this.config.redditEveryHours * 3_600_000) return null;
 
     const posts = await this.deps.reddit.sweep(Object.keys(SUBREDDITS), { signal: options.signal, period: "week" });
@@ -291,6 +309,38 @@ export class NicheRadarService {
     return { posts: saved, phrases };
   }
 
+  /**
+   * Stack Exchange once a day: the month's and all time's most-voted questions as
+   * ideas (with how many times each was read), and each site's popular tags as seeds.
+   */
+  async collectStackOnce(options: { signal?: AbortSignal; now?: Date } = {}): Promise<{ questions: number; seeds: number } | null> {
+    if (!this.deps.stackexchange) return null;
+    const now = options.now ?? new Date();
+    const last = await this.deps.radar.lastIdeasAt("stackexchange");
+    if (last && now.getTime() - last.getTime() < this.config.stackEveryHours * 3_600_000) return null;
+
+    const { questions, tags } = await this.deps.stackexchange.sweep(Object.keys(STACK_SITES), { signal: options.signal, withTags: true });
+    const saved = await this.deps.radar.addIdeas(
+      questions.map((q) => ({
+        source: "stackexchange",
+        community: q.community,
+        title: q.title,
+        url: q.url,
+        score: q.score,
+        comments: q.answers,
+        views: q.views,
+        posted_at: q.postedAt,
+        kind: "question",
+        category: q.category,
+        collected_at: now.toISOString(),
+      })),
+    );
+    let seeds = 0;
+    for (const { site, tags: names } of tags) seeds += await this.addSeeds(names, "stackexchange", STACK_SITES[site] ?? null);
+    this.log.info("stack exchange collected", { questions: saved, seeds });
+    return { questions: saved, seeds };
+  }
+
   /** Turn the week's most-discussed posts into searchable niche phrases (AI), and add the new ones. */
   private async phrasesFromPosts(posts: readonly RedditPost[]): Promise<number> {
     if (!this.deps.ai || posts.length === 0) return 0;
@@ -307,13 +357,15 @@ export class NicheRadarService {
       const rows = object.phrases
         .map((p) => ({ phrase: normalizeKeyword(p.phrase), community: p.community.replace(/^r\//i, "").toLowerCase() }))
         .filter((p) => p.phrase.split(" ").length >= 2 && p.phrase.split(" ").length <= 6)
-        .map((p) => ({
-          keyword: p.phrase,
-          seed: `r/${p.community}`,
-          source: "reddit",
-          depth: 1,
-          category: categoryFor(p.phrase) ?? SUBREDDITS[p.community] ?? null,
-        }));
+        .map((p) =>
+          withPriority({
+            keyword: p.phrase,
+            seed: `r/${p.community}`,
+            source: "reddit",
+            depth: 1,
+            category: categoryFor(p.phrase) ?? SUBREDDITS[p.community] ?? null,
+          }),
+        );
       return this.deps.radar.addKeywords(rows);
     } catch (error) {
       this.log.warn("reddit phrase extraction failed", { error });
@@ -336,9 +388,18 @@ export class NicheRadarService {
     });
   }
 
-  async ideas(options: { limit?: number; days?: number; kind?: string; category?: string | null; now?: Date } = {}): Promise<NicheIdeaRow[]> {
+  async ideas(
+    options: { limit?: number; days?: number; kind?: string; source?: string; category?: string | null; orderBy?: "score" | "views"; now?: Date } = {},
+  ): Promise<NicheIdeaRow[]> {
     const now = options.now ?? new Date();
-    return this.deps.radar.ideas({ limit: options.limit ?? 30, since: new Date(now.getTime() - (options.days ?? 14) * DAY), kind: options.kind, category: options.category });
+    return this.deps.radar.ideas({
+      limit: options.limit ?? 30,
+      since: new Date(now.getTime() - (options.days ?? 14) * DAY),
+      kind: options.kind,
+      source: options.source,
+      category: options.category,
+      orderBy: options.orderBy,
+    });
   }
 
   /** Phrases good enough to grow the channel library around. */

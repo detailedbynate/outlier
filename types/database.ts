@@ -261,6 +261,8 @@ export type NicheKeywordRow = {
   ease_checked_at: string | null;
   ease: Json | null;
   score: number | null;
+  /** Which unchecked phrases to read first (priority.ts). */
+  priority: number;
   updated_at: string;
 };
 
@@ -272,6 +274,8 @@ export type NicheIdeaRow = {
   url: string;
   score: number;
   comments: number;
+  /** Times the question was viewed, where the source says (Stack Exchange). */
+  views: number | null;
   posted_at: string | null;
   kind: string;
   category: string | null;

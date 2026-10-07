@@ -17,7 +17,7 @@ export function memoryRadar(): RadarDeps["radar"] & { rows: Map<string, NicheKey
         if (rows.has(r.keyword)) continue;
         rows.set(r.keyword, {
           source: "autocomplete", depth: 0, suggest_rank: null, category: null, discovered_at: new Date().toISOString(), expanded_at: null,
-          supply_checked_at: null, supply: null, demand_checked_at: null, demand: null, ease_checked_at: null, ease: null, score: null,
+          supply_checked_at: null, supply: null, demand_checked_at: null, demand: null, ease_checked_at: null, ease: null, score: null, priority: 0,
           updated_at: new Date().toISOString(), ...r,
         } as NicheKeywordRow);
         added += 1;
@@ -37,7 +37,7 @@ export function memoryRadar(): RadarDeps["radar"] & { rows: Map<string, NicheKey
     dueForSupply: async (staleBefore, limit) =>
       all()
         .filter((r) => !r.supply_checked_at || new Date(r.supply_checked_at) < staleBefore)
-        .sort((a, b) => Number(b.source === "rising" && !b.supply_checked_at) - Number(a.source === "rising" && !a.supply_checked_at) || a.depth - b.depth)
+        .sort((a, b) => Number(!b.supply_checked_at) - Number(!a.supply_checked_at) || (b.priority ?? 0) - (a.priority ?? 0))
         .slice(0, limit),
     dueForDemand: async (staleBefore, limit) =>
       all().filter((r) => r.supply_checked_at && (!r.demand_checked_at || new Date(r.demand_checked_at) < staleBefore)).sort(byScore).slice(0, limit),
@@ -56,10 +56,17 @@ export function memoryRadar(): RadarDeps["radar"] & { rows: Map<string, NicheKey
       all().filter((r) => r.score !== null && (minScore === undefined || r.score >= minScore) && (!category || r.category === category)).sort(byScore).slice(0, limit),
     get: async (keyword) => rows.get(keyword) ?? null,
     addIdeas: async (insert) => {
-      for (const r of insert) ideaRows.push({ id: String(ideaRows.length), community: null, score: 0, comments: 0, posted_at: null, kind: "discussion", category: null, collected_at: new Date().toISOString(), ...r } as NicheIdeaRow);
+      for (const r of insert) ideaRows.push({ id: String(ideaRows.length), community: null, score: 0, comments: 0, views: null, posted_at: null, kind: "discussion", category: null, collected_at: new Date().toISOString(), ...r } as NicheIdeaRow);
       return insert.length;
     },
-    ideas: async ({ limit }) => ideaRows.slice(0, limit),
-    lastIdeasAt: async () => (ideaRows.length ? new Date(ideaRows[ideaRows.length - 1]!.collected_at) : null),
+    ideas: async ({ limit, source, orderBy }) =>
+      ideaRows
+        .filter((r) => !source || r.source === source)
+        .sort((a, b) => (orderBy === "views" ? (b.views ?? -1) - (a.views ?? -1) : b.score - a.score))
+        .slice(0, limit),
+    lastIdeasAt: async (source) => {
+      const mine = ideaRows.filter((r) => !source || r.source === source);
+      return mine.length ? new Date(mine[mine.length - 1]!.collected_at) : null;
+    },
   };
 }

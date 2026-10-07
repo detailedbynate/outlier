@@ -59,26 +59,18 @@ export class RadarRepository {
     );
   }
 
-  /** Phrases whose search results to read next: new searches first, then never-checked, then the stalest. */
+  /** Phrases whose search results to read next: never-checked first, most promising (priority.ts) first, then the stalest. */
   async dueForSupply(staleBefore: Date, limit: number): Promise<NicheKeywordRow[]> {
-    const rising = unwrap(
-      await this.db.from("niche_keywords").select("*").eq("source", "rising").is("supply_checked_at", null).order("suggest_rank", { ascending: true, nullsFirst: false }).limit(limit),
-      "niche_keywords.dueForSupply.rising",
-    );
-    if (rising.length >= limit) return rising;
-    const rest = unwrap(
+    return unwrap(
       await this.db
         .from("niche_keywords")
         .select("*")
         .or(`supply_checked_at.is.null,supply_checked_at.lt.${staleBefore.toISOString()}`)
         .order("supply_checked_at", { ascending: true, nullsFirst: true })
-        .order("depth", { ascending: true })
-        .order("suggest_rank", { ascending: true, nullsFirst: true })
+        .order("priority", { ascending: false })
         .limit(limit),
       "niche_keywords.dueForSupply",
     );
-    const taken = new Set(rising.map((r) => r.keyword));
-    return [...rising, ...rest.filter((r) => !taken.has(r.keyword))].slice(0, limit);
   }
 
   async dueForDemand(staleBefore: Date, limit: number): Promise<NicheKeywordRow[]> {
@@ -141,15 +133,18 @@ export class RadarRepository {
     return saved.length;
   }
 
-  async ideas(options: { limit: number; since: Date; kind?: string; category?: string | null }): Promise<NicheIdeaRow[]> {
+  async ideas(options: { limit: number; since: Date; kind?: string; source?: string; category?: string | null; orderBy?: "score" | "views" }): Promise<NicheIdeaRow[]> {
     let query = this.db.from("niche_ideas").select("*").gte("collected_at", options.since.toISOString());
     if (options.kind) query = query.eq("kind", options.kind);
+    if (options.source) query = query.eq("source", options.source);
     if (options.category) query = query.eq("category", options.category);
-    return unwrap(await query.order("score", { ascending: false }).limit(options.limit), "niche_ideas.list");
+    return unwrap(await query.order(options.orderBy ?? "score", { ascending: false, nullsFirst: false }).limit(options.limit), "niche_ideas.list");
   }
 
-  async lastIdeasAt(): Promise<Date | null> {
-    const rows = unwrap(await this.db.from("niche_ideas").select("collected_at").order("collected_at", { ascending: false }).limit(1), "niche_ideas.last");
+  async lastIdeasAt(source?: string): Promise<Date | null> {
+    let query = this.db.from("niche_ideas").select("collected_at");
+    if (source) query = query.eq("source", source);
+    const rows = unwrap(await query.order("collected_at", { ascending: false }).limit(1), "niche_ideas.last");
     return rows[0] ? new Date(rows[0].collected_at) : null;
   }
 }

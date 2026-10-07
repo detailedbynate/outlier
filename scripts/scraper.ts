@@ -81,7 +81,7 @@ async function main(): Promise<void> {
   const { getAdminDatabase } = await import("@/lib/database/client");
   const { getServices, ChannelService } = await import("@/lib/services");
   const { runWithQuotaContext } = await import("@/lib/youtube");
-  const { createHybridSource, getGate, InnerTubeBlockedError, InnerTubeSearch } = await import("@/lib/innertube");
+  const { createHybridSource, getGate, InnerTubeBlockedError, InnerTubeGate, InnerTubeSearch } = await import("@/lib/innertube");
   const { fetchSuggestions } = await import("@/lib/radar/suggest");
   const { sortDiscovered } = await import("@/lib/niches/discover");
   const { clampState, decide, DEFAULT_THAW_HOURS, FileRampStore, initialState, parseSteps } = await import("@/lib/innertube/ramp");
@@ -125,51 +125,83 @@ async function main(): Promise<void> {
 
   const skipUntil = new Map<string, number>();
 
-  // Niche Radar: autocomplete and search go through this process's gate, so they
-  // share the ladder's pace and breaker with channel refreshes.
+  // Niche Radar. Search reads go through this process's gate, so they share the
+  // ladder's pace and breaker with channel refreshes. Autocomplete is a different
+  // Google host (the one every browser hits per keystroke), so it gets a gate of
+  // its own: its pace doesn't eat YouTube's, and a refusal there pauses only it.
   const lang = config.OUTLIER_LANGUAGE.toLowerCase();
   const region = config.OUTLIER_REGION.toUpperCase();
   const scrapedSearch = new InnerTubeSearch(gate, { lang, location: region });
+  const suggestGate = new InnerTubeGate(
+    { requestsPerMinute: config.RADAR_SUGGESTS_PER_MINUTE, maxConcurrent: 1, cacheTtlMs: 6 * 3_600_000, maxCacheEntries: 2_000 },
+    { logger: logger.child({ module: "radar.suggest" }) },
+  );
   const radar = services.radar.withScraping({
-    suggest: (q) => gate.run({ label: `suggest:${q.slice(0, 40)}`, cacheKey: `suggest:${lang}:${region}:${q}`, lane: "background" }, () => fetchSuggestions(q, { lang, region })),
+    suggest: (q) => suggestGate.run({ label: `suggest:${q.slice(0, 40)}`, cacheKey: `suggest:${lang}:${region}:${q}`, lane: "background" }, () => fetchSuggestions(q, { lang, region })),
     search: (q) => scrapedSearch.search({ q, type: "video", order: "relevance", maxResults: 20 }, { lane: "background" }),
   });
   let radarSeeded = false;
   let librarySeededAt = 0;
+  // Autocomplete growth and the daily Reddit / Stack Exchange sweeps take minutes and
+  // don't touch YouTube's gate, so they run beside the rounds instead of inside them.
+  let expanding: Promise<void> | null = null;
+  let collecting: Promise<void> | null = null;
+  const inBackground = (label: string, work: () => Promise<unknown>): Promise<void> =>
+    runWithQuotaContext({ lane: "background", operation: `scraper:${label}` }, work)
+      .then((result) => {
+        if (result) logger.info(`scraper ${label}`, { result });
+      })
+      .catch((error) => logger.warn(`scraper ${label} failed`, { error: error instanceof Error ? error.message : String(error) }));
 
   /**
-   * A little radar work each round: grow phrases through autocomplete, read what
-   * ranks for a few, then the API-free extras (search volume, AI ease, Reddit).
-   * Skipped while the gate is paused; a block stops it for the round.
+   * A little radar work each round: grow phrases through autocomplete (in the
+   * background), read what ranks for a few, then search volume and AI ease.
+   * Reading results is skipped while the gate is paused.
    */
   const runRadar = async (): Promise<void> => {
-    if (controller.signal.aborted || gate.state().open) return;
+    if (controller.signal.aborted) return;
     const signal = controller.signal;
     try {
+      if (!radarSeeded) {
+        const added = await radar.seed();
+        radarSeeded = true;
+        if (added > 0) logger.info("radar seeded", { added });
+      }
+      // Once a day the library's best niches become seeds too: proven topics whose
+      // searches the radar then combs for openings.
+      if (Date.now() - librarySeededAt > 86_400_000) {
+        librarySeededAt = Date.now();
+        const boards = await Promise.all([services.niches.discover("shorts"), services.niches.discover("long_form")]);
+        const terms = boards.flatMap((board) => sortDiscovered(board, "best").slice(0, 40).map((n) => n.term));
+        const added = await radar.addSeeds(terms, "library");
+        if (added > 0) logger.info("radar seeded from library", { added });
+      }
+    } catch (error) {
+      // Most likely the radar's tables aren't there yet (migration not applied).
+      logger.warn("scraper radar seeding failed", { error: error instanceof Error ? error.message : String(error) });
+      return;
+    }
+    if (!expanding && !suggestGate.state().open) {
+      expanding = inBackground("radar expand", () => radar.expandOnce({ maxQueries: config.RADAR_SUGGESTS_PER_ROUND, signal })).finally(() => {
+        expanding = null;
+      });
+    }
+    if (!collecting) {
+      collecting = inBackground("radar collect", async () => {
+        const [reddit, stack] = await Promise.allSettled([radar.collectRedditOnce({ signal }), radar.collectStackOnce({ signal })]);
+        const value = (r: PromiseSettledResult<unknown>) => (r.status === "fulfilled" ? r.value : { error: String(r.reason).slice(0, 200) });
+        return value(reddit) || value(stack) ? { reddit: value(reddit), stack: value(stack) } : null;
+      }).finally(() => {
+        collecting = null;
+      });
+    }
+    if (gate.state().open) return;
+    try {
       await runWithQuotaContext({ lane: "background", operation: "scraper:radar" }, async () => {
-        if (!radarSeeded) {
-          const added = await radar.seed();
-          radarSeeded = true;
-          if (added > 0) logger.info("radar seeded", { added });
-        }
-        // Once a day the library's best niches become seeds too: proven topics whose
-        // searches the radar then combs for openings.
-        if (Date.now() - librarySeededAt > 86_400_000) {
-          librarySeededAt = Date.now();
-          const boards = await Promise.all([services.niches.discover("shorts"), services.niches.discover("long_form")]);
-          const terms = boards.flatMap((board) => sortDiscovered(board, "best").slice(0, 40).map((n) => n.term));
-          const added = await radar.addSeeds(terms, "library");
-          if (added > 0) logger.info("radar seeded from library", { added });
-        }
-        const grown = await radar.expandOnce({ maxQueries: config.RADAR_SUGGESTS_PER_ROUND, signal });
         const supply = await radar.checkSupplyOnce({ limit: config.RADAR_SUPPLY_PER_ROUND, signal });
-        const extras = await Promise.allSettled([
-          radar.enrichDemandOnce({ signal }),
-          radar.rateEaseOnce({ limit: config.RADAR_EASE_PER_ROUND }),
-          radar.collectRedditOnce({ signal }),
-        ]);
-        const [demand, ease, reddit] = extras.map((r) => (r.status === "fulfilled" ? r.value : { error: String(r.reason).slice(0, 200) }));
-        logger.info("scraper radar", { grown, supply, demand, ease, reddit });
+        const extras = await Promise.allSettled([radar.enrichDemandOnce({ signal }), radar.rateEaseOnce({ limit: config.RADAR_EASE_PER_ROUND })]);
+        const [demand, ease] = extras.map((r) => (r.status === "fulfilled" ? r.value : { error: String(r.reason).slice(0, 200) }));
+        logger.info("scraper radar", { supply, demand, ease, suggest: suggestGate.state().open ? "paused" : "running" });
       });
     } catch (error) {
       // The radar is a bonus on top of refreshes; a failure here never costs the round.

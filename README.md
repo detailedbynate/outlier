@@ -295,11 +295,30 @@ Search used to match niches by text ("cooking" = any title containing "cooking")
 - **Quality flags**: channels flagged `reupload`, `compilation` or `spam_or_misleading` are left out of niche analysis.
 - **Underrated niches** are mined from confident labels first, so they're real niches rather than title words.
 - **Shorts Channels ranks creators by `underrated_score`** by default (a column on the `shorts_channels` view, 0-100): average Short views relative to subscribers (up to 500x), how often uploads beat the channel's median, real demand, still posting, and a size factor that gives 1M+ channels nothing. On the library at the time, the top 30 went from a median of 1.7M subscribers (sorted by average views) to 8K. Channels flagged as reuploads, compilations or spam are hidden.
-- **`library.grow`** (every 6h) first follows **featured channels**: creators list peers in their niche on their channel page, and `channelSections.list` costs 1 unit versus 100 for a search. It checks `LIBRARY_FEATURED_CHECKS_PER_RUN` confidently labeled channels under `LIBRARY_FEATURED_MAX_SUBSCRIBERS` and queues up to `LIBRARY_FEATURED_NEW_PER_RUN` creators we don't have. Then it runs Shorts discovery for the seed niches in `lib/niches/seeds.ts` (~240, mostly games) the library is thinnest on, skipping any searched in the last `LIBRARY_GROWTH_RESEED_DAYS`. It runs in the background quota lane, has its own daily cap (`LIBRARY_GROWTH_DAILY_SEARCHES`), and never uses up users' daily discovery searches.
+- **`library.grow`** (every 2h) first follows **featured channels**: creators list peers in their niche on their channel page, and `channelSections.list` costs 1 unit versus 100 for a search. It checks `LIBRARY_FEATURED_CHECKS_PER_RUN` confidently labeled channels under `LIBRARY_FEATURED_MAX_SUBSCRIBERS` and queues up to `LIBRARY_FEATURED_NEW_PER_RUN` creators we don't have. Then it alternates Shorts and long-form discovery for the seed niches in `lib/niches/seeds.ts` (high-RPM topics first, then games and topics) plus the Niche Radar's best phrases, thinnest first, skipping any searched in the last `LIBRARY_GROWTH_RESEED_DAYS`. It runs in the background quota lane, has its own daily cap (`LIBRARY_GROWTH_DAILY_SEARCHES`), and never uses up users' daily discovery searches.
 
 **Storage:** each channel with its uploads and stat history takes roughly 100-170 KB, so the production budget (`STORAGE_BUDGET_MB=150000`) has room for over a million creators; the database was 281 MB at about 5,900 channels. What actually bounds growth is YouTube quota for ingestion and the scraper's rate, not disk.
 
 To teach the labeler a new game or topic, add it to `lib/niches/dictionary.ts` with the names people write for it.
+
+## Niche Finder: Discover and the Niche Radar
+
+The Niche Finder opens on a **Discover** board, so nobody has to know what to search for. It has three tabs:
+
+- **Tracked channels**: every niche in the library (`lib/niches/discover.ts`), per format, scored on RPM (category bands in `lib/niches/revenue.ts`), views, how untapped it is, and how easy it is to make. Cached 6h per format.
+- **Search gaps**: the **Niche Radar** (`lib/radar/`, `NicheRadarService`), for niches the library has no channels for yet.
+- **Video ideas**: AI first-video ideas for the best gaps, Stack Exchange questions by views, and Reddit questions from this week.
+
+The radar runs inside the scraper process, a little each round:
+
+1. **Seeds** come from `lib/niches/seeds.ts`, the library's top Discover niches (daily), and Stack Exchange tags (daily).
+2. **Autocomplete** (`suggest.ts`) grows seeds into the phrases people actually type: a-z for seeds, a few question prefixes deeper, capped at depth 2 and 60K phrases. It has its own gate (`RADAR_SUGGESTS_PER_MINUTE`) because it's a different Google host. A weekly light re-sweep of each seed marks phrases that weren't there before as **rising** (new demand).
+3. **Supply** (`supply.ts`) reads what ranks for a phrase through the scraper's gate, then 1 unit per 50 to hydrate. It checks whether the results are old, whether small channels are pulling more views than subscribers, and whether giants are absent. Which phrases are read first is set by `priority.ts`: rising, paying categories, and top of autocomplete.
+4. **Demand and pay** (`demand.ts`) come from Google search volume, CPC and the 12-month trend via DataForSEO, if `DATAFORSEO_LOGIN`/`PASSWORD` are set. Phrases are batched by 100 or more.
+5. **Ease** (`ease.ts`) is an AI rating of what it takes to make the videos ranking for the phrase, with three first-video ideas. Only phrases scoring 50+ are rated.
+6. The **score** (`score.ts`) is 25% demand, 25% pay, 30% gap and 20% ease. Phrases scoring 60+ feed `library.grow` as seeds.
+
+**Ideas** come from Stack Exchange (`stackexchange.ts`, no key needed, about 100 requests a day; `STACKEXCHANGE_KEY` raises the cap) and Reddit (`reddit.ts`, needs `REDDIT_CLIENT_ID`/`SECRET` for app-only OAuth). Note that Reddit's Data API terms restrict commercial use. The tables are `niche_keywords` and `niche_ideas` (migration `20261007000032_niche_radar.sql`).
 
 ---
 

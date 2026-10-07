@@ -90,7 +90,7 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
     }
   }
   const savedList = readSavedNiches(user.user_metadata);
-  const [popular, allTop, related, saved, own, discovered, radarNiches, questions] = await Promise.all([
+  const [popular, allTop, related, saved, own, discovered, radarNiches, questions, evergreen] = await Promise.all([
     result ? Promise.resolve([]) : services.niches.popularTopics(8),
     result ? services.niches.topNiches(15) : Promise.resolve([]),
     result ? services.niches.relatedNiches(result.topic, result.report, 9) : Promise.resolve([]),
@@ -100,7 +100,8 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
     result || view.board !== "library" ? Promise.resolve([]) : services.niches.discover(view.format),
     // The radar tables arrive with a migration; until they exist these boards show their empty state.
     !result && browsing && view.board !== "library" ? services.radar.list({ limit: 400 }).catch(() => []) : Promise.resolve([]),
-    !result && browsing && view.board === "ideas" ? services.radar.ideas({ limit: 40, days: 21, kind: "question" }).catch(() => []) : Promise.resolve([]),
+    !result && browsing && view.board === "ideas" ? services.radar.ideas({ limit: 30, days: 21, kind: "question", source: "reddit" }).catch(() => []) : Promise.resolve([]),
+    !result && browsing && view.board === "ideas" ? services.radar.ideas({ limit: 30, days: 30, source: "stackexchange", orderBy: "views" }).catch(() => []) : Promise.resolve([]),
   ]);
   const discoverList = sortDiscovered(
     discovered.filter((n) => view.rpm === "all" || n.rpmTier === view.rpm),
@@ -143,7 +144,7 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
       {result ? null : <SavedNiches niches={saved} />}
       {result ? <Report result={result} drill={drill} saved={isSaved(savedList, result.topic)} own={own} /> : null}
       {related.length > 0 ? <IdeaBoard ideas={related} title={`Niches next to ${result!.topic}`} sub="Other researched topics that overlap with this one" /> : null}
-      {result ? null : <DiscoverBoard niches={discoverList} gaps={sortGaps(radarNiches, view)} questions={questions} view={view} />}
+      {result ? null : <DiscoverBoard niches={discoverList} gaps={sortGaps(radarNiches, view)} questions={questions} evergreen={evergreen} view={view} />}
       {result && topNiches.length > 0 ? (
         <IdeaBoard ideas={topNiches} title="Other underrated niches" sub="Mined from every channel Outlier tracks: real demand, room left, and small channels winning. Pick one to dig in." />
       ) : null}
@@ -720,7 +721,7 @@ function sortGaps(niches: readonly RadarNiche[], view: View): RadarNiche[] {
 const BOARD_SUB: Record<Board, string> = {
   library: "No search needed. Every niche in the channels Outlier tracks, scored on RPM, views, how untapped it is and how easy it is to make.",
   gaps: "What people type into YouTube search where the results are old, small channels are winning and no giant owns the page. Checked around the clock.",
-  ideas: "First videos to make in the most open niches, and the questions people keep asking on Reddit.",
+  ideas: "First videos to make in the most open niches, questions read hundreds of thousands of times on Stack Exchange, and what Reddit is asking this week.",
 };
 
 /**
@@ -728,7 +729,19 @@ const BOARD_SUB: Record<Board, string> = {
  * gets watched, what's untapped and what's easy to make. Three sources: the
  * channel library, the search radar, and the ideas both turn up.
  */
-function DiscoverBoard({ niches, gaps, questions, view }: { niches: DiscoveredNiche[]; gaps: RadarNiche[]; questions: NicheIdeaRow[]; view: View }) {
+function DiscoverBoard({
+  niches,
+  gaps,
+  questions,
+  evergreen,
+  view,
+}: {
+  niches: DiscoveredNiche[];
+  gaps: RadarNiche[];
+  questions: NicheIdeaRow[];
+  evergreen: NicheIdeaRow[];
+  view: View;
+}) {
   return (
     <section className="niche-ideas" aria-label="Discover niches">
       <h2 className="dash-subhead">
@@ -746,7 +759,7 @@ function DiscoverBoard({ niches, gaps, questions, view }: { niches: DiscoveredNi
       {view.board === "gaps" ? (
         <GapBoard gaps={gaps} />
       ) : view.board === "ideas" ? (
-        <IdeasBoard gaps={gaps} questions={questions} />
+        <IdeasBoard gaps={gaps} questions={questions} evergreen={evergreen} />
       ) : (
         <LibraryBoard niches={niches} />
       )}
@@ -915,9 +928,9 @@ function GapBoard({ gaps }: { gaps: RadarNiche[] }) {
   );
 }
 
-function IdeasBoard({ gaps, questions }: { gaps: RadarNiche[]; questions: NicheIdeaRow[] }) {
+function IdeasBoard({ gaps, questions, evergreen }: { gaps: RadarNiche[]; questions: NicheIdeaRow[]; evergreen: NicheIdeaRow[] }) {
   const withIdeas = gaps.filter((n) => (n.ease?.ideas.length ?? 0) > 0).slice(0, 12);
-  if (withIdeas.length === 0 && questions.length === 0) return <RadarEmpty />;
+  if (withIdeas.length === 0 && questions.length === 0 && evergreen.length === 0) return <RadarEmpty />;
   return (
     <div className="ideas-columns">
       {withIdeas.length > 0 ? (
@@ -942,9 +955,27 @@ function IdeasBoard({ gaps, questions }: { gaps: RadarNiche[]; questions: NicheI
           </ul>
         </div>
       ) : null}
+      {evergreen.length > 0 ? (
+        <div className="dash-panel ideas-list">
+          <h3>Questions people search for</h3>
+          <ul>
+            {evergreen.map((q) => (
+              <li key={q.id}>
+                <a href={q.url} target="_blank" rel="noreferrer">
+                  {q.title}
+                </a>
+                <span className="dash-row-sub">
+                  {q.views != null ? `${formatCompact(q.views)} views · ` : ""}
+                  {q.community ?? "Stack Exchange"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       {questions.length > 0 ? (
         <div className="dash-panel ideas-list">
-          <h3>Questions people keep asking</h3>
+          <h3>Asked on Reddit this week</h3>
           <ul>
             {questions.map((q) => (
               <li key={q.id}>
