@@ -13,7 +13,7 @@ const LINKS = [
 ];
 
 /** Floating glass header. Gains a little contrast on scroll and highlights the section in view. */
-export function LandingHeader({ minimal = false }: { minimal?: boolean } = {}) {
+export function LandingHeader({ minimal = false, signedIn = false }: { minimal?: boolean; signedIn?: boolean } = {}) {
   const [scrolled, setScrolled] = useState(false);
   const [active, setActive] = useState<string | null>(null);
 
@@ -67,8 +67,8 @@ export function LandingHeader({ minimal = false }: { minimal?: boolean } = {}) {
           ))}
         </nav>
         <div className="pill-actions">
-          <Link href="/login" className="pill-button pill-button-ghost">
-            Sign in
+          <Link href={signedIn ? "/" : "/login"} className="pill-button pill-button-ghost">
+            {signedIn ? "Open app" : "Sign in"}
           </Link>
           <ScrollLink to="pricing" className="pill-button pill-button-primary">
             Subscribe now

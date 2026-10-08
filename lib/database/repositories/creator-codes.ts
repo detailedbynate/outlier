@@ -34,6 +34,14 @@ export class CreatorCodeRepository {
     assertOk(await this.db.from("creator_codes").update({ discount_percent: percent, discount_months: months }).eq("id", id), "creatorCodes.setDiscount");
   }
 
+  /** A new commission rate for payments from now on; commission already recorded keeps its rate. */
+  async setCommission(id: string, percent: number, months: number | null): Promise<void> {
+    assertOk(
+      await this.db.from("creator_codes").update({ commission_percent: percent, commission_months: months }).eq("id", id),
+      "creatorCodes.setCommission",
+    );
+  }
+
   async setActive(id: string, active: boolean): Promise<void> {
     assertOk(await this.db.from("creator_codes").update({ active }).eq("id", id), "creatorCodes.setActive");
   }

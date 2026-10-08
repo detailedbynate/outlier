@@ -353,7 +353,7 @@ function LandingFooter() {
  * For visitors a creator or friend sent: they've already heard what Outlier
  * does, so it's the pitch, the offer, the video and straight to the plans.
  */
-function FocusedLanding({ creatorCode, codeError }: { creatorCode: LandingCreatorCode | null; codeError: boolean }) {
+function FocusedLanding({ creatorCode, codeError, signedIn }: { creatorCode: LandingCreatorCode | null; codeError: boolean; signedIn: boolean }) {
   const now = new Date();
   const code = creatorCode;
   const plans = sellablePlans();
@@ -363,7 +363,7 @@ function FocusedLanding({ creatorCode, codeError }: { creatorCode: LandingCreato
     <div className="landing-root landing-focused">
       <div className="landing-backdrop" aria-hidden="true" />
 
-      <LandingHeader minimal />
+      <LandingHeader minimal signedIn={signedIn} />
 
       <main>
         <section className="landing-hero">
@@ -430,14 +430,15 @@ export async function LandingPage({
   creatorCode = null,
   focused = false,
   codeError = false,
-}: { referralCode?: string | null; creatorCode?: LandingCreatorCode | null; focused?: boolean; codeError?: boolean } = {}) {
-  if (focused) return <FocusedLanding creatorCode={creatorCode} codeError={codeError} />;
+  signedIn = false,
+}: { referralCode?: string | null; creatorCode?: LandingCreatorCode | null; focused?: boolean; codeError?: boolean; signedIn?: boolean } = {}) {
+  if (focused) return <FocusedLanding creatorCode={creatorCode} codeError={codeError} signedIn={signedIn} />;
   const [count, picks] = await Promise.all([waitlistCount(), showcasePicks(new Date())]);
   return (
     <div className="landing-root">
       <div className="landing-backdrop" aria-hidden="true" />
 
-      <LandingHeader />
+      <LandingHeader signedIn={signedIn} />
 
       <main>
         <section className="landing-hero">

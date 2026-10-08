@@ -11,7 +11,7 @@ import { fullPriceIdFor, priceIdFor } from "@/lib/billing/subscriptions";
 import { getStripe } from "@/lib/billing/stripe";
 import { offerOpen, TRIAL_OFFER } from "@/lib/billing/trial";
 import { activeCreatorCode, creatorCheckoutFields } from "@/lib/billing/creator-codes";
-import { recordSiteEvent } from "@/lib/analytics/site-events";
+import { checkoutVisitorMetadata, recordSiteEvent } from "@/lib/analytics/site-events";
 import { getServices } from "@/lib/services";
 
 async function siteUrl(): Promise<string> {
@@ -52,7 +52,7 @@ export async function startCheckout(formData: FormData): Promise<void> {
       ],
       client_reference_id: current.user.id,
       customer_email: current.email || undefined,
-      metadata: { userId: current.user.id, packId: pack.id },
+      metadata: { userId: current.user.id, packId: pack.id, ...(await checkoutVisitorMetadata()) },
       success_url: `${base}/billing?status=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${base}/billing?status=cancelled`,
     });
@@ -97,7 +97,7 @@ export async function startSubscription(formData: FormData): Promise<void> {
       ...(creator ? { discounts: creator.discounts } : coupon ? { discounts: [{ coupon }] } : { allow_promotion_codes: true }),
       client_reference_id: current.user.id,
       ...(existing.stripeCustomerId ? { customer: existing.stripeCustomerId } : { customer_email: current.email || undefined }),
-      metadata: { userId: current.user.id, planId: plan.id, ...creator?.metadata },
+      metadata: { userId: current.user.id, planId: plan.id, ...creator?.metadata, ...(await checkoutVisitorMetadata()) },
       // Renewals and cancellations arrive with no metadata, so the subscription carries its own.
       // The creator code rides along too: every invoice it pays commission on carries it.
       subscription_data: { metadata: { userId: current.user.id, planId: plan.id, ...creator?.metadata } },

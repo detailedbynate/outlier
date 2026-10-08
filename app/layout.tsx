@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { DM_Sans, Schibsted_Grotesk } from "next/font/google";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -22,6 +23,7 @@ import { getServices } from "@/lib/services";
 import { signOut } from "./login/actions";
 import "./globals.css";
 import { writerOpenTo } from "@/lib/scripts/access";
+import { LANDING_HEADER } from "@/lib/landing-link";
 
 const dmSans = DM_Sans({ subsets: ["latin"], display: "swap", variable: "--font-sans" });
 // Small labels in the signed-in app (menu sections, table headings); body text stays DM Sans.
@@ -43,8 +45,9 @@ function Brand() {
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const current = await getCurrentUser();
+  const landingLink = (await headers()).get(LANDING_HEADER) === "1";
 
-  if (!current?.approved) {
+  if (!current?.approved || landingLink) {
     return (
       <html lang="en" className={dmSans.variable}>
         <body>
@@ -68,7 +71,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             </header>
             {children}
           </div>
-          <SiteTracker signedIn={Boolean(current)} />
+          {current?.isAdmin ? null : <SiteTracker signedIn={Boolean(current)} />}
         </body>
       </html>
     );

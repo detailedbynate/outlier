@@ -6,7 +6,7 @@ import { discountLabel, displayCode, statsFrom } from "@/lib/creator-codes/codes
 import { siteOrigin } from "@/lib/referrals/links";
 import { getServices } from "@/lib/services";
 import { CreateCodeForm } from "./create-form";
-import { markPaidOut, setCodeActive, setCodeDiscount } from "./actions";
+import { markPaidOut, setCodeActive, setCodeCommission, setCodeDiscount } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -91,6 +91,28 @@ export default async function AdminCreatorCodesPage() {
                     </td>
                     <td>
                       {code.commission_percent}%{code.commission_months ? ` for ${code.commission_months} mo` : ", ongoing"}
+                      <details className="code-discount-edit">
+                        <summary className="stat-note">Change</summary>
+                        <form action={setCodeCommission} className="row" style={{ gap: 6, marginTop: 6 }}>
+                          <input type="hidden" name="id" value={code.id} />
+                          <input name="commissionPercent" type="number" min={0} max={100} defaultValue={code.commission_percent} aria-label="Commission %" style={{ width: 64 }} />
+                          <span className="stat-note">% for</span>
+                          <input
+                            name="commissionMonths"
+                            type="number"
+                            min={1}
+                            max={120}
+                            defaultValue={code.commission_months ?? ""}
+                            placeholder="all"
+                            aria-label="Months, blank for as long as they pay"
+                            style={{ width: 56 }}
+                          />
+                          <span className="stat-note">mo</span>
+                          <button type="submit" className="button-ghost">
+                            Save
+                          </button>
+                        </form>
+                      </details>
                     </td>
                     <td>{stats.customers}</td>
                     <td>{dollars(stats.revenueCents)}</td>

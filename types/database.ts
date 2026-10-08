@@ -416,6 +416,10 @@ export type SiteEventRow = {
   detail: string | null;
   amount_cents: number | null;
   dedupe_key: string | null;
+  source: string | null;
+  channel: string | null;
+  engaged_ms: number | null;
+  scroll_pct: number | null;
 };
 
 export type ReferralRewardRow = {

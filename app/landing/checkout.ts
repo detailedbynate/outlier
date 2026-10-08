@@ -5,12 +5,13 @@ import { redirect } from "next/navigation";
 import { FREE_TRIAL_DAYS, findPlan } from "@/lib/billing/plans";
 import { getStripe } from "@/lib/billing/stripe";
 import { activeCreatorCode, creatorCheckoutFields } from "@/lib/billing/creator-codes";
-import { recordSiteEvent } from "@/lib/analytics/site-events";
+import { checkoutVisitorMetadata, recordSiteEvent } from "@/lib/analytics/site-events";
 import { fullPriceIdFor, priceIdFor } from "@/lib/billing/subscriptions";
 import { env } from "@/lib/core/env";
 import { logger } from "@/lib/core/logger";
 import { getServices } from "@/lib/services";
 import { clientIpFrom } from "@/lib/services/rate-limit-service";
+import { getCurrentUser } from "@/lib/auth/session";
 
 async function siteUrl(h: Headers): Promise<string> {
   const configured = env().SITE_URL;
@@ -29,6 +30,8 @@ export async function startPublicSubscription(formData: FormData): Promise<void>
   const price = plan ? priceIdFor(plan) : null;
   if (!plan || !price) redirect("/?checkout=error#pricing");
   const freeTrial = formData.get("trial") === "1";
+  // Already have an account: subscribe it from Billing, where the creator code applies too.
+  if (await getCurrentUser()) redirect("/billing#plans");
 
   const h = await headers();
   const base = await siteUrl(h);
@@ -46,7 +49,7 @@ export async function startPublicSubscription(formData: FormData): Promise<void>
       line_items: [{ price: billed, quantity: 1 }],
       // Stripe takes a set discount or a code box, not both.
       ...(creator ? { discounts: creator.discounts } : { allow_promotion_codes: true }),
-      metadata: { planId: plan.id, ...creator?.metadata },
+      metadata: { planId: plan.id, ...creator?.metadata, ...(await checkoutVisitorMetadata()) },
       subscription_data: {
         metadata: { planId: plan.id, ...creator?.metadata },
         // The free-trial offer (the popup) asks for it; the plan buttons charge straight away.

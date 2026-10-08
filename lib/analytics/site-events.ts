@@ -4,7 +4,7 @@ import { env } from "@/lib/core/env";
 import { logger } from "@/lib/core/logger";
 import { getServices } from "@/lib/services";
 import { clientIpFrom } from "@/lib/services/rate-limit-service";
-import { deviceOf, isBot, visitorId, type SiteEventKind } from "./site";
+import { cookieFrom, deviceOf, isBot, NO_TRACK_COOKIE, persistentVisitorId, VISITOR_COOKIE, visitorId, type SiteEventKind } from "./site";
 import type { TablesInsert } from "@/types/database";
 
 const log = logger.child({ module: "analytics.site" });
@@ -17,8 +17,23 @@ export function trafficSalt(): string {
 /** The anonymous visitor id for this request, matching what the page tracker records. */
 export function visitorFrom(h: Pick<Headers, "get">, now = new Date()): string | null {
   const userAgent = h.get("user-agent");
-  if (isBot(userAgent)) return null;
-  return visitorId({ ip: clientIpFrom(h), userAgent: userAgent!, salt: trafficSalt(), now });
+  if (isBot(userAgent) || cookieFrom(h.get("cookie"), NO_TRACK_COOKIE)) return null;
+  const salt = trafficSalt();
+  return persistentVisitorId(cookieFrom(h.get("cookie"), VISITOR_COOKIE), salt) ?? visitorId({ ip: clientIpFrom(h), userAgent: userAgent!, salt, now });
+}
+
+/**
+ * Checkout metadata that ties a payment back to the visit that led to it, so
+ * the traffic page can say which platform paying customers came from. The id
+ * is the anonymous hash, nothing personal.
+ */
+export async function checkoutVisitorMetadata(): Promise<Record<string, string>> {
+  try {
+    const visitor = visitorFrom(await headers());
+    return visitor ? { siteVisitor: visitor } : {};
+  } catch {
+    return {};
+  }
 }
 
 export function deviceFrom(h: Pick<Headers, "get">): string | null {

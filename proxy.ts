@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { E2E_COOKIE, isE2EBypass } from "./lib/auth/e2e";
+import { LANDING_HEADER } from "./lib/landing-link";
 
 /** Reachable without signing in. Prefix match for entries ending in "/". */
 // /signup and /welcome are where a paying subscriber lands before they have an
@@ -16,7 +17,17 @@ function isPublic(pathname: string): boolean {
  * This is an optimistic gate only — pages and actions re-check with requireApprovedUser().
  */
 export async function proxy(request: NextRequest) {
-  let response = NextResponse.next({ request });
+  // A creator or referral link (/?code=X, /?ref=X) shows the landing page even
+  // to someone signed in, so the layout must skip the app shell. It can't see
+  // the query string, so it's told with a request header.
+  const landingLink = request.nextUrl.pathname === "/" && (request.nextUrl.searchParams.has("code") || request.nextUrl.searchParams.has("ref"));
+  const forward = () => {
+    const headers = new Headers(request.headers);
+    headers.delete(LANDING_HEADER);
+    if (landingLink) headers.set(LANDING_HEADER, "1");
+    return NextResponse.next({ request: { headers } });
+  };
+  let response = forward();
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !anonKey) return response;
@@ -26,7 +37,7 @@ export async function proxy(request: NextRequest) {
       getAll: () => request.cookies.getAll(),
       setAll: (toSet) => {
         for (const { name, value } of toSet) request.cookies.set(name, value);
-        response = NextResponse.next({ request });
+        response = forward();
         for (const { name, value, options } of toSet) response.cookies.set(name, value, options);
       },
     },
@@ -47,6 +58,11 @@ export async function proxy(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code")?.trim().toLowerCase();
   if (code && /^[a-z0-9][a-z0-9_-]{1,19}$/.test(code)) {
     response.cookies.set("outlier_code", code, { maxAge: 30 * 24 * 3600, sameSite: "lax", path: "/", httpOnly: true, secure: request.nextUrl.protocol === "https:" });
+  }
+  // A random id for counting unique visitors across days (lib/analytics/site.ts). Nothing else is in it.
+  // Not for anyone who opted out or whose browser sends Global Privacy Control: they're counted cookieless.
+  if (!request.cookies.get("outlier_vid") && !request.cookies.get("outlier_notrack") && request.headers.get("sec-gpc") !== "1") {
+    response.cookies.set("outlier_vid", crypto.randomUUID(), { maxAge: 365 * 24 * 3600, sameSite: "lax", path: "/", httpOnly: true, secure: request.nextUrl.protocol === "https:" });
   }
   if (!user && !isE2EBypass(request.cookies.get(E2E_COOKIE)?.value) && !isPublic(pathname)) {
     const loginUrl = request.nextUrl.clone();

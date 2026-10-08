@@ -33,12 +33,17 @@ export default function PrivacyPage() {
       </p>
 
       <p>
-        <strong>Site visits:</strong> to see how many people visit and how many reach pricing and checkout, we record each page
-        view with the page, the site that linked you (for example youtube.com), any campaign tag or creator code in the link, and
-        whether you&apos;re on a phone, tablet or computer. Instead of a cookie, a visitor is counted with a code made by
-        scrambling your IP address and browser together with the date, which changes every day and can&apos;t be turned back
-        into your IP address. We never store the IP address itself for this, and these records aren&apos;t tied to your account.
-        Admins&apos; own visits aren&apos;t counted.
+        <strong>Site visits:</strong> to see how many people visit, where they came from, and how many reach pricing and
+        checkout, we record each page view with the page, the site or app that linked you (for example YouTube), any campaign tag
+        or creator code in the link, whether you&apos;re on a phone, tablet or computer, and how long the page was on screen and
+        how far you scrolled. So that someone coming back counts as one visitor, your browser gets a first-party cookie
+        (<code>outlier_vid</code>) holding a random id; we only store a scrambled version of it. If cookies are blocked, a visitor
+        is counted with a code made by scrambling your IP address and browser together with the date, which changes every day
+        and can&apos;t be turned back into your IP address. We never store the IP address itself for this, and these records
+        aren&apos;t tied to your name or email, aren&apos;t shared with anyone, and aren&apos;t used for advertising. When you
+        pay, the scrambled id goes along with the payment so we can see which site paying customers came from. Admins&apos; own
+        visits aren&apos;t counted. If your browser sends a Global Privacy Control signal we don&apos;t set the cookie, and you can
+        turn counting off below.
       </p>
       <p>
         <strong>Referral links and creator codes:</strong> if you arrive through someone&apos;s link, we remember the link so
@@ -157,12 +162,22 @@ export default function PrivacyPage() {
 
       <h2>Cookies</h2>
       <p>
-        Outlier sets only first-party cookies it needs to work: ones that keep you signed in, and, if you arrived through a
-        referral link or creator code, one that remembers that link for 30 days so the credit and the discount you came for still
-        apply when you subscribe. Your browser&apos;s local storage also remembers small things like a popup you closed. There
-        are no advertising, analytics or cross-site tracking cookies — visits are counted without cookies, as described above —
-        which is why you aren&apos;t asked to consent to any.
+        Outlier sets only first-party cookies: ones that keep you signed in; if you arrived through a referral link or creator
+        code, one that remembers that link for 30 days so the credit and the discount you came for still apply when you
+        subscribe; and <code>outlier_vid</code>, which lasts a year and is used only to count unique visitors as described above.
+        Your browser&apos;s local storage also remembers small things like a popup you closed. There are no advertising or
+        cross-site tracking cookies, and nothing is shared with ad networks.
       </p>
+      <form action="/api/track/opt-out" method="post">
+        <input type="hidden" name="back" value="/privacy" />
+        <p>
+          Don&apos;t want your visits counted?{" "}
+          <button type="submit" className="button-ghost">
+            Turn off visit counting in this browser
+          </button>{" "}
+          This deletes <code>outlier_vid</code> and sets a cookie (<code>outlier_notrack</code>) that tells us not to count you.
+        </p>
+      </form>
 
       <h2>Changes</h2>
       <p>

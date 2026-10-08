@@ -19,6 +19,7 @@ export async function recordPaidCheckout(session: Stripe.Checkout.Session): Prom
       amount_cents: session.amount_total ?? null,
       creator_code: metadata[CREATOR_CODE_METADATA] ?? null,
       dedupe_key: `checkout:${session.id}`,
+      visitor: metadata.siteVisitor ?? null,
     },
     { fromRequest: false },
   );

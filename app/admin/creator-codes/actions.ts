@@ -70,6 +70,18 @@ export async function markPaidOut(formData: FormData): Promise<void> {
   revalidatePath("/admin/creator-codes");
 }
 
+/** A new commission for payments from now on. What's already been earned stays as it was. Blank months = as long as they pay. */
+export async function setCodeCommission(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = text(formData, "id");
+  const percent = whole(formData, "commissionPercent", 0, 100);
+  const rawMonths = text(formData, "commissionMonths");
+  const months = rawMonths === "" ? null : whole(formData, "commissionMonths", 1, 120);
+  if (!id || percent === null || (rawMonths !== "" && months === null)) return;
+  await getServices().repositories.creatorCodes.setCommission(id, percent, months);
+  revalidatePath("/admin/creator-codes");
+}
+
 /** A new discount for anyone who checks out from now on. People already subscribed keep theirs. */
 export async function setCodeDiscount(formData: FormData): Promise<void> {
   await requireAdmin();
