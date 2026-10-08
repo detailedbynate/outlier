@@ -13864,3 +13864,58 @@ body.app-body {
 .pricing-terms-code {
   color: var(--accent-text, #b4a3fb);
 }
+
+/* "Have a creator code?" under the plans (components/creator-code-entry.tsx). */
+.creator-code-entry {
+  margin: 24px auto 0;
+  max-width: 420px;
+  text-align: center;
+}
+
+.creator-code-entry summary {
+  display: inline-block;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-secondary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  list-style: none;
+}
+
+.creator-code-entry summary::-webkit-details-marker {
+  display: none;
+}
+
+.creator-code-entry summary:hover {
+  color: var(--text-primary);
+}
+
+.creator-code-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.creator-code-form input[name="code"] {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 16px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2, rgba(255, 255, 255, 0.04));
+  color: var(--text-primary);
+  font: inherit;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.creator-code-form input[name="code"]::placeholder {
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.creator-code-error {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #f87171;
+}

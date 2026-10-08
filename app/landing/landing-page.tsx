@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { CreatorCodeEntry } from "@/components/creator-code-entry";
 import { BrandMark } from "@/components/icons";
 import { env } from "@/lib/core/env";
 import { logger } from "@/lib/core/logger";
@@ -199,7 +200,7 @@ const withCode = (cents: number, code: LandingCreatorCode) => Math.round((cents 
  * Plans, priced straight from the same definitions the app bills against. With
  * a creator's code the cards show what the visitor will actually pay.
  */
-function PricingSection({ code = null, focused = false }: { code?: LandingCreatorCode | null; focused?: boolean }) {
+function PricingSection({ code = null, focused = false, codeError = false }: { code?: LandingCreatorCode | null; focused?: boolean; codeError?: boolean }) {
   const sellable = sellablePlans();
   if (sellable.length === 0) return null;
   const now = new Date();
@@ -282,6 +283,7 @@ function PricingSection({ code = null, focused = false }: { code?: LandingCreato
           );
         })}
       </div>
+      {code ? null : <CreatorCodeEntry from="landing" error={codeError} />}
       <p className="pricing-foot">
         Payments are handled by Stripe. Subscribing creates your account — we email you a sign-in link straight after. It renews
         monthly until you cancel; see our <Link href="/terms">Terms</Link> and <Link href="/refunds">Refund Policy</Link>.
@@ -351,7 +353,7 @@ function LandingFooter() {
  * For visitors a creator or friend sent: they've already heard what Outlier
  * does, so it's the pitch, the offer, the video and straight to the plans.
  */
-function FocusedLanding({ creatorCode }: { creatorCode: LandingCreatorCode | null }) {
+function FocusedLanding({ creatorCode, codeError }: { creatorCode: LandingCreatorCode | null; codeError: boolean }) {
   const now = new Date();
   const code = creatorCode;
   const plans = sellablePlans();
@@ -411,7 +413,7 @@ function FocusedLanding({ creatorCode }: { creatorCode: LandingCreatorCode | nul
 
         <LaunchVideo />
 
-        <PricingSection code={code} focused />
+        <PricingSection code={code} focused codeError={codeError} />
       </main>
 
       <TrialOffer days={FREE_TRIAL_DAYS} plans={trialPlans(now, code)} code={popupCode(code)} />
@@ -427,8 +429,9 @@ export async function LandingPage({
   referralCode = null,
   creatorCode = null,
   focused = false,
-}: { referralCode?: string | null; creatorCode?: LandingCreatorCode | null; focused?: boolean } = {}) {
-  if (focused) return <FocusedLanding creatorCode={creatorCode} />;
+  codeError = false,
+}: { referralCode?: string | null; creatorCode?: LandingCreatorCode | null; focused?: boolean; codeError?: boolean } = {}) {
+  if (focused) return <FocusedLanding creatorCode={creatorCode} codeError={codeError} />;
   const [count, picks] = await Promise.all([waitlistCount(), showcasePicks(new Date())]);
   return (
     <div className="landing-root">
@@ -519,7 +522,7 @@ export async function LandingPage({
           </div>
         </section>
 
-        <PricingSection code={creatorCode} />
+        <PricingSection code={creatorCode} codeError={codeError} />
 
         <section id="waitlist" className="landing-list-section">
           <Reveal className="landing-list-inner">

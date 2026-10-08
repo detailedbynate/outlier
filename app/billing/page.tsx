@@ -6,7 +6,10 @@ import { logger } from "@/lib/core/logger";
 import { CREDIT_PACKS, formatPrice } from "@/lib/billing/packs";
 import { billingEnabled, fulfillCheckout, getStripe } from "@/lib/billing/stripe";
 import { getServices } from "@/lib/services";
-import { FREE_PLAN, onSale, PLANS, SALE_ENDS_LABEL } from "@/lib/billing/plans";
+import { FREE_PLAN, fullPriceCents, onSale, PLANS, SALE_ENDS_LABEL } from "@/lib/billing/plans";
+import { activeCreatorCode } from "@/lib/billing/creator-codes";
+import { discountLabel, displayCode } from "@/lib/creator-codes/codes";
+import { CreatorCodeEntry } from "@/components/creator-code-entry";
 import { ZapIcon } from "@/components/icons";
 import { priceCentsFor, sellablePlans, syncSubscription } from "@/lib/billing/subscriptions";
 import { offerOpen, timeLeft, TRIAL_OFFER } from "@/lib/billing/trial";
@@ -15,7 +18,7 @@ import { openBillingPortal, startCheckout, startSubscription } from "./actions";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Credits · Outlier" };
 
-type SearchParams = Promise<{ status?: string; session_id?: string }>;
+type SearchParams = Promise<{ status?: string; session_id?: string; code_error?: string }>;
 
 const PLAN_ORDER = new Map(PLANS.map((plan, index) => [plan.id, index]));
 /** The cheapest top-up, quoted on every plan so the credit cap never looks like a wall. */
@@ -23,7 +26,7 @@ const cheapestPack = [...CREDIT_PACKS].sort((a, b) => a.priceCents - b.priceCent
 
 export default async function BillingPage({ searchParams }: { searchParams: SearchParams }) {
   const current = await requireApprovedUser();
-  const { status, session_id: sessionId } = await searchParams;
+  const { status, session_id: sessionId, code_error: codeError } = await searchParams;
 
   // Back from Stripe: credit the purchase now rather than waiting on the webhook.
   let bought: number | null = null;
@@ -59,6 +62,9 @@ export default async function BillingPage({ searchParams }: { searchParams: Sear
   const trialOffer = offerOpen(trial, now.getTime());
   // Stripe's own trial: they've subscribed, and the first charge is at the period end.
   const stripeTrial = subscription.status === "trialing" && subscription.plan.priceCents > 0;
+  // A creator's code (from their link or typed below) beats the trial offer, as at checkout. Not their own code, though.
+  const code = await activeCreatorCode();
+  const creator = code && code.user_id !== current.user.id ? code : null;
   const fmtEnd = (iso: string) => new Date(iso).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
 
   return (
@@ -99,7 +105,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Sear
       </section>
 
       {enabled && plans.length > 0 ? (
-        <section className="billing-plans-section" aria-label="Plans">
+        <section id="plans" className="billing-plans-section" aria-label="Plans">
           <h2 className="section-title">Plans</h2>
           <p className="billing-plans-lede">
             {trial && trialLive
@@ -119,9 +125,11 @@ export default async function BillingPage({ searchParams }: { searchParams: Sear
               const isCurrent = subscription.plan.id === plan.id;
               // A trial isn't paid for yet: its card buys the plan rather than managing it.
               const manage = isCurrent && !trialLive;
-              const offered = trialOffer && plan.id === TRIAL_OFFER.planId;
-              const sale = onSale(plan, now) && !offered;
               const paid = plan.priceCents > 0;
+              // With a creator's code: their discount off the full price, nothing else on top.
+              const coded = creator && paid && !manage ? Math.round((fullPriceCents(plan) * (100 - creator.discount_percent)) / 100) : null;
+              const offered = trialOffer && plan.id === TRIAL_OFFER.planId && coded === null;
+              const sale = onSale(plan, now) && !offered && coded === null;
               return (
                 <form
                   key={plan.id}
@@ -163,7 +171,8 @@ export default async function BillingPage({ searchParams }: { searchParams: Sear
                   </div>
 
                   <div className="billing-plan-price">
-                    <strong>{offered ? formatPrice(TRIAL_OFFER.priceCents) : paid ? formatPrice(priceCentsFor(plan, now)) : "Free"}</strong>
+                    <strong>{coded !== null ? formatPrice(coded) : offered ? formatPrice(TRIAL_OFFER.priceCents) : paid ? formatPrice(priceCentsFor(plan, now)) : "Free"}</strong>
+                    {coded !== null ? <span className="billing-plan-was">{formatPrice(fullPriceCents(plan))}</span> : null}
                     {offered ? <span className="billing-plan-was">{formatPrice(priceCentsFor(plan, now))}</span> : null}
                     {sale ? <span className="billing-plan-was">{formatPrice(plan.listPriceCents!)}</span> : null}
                   </div>
@@ -171,6 +180,9 @@ export default async function BillingPage({ searchParams }: { searchParams: Sear
                     {paid ? "per month, billed monthly" : "no card needed"}
                     {offered ? ` · trial price for your first ${TRIAL_OFFER.months} months, then ${formatPrice(priceCentsFor(plan, now))}` : ""}
                     {sale ? ` · launch price until ${SALE_ENDS_LABEL}, then ${formatPrice(plan.listPriceCents!)}` : ""}
+                    {coded !== null && creator
+                      ? ` · with code ${displayCode(creator.code)} for your first ${creator.discount_months === 1 ? "month" : `${creator.discount_months} months`}, then ${formatPrice(fullPriceCents(plan))}`
+                      : ""}
                   </span>
 
                   {paid || isCurrent ? (
@@ -181,7 +193,9 @@ export default async function BillingPage({ searchParams }: { searchParams: Sear
                           ? paid
                             ? "Manage plan"
                             : "Your plan"
-                          : offered
+                          : coded !== null && creator
+                            ? `Get ${plan.name} ${creator.discount_percent}% off`
+                            : offered
                             ? `Get ${plan.name} for ${formatPrice(TRIAL_OFFER.priceCents)}` : PLAN_ORDER.get(plan.id)! < PLAN_ORDER.get(subscription.plan.id)! ? `Switch to ${plan.name}` : `Get ${plan.name}`}
                     </button>
                   ) : (
@@ -198,6 +212,13 @@ export default async function BillingPage({ searchParams }: { searchParams: Sear
               );
             })}
           </div>
+          {creator ? (
+            <p className="billing-plans-lede" role="status">
+              Code <strong>{displayCode(creator.code)}</strong>: {discountLabel(creator)}, applied at checkout.
+            </p>
+          ) : (
+            <CreatorCodeEntry from="billing" error={codeError === "1"} />
+          )}
           {subscription.hasBilling && subscription.plan.priceCents === 0 ? (
             <form action={openBillingPortal}>
               <button type="submit">Billing history and invoices</button>
