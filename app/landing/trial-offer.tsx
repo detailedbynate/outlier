@@ -94,7 +94,6 @@ export function TrialOffer({ days, plans, code = null }: { days: number; plans: 
           <span className="paywall-hero-chip">{code ? `Code ${code.code}` : "18× usual views"}</span>
         </div>
         <form action={startPublicSubscription} className="paywall-modal-body">
-          {code ? <input type="hidden" name="withCode" value="1" /> : null}
           {code ? (
             <>
               <h2 id="trial-offer-title">

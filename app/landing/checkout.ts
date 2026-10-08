@@ -38,8 +38,9 @@ export async function startPublicSubscription(formData: FormData): Promise<void>
   let url: string | null = null;
   try {
     await getServices().rateLimits.enforce("checkoutIp", clientIpFrom(h));
-    // Only checkouts from a page that showed the code use it, so the price matches what was on screen.
-    const code = formData.get("withCode") === "1" ? await activeCreatorCode() : null;
+    // Came in on a creator's link (or typed their code): their discount applies wherever they check out from,
+    // so the creator gets credit. Not on the free trial, though: whoever clicks that gets the trial they picked.
+    const code = freeTrial ? null : await activeCreatorCode();
     const creator = code ? await creatorCheckoutFields(code) : null;
     // A creator's discount comes off the full price, not the launch price.
     const billed = creator ? ((await fullPriceIdFor(plan)) ?? price) : price;
