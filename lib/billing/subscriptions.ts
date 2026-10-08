@@ -3,7 +3,7 @@ import type Stripe from "stripe";
 import { env } from "@/lib/core/env";
 import { logger } from "@/lib/core/logger";
 import { getServices } from "@/lib/services";
-import { findPlan, onSale, PAID_PLANS, type Plan, type PlanId } from "./plans";
+import { findPlan, fullPriceCents, onSale, PAID_PLANS, type Plan, type PlanId } from "./plans";
 import { getStripe } from "./stripe";
 
 /**
@@ -49,11 +49,52 @@ export function sellablePlans(): Plan[] {
   return PAID_PLANS.filter((plan) => priceIdFor(plan) !== null);
 }
 
+/** Lookup key of the full-price Price made for creator-code checkouts. */
+const fullPriceKey = (plan: Plan) => `outlier-${plan.id}-full-${fullPriceCents(plan)}`;
+
+/**
+ * The Stripe Price for a plan at its full price, for checkouts with a creator's
+ * code: the code's discount comes off the full price, not the launch price.
+ * When no list Price is configured, one is made in Stripe the first time it's
+ * needed, on the same product as the plan's Price. Null when Stripe won't have
+ * it, and checkout falls back to the plan's normal Price.
+ */
+export async function fullPriceIdFor(plan: Plan): Promise<string | null> {
+  if (plan.listPriceCents === undefined) return priceIdFor(plan);
+  const configured = listPriceIdFor(plan);
+  if (configured) return configured;
+  const current = priceIdFor(plan);
+  if (!current) return null;
+  const stripe = getStripe();
+  const lookupKey = fullPriceKey(plan);
+  try {
+    const found = await stripe.prices.list({ lookup_keys: [lookupKey], active: true, limit: 1 });
+    if (found.data[0]) return found.data[0].id;
+    const base = await stripe.prices.retrieve(current);
+    const created = await stripe.prices.create({
+      product: typeof base.product === "string" ? base.product : base.product.id,
+      currency: base.currency,
+      unit_amount: fullPriceCents(plan),
+      recurring: { interval: base.recurring?.interval ?? "month" },
+      ...(base.tax_behavior ? { tax_behavior: base.tax_behavior } : {}),
+      lookup_key: lookupKey,
+      nickname: `${plan.name} full price`,
+    });
+    return created.id;
+  } catch (error) {
+    logger.error("full price unavailable", { plan: plan.id, error });
+    return null;
+  }
+}
+
 /** The plan a Stripe subscription is for, read back from the Price it bills. */
 export function planForSubscription(subscription: Stripe.Subscription): PlanId | null {
-  const priceId = subscription.items.data[0]?.price.id;
+  const price = subscription.items.data[0]?.price;
+  const priceId = price?.id;
   if (!priceId) return null;
   const config = env();
+  const fromKey = PAID_PLANS.find((plan) => price.lookup_key === fullPriceKey(plan));
+  if (fromKey) return fromKey.id;
   // Launch-price subscribers keep their Price after the sale, so both Pro Prices mean Pro.
   if (priceId === config.STRIPE_PRICE_PRO || priceId === config.STRIPE_PRICE_PRO_LIST) return "pro";
   if (priceId === config.STRIPE_PRICE_EXPERT) return "expert";

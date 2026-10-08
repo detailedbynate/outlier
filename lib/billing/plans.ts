@@ -111,6 +111,14 @@ export function planOrFree(id: string | null | undefined): Plan {
 export const PAID_PLANS = PLANS.filter((plan) => plan.priceCents > 0);
 
 /** Is this plan's launch price still running? */
+/**
+ * What a creator's code takes its discount off: the full price, never the
+ * launch price, so a code is a deal of its own rather than a sale on a sale.
+ */
+export function fullPriceCents(plan: Plan): number {
+  return plan.listPriceCents ?? plan.priceCents;
+}
+
 export function onSale(plan: Plan, now: Date = new Date()): boolean {
   return plan.listPriceCents !== undefined && now.getTime() < SALE_ENDS_AT;
 }

@@ -9,28 +9,43 @@ export interface TrialOfferPlan {
   price: string;
   /** Struck through while the launch price runs. */
   was: string | null;
+  /** The price with the visitor's creator code, when they have one. */
+  codePrice?: string | null;
+}
+
+/** A creator's code the visitor came in with. */
+export interface TrialOfferCode {
+  code: string;
+  creatorName: string;
+  percent: number;
+  months: number;
 }
 
 /** A dismissed offer stays away this long in this browser. */
 const QUIET_MS = 3 * 24 * 3_600_000;
+const CODE_QUIET_MS = 24 * 3_600_000;
 const KEY = "outlier:trial-offer-dismissed";
 
 /**
- * The free-trial deal on the landing page. The page itself sells plans at full
- * price; after someone has been reading for 10-15 seconds this offers them the
- * first days free. Only checkout from here starts with the trial.
+ * The deal on the landing page, offered after someone has been reading for a
+ * few seconds. Normally it's the first days free (only checkout from here
+ * starts with the trial). Someone who came in on a creator's code gets their
+ * code's discount instead: it's what the creator promised them, and it's
+ * what the creator is paid on.
  */
-export function TrialOffer({ days, plans }: { days: number; plans: TrialOfferPlan[] }) {
+export function TrialOffer({ days, plans, code = null }: { days: number; plans: TrialOfferPlan[]; code?: TrialOfferCode | null }) {
   const [open, setOpen] = useState(false);
   const [planId, setPlanId] = useState<TrialOfferPlan["id"]>("pro");
+  const key = code ? `outlier:code-offer-dismissed:${code.code}` : KEY;
 
   useEffect(() => {
     try {
-      if (Date.now() - Number(window.localStorage.getItem(KEY) ?? 0) < QUIET_MS) return;
+      if (Date.now() - Number(window.localStorage.getItem(key) ?? 0) < (code ? CODE_QUIET_MS : QUIET_MS)) return;
     } catch {
       // Storage blocked: the offer shows once per visit instead.
     }
-    let left = 10_000 + Math.random() * 5_000;
+    // Someone sent by a creator is already warm: offer sooner.
+    let left = code ? 6_000 + Math.random() * 3_000 : 10_000 + Math.random() * 5_000;
     let last = Date.now();
     // Count only time the page is actually being looked at.
     const timer = setInterval(() => {
@@ -43,7 +58,7 @@ export function TrialOffer({ days, plans }: { days: number; plans: TrialOfferPla
       }
     }, 500);
     return () => clearInterval(timer);
-  }, []);
+  }, [key, code]);
 
   useEffect(() => {
     if (!open) return;
@@ -56,10 +71,11 @@ export function TrialOffer({ days, plans }: { days: number; plans: TrialOfferPla
 
   if (!open || plans.length === 0) return null;
   const plan = plans.find((p) => p.id === planId) ?? plans[0]!;
+  const months = code ? (code.months === 1 ? "first month" : `first ${code.months} months`) : "";
 
   function dismiss() {
     try {
-      window.localStorage.setItem(KEY, String(Date.now()));
+      window.localStorage.setItem(key, String(Date.now()));
     } catch {
       // Nothing to remember it in.
     }
@@ -75,11 +91,24 @@ export function TrialOffer({ days, plans }: { days: number; plans: TrialOfferPla
               <span key={i} data-peak={h === 100 ? "" : undefined} style={{ height: `${h}%` }} />
             ))}
           </div>
-          <span className="paywall-hero-chip">18× usual views</span>
+          <span className="paywall-hero-chip">{code ? `Code ${code.code}` : "18× usual views"}</span>
         </div>
         <form action={startPublicSubscription} className="paywall-modal-body">
-          <h2 id="trial-offer-title">Try Outlier free for {days} days</h2>
-          <p className="paywall-modal-sub">Every tool, the Script Writer and a full month&apos;s credits. Cancel before the trial ends and you pay nothing.</p>
+          {code ? (
+            <>
+              <h2 id="trial-offer-title">
+                {code.creatorName} got you {code.percent}% off
+              </h2>
+              <p className="paywall-modal-sub">
+                {code.percent}% off your {months} of Pro or Expert with code {code.code}. Every tool, the Script Writer and a full month&apos;s credits. Cancel any time.
+              </p>
+            </>
+          ) : (
+            <>
+              <h2 id="trial-offer-title">Try Outlier free for {days} days</h2>
+              <p className="paywall-modal-sub">Every tool, the Script Writer and a full month&apos;s credits. Cancel before the trial ends and you pay nothing.</p>
+            </>
+          )}
 
           {plans.length > 1 ? (
             <div className="trial-offer-plans" role="radiogroup" aria-label="Plan">
@@ -87,7 +116,15 @@ export function TrialOffer({ days, plans }: { days: number; plans: TrialOfferPla
                 <button key={p.id} type="button" role="radio" aria-checked={p.id === plan.id} onClick={() => setPlanId(p.id)}>
                   <strong>{p.name}</strong>
                   <span>
-                    {p.was ? <s>{p.was}</s> : null} {p.price}/mo
+                    {code && p.codePrice ? (
+                      <>
+                        <s>{p.price}</s> {p.codePrice}/mo
+                      </>
+                    ) : (
+                      <>
+                        {p.was ? <s>{p.was}</s> : null} {p.price}/mo
+                      </>
+                    )}
                   </span>
                 </button>
               ))}
@@ -95,21 +132,30 @@ export function TrialOffer({ days, plans }: { days: number; plans: TrialOfferPla
           ) : null}
 
           <input type="hidden" name="planId" value={plan.id} />
-          <input type="hidden" name="trial" value="1" />
+          {code ? null : <input type="hidden" name="trial" value="1" />}
           <button type="submit" className="paywall-cta trial-offer-cta">
-            Start my free trial
+            {code ? `Claim ${code.percent}% off ${plan.name}` : "Start my free trial"}
           </button>
-          <p className="paywall-price-note paywall-then">
-            Then
-            {plan.was ? (
-              <span className="paywall-was">
-                <span className="sr-only">was </span>
-                {plan.was}
+          {code && plan.codePrice ? (
+            <p className="paywall-price-note paywall-then">
+              <span className="paywall-now">{plan.codePrice}/mo</span>
+              <span>
+                for your {months}, then {plan.price}/mo. Applied automatically at checkout.
               </span>
-            ) : null}
-            <span className="paywall-now">{plan.price}/mo</span>
-            <span>Card needed. Nothing is charged for {days} days.</span>
-          </p>
+            </p>
+          ) : (
+            <p className="paywall-price-note paywall-then">
+              Then
+              {plan.was ? (
+                <span className="paywall-was">
+                  <span className="sr-only">was </span>
+                  {plan.was}
+                </span>
+              ) : null}
+              <span className="paywall-now">{plan.price}/mo</span>
+              <span>Card needed. Nothing is charged for {days} days.</span>
+            </p>
+          )}
           <button type="button" className="paywall-later" onClick={dismiss}>
             No thanks
           </button>

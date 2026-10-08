@@ -25,6 +25,15 @@ export class CreatorCodeRepository {
     return result.data;
   }
 
+  async setCoupon(id: string, couponId: string): Promise<void> {
+    assertOk(await this.db.from("creator_codes").update({ stripe_coupon_id: couponId }).eq("id", id), "creatorCodes.setCoupon");
+  }
+
+  /** A new discount for people who check out from now on; its coupon is made at their checkout. */
+  async setDiscount(id: string, percent: number, months: number): Promise<void> {
+    assertOk(await this.db.from("creator_codes").update({ discount_percent: percent, discount_months: months }).eq("id", id), "creatorCodes.setDiscount");
+  }
+
   async setActive(id: string, active: boolean): Promise<void> {
     assertOk(await this.db.from("creator_codes").update({ active }).eq("id", id), "creatorCodes.setActive");
   }

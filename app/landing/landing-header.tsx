@@ -13,7 +13,7 @@ const LINKS = [
 ];
 
 /** Floating glass header. Gains a little contrast on scroll and highlights the section in view. */
-export function LandingHeader() {
+export function LandingHeader({ minimal = false }: { minimal?: boolean } = {}) {
   const [scrolled, setScrolled] = useState(false);
   const [active, setActive] = useState<string | null>(null);
 
@@ -60,7 +60,7 @@ export function LandingHeader() {
           <span>Outlier</span>
         </Link>
         <nav className="pill-nav" aria-label="Sections">
-          {LINKS.map((link) => (
+          {(minimal ? [] : LINKS).map((link) => (
             <ScrollLink key={link.id} to={link.id} className="pill-nav-link" ariaCurrent={active === link.id}>
               {link.label}
             </ScrollLink>

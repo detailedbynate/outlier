@@ -6,7 +6,7 @@ import { FREE_TRIAL_DAYS, findPlan } from "@/lib/billing/plans";
 import { getStripe } from "@/lib/billing/stripe";
 import { activeCreatorCode, creatorCheckoutFields } from "@/lib/billing/creator-codes";
 import { recordSiteEvent } from "@/lib/analytics/site-events";
-import { priceIdFor } from "@/lib/billing/subscriptions";
+import { fullPriceIdFor, priceIdFor } from "@/lib/billing/subscriptions";
 import { env } from "@/lib/core/env";
 import { logger } from "@/lib/core/logger";
 import { getServices } from "@/lib/services";
@@ -36,19 +36,22 @@ export async function startPublicSubscription(formData: FormData): Promise<void>
   try {
     await getServices().rateLimits.enforce("checkoutIp", clientIpFrom(h));
     const code = await activeCreatorCode();
-    const creator = code ? creatorCheckoutFields(code) : null;
+    const creator = code ? await creatorCheckoutFields(code) : null;
+    // A creator's discount comes off the full price, not the launch price.
+    const billed = creator ? ((await fullPriceIdFor(plan)) ?? price) : price;
     const session = await getStripe().checkout.sessions.create({
       mode: "subscription",
       // Stripe is the seller of record: it handles sales tax/VAT, fraud and disputes.
       managed_payments: { enabled: true },
-      line_items: [{ price, quantity: 1 }],
+      line_items: [{ price: billed, quantity: 1 }],
       // Stripe takes a set discount or a code box, not both.
       ...(creator ? { discounts: creator.discounts } : { allow_promotion_codes: true }),
       metadata: { planId: plan.id, ...creator?.metadata },
       subscription_data: {
         metadata: { planId: plan.id, ...creator?.metadata },
         // The free-trial offer (the popup) asks for it; the plan buttons charge straight away.
-        ...(freeTrial
+        // A creator's discount is the offer for code visitors; it doesn't stack with the free trial.
+        ...(freeTrial && !creator
           ? {
               trial_period_days: FREE_TRIAL_DAYS,
               // No card on file when the trial ends means no plan, not an unpaid one.
@@ -61,7 +64,7 @@ export async function startPublicSubscription(formData: FormData): Promise<void>
       cancel_url: `${base}/?checkout=cancelled#pricing`,
     });
     url = session.url;
-    await recordSiteEvent("checkout_start", { path: "/", detail: freeTrial ? `${plan.id} (free trial)` : plan.id, creator_code: code?.code ?? null });
+    await recordSiteEvent("checkout_start", { path: "/", detail: freeTrial ? `${plan.id} (free trial)` : plan.id, creator_code: creator ? code!.code : null });
   } catch (error) {
     logger.error("public subscription checkout failed", { plan: plan.id, error });
   }

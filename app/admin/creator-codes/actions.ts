@@ -69,3 +69,14 @@ export async function markPaidOut(formData: FormData): Promise<void> {
   logger.info("creator commission paid out", { codeId: id, cents, by: current.user.id });
   revalidatePath("/admin/creator-codes");
 }
+
+/** A new discount for anyone who checks out from now on. People already subscribed keep theirs. */
+export async function setCodeDiscount(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  const percent = Math.round(Number(formData.get("discountPercent")));
+  const months = Math.round(Number(formData.get("discountMonths")));
+  if (!id || !(percent >= 1 && percent <= 100) || !(months >= 1 && months <= 36)) return;
+  await getServices().repositories.creatorCodes.setDiscount(id, percent, months);
+  revalidatePath("/admin/creator-codes");
+}

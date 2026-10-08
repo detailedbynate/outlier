@@ -6,7 +6,7 @@ import { discountLabel, displayCode, statsFrom } from "@/lib/creator-codes/codes
 import { siteOrigin } from "@/lib/referrals/links";
 import { getServices } from "@/lib/services";
 import { CreateCodeForm } from "./create-form";
-import { markPaidOut, setCodeActive } from "./actions";
+import { markPaidOut, setCodeActive, setCodeDiscount } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +38,10 @@ export default async function AdminCreatorCodesPage() {
 
       <section className="card">
         <h2 className="section-title">New code</h2>
-        <p className="stat-note">The discount is fixed once the code exists (it&apos;s a Stripe coupon). To change it, switch the code off and make a new one.</p>
+        <p className="stat-note">
+          The discount comes off the full plan price (Pro $15), not the launch price. You can change it later: new checkouts get the new discount, and people already
+          subscribed keep theirs.
+        </p>
         <CreateCodeForm />
       </section>
 
@@ -70,7 +73,22 @@ export default async function AdminCreatorCodesPage() {
                       <div className="stat-note">{`${origin}/?code=${displayCode(code.code)}`}</div>
                     </td>
                     <td>{code.creator_name}</td>
-                    <td>{discountLabel(code)}</td>
+                    <td>
+                      {discountLabel(code)}
+                      <details className="code-discount-edit">
+                        <summary className="stat-note">Change</summary>
+                        <form action={setCodeDiscount} className="row" style={{ gap: 6, marginTop: 6 }}>
+                          <input type="hidden" name="id" value={code.id} />
+                          <input name="discountPercent" type="number" min={1} max={100} defaultValue={code.discount_percent} aria-label="Discount %" style={{ width: 64 }} />
+                          <span className="stat-note">% for</span>
+                          <input name="discountMonths" type="number" min={1} max={36} defaultValue={code.discount_months} aria-label="Months" style={{ width: 56 }} />
+                          <span className="stat-note">mo</span>
+                          <button type="submit" className="button-ghost">
+                            Save
+                          </button>
+                        </form>
+                      </details>
+                    </td>
                     <td>
                       {code.commission_percent}%{code.commission_months ? ` for ${code.commission_months} mo` : ", ongoing"}
                     </td>

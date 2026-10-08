@@ -23,7 +23,7 @@ export function CreateCodeForm() {
       </label>
       <label className="field">
         <span>Discount %</span>
-        <input name="discountPercent" type="number" min={1} max={100} defaultValue={20} required />
+        <input name="discountPercent" type="number" min={1} max={100} defaultValue={40} required />
       </label>
       <label className="field">
         <span>For months</span>

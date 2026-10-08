@@ -7,7 +7,7 @@ import { env } from "@/lib/core/env";
 import { logger } from "@/lib/core/logger";
 import { CREDIT_TAX_CODE, findPack } from "@/lib/billing/packs";
 import { findPlan } from "@/lib/billing/plans";
-import { priceIdFor } from "@/lib/billing/subscriptions";
+import { fullPriceIdFor, priceIdFor } from "@/lib/billing/subscriptions";
 import { getStripe } from "@/lib/billing/stripe";
 import { offerOpen, TRIAL_OFFER } from "@/lib/billing/trial";
 import { activeCreatorCode, creatorCheckoutFields } from "@/lib/billing/creator-codes";
@@ -79,7 +79,9 @@ export async function startSubscription(formData: FormData): Promise<void> {
   const existing = await getServices().subscriptions.stateFor(current.user.id);
   // A creator's code beats the trial offer: it's what the creator gets paid on. Not their own code, though.
   const code = await activeCreatorCode();
-  const creator = code && code.user_id !== current.user.id ? creatorCheckoutFields(code) : null;
+  const creator = code && code.user_id !== current.user.id ? await creatorCheckoutFields(code) : null;
+  // A creator's discount comes off the full price, not the launch price.
+  const billed = creator ? ((await fullPriceIdFor(plan!)) ?? price!) : price!;
   // Someone on a trial, or just out of one, gets Expert at the trial price.
   const coupon = !creator && plan.id === TRIAL_OFFER.planId && offerOpen(existing.trial, Date.now()) ? await trialCoupon() : null;
   let url: string | null = null;
@@ -88,7 +90,7 @@ export async function startSubscription(formData: FormData): Promise<void> {
       mode: "subscription",
       // Stripe is the seller of record: it handles sales tax/VAT, fraud and disputes.
       managed_payments: { enabled: true },
-      line_items: [{ price, quantity: 1 }],
+      line_items: [{ price: billed, quantity: 1 }],
       // Launch offers and comped accounts are run as Stripe promotion codes, so
       // the discount lives with the subscription instead of in our own pricing.
       // Stripe takes one or the other: the trial offer, or a code box.

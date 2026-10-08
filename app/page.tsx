@@ -21,7 +21,12 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const referralCode = normalizeReferralCode(params.ref) ?? normalizeReferralCode(jar.get(REFERRAL_COOKIE)?.value);
   if (current && !current.approved) redirect("/not-approved");
   if (current && !current.onboardingCompleted) redirect("/onboarding");
-  if (!current) return <LandingPage referralCode={referralCode} creatorCode={await creatorCodeFor(normalizeCreatorCode(params.code) ?? normalizeCreatorCode(jar.get(CREATOR_CODE_COOKIE)?.value))} />;
+  if (!current) {
+    const creatorCode = await creatorCodeFor(normalizeCreatorCode(params.code) ?? normalizeCreatorCode(jar.get(CREATOR_CODE_COOKIE)?.value));
+    // Someone sent here by a creator or a friend already heard the pitch: show the offer and the plans.
+    const focused = Boolean(creatorCode || normalizeReferralCode(params.ref));
+    return <LandingPage referralCode={referralCode} creatorCode={creatorCode} focused={focused} />;
+  }
   // Free is Shorts Channels only: the dashboard is a paywall there.
   if (await paidFeaturesLocked(current)) return <Paywall feature={PAID_FEATURES.dashboard} />;
   return <DashboardView current={current} />;
@@ -31,5 +36,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 async function creatorCodeFor(code: string | null) {
   if (!code) return null;
   const row = await getServices().repositories.creatorCodes.find(code).catch(() => null);
-  return row?.active ? { code: displayCode(row.code), creatorName: row.creator_name, offer: discountLabel(row) } : null;
+  return row?.active
+    ? { code: displayCode(row.code), creatorName: row.creator_name, offer: discountLabel(row), percent: row.discount_percent, months: row.discount_months }
+    : null;
 }

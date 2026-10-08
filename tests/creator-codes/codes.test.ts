@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { commissionFor, discountLabel, normalizeCreatorCode, statsFrom } from "@/lib/creator-codes/codes";
+import { commissionFor, discountLabel, normalizeCreatorCode, statsFrom, stripeCouponIdFor } from "@/lib/creator-codes/codes";
+import { fullPriceCents, PLANS } from "@/lib/billing/plans";
 
 describe("creator codes", () => {
   it("accepts short codes in any case, and nothing that could break a URL", () => {
@@ -15,6 +16,15 @@ describe("creator codes", () => {
   it("says the offer plainly", () => {
     expect(discountLabel({ discount_percent: 20, discount_months: 2 })).toBe("20% off your first 2 months");
     expect(discountLabel({ discount_percent: 50, discount_months: 1 })).toBe("50% off your first month");
+  });
+
+  it("takes the discount off the full price, with a coupon per discount", () => {
+    const pro = PLANS.find((plan) => plan.id === "pro")!;
+    expect(fullPriceCents(pro)).toBe(1_500);
+    expect(Math.round((fullPriceCents(pro) * (100 - 40)) / 100)).toBe(900);
+    const code = { code: "sktl", discount_percent: 47, discount_months: 2 };
+    expect(stripeCouponIdFor(code)).toBe("creator-sktl-47off-2m");
+    expect(stripeCouponIdFor({ ...code, discount_percent: 20 })).not.toBe(stripeCouponIdFor(code));
   });
 
   it("pays a share of each invoice, inside the code's window", () => {

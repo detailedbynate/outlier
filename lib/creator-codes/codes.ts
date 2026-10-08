@@ -23,8 +23,13 @@ export function displayCode(code: string): string {
   return code.toUpperCase();
 }
 
-export function stripeCouponIdFor(code: string): string {
-  return `creator-${code}`;
+/**
+ * The Stripe coupon for a code's discount. Coupons can't be edited, so the
+ * discount is part of the id: change a code's discount and the next checkout
+ * makes a fresh coupon, while people who already subscribed keep theirs.
+ */
+export function stripeCouponIdFor(code: { code: string; discount_percent: number; discount_months: number }): string {
+  return `creator-${code.code}-${code.discount_percent}off-${code.discount_months}m`;
 }
 
 /** "20% off your first 2 months". */

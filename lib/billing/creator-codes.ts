@@ -21,9 +21,38 @@ export async function activeCreatorCode(): Promise<CreatorCodeRow | null> {
   }
 }
 
-/** Checkout session fields that apply a creator's discount and tag the subscription with the code. */
-export function creatorCheckoutFields(code: CreatorCodeRow): { discounts: { coupon: string }[]; metadata: Record<string, string> } {
-  return { discounts: [{ coupon: code.stripe_coupon_id }], metadata: { [CREATOR_CODE_METADATA]: code.code } };
+/** Make sure the coupon for a code's current discount exists in Stripe. */
+async function ensureCoupon(code: Pick<CreatorCodeRow, "code" | "discount_percent" | "discount_months">): Promise<string> {
+  const couponId = stripeCouponIdFor(code);
+  const stripe = getStripe();
+  try {
+    await stripe.coupons.retrieve(couponId);
+  } catch {
+    await stripe.coupons.create({
+      id: couponId,
+      name: `Creator code ${displayCode(code.code)}`,
+      percent_off: code.discount_percent,
+      duration: "repeating",
+      duration_in_months: code.discount_months,
+    });
+  }
+  return couponId;
+}
+
+/**
+ * Checkout session fields that apply a creator's discount and tag the
+ * subscription with the code. Null when Stripe won't make the coupon, and
+ * checkout goes ahead at the normal price.
+ */
+export async function creatorCheckoutFields(code: CreatorCodeRow): Promise<{ discounts: { coupon: string }[]; metadata: Record<string, string> } | null> {
+  try {
+    const coupon = await ensureCoupon(code);
+    if (coupon !== code.stripe_coupon_id) await getServices().repositories.creatorCodes.setCoupon(code.id, coupon).catch(() => undefined);
+    return { discounts: [{ coupon }], metadata: { [CREATOR_CODE_METADATA]: code.code } };
+  } catch (error) {
+    logger.error("creator coupon unavailable", { code: code.code, error });
+    return null;
+  }
 }
 
 export interface NewCreatorCode {
@@ -36,27 +65,11 @@ export interface NewCreatorCode {
   commissionMonths: number | null;
 }
 
-/**
- * Makes the Stripe coupon behind a code, then the code. Coupons can't be
- * changed once made, so a code's discount is fixed: to change it, switch the
- * code off and make a new one.
- */
+/** Makes the Stripe coupon behind a code, then the code. */
 export async function createCreatorCode(input: NewCreatorCode): Promise<CreatorCodeRow | "taken"> {
   const repo = getServices().repositories.creatorCodes;
   if (await repo.find(input.code)) return "taken";
-  const couponId = stripeCouponIdFor(input.code);
-  const stripe = getStripe();
-  try {
-    await stripe.coupons.retrieve(couponId);
-  } catch {
-    await stripe.coupons.create({
-      id: couponId,
-      name: `Creator code ${displayCode(input.code)}`,
-      percent_off: input.discountPercent,
-      duration: "repeating",
-      duration_in_months: input.discountMonths,
-    });
-  }
+  const couponId = await ensureCoupon({ code: input.code, discount_percent: input.discountPercent, discount_months: input.discountMonths });
   const row = await repo.create({
     code: input.code,
     creator_name: input.creatorName,
