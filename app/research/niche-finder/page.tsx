@@ -870,8 +870,8 @@ function DiscoverBoard({
       </BoardBody>
       </BoardNav>
       <p className="dash-row-sub">
-        RPM is what a creator keeps per 1,000 views, estimated from public creator reports. Shorts pay far less per view than long-form (cents per 1,000), so compare them by earnings per 1M views.
-        {view.lens === "gaming" ? " In gaming it depends most on who watches: kid-heavy games pay least, strategy, sims and PC games the most." : " Real RPM also depends on audience country and season."}
+        RPM is what a creator keeps per 1,000 views, estimated from public creator reports and then moved for each niche&apos;s own audience: where its channels are, how much is made for kids, and for long-form, whether videos run 8+ minutes. Shorts pay far less per view than long-form (cents per 1,000), so compare them by earnings per 1M views.
+        {view.lens === "gaming" ? " In gaming it depends most on who watches: kid-heavy games pay least, strategy, sims and PC games the most." : " Real RPM also swings with the season."}
       </p>
     </section>
   );
@@ -964,6 +964,7 @@ function LibraryBoard({ niches, allRound, view }: { niches: DiscoveredNiche[]; a
             <div><dt>Per 1M views</dt><dd>~{formatMoney(n.perMillion)}</dd></div>
             <div><dt>RPM per 1K</dt><dd>{formatMoneyRange(n.rpm)}</dd></div>
           </dl>
+          {n.rpmNote ? <p className="discover-rpm-note">{n.rpmNote}</p> : null}
           <div className="discover-bars">
             {(["audience", "views", "untapped", "easy", "rpm"] as const).map((k) => (
               <div key={k} className="discover-bar">

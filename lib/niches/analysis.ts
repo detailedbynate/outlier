@@ -23,6 +23,7 @@ export interface NicheVideo {
   outlier_score: number | null;
   /** Length in seconds, when stored. */
   duration_seconds?: number | null;
+  made_for_kids?: boolean | null;
 }
 
 export interface NicheChannel {
@@ -37,6 +38,8 @@ export interface NicheChannel {
   published_at?: string | null;
   /** The channel's subject (a NicheCategory), when it's been labeled with confidence. */
   category?: string | null;
+  /** Two-letter country the channel lists, when it lists one. */
+  country?: string | null;
 }
 
 export type Level = "low" | "medium" | "high";

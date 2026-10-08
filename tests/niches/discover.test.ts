@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { NicheChannel, NicheVideo } from "@/lib/niches/analysis";
-import { easeFor, libraryWeights, monthlyViewsOf, newcomersIn, rpmTierOf, sortDiscovered, type DiscoveredNiche } from "@/lib/niches/discover";
+import { easeFor, libraryWeights, looksLikeNiche, monthlyViewsOf, newcomersIn, rpmTierOf, sortDiscovered, type DiscoveredNiche } from "@/lib/niches/discover";
+import { adjustRpm, audienceAdjustment } from "@/lib/niches/revenue";
 
 const NOW = new Date("2026-10-07T00:00:00Z");
 const daysAgo = (d: number) => new Date(NOW.getTime() - d * 86_400_000).toISOString();
@@ -66,6 +67,38 @@ describe("discover", () => {
     expect(sortDiscovered([oneTrick, weak, allRound], "bets").map((n) => n.term)).toEqual(["all round", "one trick", "weak"]);
   });
 
+
+  it("moves RPM for who's watching: country, kids, and mid-roll length", () => {
+    const us = ["a", "b", "c"].map((c) => ({ channelId: c, country: "US", madeForKids: false, minutes: null, views: 10_000 }));
+    const ph = ["a", "b", "c"].map((c) => ({ channelId: c, country: "PH", madeForKids: false, minutes: null, views: 10_000 }));
+    expect(audienceAdjustment(us, "shorts")).toMatchObject({ factor: 1.4, note: expect.stringContaining("high-paying") });
+    expect(audienceAdjustment(ph, "shorts")).toMatchObject({ factor: 0.3, note: expect.stringContaining("the Philippines") });
+    // Two channels with a country say too little: geography stays neutral.
+    expect(audienceAdjustment(us.slice(0, 2), "shorts").factor).toBe(1);
+    const kids = us.map((s) => ({ ...s, country: null, madeForKids: true }));
+    expect(audienceAdjustment(kids, "shorts")).toMatchObject({ factor: 0.3, note: expect.stringContaining("made-for-kids") });
+    const short = us.map((s) => ({ ...s, country: null, minutes: 4 }));
+    expect(audienceAdjustment(short, "long_form").factor).toBe(0.85);
+    expect(audienceAdjustment(short, "shorts").factor).toBe(1);
+    expect(adjustRpm([0.02, 0.06], 1.4, "shorts")).toEqual([0.028, 0.084]);
+  });
+
+  it("drops mined names that aren't niches", () => {
+    const channels = new Map(["a", "b", "c", "d", "e"].map((id) => [id, { ...channel(id, 900), title: `Creator ${id.repeat(3)}x` }]));
+    const titled = (term: string, ids: string[]) => ids.map((c, i) => ({ ...video(`${c}${i}`, c, 1_000, 10), title: `my ${term} run` }));
+    expect(looksLikeNiche("comic dub", titled("comic dub", ["a", "b", "c", "d"]), channels)).toBe(true);
+    // Hashtags run together.
+    expect(looksLikeNiche("mlbb10th allinmlbb", titled("mlbb10th allinmlbb", ["a", "b", "c", "d"]), channels)).toBe(false);
+    // Only ever a hashtag, never said in a title.
+    const tagged = ["a", "b", "c", "d"].map((c) => ({ ...video(c, c, 1_000, 10), title: "gg #doorsarchives" }));
+    expect(looksLikeNiche("doorsarchives", tagged, channels)).toBe(false);
+    // A creator's own name.
+    const named = new Map([...channels, ["e", { ...channel("e", 900), title: "HummusThunder" }]]);
+    expect(looksLikeNiche("hummus thunder", titled("hummus thunder", ["a", "b", "c", "e", "e"]), named)).toBe(false);
+    // One creator under four channel names.
+    const one = new Map(["SnappiyTV", "Snapiyy TV", "Snappiy", "Snapiyy"].map((title, i) => [String(i), { ...channel(String(i), 900), title }]));
+    expect(looksLikeNiche("console champion", titled("console champion", ["0", "1", "2", "3"]), one)).toBe(false);
+  });
 
   it("tiers RPM per format", () => {
     expect(rpmTierOf([8, 20], "long_form")).toBe("high");

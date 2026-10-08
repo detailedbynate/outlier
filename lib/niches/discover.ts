@@ -9,7 +9,7 @@
 import { NICHE_CATEGORIES, type NicheCategory } from "./labeling";
 import { topicAliases, type NicheChannel, type NicheVideo } from "./analysis";
 import { normalizeName } from "./naming";
-import { categoryFor, rpmFor } from "./revenue";
+import { adjustRpm, audienceAdjustment, categoryFor, rpmFor } from "./revenue";
 import { findUnderratedNiches, type UnderratedNiche } from "./underrated";
 
 export type DiscoverFormat = "shorts" | "long_form";
@@ -42,8 +42,10 @@ export interface Newcomers {
 export interface DiscoveredNiche extends UnderratedNiche {
   format: DiscoverFormat;
   category: NicheCategory | null;
-  /** Creator RPM range in USD for this format. */
+  /** Creator RPM range in USD for this format: the category's band, moved for this niche's audience. */
   rpm: [number, number];
+  /** What moved it off the category's band, when something did. */
+  rpmNote: string | null;
   rpmTier: RpmTier;
   /** Rough earnings per 1M views, midpoint of the RPM range. */
   perMillion: number;
@@ -204,7 +206,17 @@ export function scoreNiche(
 ): DiscoveredNiche {
   const now = context.now ?? new Date();
   const category = context.category ?? categoryFor(niche.term);
-  const rpm = rpmFor(category, format, niche.term);
+  const audience = audienceAdjustment(
+    videos.map((v) => ({
+      channelId: v.channel_id,
+      country: context.channels?.get(v.channel_id)?.country ?? null,
+      madeForKids: v.made_for_kids === true,
+      minutes: v.duration_seconds ? v.duration_seconds / 60 : null,
+      views: v.view_count,
+    })),
+    format,
+  );
+  const rpm = adjustRpm(rpmFor(category, format, niche.term), audience.factor, format);
   const mid = (rpm[0] + rpm[1]) / 2;
   const minutes = format === "long_form" ? median(videos.flatMap((v) => (v.duration_seconds ? [v.duration_seconds / 60] : []))) : null;
   const ease = easeFor(niche.term, category, format, minutes);
@@ -240,6 +252,7 @@ export function scoreNiche(
     format,
     category,
     rpm,
+    rpmNote: audience.note,
     rpmTier: rpmTierOf(rpm, format),
     perMillion: Math.round(mid * 1000),
     medianMinutes: minutes === null ? null : Math.round(minutes),
@@ -282,7 +295,9 @@ export function discoverNiches(
   options: { now?: Date; max?: number; weightOf?: (publishedAt: string) => number } = {},
 ): DiscoveredNiche[] {
   const now = options.now ?? new Date();
-  const slice = videos.filter((v) => (format === "shorts" ? v.format === "short" : v.format === "long_form"));
+  const slice = videos.filter(
+    (v) => (format === "shorts" ? v.format === "short" : v.format === "long_form") && !SPAM.test(v.title) && !SPAM.test(channels.get(v.channel_id)?.title ?? ""),
+  );
   // Long-form gets fewer views per upload than Shorts; don't hold it to the Shorts bar.
   // Mine wide, then keep only names with a known category: that drops title words
   // like "hero" or "david" and gives every niche a real RPM band.
@@ -311,6 +326,7 @@ export function discoverNiches(
   for (const niche of ranked) {
     const ids = new Set(niche.examples.map((e) => e.youtubeVideoId));
     const videos = byTerm(niche.term);
+    if (!known(niche) && !looksLikeNiche(niche.term, videos, channels)) continue;
     const videoIds = new Set(videos.map((v) => v.id));
     const twin = kept.find((k) => sameNiche(k.niche, niche, k.ids, ids) || mostlyShared(k.videoIds, videoIds));
     if (!twin) kept.push({ niche, ids, videos, videoIds });
@@ -318,6 +334,41 @@ export function discoverNiches(
   // Back in the miner's order.
   kept.sort((a, b) => mined.indexOf(a.niche) - mined.indexOf(b.niche));
   return kept.map(({ niche, videos }) => scoreNiche(niche, format, videos, { channels, now, weightOf: options.weightOf, category: categories.get(niche.term) }));
+}
+
+/** Adult and bait spam that slips in under ordinary words ("japan movie"). */
+const SPAM = /\b(s[e3]x|sexy|nsfw|erotic|onlyfans|nude|kissing massage|oil massage|hot massage)\b/i;
+
+/** Channels that have to say a name in their titles, not just hashtag it, before it's a niche. */
+const MIN_TITLE_CHANNELS = 3;
+/** Different creators a niche needs: one person under four channel names is still one. */
+const MIN_CREATORS = 4;
+
+/**
+ * A mined name the dictionary doesn't know is only a niche if it reads like one:
+ * not hashtags run together ("mlbb10th allinmlbb"), not a creator's own name
+ * ("hummus thunder"), and not one creator posting under a few channel names.
+ */
+export function looksLikeNiche(term: string, videos: readonly NicheVideo[], channels: ReadonlyMap<string, NicheChannel>): boolean {
+  if (term.split(/\s+/).some((word) => word.length >= 6 && /[a-z]\d|\d[a-z]{3,}/i.test(word))) return false;
+  const key = normalizeName(term);
+  if (!key) return false;
+  const inTitles = new Set(videos.filter((v) => ` ${normalizeName(v.title.replace(/#\S+/g, " "))} `.includes(` ${key} `)).map((v) => v.channel_id));
+  if (inTitles.size < MIN_TITLE_CHANNELS) return false;
+  const squashed = key.replace(/ /g, "");
+  const squash = (title: string) => normalizeName(title).replace(/ /g, "");
+  const named = videos.filter((v) => squashed.length >= 5 && squash(channels.get(v.channel_id)?.title ?? "").includes(squashed)).length;
+  if (named >= 0.3 * videos.length) return false;
+  const creators = new Set([...new Set(videos.map((v) => v.channel_id))].map((id) => creatorKey(channels.get(id)?.title ?? id)));
+  return creators.size >= MIN_CREATORS;
+}
+
+/** "SnappiyTV", "Snapiyy TV" and "Snappiy" are one creator: compare channel names by their consonants. */
+function creatorKey(title: string): string {
+  const squashed = normalizeName(title)
+    .replace(/ /g, "")
+    .replace(/(tv|yt|gaming|official|shorts|clips|live)+$/, "");
+  return (squashed.replace(/[aeiouy]/g, "").replace(/(.)\1+/g, "$1").slice(0, 6) || squashed).slice(0, 8);
 }
 
 /** Most of the smaller set's uploads are in the bigger one: the same niche under two names. */

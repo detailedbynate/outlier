@@ -65,7 +65,7 @@ const CATEGORY_HINTS: [RegExp, NicheCategory][] = [
   [/\b(travel|camping|hiking|fishing|hunting|outdoor|cruise|digital nomad|moving abroad|expat|airport|flights?\b)/, "Travel & Outdoors"],
   [/\b(cook|recipe|food|baking|bbq|meal)/, "Food & Cooking"],
   [/\b(diy|craft|woodwork|home|garden|renovat|cleaning|plumb|hvac|roof|solar|heat pump|lawn|pest control|electrical|wiring|drywall|insulation)/, "DIY, Crafts & Home"],
-  [/\b(game|gaming|minecraft|roblox|fortnite|gta|pokemon|monsters|speedrun|esports)/, "Gaming"],
+  [/\b(game|gaming|minecraft|roblox|fortnite|gta|pokemon|monsters|speedrun|esports|nba ?2k|2k2\d)/, "Gaming"],
   [/\b(football|soccer|nba|basketball|nfl|sports?|boxing|ufc|golf|tennis|surf)/, "Sports"],
   [/\b(dog|cat|pet|animal|puppy|kitten)/, "Animals & Pets"],
   [/\b(music|song|dance|guitar|piano|singing|rap)/, "Music & Dance"],
@@ -108,7 +108,7 @@ export function rpmFor(category: NicheCategory | null, format: "shorts" | "long_
  * simulators, chess and PC hardware have older viewers advertisers pay more for.
  */
 const OLDER_AUDIENCE =
-  /\b(chess|poker|flight sim|microsoft flight|msfs|cities[: ]+skylines|factorio|satisfactory|civilization|civ (?:v|vi|vii|[5-7])\b|total war|hearts of iron|crusader kings|stellaris|europa universalis|eve online|star citizen|sim ?racing|iracing|assetto corsa|euro truck|american truck|farming simulator|tarkov|arma\b|dcs world|war thunder|world of tanks|anno \d|rimworld|kerbal|planet coaster|football manager|f1 2\d|gran turismo|pc build|gaming pc|graphics cards?|gpu\b|steam deck)/i;
+  /\b(chess|poker|flight sim|microsoft flight|msfs|cities[: ]+skylines|factorio|satisfactory|civilization|civ (?:v|vi|vii|[5-7])\b|total war|hearts of iron|crusader kings|stellaris|europa universalis|eve online|star citizen|sim ?racing|iracing|assetto corsa|euro truck|american truck|farming simulator|tarkov|arma\b|dcs world|war thunder|world of tanks|anno \d|rimworld|kerbal|planet coaster|football manager|f1 2\d|gran turismo|pc build|gaming pc|graphics cards?|gpu\b|steam deck|magnus carlsen|hikaru|gotham ?chess|levy rozman)/i;
 const YOUNG_AUDIENCE =
   /\b(roblox|minecraft|fortnite|among us|toca|gacha|brawl stars|subway surfers|geometry dash|five nights|fnaf|poppy playtime|skibidi|piggy|adopt me|blox fruits|bedwars|pet simulator|garten of banban|rainbow friends|stumble guys|murder mystery|brookhaven|bloxburg|dress to impress|grow a garden|steal a brainrot|99 nights)/i;
 
@@ -123,6 +123,97 @@ function gamingBand(term: string): RpmBand {
   const factor = { older: 2, typical: 1, young: 0.6 }[gameAudience(term)];
   const scale = ([low, high]: Range, places: number): Range => [Number((low * factor).toFixed(places)), Number((high * factor).toFixed(places))];
   return { long: scale(base.long, 2), shorts: scale(base.shorts, 3) };
+}
+
+/**
+ * Ad rates by where viewers are, against the mixed audience the category bands
+ * assume. A channel's country stands in for its viewers': an American gaming
+ * channel is watched mostly in rich ad markets, a Filipino one mostly at home.
+ */
+const HIGH_PAYING = new Set(["US", "CA", "GB", "AU", "NZ", "IE", "CH", "NO", "DK", "SE", "NL", "DE", "AT", "BE", "FI", "LU", "IS", "SG"]);
+const MID_PAYING = new Set(["FR", "ES", "IT", "PT", "JP", "KR", "IL", "HK", "TW", "AE", "SA", "QA", "KW", "CZ", "PL"]);
+const COUNTRY_RATE = { high: 1.4, mid: 0.8, low: 0.3 } as const;
+const COUNTRY_NAME: Record<string, string> = {
+  US: "the US", GB: "the UK", CA: "Canada", AU: "Australia", DE: "Germany", BR: "Brazil", ID: "Indonesia", IN: "India", PH: "the Philippines",
+  MX: "Mexico", VN: "Vietnam", FR: "France", ES: "Spain", IT: "Italy", JP: "Japan", PL: "Poland", RU: "Russia", AR: "Argentina", MY: "Malaysia",
+  TH: "Thailand", TR: "Turkey", PK: "Pakistan", BD: "Bangladesh", EG: "Egypt", NG: "Nigeria", CO: "Colombia", PE: "Peru", CL: "Chile", ZA: "South Africa", KR: "Korea", RO: "Romania", UA: "Ukraine", SA: "Saudi Arabia",
+};
+
+function countryTier(country: string): keyof typeof COUNTRY_RATE {
+  return HIGH_PAYING.has(country) ? "high" : MID_PAYING.has(country) ? "mid" : "low";
+}
+
+/** One upload's say in who a niche's audience is. */
+export interface AudienceSignal {
+  channelId: string;
+  /** The channel's country, when it lists one. */
+  country: string | null;
+  madeForKids: boolean;
+  /** Length in minutes, when known. */
+  minutes: number | null;
+  views: number;
+}
+
+export interface RpmAdjustment {
+  /** Multiply the category's RPM band by this. */
+  factor: number;
+  /** Why, in a few words, when the audience moves it. */
+  note: string | null;
+}
+
+/** Uploads with a known country, from this many channels, before geography counts. */
+const MIN_COUNTRY_CHANNELS = 3;
+
+/**
+ * How a niche's own audience moves its RPM off the category's typical band:
+ * where its channels are, how much of it is made for kids (no personalised
+ * ads), and for long-form, whether videos run 8+ minutes (mid-roll ads).
+ * Bigger uploads count more, but by the square root so one hit can't decide it.
+ */
+export function audienceAdjustment(signals: readonly AudienceSignal[], format: "shorts" | "long_form"): RpmAdjustment {
+  if (signals.length === 0) return { factor: 1, note: null };
+  const weight = (s: AudienceSignal) => Math.sqrt(Math.max(s.views, 0) + 1);
+  const total = signals.reduce((sum, s) => sum + weight(s), 0);
+
+  const located = signals.filter((s) => s.country);
+  const byTier = { high: 0, mid: 0, low: 0 };
+  const lowCountries = new Map<string, number>();
+  let locatedWeight = 0;
+  for (const s of located) {
+    const tier = countryTier(s.country!);
+    byTier[tier] += weight(s);
+    locatedWeight += weight(s);
+    if (tier === "low") lowCountries.set(s.country!, (lowCountries.get(s.country!) ?? 0) + weight(s));
+  }
+  const geoKnown = new Set(located.map((s) => s.channelId)).size >= MIN_COUNTRY_CHANNELS;
+  const share = (tier: keyof typeof byTier) => (locatedWeight > 0 ? byTier[tier] / locatedWeight : 0);
+  const geo = geoKnown ? share("high") * COUNTRY_RATE.high + share("mid") * COUNTRY_RATE.mid + share("low") * COUNTRY_RATE.low : 1;
+
+  const kidsShare = signals.reduce((sum, s) => sum + (s.madeForKids ? weight(s) : 0), 0) / total;
+  const kids = 1 - 0.7 * kidsShare;
+
+  const timed = signals.filter((s) => s.minutes !== null);
+  const longShare = timed.length > 0 ? timed.reduce((sum, s) => sum + (s.minutes! >= 8 ? weight(s) : 0), 0) / timed.reduce((sum, s) => sum + weight(s), 0) : null;
+  const length = format === "long_form" && longShare !== null ? 0.85 + 0.3 * longShare : 1;
+
+  const factor = Math.min(Math.max(geo * kids * length, 0.2), 1.8);
+  const notes: string[] = [];
+  if (kidsShare >= 0.3) notes.push("lots of made-for-kids uploads, which get no personalised ads");
+  if (geoKnown && share("high") >= 0.7) notes.push("viewers mostly in high-paying countries like the US and UK");
+  else if (geoKnown && share("low") >= 0.5) {
+    const top = [...lowCountries].sort((a, b) => b[1] - a[1]).slice(0, 2).map(([c]) => COUNTRY_NAME[c] ?? c);
+    notes.push(`many viewers in lower-paying ad markets like ${top.join(" and ")}`);
+  }
+  if (format === "long_form" && longShare !== null && longShare < 0.3) notes.push("most videos under 8 minutes, so few mid-roll ads");
+  else if (format === "long_form" && longShare !== null && longShare >= 0.7) notes.push("8+ minute videos with room for mid-roll ads");
+  const note = notes.length > 0 ? notes[0]!.charAt(0).toUpperCase() + notes[0]!.slice(1) : null;
+  return { factor: Number(factor.toFixed(3)), note };
+}
+
+/** A band scaled for its audience, rounded to what's worth showing. */
+export function adjustRpm([low, high]: Range, factor: number, format: "shorts" | "long_form"): Range {
+  const places = format === "shorts" ? 3 : 2;
+  return [Number((low * factor).toFixed(places)), Number((high * factor).toFixed(places))];
 }
 
 export interface NicheEarnings {

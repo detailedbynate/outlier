@@ -13399,6 +13399,12 @@ body.app-body {
   color: var(--text-primary);
 }
 
+.discover-rpm-note {
+  margin: -6px 0 0;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
 .discover-scores {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

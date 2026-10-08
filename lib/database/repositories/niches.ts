@@ -135,7 +135,7 @@ export class NicheRepository {
   private async pageOfVideos(since: Date, until: Date | null, from: number, to: number, format: "short" | "long_form" | undefined, order: "published_at" | "id") {
     let query = this.db
       .from("videos")
-      .select("id, youtube_video_id, channel_id, title, tags, format, view_count, like_count, comment_count, published_at, duration_seconds")
+      .select("id, youtube_video_id, channel_id, title, tags, format, view_count, like_count, comment_count, published_at, duration_seconds, made_for_kids")
       .gte("published_at", since.toISOString());
     if (until) query = query.lt("published_at", until.toISOString());
     if (format) query = query.eq("format", format);
@@ -182,13 +182,14 @@ export class NicheRepository {
       niche_confidence: number | null;
       niche_category: string | null;
       published_at: string | null;
+      country: string | null;
     }[] = [];
     const idBatches = chunks(ids, 200);
     const channelBatches = await inParallel(idBatches.length, async (i) =>
       unwrap(
         await this.db
           .from("channels")
-          .select("id, youtube_channel_id, title, thumbnail_url, subscriber_count, niche_id, niche_labels, quality_flags, niche_confidence, niche_category, published_at")
+          .select("id, youtube_channel_id, title, thumbnail_url, subscriber_count, niche_id, niche_labels, quality_flags, niche_confidence, niche_category, published_at, country")
           .in("id", idBatches[i]!),
         "niches.sampleChannels",
       ),
@@ -221,6 +222,7 @@ export class NicheRepository {
         thumbnail_url: row.thumbnail_url,
         subscriber_count: row.subscriber_count,
         published_at: row.published_at,
+        ...(row.country ? { country: row.country.toUpperCase() } : {}),
         ...(nicheTerms.length > 0 ? { niche_terms: nicheTerms } : {}),
         ...(confident && row.niche_category ? { category: row.niche_category } : {}),
       });
