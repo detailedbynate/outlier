@@ -7,6 +7,7 @@ import { requireAdmin } from "@/lib/auth/session";
 import { conversion, fillDays, NO_TRACK_COOKIE, type SiteTraffic, type TrafficChannelRow } from "@/lib/analytics/site";
 import { getServices } from "@/lib/services";
 import { ActivityHeatmap } from "./activity-heatmap";
+import { PlatformLogo } from "./platform-logo";
 import { TrafficChart, type ChartPoint } from "./traffic-chart";
 
 export const dynamic = "force-dynamic";
@@ -20,20 +21,6 @@ const RANGES = [
 
 const PALETTE = ["#8b5cf6", "#ec4899", "#38bdf8", "#34d399", "#fbbf24", "#f97316", "#64748b"];
 
-// Brand colours for the sources people will recognise at a glance; the rest get a letter on purple.
-const BRANDS: [RegExp, string][] = [
-  [/youtube/i, "#ff0033"],
-  [/tiktok/i, "#25f4ee"],
-  [/discord/i, "#5865f2"],
-  [/google/i, "#4285f4"],
-  [/^x$|twitter/i, "#e7e7ea"],
-  [/instagram/i, "#e1306c"],
-  [/reddit/i, "#ff4500"],
-  [/facebook/i, "#1877f2"],
-  [/chatgpt|openai/i, "#10a37f"],
-  [/ link$/i, "#a78bfa"],
-  [/^direct$/i, "#7b7b88"],
-];
 
 const count = (n: number) => n.toLocaleString("en-US");
 const dollars = (cents: number) => `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -423,15 +410,6 @@ function Donut({ rows, unit }: { rows: { name: string; value: number }[]; unit: 
   );
 }
 
-function SourceAvatar({ name }: { name: string }) {
-  const color = BRANDS.find(([pattern]) => pattern.test(name))?.[1] ?? "#8b5cf6";
-  return (
-    <span className="traffic-avatar" style={{ "--brand": color } as CSSProperties} aria-hidden="true">
-      {name.replace(/^www\./, "").charAt(0).toUpperCase()}
-    </span>
-  );
-}
-
 function SourceList({ rows }: { rows: TrafficChannelRow[] }) {
   if (rows.length === 0) return <div className="empty">No visits yet.</div>;
   const total = rows.reduce((sum, r) => sum + r.visits, 0);
@@ -440,7 +418,7 @@ function SourceList({ rows }: { rows: TrafficChannelRow[] }) {
     <ul className="traffic-source-list">
       {rows.slice(0, 8).map((r, i) => (
         <li key={r.name} style={{ "--i": i } as CSSProperties}>
-          <SourceAvatar name={r.name} />
+          <PlatformLogo name={r.name} />
           <div className="traffic-source-body">
             <div className="traffic-source-line">
               <span className="traffic-source-name">{r.name}</span>
@@ -526,7 +504,7 @@ function SalesTable({ rows }: { rows: TrafficChannelRow[] }) {
                 <tr key={r.name}>
                   <td>
                     <span className="traffic-source-cell">
-                      <SourceAvatar name={r.name} />
+                      <PlatformLogo name={r.name} />
                       {r.name}
                     </span>
                   </td>
