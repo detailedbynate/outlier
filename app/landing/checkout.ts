@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { FREE_TRIAL_DAYS, findPlan } from "@/lib/billing/plans";
 import { getStripe } from "@/lib/billing/stripe";
+import { activeCreatorCode, creatorCheckoutFields } from "@/lib/billing/creator-codes";
 import { priceIdFor } from "@/lib/billing/subscriptions";
 import { env } from "@/lib/core/env";
 import { logger } from "@/lib/core/logger";
@@ -33,15 +34,18 @@ export async function startPublicSubscription(formData: FormData): Promise<void>
   let url: string | null = null;
   try {
     await getServices().rateLimits.enforce("checkoutIp", clientIpFrom(h));
+    const code = await activeCreatorCode();
+    const creator = code ? creatorCheckoutFields(code) : null;
     const session = await getStripe().checkout.sessions.create({
       mode: "subscription",
       // Stripe is the seller of record: it handles sales tax/VAT, fraud and disputes.
       managed_payments: { enabled: true },
       line_items: [{ price, quantity: 1 }],
-      allow_promotion_codes: true,
-      metadata: { planId: plan.id },
+      // Stripe takes a set discount or a code box, not both.
+      ...(creator ? { discounts: creator.discounts } : { allow_promotion_codes: true }),
+      metadata: { planId: plan.id, ...creator?.metadata },
       subscription_data: {
-        metadata: { planId: plan.id },
+        metadata: { planId: plan.id, ...creator?.metadata },
         // The free-trial offer (the popup) asks for it; the plan buttons charge straight away.
         ...(freeTrial
           ? {

@@ -4,6 +4,7 @@ import { logger } from "@/lib/core/logger";
 import { fulfillCheckout, getStripe } from "@/lib/billing/stripe";
 import { applySubscription } from "@/lib/billing/subscriptions";
 import { fulfillPublicSubscription } from "@/lib/billing/signup";
+import { recordCreatorCommission } from "@/lib/billing/creator-codes";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +44,8 @@ export async function POST(request: Request): Promise<Response> {
     ) {
       await applySubscription(event.data.object);
     }
+    // Each paid invoice from a subscription that started with a creator code earns that creator their cut.
+    if (event.type === "invoice.paid") await recordCreatorCommission(event.data.object);
   } catch (error) {
     // A 500 makes Stripe retry, and applying the same event twice is harmless.
     logger.error("stripe event handling failed", { eventId: event.id, type: event.type, error });

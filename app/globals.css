@@ -13689,3 +13689,18 @@ body.app-body {
   color: var(--text-primary);
   background: color-mix(in srgb, var(--dash-violet) 35%, transparent);
 }
+
+.landing-creator-code {
+  margin: 0 auto 20px;
+  max-width: 560px;
+  padding: 10px 16px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.landing-creator-code strong {
+  color: var(--text-primary);
+}

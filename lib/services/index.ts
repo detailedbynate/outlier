@@ -14,6 +14,7 @@ import { fetchRisingGames } from "@/lib/radar/games";
 import { fetchLaunches } from "@/lib/radar/launches";
 import { NicheRadarService } from "./niche-radar-service";
 import { ReferralRepository } from "@/lib/database/repositories/referrals";
+import { CreatorCodeRepository } from "@/lib/database/repositories/creator-codes";
 import { SubscriptionRepository } from "@/lib/database/repositories/subscriptions";
 import { SignupInviteRepository } from "@/lib/auth/signup-invites";
 import { CreditLedgerRepository } from "@/lib/database/repositories/credit-ledger";
@@ -122,6 +123,7 @@ export interface Services {
     niches: NicheRepository;
     radar: RadarRepository;
     referrals: ReferralRepository;
+    creatorCodes: CreatorCodeRepository;
     creditLedger: CreditLedgerRepository;
     subscriptions: SubscriptionRepository;
     signupInvites: SignupInviteRepository;
@@ -192,6 +194,7 @@ export function getServices(): Services {
     accounts: lazy(() => new AccountRepository(lazyDb())),
     moderation: lazy(() => new ModerationRepository(lazyDb())),
     referrals: lazy(() => new ReferralRepository(lazyDb())),
+    creatorCodes: lazy(() => new CreatorCodeRepository(lazyDb())),
     creditLedger: lazy(() => new CreditLedgerRepository(lazyDb())),
     subscriptions: lazy(() => new SubscriptionRepository(lazyDb())),
     signupInvites: lazy(() => new SignupInviteRepository(lazyDb())),

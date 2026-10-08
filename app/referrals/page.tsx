@@ -3,7 +3,8 @@ import { UsersIcon } from "@/components/icons";
 import { ReferralShare } from "@/components/referral-share";
 import { requireApprovedUser } from "@/lib/auth/session";
 import { formatNumber } from "@/lib/format";
-import { referralLinks } from "@/lib/referrals/links";
+import { discountLabel, displayCode, statsFrom } from "@/lib/creator-codes/codes";
+import { referralLinks, siteOrigin } from "@/lib/referrals/links";
 import { totalCreditsAt } from "@/lib/referrals/milestones";
 import { getServices } from "@/lib/services";
 
@@ -14,6 +15,11 @@ export default async function ReferralsPage() {
   const { user, email } = await requireApprovedUser();
   const summary = await getServices().referrals.summary(user.id, email || null);
   const links = await referralLinks(summary.code);
+  // Creators with a code see how it's doing, alongside their friend link.
+  const creatorRepo = getServices().repositories.creatorCodes;
+  const creatorCodes = await creatorRepo.forUser(user.id).catch(() => []);
+  const creatorCommissions = creatorCodes.length > 0 ? await creatorRepo.commissions(creatorCodes.map((c) => c.id)) : [];
+  const origin = creatorCodes.length > 0 ? await siteOrigin() : "";
 
   const stats = [
     { label: "Friends who joined the waitlist", value: formatNumber(summary.signups) },
@@ -35,6 +41,37 @@ export default async function ReferralsPage() {
           </div>
         </div>
       </header>
+
+      {creatorCodes.map((code) => {
+        const stats = statsFrom(creatorCommissions.filter((c) => c.code_id === code.id));
+        const dollars = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+        return (
+          <section key={code.id} className="intel-card">
+            <header className="intel-card-head">
+              <div>
+                <h2>Your creator code: {displayCode(code.code)}</h2>
+                <p className="intel-muted">
+                  Share {`${origin}/?code=${displayCode(code.code)}`}. Your viewers get {discountLabel(code)}, and you earn {code.commission_percent}% of what they pay
+                  {code.commission_months ? ` for their first ${code.commission_months} months` : ""}.{code.active ? "" : " This code is switched off for new customers."}
+                </p>
+              </div>
+            </header>
+            <div className="intel-glance referral-stats">
+              {[
+                { label: "Paying customers", value: formatNumber(stats.customers) },
+                { label: "Earned", value: dollars(stats.earnedCents) },
+                { label: "Paid out", value: dollars(stats.paidOutCents) },
+                { label: "Owed to you", value: dollars(stats.owedCents) },
+              ].map((s) => (
+                <div key={s.label} className="intel-glance-item">
+                  <span className="intel-glance-label">{s.label}</span>
+                  <span className="intel-glance-value">{s.value}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        );
+      })}
 
       <section className="intel-card">
         <ReferralShare

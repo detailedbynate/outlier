@@ -43,6 +43,11 @@ export async function proxy(request: NextRequest) {
   if (ref && /^[a-z0-9]{6,16}$/.test(ref)) {
     response.cookies.set("outlier_ref", ref, { maxAge: 30 * 24 * 3600, sameSite: "lax", path: "/", httpOnly: true, secure: request.nextUrl.protocol === "https:" });
   }
+  // Creator codes (?code=NATE) are remembered the same way, for the discount at checkout.
+  const code = request.nextUrl.searchParams.get("code")?.trim().toLowerCase();
+  if (code && /^[a-z0-9][a-z0-9_-]{1,19}$/.test(code)) {
+    response.cookies.set("outlier_code", code, { maxAge: 30 * 24 * 3600, sameSite: "lax", path: "/", httpOnly: true, secure: request.nextUrl.protocol === "https:" });
+  }
   if (!user && !isE2EBypass(request.cookies.get(E2E_COOKIE)?.value) && !isPublic(pathname)) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";

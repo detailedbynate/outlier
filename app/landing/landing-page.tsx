@@ -265,7 +265,14 @@ function PricingSection() {
   );
 }
 
-export async function LandingPage({ referralCode = null }: { referralCode?: string | null } = {}) {
+/** A creator's code the visitor came in with: shown in the hero, applied at checkout. */
+export interface LandingCreatorCode {
+  code: string;
+  creatorName: string;
+  offer: string;
+}
+
+export async function LandingPage({ referralCode = null, creatorCode = null }: { referralCode?: string | null; creatorCode?: LandingCreatorCode | null } = {}) {
   const [count, picks] = await Promise.all([waitlistCount(), showcasePicks(new Date())]);
   const discordUrl = env().DISCORD_INVITE_URL ?? DISCORD_INVITE;
 
@@ -291,6 +298,12 @@ export async function LandingPage({ referralCode = null }: { referralCode?: stri
           <p className="landing-subtitle">
             Outlier finds the Shorts channels and videos outperforming their size, so you can spot a winning niche while it&apos;s still early.
           </p>
+
+          {creatorCode ? (
+            <p className="landing-creator-code" role="status">
+              Code <strong>{creatorCode.code}</strong> from {creatorCode.creatorName}: {creatorCode.offer} on any paid plan. It&apos;s applied at checkout.
+            </p>
+          ) : null}
 
           <div className="landing-cta-row">
             <ScrollLink to="pricing" className="pill-button pill-button-primary pill-button-lg">

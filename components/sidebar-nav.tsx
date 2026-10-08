@@ -69,6 +69,7 @@ const ADMIN_SECTION: { title: string; items: NavItem[] } = {
   items: [
     { href: "/admin/accounts", label: "Accounts", icon: UsersIcon },
     { href: "/admin/waitlist", label: "Waitlist", icon: ClipboardIcon },
+    { href: "/admin/creator-codes", label: "Creator codes", icon: GiftIcon },
   ],
 };
 

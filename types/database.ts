@@ -371,6 +371,34 @@ export type ReferralCodeRow = {
   created_at: string;
 };
 
+export type CreatorCodeRow = {
+  id: string;
+  code: string;
+  creator_name: string;
+  user_id: string | null;
+  discount_percent: number;
+  discount_months: number;
+  commission_percent: number;
+  commission_months: number | null;
+  stripe_coupon_id: string;
+  active: boolean;
+  created_at: string;
+};
+
+export type CreatorCommissionRow = {
+  id: string;
+  code_id: string;
+  stripe_invoice_id: string;
+  stripe_customer_id: string | null;
+  user_id: string | null;
+  amount_cents: number;
+  commission_cents: number;
+  currency: string;
+  paid_at: string;
+  paid_out_at: string | null;
+  created_at: string;
+};
+
 export type ReferralRewardRow = {
   id: string;
   code: string;
@@ -658,6 +686,8 @@ export type Database = {
       account_settings: TableDef<AccountSettingsRow, "user_id" | "email">;
       niche_reports: TableDef<NicheReportRow, "topic_key" | "topic">;
       referral_codes: TableDef<ReferralCodeRow, "code">;
+      creator_codes: TableDef<CreatorCodeRow, "code" | "creator_name" | "discount_percent" | "discount_months" | "commission_percent" | "stripe_coupon_id">;
+      creator_commissions: TableDef<CreatorCommissionRow, "code_id" | "stripe_invoice_id" | "amount_cents" | "commission_cents" | "paid_at">;
       referral_rewards: TableDef<ReferralRewardRow, "code" | "referred_user_id">;
       credit_grants: TableDef<CreditGrantRow, "user_id" | "amount" | "reason">;
       credit_ledger: TableDef<CreditLedgerRow, "user_id" | "amount" | "kind">;

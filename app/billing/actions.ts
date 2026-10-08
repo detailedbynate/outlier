@@ -10,6 +10,7 @@ import { findPlan } from "@/lib/billing/plans";
 import { priceIdFor } from "@/lib/billing/subscriptions";
 import { getStripe } from "@/lib/billing/stripe";
 import { offerOpen, TRIAL_OFFER } from "@/lib/billing/trial";
+import { activeCreatorCode, creatorCheckoutFields } from "@/lib/billing/creator-codes";
 import { getServices } from "@/lib/services";
 
 async function siteUrl(): Promise<string> {
@@ -74,8 +75,11 @@ export async function startSubscription(formData: FormData): Promise<void> {
 
   const base = await siteUrl();
   const existing = await getServices().subscriptions.stateFor(current.user.id);
+  // A creator's code beats the trial offer: it's what the creator gets paid on. Not their own code, though.
+  const code = await activeCreatorCode();
+  const creator = code && code.user_id !== current.user.id ? creatorCheckoutFields(code) : null;
   // Someone on a trial, or just out of one, gets Expert at the trial price.
-  const coupon = plan.id === TRIAL_OFFER.planId && offerOpen(existing.trial, Date.now()) ? await trialCoupon() : null;
+  const coupon = !creator && plan.id === TRIAL_OFFER.planId && offerOpen(existing.trial, Date.now()) ? await trialCoupon() : null;
   let url: string | null = null;
   try {
     const session = await getStripe().checkout.sessions.create({
@@ -86,12 +90,13 @@ export async function startSubscription(formData: FormData): Promise<void> {
       // Launch offers and comped accounts are run as Stripe promotion codes, so
       // the discount lives with the subscription instead of in our own pricing.
       // Stripe takes one or the other: the trial offer, or a code box.
-      ...(coupon ? { discounts: [{ coupon }] } : { allow_promotion_codes: true }),
+      ...(creator ? { discounts: creator.discounts } : coupon ? { discounts: [{ coupon }] } : { allow_promotion_codes: true }),
       client_reference_id: current.user.id,
       ...(existing.stripeCustomerId ? { customer: existing.stripeCustomerId } : { customer_email: current.email || undefined }),
-      metadata: { userId: current.user.id, planId: plan.id },
+      metadata: { userId: current.user.id, planId: plan.id, ...creator?.metadata },
       // Renewals and cancellations arrive with no metadata, so the subscription carries its own.
-      subscription_data: { metadata: { userId: current.user.id, planId: plan.id } },
+      // The creator code rides along too: every invoice it pays commission on carries it.
+      subscription_data: { metadata: { userId: current.user.id, planId: plan.id, ...creator?.metadata } },
       success_url: `${base}/billing?status=subscribed&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${base}/billing?status=cancelled`,
     });
