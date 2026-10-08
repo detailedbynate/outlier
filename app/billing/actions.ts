@@ -163,3 +163,14 @@ export async function openBillingPortal(): Promise<void> {
   }
   redirect(url ?? "/billing?status=error");
 }
+
+/** Forget their Discord account and take the paid roles back. */
+export async function disconnectDiscord(): Promise<void> {
+  const current = await requireApprovedUser();
+  try {
+    await getServices().discord.unlink(current.user.id);
+  } catch (error) {
+    logger.warn("discord unlink failed", { userId: current.user.id, error: error instanceof Error ? error.message : String(error) });
+  }
+  redirect("/billing?discord=disconnected#discord");
+}

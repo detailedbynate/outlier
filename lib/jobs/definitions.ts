@@ -4,6 +4,7 @@ import type { ChannelRepository } from "@/lib/database/repositories/channels";
 import type { RateLimitRepository } from "@/lib/database/repositories/rate-limits";
 import type { SystemRepository } from "@/lib/database/repositories/system";
 import type { ChannelService } from "@/lib/services/channel-service";
+import type { DiscordService } from "@/lib/services/discord-service";
 import type { LibraryGrowthService } from "@/lib/services/library-growth-service";
 import { MONITOR_CHANNELS_JOB_TYPE, MONITOR_VIDEOS_JOB_TYPE, type MonitoringService } from "@/lib/services/monitoring-service";
 import type { NicheLabelingService } from "@/lib/services/niche-labeling-service";
@@ -17,6 +18,7 @@ import { JobRegistry } from "./registry";
 import { defineJob } from "./types";
 
 export interface JobDependencies {
+  discord: Pick<DiscordService, "enabled" | "syncAll" | "postPicks">;
   channels: ChannelService;
   videos: VideoService;
   storage: StorageBudgetService;
@@ -46,6 +48,8 @@ export interface JobDependencies {
 export const NICHE_LABEL_JOB_TYPE = "niches.label_channels";
 export const LIBRARY_GROWTH_JOB_TYPE = "library.grow";
 export const LIBRARY_FEATURED_JOB_TYPE = "library.featured";
+export const DISCORD_SYNC_JOB_TYPE = "discord.sync_roles";
+export const DISCORD_PICKS_JOB_TYPE = "discord.post_picks";
 
 /** Payload schemas are exported so API routes and MCP tools can reuse them. */
 export const channelSyncPayload = z.object({ identifier: z.string().trim().min(1).max(500) });
@@ -166,8 +170,29 @@ export function createJobRegistry(deps: JobDependencies): JobRegistry {
         handler: async () => {
           const status = await deps.storage.getStatus({ fresh: true });
           if (status.level === "over_budget") return { skipped: "storage_budget" };
-          return { ...(await deps.trending.computeDailyPicks()) };
+          const result = await deps.trending.computeDailyPicks();
+          // Fresh picks go out on Discord once a day.
+          if (deps.discord.enabled) await deps.enqueue(DISCORD_PICKS_JOB_TYPE, {}, { idempotencyKey: `${DISCORD_PICKS_JOB_TYPE}:${result.date}` });
+          return { ...result };
         },
+      }),
+    )
+    .register(
+      defineJob({
+        type: DISCORD_PICKS_JOB_TYPE,
+        description: "After the Daily Picks are chosen: post them to the Discord picks channel.",
+        payloadSchema: emptyPayload,
+        maxAttempts: 2,
+        handler: async () => ({ ...(await deps.discord.postPicks()) }),
+      }),
+    )
+    .register(
+      defineJob({
+        type: DISCORD_SYNC_JOB_TYPE,
+        description: "Scheduled daily: make every linked member's Discord roles match their plan (trials ending, missed updates).",
+        payloadSchema: emptyPayload,
+        maxAttempts: 1,
+        handler: async () => ({ ...(await deps.discord.syncAll()) }),
       }),
     )
     .register(

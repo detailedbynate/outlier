@@ -1,0 +1,49 @@
+; Outlier Discord bot (scripts/discord-bot.ts): keeps the bot online and answers
+; its slash commands. Roles and posts go out from the site itself, so stopping
+; this only takes the bot offline.
+;
+; Install:
+;   cp /opt/outlier/deploy/outlier-discord.service /etc/systemd/system/
+;   systemctl daemon-reload && systemctl enable --now outlier-discord
+;   journalctl -u outlier-discord -f
+
+[Unit]
+Description=Outlier Discord bot
+After=network-online.target
+Wants=network-online.target
+# Restarted along with the site, so every deploy runs the new code without the
+# deploy script knowing about it.
+PartOf=outlier.service
+StartLimitIntervalSec=3600
+StartLimitBurst=20
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/outlier
+EnvironmentFile=/opt/outlier/.env.production
+Environment=NODE_ENV=production
+User=outlier
+Group=outlier
+# node directly rather than npm run: npm alone would be a third of the memory cap.
+ExecStart=/usr/bin/node --conditions=react-server --import tsx scripts/discord-bot.ts
+Restart=on-failure
+RestartSec=30
+
+# Small: a quarter of a core and 256 MB at most, behind the site for CPU.
+CPUQuota=25%
+MemoryMax=256M
+MemorySwapMax=0
+TasksMax=32
+Nice=5
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/outlier
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

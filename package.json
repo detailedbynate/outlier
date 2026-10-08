@@ -20,6 +20,7 @@
     "worker": "tsx --conditions=react-server scripts/worker.ts",
     "backfill": "tsx --conditions=react-server scripts/backfill.ts",
     "scraper": "tsx --conditions=react-server scripts/scraper.ts",
+    "discord-bot": "tsx --conditions=react-server scripts/discord-bot.ts",
     "db:types": "supabase gen types typescript --local > types/database.generated.ts",
     "try-script": "tsx --conditions=react-server scripts/try-script.ts"
   },

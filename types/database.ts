@@ -385,6 +385,15 @@ export type CreatorCodeRow = {
   created_at: string;
 };
 
+export type DiscordLinkRow = {
+  user_id: string;
+  discord_id: string;
+  discord_username: string;
+  linked_at: string;
+  synced_plan: string | null;
+  synced_at: string | null;
+};
+
 export type CreatorCommissionRow = {
   id: string;
   code_id: string;
@@ -712,6 +721,7 @@ export type Database = {
       creator_codes: TableDef<CreatorCodeRow, "code" | "creator_name" | "discount_percent" | "discount_months" | "commission_percent" | "stripe_coupon_id">;
       creator_commissions: TableDef<CreatorCommissionRow, "code_id" | "stripe_invoice_id" | "amount_cents" | "commission_cents" | "paid_at">;
       site_events: TableDef<SiteEventRow, "kind">;
+      discord_links: TableDef<DiscordLinkRow, "user_id" | "discord_id" | "discord_username">;
       referral_rewards: TableDef<ReferralRewardRow, "code" | "referred_user_id">;
       credit_grants: TableDef<CreditGrantRow, "user_id" | "amount" | "reason">;
       credit_ledger: TableDef<CreditLedgerRow, "user_id" | "amount" | "kind">;

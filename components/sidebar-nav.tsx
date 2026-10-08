@@ -10,6 +10,7 @@ import {
   CoinsIcon,
   CompassIcon,
   EyeIcon,
+  MessageIcon,
   FlameIcon,
   GiftIcon,
   GridIcon,
@@ -72,6 +73,7 @@ const ADMIN_SECTION: { title: string; items: NavItem[] } = {
     { href: "/admin/waitlist", label: "Waitlist", icon: ClipboardIcon },
     { href: "/admin/creator-codes", label: "Creator codes", icon: GiftIcon },
     { href: "/admin/traffic", label: "Traffic", icon: EyeIcon },
+    { href: "/admin/discord", label: "Discord", icon: MessageIcon },
   ],
 };
 

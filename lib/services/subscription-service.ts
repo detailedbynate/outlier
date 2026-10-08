@@ -35,6 +35,7 @@ const CACHE_MS = 60_000;
 export class SubscriptionService {
   private readonly log: Logger;
   private readonly cache = new Map<string, { at: number; state: SubscriptionState }>();
+  private readonly listeners: ((userId: string) => void)[] = [];
 
   constructor(
     private readonly repository: SubscriptionRepository,
@@ -106,6 +107,12 @@ export class SubscriptionService {
     });
     this.invalidate(input.userId);
     this.log.info("subscription updated", { userId: input.userId, plan: input.plan, status: input.status });
+    for (const listener of this.listeners) listener(input.userId);
+  }
+
+  /** Be told whenever someone's plan is written (Stripe, a trial, an admin). Listeners must not throw. */
+  onChange(listener: (userId: string) => void): void {
+    this.listeners.push(listener);
   }
 
   invalidate(userId: string): void {

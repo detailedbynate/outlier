@@ -18,6 +18,7 @@ import { ReferralRepository } from "@/lib/database/repositories/referrals";
 import { CreatorCodeRepository } from "@/lib/database/repositories/creator-codes";
 import { SiteEventRepository } from "@/lib/database/repositories/site-events";
 import { SubscriptionRepository } from "@/lib/database/repositories/subscriptions";
+import { DiscordLinkRepository } from "@/lib/database/repositories/discord-links";
 import { SignupInviteRepository } from "@/lib/auth/signup-invites";
 import { CreditLedgerRepository } from "@/lib/database/repositories/credit-ledger";
 import { parseMilestones } from "@/lib/referrals/milestones";
@@ -35,7 +36,7 @@ import {
   UsageRepository,
   VideoRepository,
 } from "@/lib/database";
-import { createJobRegistry, LIBRARY_FEATURED_JOB_TYPE, LIBRARY_GROWTH_JOB_TYPE, NICHE_LABEL_JOB_TYPE } from "@/lib/jobs/definitions";
+import { createJobRegistry, DISCORD_SYNC_JOB_TYPE, LIBRARY_FEATURED_JOB_TYPE, LIBRARY_GROWTH_JOB_TYPE, NICHE_LABEL_JOB_TYPE } from "@/lib/jobs/definitions";
 import { JobQueue } from "@/lib/jobs/queue";
 import type { JobRegistry } from "@/lib/jobs/registry";
 import { JobScheduler } from "@/lib/jobs/scheduler";
@@ -73,6 +74,7 @@ import { RateLimitService } from "./rate-limit-service";
 import { ResearchService } from "./research-service";
 import { StorageBudgetService } from "./storage-budget-service";
 import { TRENDING_JOB_TYPE, TRENDING_REFRESH_JOB_TYPE, TrendingService } from "./trending-service";
+import { DiscordService, discordConfigFrom } from "./discord-service";
 import { VideoService } from "./video-service";
 import { WaitlistService } from "./waitlist-service";
 
@@ -82,6 +84,7 @@ export interface Services {
   channels: ChannelService;
   credits: CreditsService;
   subscriptions: SubscriptionService;
+  discord: DiscordService;
   videos: VideoService;
   waitlist: WaitlistService;
   onboarding: OnboardingService;
@@ -129,6 +132,7 @@ export interface Services {
     siteEvents: SiteEventRepository;
     creditLedger: CreditLedgerRepository;
     subscriptions: SubscriptionRepository;
+    discordLinks: DiscordLinkRepository;
     signupInvites: SignupInviteRepository;
     transcripts: TranscriptRepository;
     savedScripts: SavedScriptRepository;
@@ -201,6 +205,7 @@ export function getServices(): Services {
     siteEvents: lazy(() => new SiteEventRepository(lazyDb())),
     creditLedger: lazy(() => new CreditLedgerRepository(lazyDb())),
     subscriptions: lazy(() => new SubscriptionRepository(lazyDb())),
+    discordLinks: lazy(() => new DiscordLinkRepository(lazyDb())),
     signupInvites: lazy(() => new SignupInviteRepository(lazyDb())),
     transcripts: lazy(() => new TranscriptRepository(lazyDb())),
     savedScripts: lazy(() => new SavedScriptRepository(lazyDb())),
@@ -315,7 +320,22 @@ export function getServices(): Services {
   // Transcripts only exist on the scraped path; the Data API can't see them.
   const transcripts = new TranscriptService({ videos: repositories.videos, transcripts: repositories.transcripts, reader: transcriptReader });
 
+  const subscriptions = new SubscriptionService(repositories.subscriptions);
+  const discord = new DiscordService(discordConfigFrom(config), {
+    links: repositories.discordLinks,
+    planFor: async (userId) => (await subscriptions.stateFor(userId)).plan,
+    picks: () => trending.currentPicks(),
+    siteUrl: (config.SITE_URL ?? "https://www.useoutlier.online").replace(/\/+$/, ""),
+  });
+  // Roles follow the plan the moment it changes; the daily job catches anything missed.
+  if (discord.enabled) {
+    subscriptions.onChange((userId) => {
+      discord.syncUser(userId).catch((error: unknown) => logger.warn("discord role sync failed", { userId, error: error instanceof Error ? error.message : String(error) }));
+    });
+  }
+
   const jobRegistry = createJobRegistry({
+    discord,
     monitoring,
     nicheLabeling,
     libraryGrowth,
@@ -351,6 +371,7 @@ export function getServices(): Services {
     { type: "catalog.snapshot_stats", everyHours: config.STATS_SNAPSHOT_INTERVAL_HOURS },
     { type: "maintenance.prune_snapshots", everyHours: 24 },
     { type: TRENDING_JOB_TYPE, everyHours: 24 },
+    { type: DISCORD_SYNC_JOB_TYPE, everyHours: 24 },
     { type: TRENDING_REFRESH_JOB_TYPE, everyHours: 1 },
     { type: "catalog.detect_languages", everyHours: 24 },
     { type: MONITOR_VIDEOS_JOB_TYPE, everyHours: 1 },
@@ -360,7 +381,6 @@ export function getServices(): Services {
     ...(config.LIBRARY_FEATURED_CHECKS_PER_RUN > 0 ? [{ type: LIBRARY_FEATURED_JOB_TYPE, everyHours: 1 }] : []),
   ]);
 
-  const subscriptions = new SubscriptionService(repositories.subscriptions);
   const credits = new CreditsService(
     repositories.usage,
     config.MONTHLY_CREDITS,
@@ -420,6 +440,7 @@ export function getServices(): Services {
     }),
     credits,
     subscriptions,
+    discord,
     accounts,
     moderation: new ModerationService({
       moderation: repositories.moderation,

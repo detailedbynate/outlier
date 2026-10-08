@@ -58,6 +58,21 @@ const serverEnvSchema = z.object({
   RATE_LIMIT_SALT: optionalString,
   /** Discord invite link shown on the landing page (e.g. https://discord.gg/abc123). */
   DISCORD_INVITE_URL: optionalString.pipe(z.url().optional()),
+  /**
+   * The Outlier Discord bot (lib/services/discord-service.ts). Application ID and
+   * client secret are on the app's OAuth2 page, the token on its Bot page.
+   * Without all four of these the bot and "Connect Discord" stay off.
+   */
+  DISCORD_CLIENT_ID: optionalString,
+  DISCORD_CLIENT_SECRET: optionalString,
+  DISCORD_BOT_TOKEN: optionalString,
+  /** The server (guild) id: right-click the server with Developer Mode on, Copy Server ID. */
+  DISCORD_GUILD_ID: optionalString,
+  /** Role ids given to Pro and Expert subscribers (and trials), taken away when the plan ends. */
+  DISCORD_ROLE_PRO: optionalString,
+  DISCORD_ROLE_EXPERT: optionalString,
+  /** Channel the day's Daily Picks are posted to, if any. */
+  DISCORD_PICKS_CHANNEL_ID: optionalString,
 
   /** InnerTube (scraped web endpoints). One gate for the whole process: see lib/innertube/gate.ts. */
   INNERTUBE_REQUESTS_PER_MINUTE: z.coerce.number().min(0.1).max(120).default(4),
