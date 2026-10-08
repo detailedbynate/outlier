@@ -5,6 +5,7 @@ import { fulfillCheckout, getStripe } from "@/lib/billing/stripe";
 import { applySubscription } from "@/lib/billing/subscriptions";
 import { fulfillPublicSubscription } from "@/lib/billing/signup";
 import { recordCreatorCommission } from "@/lib/billing/creator-codes";
+import { recordPaidCheckout } from "@/lib/analytics/paid-checkout";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,7 @@ export async function POST(request: Request): Promise<Response> {
       await fulfillCheckout(event.data.object);
       // Subscribing from the pricing page: the payment creates the account.
       await fulfillPublicSubscription(event.data.object);
+      await recordPaidCheckout(event.data.object);
     }
     // Every change to a subscription — bought, upgraded, cancelled, renewed, or
     // failing to pay — lands here, and the row is rewritten from what Stripe says.

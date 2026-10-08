@@ -8,6 +8,7 @@ import { LOW_CREDITS_THRESHOLD } from "@/lib/services/credits-service";
 import { BrandMark, LogOutIcon } from "@/components/icons";
 import { MobileMenuToggle } from "@/components/mobile-menu-toggle";
 import { SidebarNav } from "@/components/sidebar-nav";
+import { SiteTracker } from "@/components/site-tracker";
 import { TrialReminder, type TrialReminderProps } from "@/components/trial-reminder";
 import { WhatsNew } from "@/components/whats-new";
 import { findPlan } from "@/lib/billing/plans";
@@ -67,6 +68,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             </header>
             {children}
           </div>
+          <SiteTracker signedIn={Boolean(current)} />
         </body>
       </html>
     );
@@ -126,6 +128,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             <LowCreditsPrompt remaining={credits.remaining} threshold={LOW_CREDITS_THRESHOLD} month={credits.resetsAt.slice(0, 7)} />
           ) : null}
         </div>
+        {current.isAdmin ? null : <SiteTracker signedIn />}
       </body>
     </html>
   );

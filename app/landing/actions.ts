@@ -5,6 +5,7 @@ import { REFERRAL_COOKIE, referralLinks } from "@/lib/referrals/links";
 import { isAppError } from "@/lib/core/errors";
 import { logger } from "@/lib/core/logger";
 import { getServices } from "@/lib/services";
+import { recordSiteEvent } from "@/lib/analytics/site-events";
 import { clientIpFrom } from "@/lib/services/rate-limit-service";
 
 export interface WaitlistState {
@@ -33,6 +34,7 @@ export async function joinWaitlist(_prev: WaitlistState, formData: FormData): Pr
       useCase: field(formData, "useCase"),
       source: field(formData, "source"),
     });
+    if (!alreadyJoined) await recordSiteEvent("waitlist_join", { path: "/", ref_code: field(formData, "ref") || null });
     const refCode = field(formData, "ref") || (await cookies()).get(REFERRAL_COOKIE)?.value || null;
     let referral: WaitlistState["referral"] = null;
     try {

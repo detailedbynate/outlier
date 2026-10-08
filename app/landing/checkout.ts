@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { FREE_TRIAL_DAYS, findPlan } from "@/lib/billing/plans";
 import { getStripe } from "@/lib/billing/stripe";
 import { activeCreatorCode, creatorCheckoutFields } from "@/lib/billing/creator-codes";
+import { recordSiteEvent } from "@/lib/analytics/site-events";
 import { priceIdFor } from "@/lib/billing/subscriptions";
 import { env } from "@/lib/core/env";
 import { logger } from "@/lib/core/logger";
@@ -60,6 +61,7 @@ export async function startPublicSubscription(formData: FormData): Promise<void>
       cancel_url: `${base}/?checkout=cancelled#pricing`,
     });
     url = session.url;
+    await recordSiteEvent("checkout_start", { path: "/", detail: freeTrial ? `${plan.id} (free trial)` : plan.id, creator_code: code?.code ?? null });
   } catch (error) {
     logger.error("public subscription checkout failed", { plan: plan.id, error });
   }

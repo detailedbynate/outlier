@@ -399,6 +399,25 @@ export type CreatorCommissionRow = {
   created_at: string;
 };
 
+export type SiteEventRow = {
+  id: number;
+  occurred_at: string;
+  kind: string;
+  visitor: string | null;
+  signed_in: boolean;
+  path: string | null;
+  referrer_host: string | null;
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
+  creator_code: string | null;
+  ref_code: string | null;
+  device: string | null;
+  detail: string | null;
+  amount_cents: number | null;
+  dedupe_key: string | null;
+};
+
 export type ReferralRewardRow = {
   id: string;
   code: string;
@@ -688,6 +707,7 @@ export type Database = {
       referral_codes: TableDef<ReferralCodeRow, "code">;
       creator_codes: TableDef<CreatorCodeRow, "code" | "creator_name" | "discount_percent" | "discount_months" | "commission_percent" | "stripe_coupon_id">;
       creator_commissions: TableDef<CreatorCommissionRow, "code_id" | "stripe_invoice_id" | "amount_cents" | "commission_cents" | "paid_at">;
+      site_events: TableDef<SiteEventRow, "kind">;
       referral_rewards: TableDef<ReferralRewardRow, "code" | "referred_user_id">;
       credit_grants: TableDef<CreditGrantRow, "user_id" | "amount" | "reason">;
       credit_ledger: TableDef<CreditLedgerRow, "user_id" | "amount" | "kind">;
@@ -777,6 +797,10 @@ export type Database = {
       rate_limit_hit: {
         Args: { limit_key: string; window_seconds: number; max_hits: number };
         Returns: { allowed: boolean; hits: number; resets_at: string }[];
+      };
+      site_traffic: {
+        Args: { p_since: string; p_until: string };
+        Returns: Json;
       };
       prune_snapshots: {
         Args: { daily_days?: number; max_days?: number };

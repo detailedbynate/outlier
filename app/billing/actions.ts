@@ -11,6 +11,7 @@ import { priceIdFor } from "@/lib/billing/subscriptions";
 import { getStripe } from "@/lib/billing/stripe";
 import { offerOpen, TRIAL_OFFER } from "@/lib/billing/trial";
 import { activeCreatorCode, creatorCheckoutFields } from "@/lib/billing/creator-codes";
+import { recordSiteEvent } from "@/lib/analytics/site-events";
 import { getServices } from "@/lib/services";
 
 async function siteUrl(): Promise<string> {
@@ -56,6 +57,7 @@ export async function startCheckout(formData: FormData): Promise<void> {
       cancel_url: `${base}/billing?status=cancelled`,
     });
     url = session.url;
+    await recordSiteEvent("checkout_start", { signed_in: true, path: "/billing", detail: pack.id, amount_cents: pack.priceCents });
   } catch (error) {
     logger.error("stripe checkout failed", { userId: current.user.id, pack: pack.id, error });
   }
@@ -101,6 +103,7 @@ export async function startSubscription(formData: FormData): Promise<void> {
       cancel_url: `${base}/billing?status=cancelled`,
     });
     url = session.url;
+    await recordSiteEvent("checkout_start", { signed_in: true, path: "/billing", detail: plan.id, creator_code: creator ? code!.code : null });
   } catch (error) {
     logger.error("stripe subscription checkout failed", { userId: current.user.id, plan: plan.id, error });
   }
