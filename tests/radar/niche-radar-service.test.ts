@@ -103,30 +103,52 @@ describe("NicheRadarService", () => {
     expect(await service.addSeeds(["roblox horror"], "library")).toBe(0);
   });
 
-  it("only asks for demand with a full request, at most once a week", async () => {
+  it("only asks for demand with a full request, at most once a day", async () => {
     const radar = memoryRadar();
     const searchVolume = vi.fn(async (keywords: readonly string[]) => new Map(keywords.map((k) => [k, { volume: 100, cpc: 1, competition: 10, trend: null, peakMonth: null, source: "dataforseo" as const }])));
     const service = new NicheRadarService({ radar, seeds: [], demand: { searchVolume } }, { demandMinBatch: 3 }, createLogger());
-    const checked = (keyword: string, market = "en") => radar.addKeywords([{ keyword, seed: keyword, market, supply_checked_at: NOW.toISOString() }]);
-    await checked("roth ira");
-    await checked("roth ira steuern", "de");
-    await checked("hsa explained");
+    // No YouTube check needed first: volume decides which phrases get one.
+    const phrase = (keyword: string, market = "en") => radar.addKeywords([{ keyword, seed: keyword, market }]);
+    await phrase("roth ira");
+    await phrase("roth ira steuern", "de");
+    await phrase("hsa explained");
     // Two English phrases due: a request would be half empty.
     expect(await service.enrichDemandOnce({ now: NOW })).toEqual({ enriched: 0 });
     expect(searchVolume).not.toHaveBeenCalled();
 
-    await checked("ira vs 401k");
+    await phrase("ira vs 401k");
     expect(await service.enrichDemandOnce({ now: NOW })).toEqual({ enriched: 3 });
     expect(searchVolume.mock.calls[0]![0]).not.toContain("roth ira steuern");
 
-    await Promise.all(["a b c", "d e f", "g h i"].map((k) => checked(k)));
-    const days = (n: number) => new Date(NOW.getTime() + n * 86_400_000);
-    expect(await service.enrichDemandOnce({ now: days(3) })).toEqual({ enriched: 0 });
+    await Promise.all(["a b c", "d e f", "g h i"].map((k) => phrase(k)));
+    const hours = (n: number) => new Date(NOW.getTime() + n * 3_600_000);
+    expect(await service.enrichDemandOnce({ now: hours(12) })).toEqual({ enriched: 0 });
     // A restart (a fresh service) still keeps the pace, from the saved check times.
     const restarted = new NicheRadarService({ radar, seeds: [], demand: { searchVolume } }, { demandMinBatch: 3 }, createLogger());
-    expect(await restarted.enrichDemandOnce({ now: days(3) })).toEqual({ enriched: 0 });
-    expect(await restarted.enrichDemandOnce({ now: days(8) })).toEqual({ enriched: 3 });
+    expect(await restarted.enrichDemandOnce({ now: hours(12) })).toEqual({ enriched: 0 });
+    expect(await restarted.enrichDemandOnce({ now: hours(25) })).toEqual({ enriched: 3 });
     expect(searchVolume).toHaveBeenCalledTimes(2);
+  });
+
+  it("stops paying for volume at the budget, and checks searched phrases on YouTube first", async () => {
+    const radar = memoryRadar();
+    const searchVolume = vi.fn(async (keywords: readonly string[]) =>
+      new Map(keywords.map((k) => [k, { volume: k === "popular thing" ? 50_000 : 0, cpc: 1, competition: 10, trend: null, peakMonth: null, source: "dataforseo" as const }])),
+    );
+    const service = new NicheRadarService({ radar, seeds: [], demand: { searchVolume } }, { demandMinBatch: 2, demandBudgetPhrases: 2 }, createLogger());
+    await radar.addKeywords([
+      { keyword: "nobody searches this", seed: "x", market: "en", depth: 1, priority: 90 },
+      { keyword: "popular thing", seed: "x", market: "en", depth: 1, priority: 10 },
+    ]);
+    expect(await service.enrichDemandOnce({ now: NOW })).toEqual({ enriched: 2 });
+    expect(radar.rows.get("popular thing")!.priority).toBeGreaterThan(radar.rows.get("nobody searches this")!.priority!);
+
+    await radar.addKeywords([
+      { keyword: "later one", seed: "x", market: "en" },
+      { keyword: "later two", seed: "x", market: "en" },
+    ]);
+    expect(await service.enrichDemandOnce({ now: new Date(NOW.getTime() + 2 * 86_400_000) })).toEqual({ enriched: 0 });
+    expect(searchVolume).toHaveBeenCalledTimes(1);
   });
 
   it("turns rising games into seeds and ideas, once a day", async () => {

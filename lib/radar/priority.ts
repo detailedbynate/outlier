@@ -14,6 +14,8 @@ export interface PriorityInput {
   source: string;
   depth: number;
   suggestRank: number | null;
+  /** Monthly Google searches when looked up; 0 when Google had none, null before asking. */
+  volume?: number | null;
 }
 
 const clamp01 = (n: number) => Math.min(Math.max(n, 0), 1);
@@ -29,5 +31,8 @@ export function priorityOf(input: PriorityInput): number {
   const shallow = input.depth <= 1 ? 1 : 0.6;
   // New searches, and games that just started climbing the charts.
   const fresh = input.source === "rising" || input.source === "game" ? 1 : 0;
-  return Math.round(100 * (0.45 * pay + 0.25 * rank * shallow + 0.3 * fresh));
+  if (input.volume === null || input.volume === undefined) return Math.round(100 * (0.45 * pay + 0.25 * rank * shallow + 0.3 * fresh));
+  // Real searches beat autocomplete's guess: 100K a month is as good as it gets, none sends it to the back.
+  const searched = clamp01(Math.log10(input.volume + 1) / 5);
+  return Math.round(100 * (input.volume === 0 ? 0.2 * pay : 0.3 * pay + 0.45 * searched + 0.1 * rank * shallow + 0.15 * fresh));
 }

@@ -74,19 +74,28 @@ export class RadarRepository {
     );
   }
 
+  /** Phrases to ask search volume for: shallow before deep (broader, searched more), then most promising. */
   async dueForDemand(staleBefore: Date, limit: number): Promise<NicheKeywordRow[]> {
     return unwrap(
       await this.db
         .from("niche_keywords")
         .select("*")
-        .not("supply_checked_at", "is", null)
         // Volume and CPC are asked for the US market only.
         .eq("market", "en")
         .or(`demand_checked_at.is.null,demand_checked_at.lt.${staleBefore.toISOString()}`)
-        .order("score", { ascending: false, nullsFirst: false })
+        .order("demand_checked_at", { ascending: true, nullsFirst: true })
+        .order("depth", { ascending: true })
+        .order("priority", { ascending: false })
         .limit(limit),
       "niche_keywords.dueForDemand",
     );
+  }
+
+  /** Phrases that have had search volume asked for: what the paid lookups have covered. */
+  async countDemandChecked(): Promise<number> {
+    const { count, error } = await this.db.from("niche_keywords").select("keyword", { count: "exact", head: true }).not("demand_checked_at", "is", null);
+    if (error) throw error;
+    return count ?? 0;
   }
 
   /**

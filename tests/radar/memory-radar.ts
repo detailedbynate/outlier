@@ -40,7 +40,11 @@ export function memoryRadar(): RadarDeps["radar"] & { rows: Map<string, NicheKey
         .sort((a, b) => Number(!b.supply_checked_at) - Number(!a.supply_checked_at) || (b.priority ?? 0) - (a.priority ?? 0))
         .slice(0, limit),
     dueForDemand: async (staleBefore, limit) =>
-      all().filter((r) => r.supply_checked_at && r.market === "en" && (!r.demand_checked_at || new Date(r.demand_checked_at) < staleBefore)).sort(byScore).slice(0, limit),
+      all()
+        .filter((r) => r.market === "en" && (!r.demand_checked_at || new Date(r.demand_checked_at) < staleBefore))
+        .sort((a, b) => Number(!!a.demand_checked_at) - Number(!!b.demand_checked_at) || a.depth - b.depth || (b.priority ?? 0) - (a.priority ?? 0))
+        .slice(0, limit),
+    countDemandChecked: async () => all().filter((r) => r.demand_checked_at).length,
     dueForEase: async (limit, minScore = 0) => all().filter((r) => r.supply_checked_at && !r.ease_checked_at && (r.score ?? -1) >= minScore).sort(byScore).slice(0, limit),
     update: async (keyword, patch) => {
       const row = rows.get(keyword);

@@ -49,6 +49,7 @@ export interface RadarDeps {
   radar: Pick<
     RadarRepository,
     "countKeywords" | "addKeywords" | "dueForExpansion" | "dueForResweep" | "dueForSupply" | "dueForDemand" | "dueForEase" | "update" | "markExpanded" | "top" | "addIdeas" | "ideas" | "lastIdeasAt" | "get" | "getMany" | "seededFrom" | "lastAddedAt" | "lastDemandAt"
+    | "countDemandChecked"
   >;
   /** Autocomplete through the gate. */
   suggest?: (query: string) => Promise<Suggestion[]>;
@@ -78,6 +79,11 @@ export interface RadarConfig {
   demandEveryHours: number;
   /** Wait until this many phrases are due, so no request goes out half empty. */
   demandMinBatch: number;
+  /**
+   * Stop asking once this many phrases have had volume looked up. Each 1,000 is a
+   * $0.09 request against a prepaid balance of about a dollar, so this is the spend cap.
+   */
+  demandBudgetPhrases: number;
   /** Autocomplete hops from a seed. */
   maxDepth: number;
   /** Stop growing the phrase list here. */
@@ -109,9 +115,11 @@ export interface RadarConfig {
 export const DEFAULT_RADAR_CONFIG: RadarConfig = {
   supplyRefreshDays: 30,
   demandRefreshDays: 180,
-  // The $1 starter credit is 11 requests: weekly spreads it over about two and a half months.
-  demandEveryHours: 7 * 24,
+  // Daily, so the first 5K phrases have volume within a week; the batch minimum and the
+  // budget below keep it to a full $0.09 request at a time and about $0.72 in all.
+  demandEveryHours: 24,
   demandMinBatch: 1_000,
+  demandBudgetPhrases: 8_000,
   maxDepth: 2,
   maxKeywords: 60_000,
   redditEveryHours: 12,
@@ -307,7 +315,11 @@ export class NicheRadarService {
     return result;
   }
 
-  /** Search volume and CPC for up to 1,000 checked phrases in one request. */
+  /**
+   * Search volume and CPC for up to 1,000 phrases in one request. Phrases are
+   * asked about before their YouTube results are read, so the slow scraped
+   * check goes to phrases people actually search.
+   */
   async enrichDemandOnce(options: { limit?: number; signal?: AbortSignal; now?: Date } = {}): Promise<{ enriched: number }> {
     if (!this.deps.demand) return { enriched: 0 };
     const now = options.now ?? new Date();
@@ -316,6 +328,7 @@ export class NicheRadarService {
     // The saved time keeps the pace across restarts (every deploy restarts the scraper).
     const last = await this.deps.radar.lastDemandAt();
     if (last && now.getTime() - last.getTime() < every) return { enriched: 0 };
+    if ((await this.deps.radar.countDemandChecked()) >= this.config.demandBudgetPhrases) return { enriched: 0 };
     const limit = options.limit ?? 1_000;
     const due = await this.deps.radar.dueForDemand(new Date(now.getTime() - this.config.demandRefreshDays * DAY), limit);
     // Every request costs the same, so it waits for a full one.
@@ -329,7 +342,9 @@ export class NicheRadarService {
     for (const row of due) {
       const d = demand.get(row.keyword) ?? null;
       // Phrases Google Ads didn't answer for still get a timestamp, so they aren't asked about every round.
-      await this.save(row, { demand: d ? json(d) : row.demand, demand_checked_at: now.toISOString() });
+      // Volume moves the phrase up or down the queue for its YouTube check.
+      const priority = priorityOf({ keyword: row.keyword, category: row.category ?? null, source: row.source ?? "autocomplete", depth: row.depth ?? 0, suggestRank: row.suggest_rank ?? null, volume: d ? (d.volume ?? 0) : null });
+      await this.save(row, { demand: d ? json(d) : row.demand, demand_checked_at: now.toISOString(), priority });
       if (d) enriched += 1;
     }
     return { enriched };
