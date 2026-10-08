@@ -55,6 +55,20 @@ export interface QuotaSummary {
   byOperation: { operation: string; lane: QuotaLane; units: number; requests: number; denied: number }[];
 }
 
+/**
+ * True while background work has more than `keep` units left today. Checked
+ * at most once a minute: it gates every channel read, and the ledger is a query.
+ */
+export function spareBackgroundQuota(quota: () => Pick<QuotaManager, "summary">, keep: number, clock: () => number = Date.now): () => Promise<boolean> {
+  let last = { at: -Infinity, spare: false };
+  return async () => {
+    if (clock() - last.at < 60_000) return last.spare;
+    const summary = await quota().summary();
+    last = { at: clock(), spare: summary.limits.background - summary.used.background > keep };
+    return last.spare;
+  };
+}
+
 /** Thrown when a request can't be served within quota. Retryable: the job runner reschedules to `retryAt`. */
 export class QuotaUnavailableError extends AppError {
   readonly retryAt: Date;

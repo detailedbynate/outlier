@@ -18,6 +18,7 @@ function build(overrides: {
   innertube?: Partial<InnerTubeSource>;
   api?: Partial<YouTubeService>;
   apiFallback?: boolean;
+  preferApi?: () => Promise<boolean>;
 } = {}) {
   const innertube = {
     getChannel: vi.fn(async () => channel(CHANNEL_ID, "scraped")),
@@ -32,7 +33,7 @@ function build(overrides: {
     ...overrides.api,
   } as unknown as YouTubeService;
   const gate = new InnerTubeGate();
-  return { source: new HybridYouTubeSource(innertube, api, gate, { apiFallback: overrides.apiFallback ?? true }), innertube, api, gate };
+  return { source: new HybridYouTubeSource(innertube, api, gate, { apiFallback: overrides.apiFallback ?? true, preferApi: overrides.preferApi }), innertube, api, gate };
 }
 
 describe("parseCountText", () => {
@@ -54,6 +55,20 @@ describe("HybridYouTubeSource", () => {
     await expect(source.getChannel(CHANNEL_ID)).resolves.toMatchObject({ title: "scraped" });
     expect(api.getChannel).not.toHaveBeenCalled();
     expect(source.takeCounts()).toMatchObject({ innertube: 1, api: 0 });
+  });
+
+  it("goes straight to the API while there's quota to spare, and scrapes once there isn't", async () => {
+    let spare = true;
+    const { source, api, innertube } = build({ preferApi: async () => spare });
+    await expect(source.getChannel(CHANNEL_ID)).resolves.toMatchObject({ title: "official" });
+    await source.getChannelVideos(CHANNEL_ID);
+    expect(api.getChannelVideos).toHaveBeenCalledTimes(1);
+    expect(innertube.getChannel).not.toHaveBeenCalled();
+    spare = false;
+    await expect(source.getChannel(CHANNEL_ID)).resolves.toMatchObject({ title: "scraped" });
+    // A check that fails means scrape, as before.
+    const broken = build({ preferApi: async () => { throw new Error("ledger down"); } });
+    await expect(broken.source.getChannel(CHANNEL_ID)).resolves.toMatchObject({ title: "scraped" });
   });
 
   it("falls back to the API when a scrape fails", async () => {

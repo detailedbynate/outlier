@@ -45,6 +45,7 @@ export interface JobDependencies {
 
 export const NICHE_LABEL_JOB_TYPE = "niches.label_channels";
 export const LIBRARY_GROWTH_JOB_TYPE = "library.grow";
+export const LIBRARY_FEATURED_JOB_TYPE = "library.featured";
 
 /** Payload schemas are exported so API routes and MCP tools can reuse them. */
 export const channelSyncPayload = z.object({ identifier: z.string().trim().min(1).max(500) });
@@ -279,6 +280,15 @@ export function createJobRegistry(deps: JobDependencies): JobRegistry {
         payloadSchema: emptyPayload,
         maxAttempts: 1,
         handler: (_payload, { signal }) => skipIfOverBudget(async () => ({ ...(await deps.libraryGrowth.growOnce({ signal })) })),
+      }),
+    )
+    .register(
+      defineJob({
+        type: LIBRARY_FEATURED_JOB_TYPE,
+        description: "Scheduled: follow the channels creators feature on their pages and queue the ones we don't have (1 quota unit per check).",
+        payloadSchema: emptyPayload,
+        maxAttempts: 1,
+        handler: (_payload, { signal }) => skipIfOverBudget(async () => ({ ...(await deps.libraryGrowth.followOnce({ signal })) })),
       }),
     )
     .register(

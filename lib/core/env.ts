@@ -24,6 +24,12 @@ const serverEnvSchema = z.object({
   YOUTUBE_USER_RESERVE_UNITS: z.coerce.number().int().min(0).default(3_000),
   /** Units never spent by anyone (headroom for retries and clock skew). */
   YOUTUBE_SAFETY_BUFFER_UNITS: z.coerce.number().int().min(0).default(300),
+  /**
+   * Channel imports go straight to the API (about 3 units, a second each) while
+   * background work has more than this many units left today, then back to
+   * scraping. Set it at or above the background budget to always scrape.
+   */
+  YOUTUBE_API_IMPORT_KEEP_UNITS: z.coerce.number().int().min(0).default(1_500),
   /** Units one user may spend per quota day on the default tier. */
   YOUTUBE_USER_DAILY_UNITS: z.coerce.number().int().min(1).default(1_000),
   /** Check and record quota before every request. */

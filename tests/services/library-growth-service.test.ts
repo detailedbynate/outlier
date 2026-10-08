@@ -169,6 +169,12 @@ describe("LibraryGrowthService", () => {
     expect(await service.growOnce({ now: NOW })).toMatchObject({ stoppedBy: "daily_cap", featuredChecked: 1, featuredQueued: 1 });
   });
 
+  it("follows featured channels on their own, without searching", async () => {
+    const { service, discoverShortsChannels } = setup({ sources: [{ id: "src-1", youtube_channel_id: "UCsource1xxxxxxxxxxxxxxx" }], featured: { UCsource1xxxxxxxxxxxxxxx: ["UCnewxxxxxxxxxxxxxxxxxxx"] } });
+    expect(await service.followOnce({ now: NOW })).toEqual({ featuredChecked: 1, featuredQueued: 1 });
+    expect(discoverShortsChannels).not.toHaveBeenCalled();
+  });
+
   it("doesn't retry channels whose featured list can't be read", async () => {
     const { service, markFeaturedChecked } = setup({
       config: { searchesPerRun: 0 },

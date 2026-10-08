@@ -34,12 +34,12 @@ export function createTranscriptReader(): InnerTubeTranscriptProvider {
   return new InnerTubeTranscriptProvider(gate, source);
 }
 
-export function createHybridSource(options: { apiFallback?: boolean } = {}): HybridYouTubeSource {
+export function createHybridSource(options: { apiFallback?: boolean; preferApi?: () => Promise<boolean> } = {}): HybridYouTubeSource {
   const config = env();
   const gate = getGate();
   const source = new InnerTubeSource(gate, {
     maxVideos: config.INNERTUBE_MAX_VIDEOS,
     userMaxWaitMs: config.INNERTUBE_USER_MAX_WAIT_MS,
   });
-  return new HybridYouTubeSource(source, getYouTubeService(), gate, { apiFallback: options.apiFallback ?? true });
+  return new HybridYouTubeSource(source, getYouTubeService(), gate, { apiFallback: options.apiFallback ?? true, preferApi: options.preferApi });
 }

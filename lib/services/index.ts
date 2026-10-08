@@ -32,7 +32,7 @@ import {
   UsageRepository,
   VideoRepository,
 } from "@/lib/database";
-import { createJobRegistry, LIBRARY_GROWTH_JOB_TYPE, NICHE_LABEL_JOB_TYPE } from "@/lib/jobs/definitions";
+import { createJobRegistry, LIBRARY_FEATURED_JOB_TYPE, LIBRARY_GROWTH_JOB_TYPE, NICHE_LABEL_JOB_TYPE } from "@/lib/jobs/definitions";
 import { JobQueue } from "@/lib/jobs/queue";
 import type { JobRegistry } from "@/lib/jobs/registry";
 import { JobScheduler } from "@/lib/jobs/scheduler";
@@ -50,6 +50,7 @@ import { NicheLabelingService } from "./niche-labeling-service";
 import { qualityConfigFrom } from "@/lib/research/quality";
 import { YouTubeCacheRepository, YouTubeQuotaRepository } from "@/lib/database/repositories/youtube-quota";
 import { getQuotaManager, getYouTubeService, quotaDay, setQuotaUserLimits, type QuotaManager } from "@/lib/youtube";
+import { spareBackgroundQuota } from "@/lib/youtube/quota-manager";
 import { createHybridSource, createTranscriptReader } from "@/lib/innertube";
 import { AccountService } from "./account-service";
 import { DashboardService } from "./dashboard-service";
@@ -222,7 +223,10 @@ export function getServices(): Services {
   // Channel ingestion reads YouTube's web pages first (about 1 quota unit per
   // channel instead of 3-4) and falls back to the API per channel. User-triggered
   // work takes the gate's interactive lane; jobs queue behind the scraper.
-  const channelSource = config.INNERTUBE_INGEST_ENABLED ? lazy(() => createHybridSource()) : youtube;
+  // Spare quota buys speed: while the day has room, imports skip the scraper's queue.
+  const channelSource = config.INNERTUBE_INGEST_ENABLED
+    ? lazy(() => createHybridSource({ preferApi: spareBackgroundQuota(getQuotaManager, config.YOUTUBE_API_IMPORT_KEEP_UNITS) }))
+    : youtube;
   const channels = new ChannelService(channelSource, repositories.channels, repositories.videos, {
     storage,
     snapshotVideoMaxAgeDays: config.SNAPSHOT_VIDEO_MAX_AGE_DAYS,
@@ -345,7 +349,8 @@ export function getServices(): Services {
     { type: MONITOR_VIDEOS_JOB_TYPE, everyHours: 1 },
     { type: MONITOR_CHANNELS_JOB_TYPE, everyHours: 1 },
     { type: NICHE_LABEL_JOB_TYPE, everyHours: 1 },
-    ...(config.LIBRARY_GROWTH_SEARCHES_PER_RUN > 0 || config.LIBRARY_FEATURED_CHECKS_PER_RUN > 0 ? [{ type: LIBRARY_GROWTH_JOB_TYPE, everyHours: 2 }] : []),
+    ...(config.LIBRARY_GROWTH_SEARCHES_PER_RUN > 0 || config.LIBRARY_FEATURED_CHECKS_PER_RUN > 0 ? [{ type: LIBRARY_GROWTH_JOB_TYPE, everyHours: 1 }] : []),
+    ...(config.LIBRARY_FEATURED_CHECKS_PER_RUN > 0 ? [{ type: LIBRARY_FEATURED_JOB_TYPE, everyHours: 1 }] : []),
   ]);
 
   const subscriptions = new SubscriptionService(repositories.subscriptions);

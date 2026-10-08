@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createLogger } from "@/lib/core/logger";
 import { asBackground, asUser, runWithQuotaContext } from "@/lib/youtube/quota-context";
-import { nextQuotaReset, QuotaManager, QuotaUnavailableError, quotaDay, type QuotaConfig, type QuotaStore } from "@/lib/youtube/quota-manager";
+import { nextQuotaReset, QuotaManager, QuotaUnavailableError, quotaDay, spareBackgroundQuota, type QuotaConfig, type QuotaStore } from "@/lib/youtube/quota-manager";
 import { cacheKey, type CachedResponse, type ResponseCacheStore } from "@/lib/youtube/response-cache";
 import { YouTubeService } from "@/lib/youtube/service";
 import { createFakeYouTube, listBody, rawVideo } from "../helpers/youtube";
@@ -158,5 +158,21 @@ describe("YouTubeClient quota gate and cache", () => {
   it("builds order-insensitive cache keys without the API key", () => {
     expect(cacheKey("videos", { id: ["b", "a"], part: "snippet", key: "secret" })).toBe(cacheKey("videos", { part: "snippet", id: ["a", "b"] }));
     expect(cacheKey("videos", { id: ["a"], key: "secret" })).not.toContain("secret");
+  });
+});
+
+describe("spareBackgroundQuota", () => {
+  it("says yes while background work has more than the kept units left, and asks at most once a minute", async () => {
+    let used = 4_000;
+    let now = 0;
+    const summary = vi.fn(async () => ({ limits: { background: 6_700 }, used: { background: used } }) as never);
+    const spare = spareBackgroundQuota(() => ({ summary }), 1_500, () => now);
+    expect(await spare()).toBe(true);
+    used = 6_000;
+    now = 30_000;
+    expect(await spare()).toBe(true);
+    now = 61_000;
+    expect(await spare()).toBe(false);
+    expect(summary).toHaveBeenCalledTimes(2);
   });
 });

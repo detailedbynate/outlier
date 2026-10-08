@@ -152,6 +152,18 @@ export class LibraryGrowthService {
     return stoppedBy ? { ...result, stoppedBy } : result;
   }
 
+  /**
+   * Featured channels on their own schedule. After searches, a run's time is
+   * often gone before they start, and they're the cheapest way to find creators.
+   */
+  async followOnce(options: { now?: Date; signal?: AbortSignal } = {}): Promise<Pick<GrowthRunResult, "featuredChecked" | "featuredQueued" | "stoppedBy">> {
+    const result: GrowthRunResult = { searched: [], channelsNew: 0, channelsQueued: 0, featuredChecked: 0, featuredQueued: 0 };
+    const quotaOut = await this.followFeatured(result, options.now ?? new Date(), options.signal);
+    const out = { featuredChecked: result.featuredChecked, featuredQueued: result.featuredQueued, ...(quotaOut ? { stoppedBy: "quota" as const } : {}) };
+    this.log.info("featured channels run", out);
+    return out;
+  }
+
   /** Discovery searches for the seeds the library is thinnest on. */
   private async search(result: GrowthRunResult, now: Date, signal?: AbortSignal): Promise<GrowthRunResult["stoppedBy"]> {
     const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));

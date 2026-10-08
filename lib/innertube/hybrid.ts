@@ -17,6 +17,12 @@ export interface HybridOptions {
    * there; that refusal is passed through rather than worked around.
    */
   apiFallback?: boolean;
+  /**
+   * Asked before each channel read: true sends it straight to the API. The
+   * worker sets it while the day's quota has room to spare: an API read takes a
+   * second, a scrape waits its turn behind the scraper at a few a minute.
+   */
+  preferApi?: () => Promise<boolean>;
 }
 
 /**
@@ -63,7 +69,16 @@ export class HybridYouTubeSource implements ChannelYouTubeSource {
     }
   }
 
+  private async prefersApi(): Promise<boolean> {
+    try {
+      return (await this.options.preferApi?.()) ?? false;
+    } catch {
+      return false;
+    }
+  }
+
   private async withFallback<T>(what: string, scraped: () => Promise<T>, official: () => Promise<T>): Promise<T> {
+    if (await this.prefersApi()) return this.api1(what, official);
     try {
       const result = await scraped();
       this.counts.innertube += 1;
