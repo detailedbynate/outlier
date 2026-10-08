@@ -25,8 +25,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   if (current && !landingLink && !current.onboardingCompleted) redirect("/onboarding");
   if (!current || landingLink) {
     const creatorCode = await creatorCodeFor(normalizeCreatorCode(params.code) ?? normalizeCreatorCode(jar.get(CREATOR_CODE_COOKIE)?.value));
-    // Someone sent here by a creator or a friend already heard the pitch: show the offer and the plans.
-    const focused = Boolean(creatorCode || normalizeReferralCode(params.ref));
+    // Someone who just clicked a creator's or friend's link already heard the pitch: show the offer and the plans.
+    // Coming back later to plain "/" is the normal front page; a remembered code still discounts the prices.
+    const focused = Boolean((creatorCode && normalizeCreatorCode(params.code)) || normalizeReferralCode(params.ref));
     return (
       <LandingPage referralCode={referralCode} creatorCode={creatorCode} focused={focused} codeError={params.code_error === "1"} signedIn={Boolean(current)} />
     );
