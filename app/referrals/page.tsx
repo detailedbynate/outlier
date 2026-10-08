@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 import { UsersIcon } from "@/components/icons";
 import { ReferralShare } from "@/components/referral-share";
@@ -53,6 +54,10 @@ export default async function ReferralsPage() {
                 <p className="intel-muted">
                   Share {`${origin}/?code=${displayCode(code.code)}`}. Your viewers get {discountLabel(code)}, and you earn {code.commission_percent}% of what they pay
                   {code.commission_months ? ` for their first ${code.commission_months} months` : ""}.{code.active ? "" : " This code is switched off for new customers."}
+                </p>
+                <p className="intel-muted">
+                  When you share it, say that you earn a commission (for example &ldquo;I get a cut if you use my code&rdquo;). Advertising
+                  rules require it, and it&apos;s in our <Link href="/terms">Terms</Link>.
                 </p>
               </div>
             </header>

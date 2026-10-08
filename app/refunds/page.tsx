@@ -38,6 +38,13 @@ export default function RefundsPage() {
         or a month where Outlier was broken for you and we couldn&apos;t fix it. Just tell us.
       </p>
 
+      <h2>Discounted subscriptions</h2>
+      <p>
+        If you subscribed with a discount or creator code, the same rules apply, and a refund is always of what you actually
+        paid. Once the discount period ends the plan renews at its full price — cancel before then if you don&apos;t want that.
+        Whether a creator earned a commission on your payment never affects your refund.
+      </p>
+
       <h2>Credit top-ups</h2>
       <p>
         Credit packs are a one-off purchase and the credits never expire. Unspent credits from a pack can be refunded within 7

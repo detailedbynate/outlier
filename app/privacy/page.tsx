@@ -27,8 +27,25 @@ export default function PrivacyPage() {
         servers or our database.
       </p>
       <p>
-        <strong>Waitlist:</strong> if you joined the waitlist instead of subscribing, we hold your email address and your name if
-        you gave one, and nothing else.
+        <strong>Waitlist:</strong> if you joined the waitlist instead of subscribing, we hold your email address and whatever else
+        you chose to fill in on the form — your name, channel link, niche, what you&apos;d use Outlier for, and how you heard about
+        us — plus the referral link you came through, if any.
+      </p>
+
+      <p>
+        <strong>Site visits:</strong> to see how many people visit and how many reach pricing and checkout, we record each page
+        view with the page, the site that linked you (for example youtube.com), any campaign tag or creator code in the link, and
+        whether you&apos;re on a phone, tablet or computer. Instead of a cookie, a visitor is counted with a code made by
+        scrambling your IP address and browser together with the date, which changes every day and can&apos;t be turned back
+        into your IP address. We never store the IP address itself for this, and these records aren&apos;t tied to your account.
+        Admins&apos; own visits aren&apos;t counted.
+      </p>
+      <p>
+        <strong>Referral links and creator codes:</strong> if you arrive through someone&apos;s link, we remember the link so
+        they get credit and you get any discount. If you subscribe with a creator&apos;s code, the code is recorded on your
+        subscription so we can pay that creator their commission. The creator sees totals — how many people subscribed with
+        their code and what it has earned — never your name or email. If you&apos;re a creator with a code, we hold your name,
+        your code, the commissions it has earned, and whatever payout details you give us.
       </p>
 
       <h2>How we use it</h2>
@@ -67,6 +84,12 @@ export default function PrivacyPage() {
         </li>
         <li>
           <strong>Resend</strong> — delivering the emails we send you.
+        </li>
+        <li>
+          <strong>Anthropic (Claude), Google (Gemini) and OpenRouter</strong> — the AI models behind the Script Writer and the
+          labels on niches. They receive what you type into those tools (topics, notes, sample scripts) along with public video
+          data, never your email or payment details, and process it to write the response under their own API terms. Please
+          don&apos;t put anything confidential into the Script Writer.
         </li>
         <li>
           <strong>Google / YouTube Data API</strong> — the public YouTube statistics Outlier shows. We send them search terms and
@@ -134,8 +157,11 @@ export default function PrivacyPage() {
 
       <h2>Cookies</h2>
       <p>
-        Outlier sets the cookies it needs to keep you signed in and to protect forms from abuse. There are no advertising or
-        cross-site tracking cookies, which is why you aren&apos;t asked to consent to any.
+        Outlier sets only first-party cookies it needs to work: ones that keep you signed in, and, if you arrived through a
+        referral link or creator code, one that remembers that link for 30 days so the credit and the discount you came for still
+        apply when you subscribe. Your browser&apos;s local storage also remembers small things like a popup you closed. There
+        are no advertising, analytics or cross-site tracking cookies — visits are counted without cookies, as described above —
+        which is why you aren&apos;t asked to consent to any.
       </p>
 
       <h2>Changes</h2>
