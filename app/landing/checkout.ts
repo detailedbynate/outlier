@@ -38,7 +38,8 @@ export async function startPublicSubscription(formData: FormData): Promise<void>
   let url: string | null = null;
   try {
     await getServices().rateLimits.enforce("checkoutIp", clientIpFrom(h));
-    const code = await activeCreatorCode();
+    // Only checkouts from a page that showed the code use it, so the price matches what was on screen.
+    const code = formData.get("withCode") === "1" ? await activeCreatorCode() : null;
     const creator = code ? await creatorCheckoutFields(code) : null;
     // A creator's discount comes off the full price, not the launch price.
     const billed = creator ? ((await fullPriceIdFor(plan)) ?? price) : price;

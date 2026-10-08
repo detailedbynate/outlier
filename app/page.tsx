@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { REFERRAL_COOKIE } from "@/lib/referrals/links";
-import { CREATOR_CODE_COOKIE, discountLabel, displayCode, normalizeCreatorCode } from "@/lib/creator-codes/codes";
+import { discountLabel, displayCode, normalizeCreatorCode } from "@/lib/creator-codes/codes";
 import { getServices } from "@/lib/services";
 import { normalizeReferralCode } from "@/lib/services/referral-service";
 import { getCurrentUser } from "@/lib/auth/session";
@@ -24,10 +24,11 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   if (current && !landingLink && !current.approved) redirect("/not-approved");
   if (current && !landingLink && !current.onboardingCompleted) redirect("/onboarding");
   if (!current || landingLink) {
-    const creatorCode = await creatorCodeFor(normalizeCreatorCode(params.code) ?? normalizeCreatorCode(jar.get(CREATOR_CODE_COOKIE)?.value));
+    // A creator's code shows only on their link (/?code=X). Plain "/" is the normal front page with no code on it,
+    // whatever was clicked before; the code box under the plans is there for anyone who has one.
+    const creatorCode = await creatorCodeFor(normalizeCreatorCode(params.code));
     // Someone who just clicked a creator's or friend's link already heard the pitch: show the offer and the plans.
-    // Coming back later to plain "/" is the normal front page; a remembered code still discounts the prices.
-    const focused = Boolean((creatorCode && normalizeCreatorCode(params.code)) || normalizeReferralCode(params.ref));
+    const focused = Boolean(creatorCode || normalizeReferralCode(params.ref));
     return (
       <LandingPage referralCode={referralCode} creatorCode={creatorCode} focused={focused} codeError={params.code_error === "1"} signedIn={Boolean(current)} />
     );

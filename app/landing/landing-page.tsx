@@ -232,6 +232,7 @@ function PricingSection({ code = null, focused = false, codeError = false }: { c
             <Reveal key={plan.id} delay={i * 80}>
               <form action={startPublicSubscription} className="pricing-card" data-plan={plan.id} data-featured={Boolean(plan.badge)}>
                 <input type="hidden" name="planId" value={plan.id} />
+                {code ? <input type="hidden" name="withCode" value="1" /> : null}
                 <div className="pricing-card-head">
                   <h3>{plan.name}</h3>
                   {plan.badge ? <span className="pricing-badge">{plan.badge}</span> : null}
