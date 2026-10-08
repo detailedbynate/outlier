@@ -10,6 +10,7 @@ import {
   parseClientEvent,
   persistentVisitorId,
   platformOf,
+  sourceOf,
   referrerHost,
   visitorId,
 } from "@/lib/analytics/site";
@@ -135,5 +136,22 @@ describe("visitors and where they came from", () => {
     expect(parseClientEvent({ kind: "engagement", path: "/", engagedMs: 99 * 60 * 60_000 })?.engagedMs).toBe(30 * 60_000);
     expect(parseClientEvent({ kind: "engagement", path: "/", engagedMs: 0, scroll: 50 })).toBeNull();
     expect(parseClientEvent({ kind: "pageview", path: "/", engagedMs: 5000 })?.engagedMs).toBeNull();
+  });
+});
+
+describe("sourceOf", () => {
+  const base = { referrerHost: null, utmSource: null, userAgent: "Mozilla/5.0", creatorCode: null, refCode: null };
+
+  it("names the platform when the browser says where the visit came from", () => {
+    expect(sourceOf({ ...base, referrerHost: "youtube.com", creatorCode: "sktl" })).toBe("YouTube");
+  });
+
+  it("falls back to the creator's link or a referral link when nothing says", () => {
+    expect(sourceOf({ ...base, creatorCode: "sktl" })).toBe("SKTL link");
+    expect(sourceOf({ ...base, refCode: "abc123" })).toBe("Referral link");
+  });
+
+  it("is direct with no referrer, tag, app or link", () => {
+    expect(sourceOf(base)).toBeNull();
   });
 });

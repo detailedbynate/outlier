@@ -216,6 +216,25 @@ export function platformOf(input: { referrerHost: string | null; utmSource: stri
   return IN_APP_BROWSERS.find(([pattern]) => pattern.test(ua))?.[1] ?? null;
 }
 
+/**
+ * Where to say a visit came from when the browser didn't say: Discord,
+ * iMessage, WhatsApp and most apps send no referrer, so a creator's link
+ * shows as their code ("SKTL link") and a friend's as "Referral link"
+ * instead of Direct. Null is still direct.
+ */
+export function sourceOf(input: {
+  referrerHost: string | null;
+  utmSource: string | null;
+  userAgent: string | null;
+  creatorCode: string | null;
+  refCode: string | null;
+}): string | null {
+  const platform = platformOf(input);
+  if (platform) return platform;
+  if (input.creatorCode) return `${input.creatorCode.toUpperCase()} link`;
+  return input.refCode ? "Referral link" : null;
+}
+
 /** A path worth counting: no query string, no ids. */
 export function cleanPath(path: string): string | null {
   if (!path.startsWith("/") || path.startsWith("/api/")) return null;
@@ -300,6 +319,8 @@ export interface SiteTraffic {
   platforms: TrafficChannelRow[];
   sources: { name: string; visitors: number; checkouts: number }[];
   devices: Record<string, number>;
+  /** Page views by UTC day of week (0 = Sunday) and hour, for the activity heatmap and the 24-hour chart. */
+  hours: { dow: number; hour: number; visitors: number; pageviews: number }[];
 }
 
 /** Share of `from` that made it to `to`, as a whole percent; null when nobody started. */

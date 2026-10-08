@@ -1,5 +1,5 @@
 import { deviceFrom, visitorFrom } from "@/lib/analytics/site-events";
-import { channelOf, cookieFrom, NO_TRACK_COOKIE, parseClientEvent, platformOf, referrerHost } from "@/lib/analytics/site";
+import { channelOf, cookieFrom, NO_TRACK_COOKIE, parseClientEvent, platformOf, referrerHost, sourceOf } from "@/lib/analytics/site";
 import { logger } from "@/lib/core/logger";
 import { getServices } from "@/lib/services";
 
@@ -34,7 +34,9 @@ export async function POST(request: Request): Promise<Response> {
     const referrer = referrerHost(event.referrer, request.headers.get("x-forwarded-host") ?? request.headers.get("host"));
     // Where a visit came from is decided by its page views; the database counts
     // it once, at the start of the visit.
-    const source = event.kind === "pageview" ? platformOf({ referrerHost: referrer, utmSource: event.utmSource, userAgent: request.headers.get("user-agent") }) : null;
+    const userAgent = request.headers.get("user-agent");
+    const platform = platformOf({ referrerHost: referrer, utmSource: event.utmSource, userAgent });
+    const source = event.kind === "pageview" ? sourceOf({ referrerHost: referrer, utmSource: event.utmSource, userAgent, creatorCode: event.creatorCode, refCode: event.refCode }) : null;
     await getServices().repositories.siteEvents.record({
       kind: event.kind,
       visitor,
@@ -42,7 +44,7 @@ export async function POST(request: Request): Promise<Response> {
       path: event.path,
       referrer_host: referrer,
       source,
-      channel: event.kind === "pageview" ? channelOf({ platform: source, utmMedium: event.utmMedium, creatorCode: event.creatorCode, refCode: event.refCode }) : null,
+      channel: event.kind === "pageview" ? channelOf({ platform, utmMedium: event.utmMedium, creatorCode: event.creatorCode, refCode: event.refCode }) : null,
       engaged_ms: event.engagedMs,
       scroll_pct: event.scrollPercent,
       utm_source: event.utmSource,

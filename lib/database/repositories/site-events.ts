@@ -19,6 +19,7 @@ const EMPTY: SiteTraffic = {
   platforms: [],
   sources: [],
   devices: {},
+  hours: [],
   funnel: { landing: 0, pricing: 0, checkout: 0, subscribed: 0, purchases: 0, waitlist: 0, revenueCents: 0 },
 };
 
