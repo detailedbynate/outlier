@@ -13,6 +13,7 @@ import { StackExchangeClient } from "@/lib/radar/stackexchange";
 import { fetchRisingGames } from "@/lib/radar/games";
 import { fetchLaunches } from "@/lib/radar/launches";
 import { NicheRadarService } from "./niche-radar-service";
+import { runBoardProcess, shouldOffloadBoards } from "@/lib/niches/board-process";
 import { ReferralRepository } from "@/lib/database/repositories/referrals";
 import { CreatorCodeRepository } from "@/lib/database/repositories/creator-codes";
 import { SiteEventRepository } from "@/lib/database/repositories/site-events";
@@ -398,6 +399,7 @@ export function getServices(): Services {
         enqueue,
         ai: text,
         picks: repositories.radar,
+        offload: shouldOffloadBoards() ? runBoardProcess : null,
         // Haiku alone, not a free fallback chain: this runs while someone waits for the page.
         namer: config.ANTHROPIC_API_KEY ? new AnthropicTextProvider({ apiKey: config.ANTHROPIC_API_KEY, model: "claude-haiku-4-5" }) : null,
       },

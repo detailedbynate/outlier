@@ -190,6 +190,12 @@ export interface IdeaFeeds {
  */
 const SAMPLE_SIZE = 40_000;
 
+/** One format's boards for one lens, as worked out away from the web server (see lib/niches/board-process.ts). */
+export interface NicheBoard {
+  discover: DiscoveredNiche[];
+  ideas: IdeaFeeds & { watch: GameStat[] };
+}
+
 export class NicheService {
   private readonly log: Logger;
   private readonly config: NicheConfig;
@@ -217,6 +223,13 @@ export class NicheService {
       namer?: Pick<TextProvider, "generateObject"> | null;
       /** Where the weekly picks and their outcomes are kept. Without it there's no track record. */
       picks?: Pick<RadarRepository, "addPicks" | "lastPickedOn" | "duePicks" | "updatePick" | "judgedPicks"> | null;
+      /**
+       * Works out a format's boards in another process. Mining 40K uploads is
+       * close to a minute of solid CPU, and done here it would freeze every
+       * other request on the web server until it finished. Without it (tests,
+       * scripts) the boards are worked out in this process.
+       */
+      offload?: ((format: DiscoverFormat, lens: IdeaLens) => Promise<NicheBoard>) | null;
     },
     config: Partial<NicheConfig> = {},
     logger?: Logger,
@@ -279,6 +292,8 @@ export class NicheService {
   }
 
   private async loadDiscover(format: DiscoverFormat, now: Date): Promise<DiscoveredNiche[]> {
+    const board = await this.offloadedBoard(format, "gaming", now);
+    if (board) return board.discover;
     try {
       const [{ videos, channels }, weightOf] = await Promise.all([this.formatSample(format, now), this.libraryWeights(format, now)]);
       const niches = discoverNiches(videos, channels, format, { now, weightOf });
@@ -309,6 +324,8 @@ export class NicheService {
   }
 
   private async loadIdeaFeeds(format: DiscoverFormat, lens: IdeaLens, now: Date): Promise<IdeaFeeds> {
+    const board = await this.offloadedBoard(format, lens, now);
+    if (board) return board.ideas;
     const cacheKey = `${format}:${lens}`;
     try {
       // The wider window is for telling what each channel is about; breakouts themselves are the last 14 days.
@@ -371,6 +388,38 @@ export class NicheService {
       this.log.warn("library counts failed, sizing audiences from the sample alone", { format, error });
       return undefined;
     }
+  }
+
+  /**
+   * Both boards for a format and lens, worked out in another process and put in
+   * the caches. One run serves Discover and Video ideas alike. Null when there's
+   * no other process, or it failed: the caller then works them out here.
+   */
+  private async offloadedBoard(format: DiscoverFormat, lens: IdeaLens, now: Date): Promise<NicheBoard | null> {
+    const offload = this.deps.offload;
+    if (!offload) return null;
+    try {
+      const board = await this.once(`board:${format}:${lens}`, () => offload(format, lens));
+      this.discoverCache.set(format, { at: now.getTime(), niches: board.discover });
+      this.ideaCache.set(`${format}:${lens}`, { ...board.ideas, at: now.getTime() });
+      return board;
+    } catch (error) {
+      this.log.warn("niche board process failed, working it out here", { format, lens, error });
+      return null;
+    }
+  }
+
+  /** Both boards for a format, worked out in this process. What the board process runs. */
+  async computeBoard(format: DiscoverFormat, lens: IdeaLens, now = new Date()): Promise<NicheBoard> {
+    const discover = await this.loadDiscover(format, now);
+    await this.loadIdeaFeeds(format, lens, now);
+    const ideas = this.ideaCache.get(`${format}:${lens}`);
+    return {
+      discover,
+      ideas: ideas
+        ? { breakouts: ideas.breakouts, rising: ideas.rising, formats: ideas.formats, games: ideas.games, watch: ideas.watch }
+        : { breakouts: [], rising: [], formats: [], games: [], watch: [] },
+    };
   }
 
   private readonly samples = new Map<DiscoverFormat, { at: number; load: ReturnType<NicheService["deps"]["niches"]["recentSample"]> }>();
