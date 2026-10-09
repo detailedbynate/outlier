@@ -43,6 +43,23 @@ function Brand() {
   );
 }
 
+const PLAN_NAME: Record<SidebarPlan, string> = { owner: "Owner", free: "Free plan", pro: "Pro plan", expert: "Expert plan" };
+
+/** The top of the sidebar: the mark on its own tile, the name, and which plan this account is on. */
+function SidebarBrand({ plan }: { plan?: SidebarPlan }) {
+  return (
+    <Link href="/" className="brand sidebar-brand">
+      <span className="sidebar-brand-mark">
+        <BrandMark size={26} />
+      </span>
+      <span className="sidebar-brand-text">
+        <span>Outlier</span>
+        {plan ? <small>{PLAN_NAME[plan]}</small> : null}
+      </span>
+    </Link>
+  );
+}
+
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const current = await getCurrentUser();
   const landingLink = (await headers()).get(LANDING_HEADER) === "1";
@@ -94,7 +111,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <div className="ambient" aria-hidden="true" />
         <div className="app">
           <aside className="sidebar glass">
-            <Brand />
+            <SidebarBrand plan={plan} />
             <MobileMenuToggle />
             <div id="app-sidebar-menu" className="sidebar-menu">
             <SidebarNav isAdmin={current.isAdmin} isOwner={current.isOwner} writerOpen={writerOpenTo(subscription?.plan.id, current.isOwner)} freePlan={!current.isAdmin && subscription?.plan.priceCents === 0} />
@@ -104,8 +121,11 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
                 <span className="account-avatar" aria-hidden="true">
                   {current.email.slice(0, 1).toUpperCase()}
                 </span>
-                <span className="account-email" title={current.email}>
-                  {current.email}
+                <span className="account-text">
+                  <span className="account-name">{current.email.split("@")[0]}</span>
+                  <span className="account-email" title={current.email}>
+                    {current.email}
+                  </span>
                 </span>
                 <button type="submit" className="icon-button" aria-label="Sign out" title="Sign out">
                   <LogOutIcon size={15} />

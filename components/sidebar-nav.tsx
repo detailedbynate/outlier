@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import type { ComponentType } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef, useState, type ComponentType } from "react";
 import {
   BookmarkIcon,
   ChartIcon,
@@ -16,6 +16,7 @@ import {
   GridIcon,
   LockIcon,
   PenIcon,
+  SearchIcon,
   ShortsIcon,
   SlidersIcon,
   TargetIcon,
@@ -90,9 +91,55 @@ export function SidebarNav({
   freePlan?: boolean;
 }) {
   const pathname = usePathname();
-  const sections = isAdmin ? [...SECTIONS, ADMIN_SECTION] : SECTIONS;
+  const router = useRouter();
+  const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
+  const allSections = isAdmin ? [...SECTIONS, ADMIN_SECTION] : SECTIONS;
+  const needle = query.trim().toLowerCase();
+  const sections = needle
+    ? allSections
+        .map((section) => ({ ...section, items: section.items.filter((item) => item.label.toLowerCase().includes(needle)) }))
+        .filter((section) => section.items.length > 0)
+    : allSections;
+
+  // Ctrl+K / Cmd+K jumps to the search box from anywhere.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   return (
     <nav className="sidebar-nav" aria-label="Main">
+      <label className="sidebar-search">
+        <SearchIcon size={15} />
+        <input
+          ref={searchRef}
+          type="search"
+          value={query}
+          placeholder="Search"
+          aria-label="Search pages"
+          onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={(event) => {
+            const first = sections[0]?.items[0];
+            if (event.key === "Enter" && first) {
+              router.push(first.href);
+              setQuery("");
+              event.currentTarget.blur();
+            } else if (event.key === "Escape") {
+              setQuery("");
+              event.currentTarget.blur();
+            }
+          }}
+        />
+        <kbd>Ctrl K</kbd>
+      </label>
+      {sections.length === 0 ? <p className="sidebar-search-empty">No pages match</p> : null}
       {sections.map((section) => (
         <div key={section.title} className="nav-section">
           <div className="nav-section-title">{section.title}</div>
@@ -104,7 +151,7 @@ export function SidebarNav({
             const locked = proLocked || (item.ownerOnly === true && !writerOpen);
             const badge = proLocked ? "Pro" : locked ? "Soon" : item.badge;
             return (
-              <Link key={item.href} href={item.href} className="nav-link" aria-current={active ? "page" : undefined}>
+              <Link key={item.href} href={item.href} className="nav-link" onClick={() => setQuery("")} aria-current={active ? "page" : undefined}>
                 <span className="nav-icon">
                   <Icon size={17} />
                 </span>
