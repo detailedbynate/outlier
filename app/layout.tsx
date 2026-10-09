@@ -3,10 +3,11 @@ import { headers } from "next/headers";
 import { DM_Sans, Schibsted_Grotesk } from "next/font/google";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { AccountMenu } from "@/components/account-menu";
 import { CreditsMeter, type SidebarPlan } from "@/components/credits-meter";
 import { LowCreditsPrompt } from "@/components/low-credits-prompt";
 import { LOW_CREDITS_THRESHOLD } from "@/lib/services/credits-service";
-import { BrandMark, LogOutIcon } from "@/components/icons";
+import { BrandMark } from "@/components/icons";
 import { MobileMenuToggle } from "@/components/mobile-menu-toggle";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { SiteTracker } from "@/components/site-tracker";
@@ -117,20 +118,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             <SidebarNav isAdmin={current.isAdmin} isOwner={current.isOwner} writerOpen={writerOpenTo(subscription?.plan.id, current.isOwner)} freePlan={!current.isAdmin && subscription?.plan.priceCents === 0} />
             <div className="sidebar-foot">
               <CreditsMeter status={credits} plan={plan} />
-              <form action={signOut} className="sidebar-account">
-                <span className="account-avatar" aria-hidden="true">
-                  {current.email.slice(0, 1).toUpperCase()}
-                </span>
-                <span className="account-text">
-                  <span className="account-name">{current.email.split("@")[0]}</span>
-                  <span className="account-email" title={current.email}>
-                    {current.email}
-                  </span>
-                </span>
-                <button type="submit" className="icon-button" aria-label="Sign out" title="Sign out">
-                  <LogOutIcon size={15} />
-                </button>
-              </form>
+              <AccountMenu email={current.email} signOut={signOut} />
             </div>
             </div>
           </aside>

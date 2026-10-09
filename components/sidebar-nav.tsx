@@ -8,6 +8,7 @@ import {
   ChartIcon,
   ClipboardIcon,
   CoinsIcon,
+  ChevronDownIcon,
   CompassIcon,
   EyeIcon,
   MessageIcon,
@@ -34,7 +35,16 @@ interface NavItem {
   paid?: boolean;
 }
 
-const SECTIONS: { title: string; items: NavItem[] }[] = [
+interface NavSection {
+  title: string;
+  items: NavItem[];
+  /** Only shown while searching. */
+  searchOnly?: boolean;
+  /** Folds away unless you're on one of its pages or searching. */
+  collapsible?: boolean;
+}
+
+const SECTIONS: NavSection[] = [
   { title: "Overview", items: [{ href: "/", label: "Dashboard", icon: GridIcon, paid: true }] },
   {
     title: "Research tools",
@@ -54,7 +64,9 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
     ],
   },
   {
+    // Lives in the account menu at the bottom; listed here so search still finds these pages.
     title: "Account",
+    searchOnly: true,
     items: [
       { href: "/billing", label: "Plans & credits", icon: CoinsIcon },
       { href: "/settings/preferences", label: "Preferences", icon: SlidersIcon },
@@ -67,8 +79,9 @@ function isActive(pathname: string, href: string): boolean {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
 }
 
-const ADMIN_SECTION: { title: string; items: NavItem[] } = {
+const ADMIN_SECTION: NavSection = {
   title: "Admin",
+  collapsible: true,
   items: [
     { href: "/admin/accounts", label: "Accounts", icon: UsersIcon },
     { href: "/admin/waitlist", label: "Waitlist", icon: ClipboardIcon },
@@ -100,7 +113,10 @@ export function SidebarNav({
     ? allSections
         .map((section) => ({ ...section, items: section.items.filter((item) => item.label.toLowerCase().includes(needle)) }))
         .filter((section) => section.items.length > 0)
-    : allSections;
+    : allSections.filter((section) => !section.searchOnly);
+  const [folded, setFolded] = useState(true);
+  const isOpen = (section: NavSection) =>
+    !section.collapsible || Boolean(needle) || !folded || section.items.some((item) => isActive(pathname, item.href));
 
   // Ctrl+K / Cmd+K jumps to the search box from anywhere.
   useEffect(() => {
@@ -142,8 +158,15 @@ export function SidebarNav({
       {sections.length === 0 ? <p className="sidebar-search-empty">No pages match</p> : null}
       {sections.map((section) => (
         <div key={section.title} className="nav-section">
-          <div className="nav-section-title">{section.title}</div>
-          {section.items.map((item) => {
+          {section.collapsible && !needle ? (
+            <button type="button" className="nav-section-title nav-section-toggle" aria-expanded={isOpen(section)} onClick={() => setFolded(isOpen(section))}>
+              {section.title}
+              <ChevronDownIcon size={13} />
+            </button>
+          ) : (
+            <div className="nav-section-title">{section.title}</div>
+          )}
+          {(isOpen(section) ? section.items : []).map((item) => {
             const active = isActive(pathname, item.href);
             const Icon = item.icon;
             // Locked items say so in their own colour: this is about access, not novelty.

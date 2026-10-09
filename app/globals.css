@@ -16048,7 +16048,7 @@ body:has(.auth-split) .shell {
 /* ===========================================================================
    App theme, third pass (the owner's references): near-black instead of flat
    graphite, cards with a soft top-lit sheen and hairline
-   borders, a grainy violet-to-pink glow across the top of each page, lilac
+   borders, lilac
    accents and glowing chart lines. Scoped to the signed-in app.
 =========================================================================== */
 body.app-body {
@@ -16090,40 +16090,6 @@ body.app-body {
 .home {
   --dash-surface: var(--card-sheen);
   --dash-surface-hover: linear-gradient(180deg, #121215 0%, #0c0c0e 100%);
-}
-
-/* The glow across the top of every page: violet into pink, grainy, fading into the page. */
-.app .main {
-  position: relative;
-  isolation: isolate;
-}
-
-.app .main::before {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  inset: 0 0 auto;
-  height: 340px;
-  pointer-events: none;
-  background:
-    radial-gradient(60% 120% at 12% 0%, rgba(124, 77, 255, 0.42), transparent 70%),
-    radial-gradient(50% 110% at 58% 0%, rgba(236, 72, 153, 0.26), transparent 70%),
-    radial-gradient(45% 100% at 96% 0%, rgba(99, 102, 241, 0.3), transparent 70%);
-  mask-image: linear-gradient(180deg, #000 0%, rgba(0, 0, 0, 0.55) 45%, transparent 100%);
-  border-radius: 0 0 28px 28px;
-}
-
-.app .main::after {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  inset: 0 0 auto;
-  height: 340px;
-  pointer-events: none;
-  opacity: 0.22;
-  mix-blend-mode: overlay;
-  mask-image: linear-gradient(180deg, #000, transparent);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 /* Cards: top-lit, hairline border, a brighter top edge. */
@@ -16461,4 +16427,146 @@ body.app-body {
     width: 30px;
     height: 30px;
   }
+}
+
+/* The whole menu fits on a laptop screen: tighter rows, and credits as one compact block. */
+.app .sidebar {
+  gap: 10px;
+}
+
+.app .sidebar-nav {
+  gap: 10px;
+}
+
+.app .sidebar .nav-section-title {
+  padding-bottom: 3px;
+}
+
+.app .sidebar .nav-link {
+  padding: 6px 10px;
+}
+
+.app .sidebar .credits {
+  padding: 10px 6px 6px;
+}
+
+.app .sidebar .credits-value {
+  margin-top: 4px;
+}
+
+.app .sidebar .credits-value strong {
+  font-size: 17px;
+}
+
+.app .sidebar .credits-bar {
+  margin: 6px 0 4px;
+}
+
+.app .sidebar-account {
+  padding-top: 8px;
+}
+
+.app .account-avatar {
+  width: 30px;
+  height: 30px;
+}
+
+.app .nav-section-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: auto;
+  margin: 0;
+  padding: 0 10px 3px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.app .nav-section-toggle:hover {
+  color: var(--text-secondary);
+}
+
+.nav-section-toggle svg {
+  transition: transform 0.2s var(--ease);
+}
+
+.nav-section-toggle[aria-expanded="false"] svg {
+  transform: rotate(-90deg);
+}
+
+/* Account row: the dots open the account pages and sign out, above the row. */
+.app .sidebar-account {
+  position: relative;
+}
+
+.app .account-more {
+  width: 30px;
+  height: 30px;
+  background: none;
+  border-color: transparent;
+}
+
+.app .account-more:hover,
+.app .account-more[aria-expanded="true"] {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.account-menu {
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 6px);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  border-radius: 14px;
+  background: #111114;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-top-color: rgba(255, 255, 255, 0.13);
+  animation: account-menu-in 0.16s var(--ease);
+}
+
+@keyframes account-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+.account-menu form {
+  margin: 0;
+}
+
+.app .account-menu :is(a, button) {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: auto;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  font: 500 13px var(--font);
+  color: var(--text-secondary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.app .account-menu :is(a, button):hover,
+.app .account-menu a[aria-current="page"] {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+}
+
+.app .account-menu .account-menu-signout {
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 9px 9px;
+  margin-top: 2px;
 }
