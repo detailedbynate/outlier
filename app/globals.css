@@ -15458,12 +15458,13 @@ body:has(.auth-split) .shell {
   min-height: 100vh;
   min-height: 100dvh;
   display: grid;
-  grid-template-columns: minmax(400px, 560px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(400px, 560px);
   background: #000;
 }
 
-/* The form: a dark card down the left, like a sheet laid on the stage. */
+/* The form: a dark card down the right, like a sheet laid on the stage. */
 .auth-panel {
+  order: 2;
   position: relative;
   z-index: 1;
   display: flex;
