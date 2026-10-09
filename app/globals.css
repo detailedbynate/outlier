@@ -15455,8 +15455,10 @@ body:has(.auth-split) .shell {
 }
 
 .auth-split {
-  min-height: 100vh;
-  min-height: 100dvh;
+  /* Exactly one screen tall: the stage fits itself to it and the form card scrolls inside if it must. */
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(400px, 560px);
   background: #000;
@@ -15469,6 +15471,9 @@ body:has(.auth-split) .shell {
   z-index: 1;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
   margin: 14px;
   padding: 28px clamp(24px, 4vw, 92px);
   border-radius: 22px;
@@ -15492,7 +15497,7 @@ body:has(.auth-split) .shell {
   flex-direction: column;
   justify-content: center;
   gap: 14px;
-  padding: 40px 0;
+  padding: clamp(16px, 4vh, 40px) 0;
   animation: auth-rise 0.6s var(--ease) both;
 }
 
@@ -15714,8 +15719,8 @@ body:has(.auth-split) .shell {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 34px;
-  padding: 56px 0 40px;
+  gap: clamp(16px, 3.6vh, 34px);
+  padding: clamp(24px, 6vh, 56px) 0 clamp(20px, 4vh, 40px);
   color: #fff;
 }
 
@@ -15792,7 +15797,8 @@ body:has(.auth-split) .shell {
 
 .auth-stage {
   position: relative;
-  width: min(80%, 640px);
+  /* As wide as fits, but never so tall the screen would scroll: what's left after the headline and niche rows, at 16:9. */
+  width: min(80%, 640px, max(300px, calc((100dvh - 430px) * 1.7)));
   animation: auth-rise 0.8s 0.2s var(--ease) both;
 }
 
@@ -16003,8 +16009,16 @@ body:has(.auth-split) .shell {
 }
 
 @media (max-width: 960px) {
+  /* Just the form on phones: let the page scroll normally (keyboards, small screens). */
   .auth-split {
     grid-template-columns: 1fr;
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .auth-panel {
+    overflow: visible;
   }
 
   .auth-visual {
