@@ -34,7 +34,14 @@ export default async function SignupPage({ searchParams }: { searchParams: Searc
   }
 
   return (
-    <AuthSplit>
+    <AuthSplit
+      pill="Your subscription is active"
+      foot={
+        <>
+          Already set a password? <Link href="/login">Sign in</Link>
+        </>
+      }
+    >
       <h1 className="auth-title">Set up your account</h1>
       <p className="auth-sub">Pick a password and you&apos;re in. Your subscription is already active.</p>
       <SignupForm token={token!} email={invite.email} />

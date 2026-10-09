@@ -3,10 +3,10 @@ import type { ReactNode } from "react";
 import { BrandMark } from "@/components/icons";
 
 /**
- * The sign-in, reset and signup pages: the form on a dark panel, and a liquid
- * purple panel beside it showing what Outlier looks like inside.
+ * The sign-in, reset and signup pages: the form on a dark card, and beside it
+ * a black stage with faint rings showing what Outlier looks like inside.
  */
-export function AuthSplit({ children }: { children: ReactNode }) {
+export function AuthSplit({ children, pill, foot }: { children: ReactNode; pill?: string; foot?: ReactNode }) {
   return (
     <div className="auth-split">
       <section className="auth-panel">
@@ -14,74 +14,36 @@ export function AuthSplit({ children }: { children: ReactNode }) {
           <BrandMark size={30} />
           <span>Outlier</span>
         </Link>
-        <div className="auth-panel-body">{children}</div>
-        <p className="auth-panel-foot">
-          © {new Date().getFullYear()} Outlier ·{" "}
-          <Link href="/terms">Terms</Link> ·{" "}
-          <Link href="/privacy">Privacy</Link>
-        </p>
+        <div className="auth-panel-body">
+          {pill ? <span className="auth-pill">{pill}</span> : null}
+          {children}
+        </div>
+        {foot ? <p className="auth-panel-foot">{foot}</p> : null}
       </section>
       <AuthVisual />
     </div>
   );
 }
 
+const NICHES = [
+  ["Minecraft builds", "Roblox obbies", "GTA RP", "Fortnite clips", "Valorant edits", "Horror games", "Speedruns"],
+  ["Satisfying edits", "Car builds", "Cooking Shorts", "Football skills", "Retro gaming", "Mobile games", "Map art"],
+];
+
 function AuthVisual() {
   return (
     <aside className="auth-visual" aria-hidden="true">
-      <div className="auth-liquid">
-        <span className="auth-blob auth-blob-1" />
-        <span className="auth-blob auth-blob-2" />
-        <span className="auth-blob auth-blob-3" />
-        <span className="auth-blob auth-blob-4" />
-        <svg
-          className="auth-ribbon"
-          viewBox="0 0 600 800"
-          preserveAspectRatio="xMidYMid slice"
-        >
-          <defs>
-            <linearGradient id="auth-ribbon-a" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stopColor="#c4b5fd" />
-              <stop offset="0.5" stopColor="#8b5cf6" />
-              <stop offset="1" stopColor="#ec4899" />
-            </linearGradient>
-            <filter
-              id="auth-ribbon-glow"
-              x="-20%"
-              y="-20%"
-              width="140%"
-              height="140%"
-            >
-              <feGaussianBlur stdDeviation="14" />
-            </filter>
-          </defs>
-          <path
-            className="auth-ribbon-glow"
-            d="M640 120 C 420 160, 520 420, 330 470 S 40 520, -40 760"
-            stroke="url(#auth-ribbon-a)"
-            filter="url(#auth-ribbon-glow)"
-          />
-          <path
-            className="auth-ribbon-line"
-            d="M640 120 C 420 160, 520 420, 330 470 S 40 520, -40 760"
-            stroke="url(#auth-ribbon-a)"
-          />
-          <path
-            className="auth-ribbon-thin"
-            d="M660 300 C 470 300, 470 600, 260 640 S 20 700, -60 860"
-            stroke="url(#auth-ribbon-a)"
-          />
-        </svg>
-        <span className="auth-grain" />
-      </div>
+      <div className="auth-rings" />
+      <div className="auth-glow" />
 
       <div className="auth-visual-copy">
-        <span className="auth-eyebrow">YouTube intelligence</span>
-        <h2>Find what&apos;s blowing up before everyone else does.</h2>
-        <p>
-          Breakout Shorts, rising niches and the videos beating their channel,
-          every day.
-        </p>
+        <span className="auth-new">
+          <b>New</b> Niche Finder for gaming
+        </span>
+        <h2>
+          Find <span>outliers</span> before everyone else
+        </h2>
+        <p>Breakout Shorts, rising niches and the videos beating their channel, found for you every day.</p>
       </div>
 
       <div className="auth-stage">
@@ -114,31 +76,34 @@ function AuthVisual() {
                 <em>+6%</em>
               </div>
             </div>
-            <svg
-              className="auth-mock-chart"
-              viewBox="0 0 320 110"
-              preserveAspectRatio="none"
-            >
+            <svg className="auth-mock-chart" viewBox="0 0 320 110" preserveAspectRatio="none">
               <defs>
                 <linearGradient id="auth-mock-fill" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0" stopColor="#8b5cf6" stopOpacity="0.45" />
                   <stop offset="1" stopColor="#8b5cf6" stopOpacity="0" />
                 </linearGradient>
               </defs>
-              <path
-                d="M0 92 C 30 90, 45 80, 70 82 S 110 64, 130 66 S 165 30, 190 34 S 225 52, 245 40 S 290 8, 320 10 L320 110 L0 110Z"
-                fill="url(#auth-mock-fill)"
-              />
-              <path
-                className="auth-mock-line"
-                d="M0 92 C 30 90, 45 80, 70 82 S 110 64, 130 66 S 165 30, 190 34 S 225 52, 245 40 S 290 8, 320 10"
-              />
+              <path d="M0 92 C 30 90, 45 80, 70 82 S 110 64, 130 66 S 165 30, 190 34 S 225 52, 245 40 S 290 8, 320 10 L320 110 L0 110Z" fill="url(#auth-mock-fill)" />
+              <path className="auth-mock-line" d="M0 92 C 30 90, 45 80, 70 82 S 110 64, 130 66 S 165 30, 190 34 S 225 52, 245 40 S 290 8, 320 10" />
               <circle cx="245" cy="40" r="4" />
             </svg>
           </div>
         </div>
 
-        <div className="auth-float">
+        <div className="auth-chip auth-chip-top">
+          <span className="auth-chip-icon">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="5" width="18" height="14" rx="4" />
+              <path d="m10 9.5 4.5 2.5-4.5 2.5z" />
+            </svg>
+          </span>
+          <div>
+            <strong>Live YouTube data</strong>
+            <span>Checked every day</span>
+          </div>
+        </div>
+
+        <div className="auth-chip auth-chip-bottom">
           <span className="auth-float-thumb" />
           <div>
             <strong>Short from a 3K-sub channel</strong>
@@ -147,11 +112,21 @@ function AuthVisual() {
         </div>
       </div>
 
-      <div className="auth-visual-foot">
-        <span>Daily Picks</span>
-        <span>Niche Finder</span>
-        <span>Outlier videos</span>
-        <span>Scripts</span>
+      <div className="auth-marquee">
+        {NICHES.map((row, i) => (
+          <div key={i} className="auth-marquee-row" data-dir={i % 2 ? "right" : "left"}>
+            {[0, 1].map((copy) => (
+              <div key={copy} className="auth-marquee-track">
+                {row.map((niche) => (
+                  <span key={niche} className="auth-marquee-item">
+                    <i />
+                    {niche}
+                  </span>
+                ))}
+              </div>
+            ))}
+          </div>
+        ))}
       </div>
     </aside>
   );

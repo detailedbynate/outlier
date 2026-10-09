@@ -10,13 +10,16 @@ export default async function ForgotPasswordPage() {
   if (await getCurrentUser()) redirect("/set-password");
 
   return (
-    <AuthSplit>
+    <AuthSplit
+      foot={
+        <>
+          Remembered it? <Link href="/login">Sign in</Link>
+        </>
+      }
+    >
       <h1 className="auth-title">Reset your password</h1>
       <p className="auth-sub">Enter the email you signed up with and we&apos;ll send you a link to choose a new password.</p>
       <ForgotForm />
-      <p className="auth-legal">
-        <Link href="/login">Back to sign in</Link>
-      </p>
     </AuthSplit>
   );
 }
