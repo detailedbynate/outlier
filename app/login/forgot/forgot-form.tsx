@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { AuthInput } from "@/components/auth-split";
 import { requestPasswordReset, type ResetState } from "./actions";
 
 const initialState: ResetState = { status: "idle", message: null };
@@ -17,13 +18,15 @@ export function ForgotForm() {
   }
 
   return (
-    <form action={action} className="stack" style={{ gap: 12 }}>
+    <form action={action} className="auth-form">
       <label className="field">
         <span>Email</span>
-        <input name="email" type="email" autoComplete="email" required />
+        <AuthInput icon="mail">
+          <input name="email" type="email" autoComplete="email" placeholder="you@example.com" required />
+        </AuthInput>
       </label>
       {state.status === "error" && state.message ? <p className="form-error">{state.message}</p> : null}
-      <button type="submit" disabled={pending}>
+      <button type="submit" className="auth-submit" disabled={pending}>
         {pending ? "Sending…" : "Email me a reset link"}
       </button>
     </form>
