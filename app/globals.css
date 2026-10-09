@@ -16045,34 +16045,34 @@ body:has(.auth-split) .shell {
 }
 
 /* ===========================================================================
-   App theme, third pass (the owner's references): near-black with a violet
-   tint instead of flat graphite, cards with a soft top-lit sheen and hairline
+   App theme, third pass (the owner's references): near-black instead of flat
+   graphite, cards with a soft top-lit sheen and hairline
    borders, a grainy violet-to-pink glow across the top of each page, lilac
    accents and glowing chart lines. Scoped to the signed-in app.
 =========================================================================== */
 body.app-body {
-  background: #060509;
+  background: #000;
 }
 
 .app {
-  --page: #060509;
-  --card: #121116;
-  --card-top: #18171e;
-  --card-sheen: linear-gradient(180deg, #19181f 0%, #121116 46%, #0f0e13 100%);
-  --surface-solid: #121116;
-  --surface-2: rgba(255, 255, 255, 0.04);
-  --surface-3: rgba(255, 255, 255, 0.075);
-  --border: rgba(255, 255, 255, 0.07);
+  --page: #000;
+  --card: #0a0a0c;
+  --card-top: #0f0f12;
+  --card-sheen: linear-gradient(180deg, #0f0f12 0%, #0a0a0c 50%, #08080a 100%);
+  --surface-solid: #0a0a0c;
+  --surface-2: rgba(255, 255, 255, 0.03);
+  --surface-3: rgba(255, 255, 255, 0.06);
+  --border: rgba(255, 255, 255, 0.065);
   --border-strong: rgba(255, 255, 255, 0.15);
   --grid: rgba(255, 255, 255, 0.05);
   --text-primary: #f6f5f8;
   --text-secondary: #aaa8b5;
   --text-muted: #76737f;
-  --glass-bg: #121116;
+  --glass-bg: #0a0a0c;
   --glass-border: rgba(255, 255, 255, 0.07);
-  --control-bg: rgba(255, 255, 255, 0.04);
-  --control-bg-hover: rgba(255, 255, 255, 0.08);
-  --menu-bg: #18171e;
+  --control-bg: rgba(255, 255, 255, 0.03);
+  --control-bg-hover: rgba(255, 255, 255, 0.06);
+  --menu-bg: #111114;
   --accent: #9d6bff;
   --accent-gradient: linear-gradient(180deg, #a77bff, #8150f5);
   --accent-text: #c8b4ff;
@@ -16080,7 +16080,7 @@ body.app-body {
   --dash-violet: #a77bff;
   --dash-pink: #ec4899;
   --dash-surface: var(--card-sheen);
-  --dash-surface-hover: linear-gradient(180deg, #1e1d25 0%, #16151b 100%);
+  --dash-surface-hover: linear-gradient(180deg, #121215 0%, #0c0c0e 100%);
   --radius-sm: 8px;
   --radius: 10px;
   --radius-lg: 14px;
@@ -16088,7 +16088,7 @@ body.app-body {
 
 .home {
   --dash-surface: var(--card-sheen);
-  --dash-surface-hover: linear-gradient(180deg, #1e1d25 0%, #16151b 100%);
+  --dash-surface-hover: linear-gradient(180deg, #121215 0%, #0c0c0e 100%);
 }
 
 /* The glow across the top of every page: violet into pink, grainy, fading into the page. */
@@ -16129,7 +16129,7 @@ body.app-body {
 .app :is(.glass, .card, .panel, .dash-panel) {
   background: var(--card-sheen);
   border: 1px solid var(--border);
-  border-top-color: rgba(255, 255, 255, 0.1);
+  border-top-color: rgba(255, 255, 255, 0.09);
 }
 
 .app .dash-panel,
@@ -16139,26 +16139,50 @@ body.app-body {
 
 /* Tiles inside a card: a lighter wash rather than another card. */
 .app :is(.dash-panel, .card) :is(.dash-stat, .home-stat, .stat) {
-  background: rgba(255, 255, 255, 0.03);
+  background: transparent;
   border-color: rgba(255, 255, 255, 0.06);
 }
 
 .app :is(.dash-panel, .card) :is(.dash-stat, .home-stat, .stat):hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.025);
 }
 
 /* Sidebar: a card of its own, the current page a lifted pill with a lilac icon. */
 .app .sidebar {
-  background: linear-gradient(180deg, #16151b 0%, #0f0e13 100%);
+  background: #050506;
   border: 1px solid var(--border);
-  border-top-color: rgba(255, 255, 255, 0.1);
+  border-top-color: rgba(255, 255, 255, 0.09);
   border-radius: 20px;
+}
+
+/* Credits and the account row sit on the sidebar itself, split by a hairline, not in boxes. */
+.app .sidebar .credits {
+  background: none;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  padding: 14px 6px 10px;
+}
+
+.app .sidebar .credits-icon {
+  background: var(--accent-wash);
+  color: var(--accent-text);
+}
+
+.app .sidebar-account {
+  border-top: 1px solid var(--border);
+  padding: 12px 6px 2px;
+}
+
+.app .account-avatar {
+  background: var(--accent-wash);
+  color: var(--accent-text);
 }
 
 @media (min-width: 901px) {
   .app .sidebar-foot {
-    background: #0f0e13;
-    box-shadow: 0 -14px 16px -6px #0f0e13 !important;
+    background: #050506;
+    box-shadow: 0 -14px 16px -6px #050506 !important;
   }
 }
 
@@ -16177,8 +16201,8 @@ body.app-body {
 }
 
 .app .nav-link[aria-current="page"] {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04));
-  border-color: rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.035));
+  border-color: rgba(255, 255, 255, 0.07);
   color: var(--text-primary);
 }
 
