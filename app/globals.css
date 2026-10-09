@@ -16043,3 +16043,204 @@ body:has(.auth-split) .shell {
     padding: 22px 18px;
   }
 }
+
+/* ===========================================================================
+   App theme, third pass (the owner's references): near-black with a violet
+   tint instead of flat graphite, cards with a soft top-lit sheen and hairline
+   borders, a grainy violet-to-pink glow across the top of each page, lilac
+   accents and glowing chart lines. Scoped to the signed-in app.
+=========================================================================== */
+body.app-body {
+  background: #060509;
+}
+
+.app {
+  --page: #060509;
+  --card: #121116;
+  --card-top: #18171e;
+  --card-sheen: linear-gradient(180deg, #19181f 0%, #121116 46%, #0f0e13 100%);
+  --surface-solid: #121116;
+  --surface-2: rgba(255, 255, 255, 0.04);
+  --surface-3: rgba(255, 255, 255, 0.075);
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.15);
+  --grid: rgba(255, 255, 255, 0.05);
+  --text-primary: #f6f5f8;
+  --text-secondary: #aaa8b5;
+  --text-muted: #76737f;
+  --glass-bg: #121116;
+  --glass-border: rgba(255, 255, 255, 0.07);
+  --control-bg: rgba(255, 255, 255, 0.04);
+  --control-bg-hover: rgba(255, 255, 255, 0.08);
+  --menu-bg: #18171e;
+  --accent: #9d6bff;
+  --accent-gradient: linear-gradient(180deg, #a77bff, #8150f5);
+  --accent-text: #c8b4ff;
+  --accent-wash: rgba(157, 107, 255, 0.14);
+  --dash-violet: #a77bff;
+  --dash-pink: #ec4899;
+  --dash-surface: var(--card-sheen);
+  --dash-surface-hover: linear-gradient(180deg, #1e1d25 0%, #16151b 100%);
+  --radius-sm: 8px;
+  --radius: 10px;
+  --radius-lg: 14px;
+}
+
+.home {
+  --dash-surface: var(--card-sheen);
+  --dash-surface-hover: linear-gradient(180deg, #1e1d25 0%, #16151b 100%);
+}
+
+/* The glow across the top of every page: violet into pink, grainy, fading into the page. */
+.app .main {
+  position: relative;
+  isolation: isolate;
+}
+
+.app .main::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0 0 auto;
+  height: 340px;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 120% at 12% 0%, rgba(124, 77, 255, 0.42), transparent 70%),
+    radial-gradient(50% 110% at 58% 0%, rgba(236, 72, 153, 0.26), transparent 70%),
+    radial-gradient(45% 100% at 96% 0%, rgba(99, 102, 241, 0.3), transparent 70%);
+  mask-image: linear-gradient(180deg, #000 0%, rgba(0, 0, 0, 0.55) 45%, transparent 100%);
+  border-radius: 0 0 28px 28px;
+}
+
+.app .main::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0 0 auto;
+  height: 340px;
+  pointer-events: none;
+  opacity: 0.22;
+  mix-blend-mode: overlay;
+  mask-image: linear-gradient(180deg, #000, transparent);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Cards: top-lit, hairline border, a brighter top edge. */
+.app :is(.glass, .card, .panel, .dash-panel) {
+  background: var(--card-sheen);
+  border: 1px solid var(--border);
+  border-top-color: rgba(255, 255, 255, 0.1);
+}
+
+.app .dash-panel,
+.app .card {
+  border-radius: 20px;
+}
+
+/* Tiles inside a card: a lighter wash rather than another card. */
+.app :is(.dash-panel, .card) :is(.dash-stat, .home-stat, .stat) {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.app :is(.dash-panel, .card) :is(.dash-stat, .home-stat, .stat):hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Sidebar: a card of its own, the current page a lifted pill with a lilac icon. */
+.app .sidebar {
+  background: linear-gradient(180deg, #16151b 0%, #0f0e13 100%);
+  border: 1px solid var(--border);
+  border-top-color: rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+}
+
+@media (min-width: 901px) {
+  .app .sidebar-foot {
+    background: #0f0e13;
+    box-shadow: 0 -14px 16px -6px #0f0e13 !important;
+  }
+}
+
+.app .nav-link {
+  border: 1px solid transparent;
+  border-radius: 12px;
+}
+
+.app .nav-icon {
+  background: none;
+  width: 22px;
+}
+
+.app .nav-link:hover {
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.app .nav-link[aria-current="page"] {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04));
+  border-color: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+.app .nav-link[aria-current="page"] .nav-icon {
+  background: none;
+  color: var(--accent-text);
+}
+
+.app .nav-badge {
+  background: rgba(157, 107, 255, 0.2);
+  color: var(--accent-text);
+}
+
+/* Type: bigger, lighter page titles; calmer card titles. */
+.app h1,
+.app .dash-hero h1 {
+  font-size: clamp(28px, 3vw, 36px);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+.app .dash-panel-titles h2 {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+/* Buttons: lilac primary, quiet glass secondary. */
+.app .button-ghost {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.app .button-ghost:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.app :is(input, select, textarea) {
+  background: rgba(255, 255, 255, 0.035);
+  border-color: rgba(255, 255, 255, 0.09);
+}
+
+.app :is(.chip, .keyword-chip) {
+  background: rgba(255, 255, 255, 0.035);
+  border-color: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+}
+
+.app .chip[aria-current="true"],
+.app .chip[aria-pressed="true"] {
+  background: var(--accent-wash);
+  border-color: rgba(157, 107, 255, 0.45);
+  color: var(--text-primary);
+}
+
+/* Chart lines glow, as in the reference. */
+.app :is(.home-spark-line, .intel-spark path, .home-ring-fill) {
+  filter: drop-shadow(0 0 6px rgba(167, 123, 255, 0.65));
+}
+
+.app .home-spark-area {
+  fill: rgba(167, 123, 255, 0.14);
+}
