@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { AuthVideo } from "@/components/auth-video";
 import { BrandMark } from "@/components/icons";
 
 /**
@@ -37,9 +38,6 @@ function AuthVisual() {
       <div className="auth-glow" />
 
       <div className="auth-visual-copy">
-        <span className="auth-new">
-          <b>New</b> Niche Finder for gaming
-        </span>
         <h2>
           Find <span>outliers</span> before everyone else
         </h2>
@@ -54,39 +52,8 @@ function AuthVisual() {
             <i />
             <span>useoutlier.online</span>
           </div>
-          <div className="auth-mock-body">
-            <div className="auth-mock-title">
-              <strong>Outliers today</strong>
-              <span>Live</span>
-            </div>
-            <div className="auth-mock-stats">
-              <div>
-                <small>Views</small>
-                <b>2.4M</b>
-                <em>+38%</em>
-              </div>
-              <div>
-                <small>Outlier score</small>
-                <b>18.2×</b>
-                <em>+12%</em>
-              </div>
-              <div>
-                <small>New channels</small>
-                <b>1,284</b>
-                <em>+6%</em>
-              </div>
-            </div>
-            <svg className="auth-mock-chart" viewBox="0 0 320 110" preserveAspectRatio="none">
-              <defs>
-                <linearGradient id="auth-mock-fill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0" stopColor="#8b5cf6" stopOpacity="0.45" />
-                  <stop offset="1" stopColor="#8b5cf6" stopOpacity="0" />
-                </linearGradient>
-              </defs>
-              <path d="M0 92 C 30 90, 45 80, 70 82 S 110 64, 130 66 S 165 30, 190 34 S 225 52, 245 40 S 290 8, 320 10 L320 110 L0 110Z" fill="url(#auth-mock-fill)" />
-              <path className="auth-mock-line" d="M0 92 C 30 90, 45 80, 70 82 S 110 64, 130 66 S 165 30, 190 34 S 225 52, 245 40 S 290 8, 320 10" />
-              <circle cx="245" cy="40" r="4" />
-            </svg>
+          <div className="auth-video">
+            <AuthVideo />
           </div>
         </div>
 
