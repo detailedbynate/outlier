@@ -31,6 +31,7 @@ import type { GameStat } from "@/lib/niches/games";
 import { mineFirst, nichePreferences } from "@/lib/niches/personal";
 import { gameAlert, type GameAlert } from "@/lib/niches/alerts";
 import { gameIn } from "@/lib/niches/rule-labeler";
+import { platformOf } from "@/lib/niches/naming";
 import type { NicheIdeaRow, NichePickRow } from "@/types/database";
 
 export const dynamic = "force-dynamic";
@@ -958,6 +959,7 @@ function LibraryBoard({ niches, hiddenCount, allRound, view }: { niches: Discove
           <header className="niche-idea-head">
             <h3>
               <Link href={`/research/niche-finder?topic=${encodeURIComponent(n.term)}`}>{n.term}</Link>
+              {platformOf(n.term) ? <span className="discover-platform">{platformOf(n.term)} game</span> : null}
             </h3>
             <span className="niche-score" data-band={band(n.total)}>
               {n.total}

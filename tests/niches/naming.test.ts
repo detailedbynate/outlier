@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canonicalNiche, displayNicheName, isUsefulNiche, nicheKey, readsLikeAName, titleCaseNiche } from "@/lib/niches/naming";
+import { canonicalNiche, displayNicheName, isUsefulNiche, nicheKey, platformOf, readsLikeAName, titleCaseNiche } from "@/lib/niches/naming";
 import { tokenize, topicKey } from "@/lib/niches/analysis";
 
 /** Titles in the ordinary mixed-case style most channels use. */
@@ -132,5 +132,13 @@ describe("isUsefulNiche", () => {
         titles: ["All the entities Ranked Again", "New entities Are Here Now", "These entities Are Scary", "My entities Tier List"],
       }),
     ).toBe(false);
+  });
+});
+
+describe("platformOf", () => {
+  it("names the platform a game lives inside", () => {
+    expect(platformOf("Doors")).toBe("Roblox");
+    expect(platformOf("Blox Fruits")).toBe("Roblox");
+    expect(platformOf("Fortnite")).toBeNull();
   });
 });

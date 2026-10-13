@@ -69,6 +69,12 @@ export function dictionaryName(term: string): string | null {
   return BY_PHRASE.get(key) ?? BY_PHRASE.get(key.replace(/ /g, "")) ?? null;
 }
 
+/** The platform a known game lives inside ("Roblox" for Doors), so a plain-word name doesn't read as junk. */
+export function platformOf(term: string): string | null {
+  const name = dictionaryName(term);
+  return NICHE_DICTIONARY.find((e) => e.name === name)?.within ?? null;
+}
+
 export function isDictionaryName(term: string): boolean {
   return dictionaryName(term) !== null;
 }
