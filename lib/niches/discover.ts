@@ -10,7 +10,8 @@ import { NICHE_CATEGORIES, type NicheCategory } from "./labeling";
 import { topicAliases, type NicheChannel, type NicheVideo } from "./analysis";
 import { normalizeName } from "./naming";
 import { adjustRpm, audienceAdjustment, categoryFor, rpmFor } from "./revenue";
-import { findUnderratedNiches, type UnderratedNiche } from "./underrated";
+import { examplesFor } from "./examples";
+import { assessNiche, findUnderratedNiches, type UnderratedNiche } from "./underrated";
 
 export type DiscoverFormat = "shorts" | "long_form";
 export type RpmTier = "high" | "mid" | "low";
@@ -296,13 +297,19 @@ export function discoverNiches(
 ): DiscoveredNiche[] {
   const now = options.now ?? new Date();
   const slice = videos.filter(
-    (v) => (format === "shorts" ? v.format === "short" : v.format === "long_form") && !SPAM.test(v.title) && !SPAM.test(channels.get(v.channel_id)?.title ?? ""),
+    (v) =>
+      (format === "shorts" ? v.format === "short" : v.format === "long_form") &&
+      // Made for kids: no comments, no personalised ads, a fraction of the RPM. Not a business to start.
+      v.made_for_kids !== true &&
+      !SPAM.test(v.title) &&
+      !SPAM.test(channels.get(v.channel_id)?.title ?? ""),
   );
+  const minViewsPerDay = format === "shorts" ? 300 : 100;
   // Long-form gets fewer views per upload than Shorts; don't hold it to the Shorts bar.
   // Mine wide, then keep only names with a known category: that drops title words
   // like "hero" or "david" and gives every niche a real RPM band.
   const categories = new Map<string, NicheCategory>();
-  const mined = findUnderratedNiches(slice, channels, { max: options.max ?? 250, now, minViewsPerDay: format === "shorts" ? 300 : 100 }).filter((niche) => {
+  const mined = findUnderratedNiches(slice, channels, { max: options.max ?? 250, now, minViewsPerDay }).filter((niche) => {
     const category = categoryFor(niche.term) ?? channelCategory(niche, slice, channels);
     if (category) categories.set(niche.term, category);
     return category !== null;
@@ -310,11 +317,13 @@ export function discoverNiches(
   // Titles and tags normalized once: every niche is matched against all of them.
   const texts = slice.map((v) => {
     const spaced = ` ${normalizeName([v.title, ...v.tags.slice(0, 30)].join(" "))} `;
-    return { spaced, squashed: spaced.replace(/ /g, "") };
+    return { spaced, squashed: spaced.replace(/ /g, ""), title: ` ${normalizeName(v.title)} ` };
   });
+  const titleOf = new Map(slice.map((v, i) => [v, texts[i]!.title]));
+  const phrasesOf = (term: string) => [...new Set([term, ...topicAliases(term)].map(normalizeName).filter((p) => p.length >= 2))];
   // A niche's uploads are the ones naming it or one of its aliases: "msm" is My Singing Monsters too.
   const byTerm = (term: string) => {
-    const phrases = [...new Set([term, ...topicAliases(term)].map(normalizeName).filter((p) => p.length >= 2))];
+    const phrases = phrasesOf(term);
     const squashed = phrases.map((p) => p.replace(/ /g, "")).filter((p) => p.length >= 5);
     return slice.filter((_, i) => phrases.some((p) => texts[i]!.spaced.includes(` ${p} `)) || squashed.some((p) => texts[i]!.squashed.includes(p)));
   };
@@ -323,21 +332,42 @@ export function discoverNiches(
   const known = (n: UnderratedNiche) => categoryFor(n.term) !== null;
   const ranked = [...mined].sort((a, b) => Number(known(b)) - Number(known(a)));
   const kept: { niche: UnderratedNiche; ids: Set<string>; videos: NicheVideo[]; videoIds: Set<string> }[] = [];
-  for (const niche of ranked) {
+  for (const found of ranked) {
+    const videos = byTerm(found.term);
+    if (!known(found) && !looksLikeNiche(found.term, videos, channels)) continue;
+    // The miner found it under a title word ("ball", "show") that the name stands for; the
+    // numbers and examples come from the uploads that actually name it ("Blade Ball", "MLB The Show"),
+    // not every video with that word in it.
+    if (videos.length < MIN_NICHE_VIDEOS || new Set(videos.map((v) => v.channel_id)).size < MIN_NICHE_CHANNELS) continue;
+    const niche = assessNiche(found.term, videos, channels, { now, minViewsPerDay, maxDominance: 0.6 });
+    if (!niche) continue;
+    // Examples say the name in the title where they can; a hashtag-only match ("#zelda" on a GTA 6 meme) reads as a mismatch.
+    const phrases = phrasesOf(found.term);
+    const titled = new Set(videos.filter((v) => phrases.some((p) => titleOf.get(v)!.includes(` ${p} `))).map((v) => v.id));
+    if (titled.size > 0) {
+      const first = examplesFor(videos.filter((v) => titled.has(v.id)), channels);
+      const used = new Set(first.map((e) => e.youtubeVideoId));
+      const seenChannels = new Set(videos.filter((v) => used.has(v.youtube_video_id)).map((v) => v.channel_id));
+      const rest = examplesFor(videos.filter((v) => !titled.has(v.id) && !seenChannels.has(v.channel_id)), channels, 3 - first.length);
+      niche.examples = [...first, ...rest];
+    }
     const ids = new Set(niche.examples.map((e) => e.youtubeVideoId));
-    const videos = byTerm(niche.term);
-    if (!known(niche) && !looksLikeNiche(niche.term, videos, channels)) continue;
     const videoIds = new Set(videos.map((v) => v.id));
     const twin = kept.find((k) => sameNiche(k.niche, niche, k.ids, ids) || mostlyShared(k.videoIds, videoIds));
     if (!twin) kept.push({ niche, ids, videos, videoIds });
   }
   // Back in the miner's order.
-  kept.sort((a, b) => mined.indexOf(a.niche) - mined.indexOf(b.niche));
+  const order = new Map(mined.map((n, i) => [n.term, i]));
+  kept.sort((a, b) => (order.get(a.niche.term) ?? 0) - (order.get(b.niche.term) ?? 0));
   return kept.map(({ niche, videos }) => scoreNiche(niche, format, videos, { channels, now, weightOf: options.weightOf, category: categories.get(niche.term) }));
 }
 
 /** Adult and bait spam that slips in under ordinary words ("japan movie"). */
-const SPAM = /\b(s[e3]x|sexy|nsfw|erotic|onlyfans|nude|kissing massage|oil massage|hot massage)\b/i;
+const SPAM = /\b(s[e3]x|sexy|nsfw|erotic|onlyfans|nude|kissing (?:massage|scene)|hot kiss(?:ing)?|hot videos?|young wife|oil massage|hot massage)\b/i;
+
+/** Uploads that must name a niche, and channels posting them, before it's shown. Same floor as the miner. */
+const MIN_NICHE_VIDEOS = 6;
+const MIN_NICHE_CHANNELS = 4;
 
 /** Channels that have to say a name in their titles, not just hashtag it, before it's a niche. */
 const MIN_TITLE_CHANNELS = 3;

@@ -16570,3 +16570,60 @@ body.app-body {
   border-radius: 0 0 9px 9px;
   margin-top: 2px;
 }
+
+/* Discover cards: the name's link covers the whole card; "Not for me" sits above it. */
+.discover-card-link {
+  position: relative;
+}
+
+.discover-card-link h3 a::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.discover-card-link h3 a:hover {
+  text-decoration: none;
+}
+
+.discover-card-link:focus-within {
+  outline: 2px solid var(--dash-violet);
+  outline-offset: 2px;
+}
+
+.discover-hide {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.discover-hide button,
+.discover-unhide button {
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.1));
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.discover-hide button:hover,
+.discover-unhide button:hover {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+
+.discover-unhide {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}

@@ -3,9 +3,10 @@ import { JobWorker } from "@/lib/jobs/worker";
 import { getServices } from "@/lib/services";
 
 export const dynamic = "force-dynamic";
-// Stay within the Vercel Hobby function limit; jobs stop starting ~15s before it.
-export const maxDuration = 60;
-const WORK_BUDGET_MS = 40_000;
+// The server's tick script waits 90s for this; jobs stop starting ~15s before that.
+// The free AI models the niche labeler falls back to need most of a minute per batch.
+export const maxDuration = 90;
+const WORK_BUDGET_MS = 75_000;
 
 /**
  * POST /api/cron/tick — called on a schedule (GitHub Actions). Enqueues due

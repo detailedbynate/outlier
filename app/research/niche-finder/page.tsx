@@ -17,7 +17,8 @@ import type { NicheCreator, NicheExample } from "@/lib/niches/examples";
 import { reasonFor, type NicheIdea, type NicheResult, type TrackRecord } from "@/lib/services/niche-service";
 import { asUser } from "@/lib/youtube/quota-context";
 import { nicheFit, type OwnChannelMonth } from "@/lib/niches/fit";
-import { isSaved, readSavedNiches } from "@/lib/niches/saved";
+import { isSaved, readHiddenNiches, readSavedNiches } from "@/lib/niches/saved";
+import { hideNiche } from "./actions";
 import { CompareBox, FitPanel, Patterns, SaveNicheButton, SavedNiches, ScoreBreakdown, TrendChart } from "./insights";
 import { TopicInput } from "./topic-input";
 import { BoardBody, BoardNav, NavLink } from "./board-nav";
@@ -137,7 +138,10 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
     ideasOn && gaming ? services.radar.risingGames({ limit: 18 }).catch(() => []) : Promise.resolve([]),
     ideasOn && gaming ? services.niches.trackRecord() : Promise.resolve(null),
   ]);
-  const shown = discovered.filter((n) => (!gaming || n.category === "Gaming") && (view.rpm === "all" || rpmTierIn(view.lens, n.rpmTier, n.term) === view.rpm));
+  const hidden = new Set(readHiddenNiches(user.user_metadata));
+  const notHidden = discovered.filter((n) => !hidden.has(topicKey(n.term)));
+  const hiddenCount = discovered.length - notHidden.length;
+  const shown = notHidden.filter((n) => (!gaming || n.category === "Gaming") && (view.rpm === "all" || rpmTierIn(view.lens, n.rpmTier, n.term) === view.rpm));
   const sorted = sortDiscovered(shown, view.sort);
   // Strong on everything next to the rest of what's shown.
   const allRound = new Set([...allRoundScores(shown)].flatMap(([n, r]) => (r.weakest >= 0.5 ? [n.term] : [])));
@@ -194,7 +198,7 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
       {result ? null : <SavedNiches niches={saved.map((n) => ({ ...n, alert: alerts.get(n.key) ?? null }))} />}
       {result ? <Report result={result} drill={drill} saved={isSaved(savedList, result.topic)} own={own} /> : null}
       {related.length > 0 ? <IdeaBoard ideas={related} title={`Niches next to ${result!.topic}`} sub="Other researched topics that overlap with this one" /> : null}
-      {result ? null : <DiscoverBoard niches={discoverList} allRound={allRound} gaps={sortGaps(radarNiches, view)} questions={questions} evergreen={evergreen} breakouts={mineFirst(proof.breakouts, mine, (b) => b.game)} rising={mineFirst(proof.rising, mine, (c) => c.game)} formats={proof.formats} games={mineFirst(proof.games, mine, (g) => g.game)} mine={mine} record={record} risingGames={risingGames} requests={requests} launches={launches} view={view} />}
+      {result ? null : <DiscoverBoard niches={discoverList} hiddenCount={hiddenCount} allRound={allRound} gaps={sortGaps(radarNiches, view)} questions={questions} evergreen={evergreen} breakouts={mineFirst(proof.breakouts, mine, (b) => b.game)} rising={mineFirst(proof.rising, mine, (c) => c.game)} formats={proof.formats} games={mineFirst(proof.games, mine, (g) => g.game)} mine={mine} record={record} risingGames={risingGames} requests={requests} launches={launches} view={view} />}
       {result && topNiches.length > 0 ? (
         <IdeaBoard ideas={topNiches} title="Other underrated niches" sub="Mined from every channel Outlier tracks: real demand, room left, and small channels winning. Pick one to dig in." />
       ) : null}
@@ -799,6 +803,7 @@ const BOARD_SUB: Record<Lens, Record<Board, string>> = {
  */
 function DiscoverBoard({
   niches,
+  hiddenCount,
   allRound,
   gaps,
   questions,
@@ -815,6 +820,7 @@ function DiscoverBoard({
   view,
 }: {
   niches: DiscoveredNiche[];
+  hiddenCount: number;
   allRound: ReadonlySet<string>;
   gaps: RadarNiche[];
   questions: NicheIdeaRow[];
@@ -865,7 +871,7 @@ function DiscoverBoard({
           launches={launches}
         />
       ) : (
-        <LibraryBoard niches={niches} allRound={allRound} view={view} />
+        <LibraryBoard niches={niches} hiddenCount={hiddenCount} allRound={allRound} view={view} />
       )}
       </BoardBody>
       </BoardNav>
@@ -921,7 +927,13 @@ function Filters({ view }: { view: View }) {
   );
 }
 
-function LibraryBoard({ niches, allRound, view }: { niches: DiscoveredNiche[]; allRound: ReadonlySet<string>; view: View }) {
+function LibraryBoard({ niches, hiddenCount, allRound, view }: { niches: DiscoveredNiche[]; hiddenCount: number; allRound: ReadonlySet<string>; view: View }) {
+  const unhide = hiddenCount > 0 ? (
+    <form action={hideNiche} className="discover-unhide">
+      <span>{hiddenCount} niche{hiddenCount === 1 ? "" : "s"} you marked not for you {hiddenCount === 1 ? "is" : "are"} hidden.</span>
+      <button type="submit">Show them again</button>
+    </form>
+  ) : null;
   if (niches.length === 0) {
     return (
       <div className="dash-empty">
@@ -930,20 +942,23 @@ function LibraryBoard({ niches, allRound, view }: { niches: DiscoveredNiche[]; a
           The list grows as more channels are tracked. Meanwhile, <Link href={discoverHref(view, { board: "gaps" })}>search gaps</Link> covers niches
           nobody tracks yet.
         </p>
+        {unhide}
       </div>
     );
   }
   return (
+    <>
     <div className="niche-idea-grid">
       {niches.map((n, i) => (
-        <Link
+        <article
           key={n.term}
-          href={`/research/niche-finder?topic=${encodeURIComponent(n.term)}`}
-          className="dash-panel niche-idea discover-card"
+          className="dash-panel niche-idea discover-card discover-card-link"
           style={{ "--i": i + 1 } as CSSProperties}
         >
           <header className="niche-idea-head">
-            <h3>{n.term}</h3>
+            <h3>
+              <Link href={`/research/niche-finder?topic=${encodeURIComponent(n.term)}`}>{n.term}</Link>
+            </h3>
             <span className="niche-score" data-band={band(n.total)}>
               {n.total}
             </span>
@@ -979,9 +994,15 @@ function LibraryBoard({ niches, allRound, view }: { niches: DiscoveredNiche[]; a
             <span>{formatPercent(n.smallChannelViewShare, 0)} views to small channels</span>
             <span>{n.easeNote}</span>
           </div>
-        </Link>
+          <form action={hideNiche} className="discover-hide">
+            <input type="hidden" name="topic" value={n.term} />
+            <button type="submit" title="Hide this niche from your Discover board">Not for me</button>
+          </form>
+        </article>
       ))}
     </div>
+    {unhide}
+    </>
   );
 }
 

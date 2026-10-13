@@ -42,3 +42,20 @@ export function withoutSaved(list: readonly SavedNiche[], topic: string): SavedN
   const key = topicKey(topic);
   return list.filter((n) => n.key !== key);
 }
+
+/**
+ * Niches someone marked "not for me" on the Discover board. Topic keys only,
+ * newest first, on the account next to the saved list.
+ */
+export const HIDDEN_NICHES_KEY = "hidden_niches";
+export const MAX_HIDDEN_NICHES = 150;
+
+export function readHiddenNiches(metadata: Record<string, unknown> | undefined): string[] {
+  const raw = metadata?.[HIDDEN_NICHES_KEY];
+  return Array.isArray(raw) ? raw.filter((k): k is string => typeof k === "string") : [];
+}
+
+export function withHidden(list: readonly string[], topic: string): string[] {
+  const key = topicKey(topic);
+  return [key, ...list.filter((k) => k !== key)].slice(0, MAX_HIDDEN_NICHES);
+}

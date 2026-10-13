@@ -205,7 +205,8 @@ const serverEnvSchema = z.object({
   /** Claude model for niche labeling when Anthropic is the provider. */
   NICHE_LABEL_MODEL: z.string().trim().min(1).default("claude-haiku-4-5"),
   /** Channels per model call when labeling. */
-  NICHE_LABEL_BATCH_SIZE: z.coerce.number().int().min(1).max(50).default(20),
+  // Small: the free models answer eight channels well inside a tick, twenty often not at all.
+  NICHE_LABEL_BATCH_SIZE: z.coerce.number().int().min(1).max(50).default(8),
   /** Channels labeled per hourly run. */
   NICHE_LABEL_MAX_PER_RUN: z.coerce.number().int().min(0).max(5_000).default(200),
   /**

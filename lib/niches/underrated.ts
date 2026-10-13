@@ -79,6 +79,49 @@ function reasonFor(metrics: NicheMetrics, smallShare: number): string {
 }
 
 /**
+ * Scores one niche from the uploads that belong to it, or null when they don't
+ * add up to one a newcomer could break into: too quiet, locked down by a few
+ * channels, or watched only on the big accounts.
+ */
+export function assessNiche(
+  term: string,
+  videos: readonly NicheVideo[],
+  channels: ReadonlyMap<string, NicheChannel>,
+  options: { now: Date; minViewsPerDay: number; maxDominance: number },
+): UnderratedNiche | null {
+  const metrics = computeNicheMetrics(videos, channels, options.now);
+  if (metrics.medianViewsPerDay < options.minViewsPerDay) return null;
+  // With four channels the top three always hold ~75%, so measure against an even split.
+  if (dominanceOf(metrics) > options.maxDominance) return null;
+
+  let smallViews = 0;
+  let totalViews = 0;
+  for (const video of videos) {
+    const subs = channels.get(video.channel_id)?.subscriber_count ?? null;
+    totalViews += video.view_count;
+    if (subs !== null && subs < SMALL_CHANNEL_SUBS) smallViews += video.view_count;
+  }
+  const smallChannelViewShare = totalViews > 0 ? smallViews / totalViews : 0;
+  // Saturated: the audience only watches the big accounts.
+  if (smallChannelViewShare < 0.25) return null;
+
+  const demand = clamp01(Math.log10(metrics.medianViewsPerDay + 1) / 5);
+  const growth = metrics.growth === null ? 0.5 : clamp01((metrics.growth + 0.5) / 1.5);
+  const viral = clamp01(metrics.viralRate / 0.25);
+  const room = clamp01(1 - dominanceOf(metrics));
+  const score = Math.round(100 * (0.3 * smallChannelViewShare + 0.25 * demand + 0.2 * viral + 0.15 * room + 0.1 * growth));
+  return {
+    term,
+    metrics,
+    examples: examplesFor(videos, channels),
+    creators: creatorsFor(videos, channels),
+    score,
+    smallChannelViewShare: Math.round(smallChannelViewShare * 1000) / 1000,
+    reason: reasonFor(metrics, smallChannelViewShare),
+  };
+}
+
+/**
  * Mine every term in the sample, keep the ones a newcomer could break into, and
  * rank by how much demand goes to small channels.
  */
@@ -123,36 +166,8 @@ export function findUnderratedNiches(
     // Show niches, not title words: known names and labels pass, a bare word has to read like a name.
     if (!isUsefulNiche(term, { labeled, titles: entry.videos.map((v) => v.title) })) continue;
 
-    const metrics = computeNicheMetrics(entry.videos, channels, now);
-    if (metrics.medianViewsPerDay < minViewsPerDay) continue;
-    // With four channels the top three always hold ~75%, so measure against an even split.
-    if (dominanceOf(metrics) > maxDominance) continue;
-
-    let smallViews = 0;
-    let totalViews = 0;
-    for (const video of entry.videos) {
-      const subs = channels.get(video.channel_id)?.subscriber_count ?? null;
-      totalViews += video.view_count;
-      if (subs !== null && subs < SMALL_CHANNEL_SUBS) smallViews += video.view_count;
-    }
-    const smallChannelViewShare = totalViews > 0 ? smallViews / totalViews : 0;
-    // Saturated: the audience only watches the big accounts.
-    if (smallChannelViewShare < 0.25) continue;
-
-    const demand = clamp01(Math.log10(metrics.medianViewsPerDay + 1) / 5);
-    const growth = metrics.growth === null ? 0.5 : clamp01((metrics.growth + 0.5) / 1.5);
-    const viral = clamp01(metrics.viralRate / 0.25);
-    const room = clamp01(1 - dominanceOf(metrics));
-    const score = Math.round(100 * (0.3 * smallChannelViewShare + 0.25 * demand + 0.2 * viral + 0.15 * room + 0.1 * growth));
-    candidates.push({
-      term,
-      metrics,
-      examples: examplesFor(entry.videos, channels),
-      creators: creatorsFor(entry.videos, channels),
-      score,
-      smallChannelViewShare: Math.round(smallChannelViewShare * 1000) / 1000,
-      reason: reasonFor(metrics, smallChannelViewShare),
-    });
+    const niche = assessNiche(term, entry.videos, channels, { now, minViewsPerDay, maxDominance });
+    if (niche) candidates.push(niche);
   }
 
   // "clash royale" says more than "clash", so a two-word niche wins ties with its own words.

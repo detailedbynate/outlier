@@ -70,13 +70,22 @@ export function canonicalNiche(term: string): string | null {
   return owners?.size === 1 ? [...owners][0]! : null;
 }
 
+/** Written in capitals wherever they appear: "NBA Basketball", not "Nba Basketball". */
+const ACRONYMS = new Set(["nba", "nfl", "nhl", "mlb", "ufc", "wwe", "f1", "gta", "fps", "rpg", "mmo", "asmr", "diy", "ai", "pc", "ps5", "rc", "ev", "usa", "uk", "tcg", "mtg", "dnd", "fnaf", "mlbb", "pvz", "cod", "jjk"]);
+
 const SMALL_WORDS = new Set(["a", "an", "and", "at", "by", "for", "from", "in", "of", "on", "or", "the", "to", "vs", "with"]);
 
 /** Title case for terms the dictionary doesn't know: "funny moments" -> "Funny Moments". */
 export function titleCaseNiche(term: string): string {
   const words = term.trim().split(/\s+/);
   return words
-    .map((word, index) => (index > 0 && SMALL_WORDS.has(word.toLowerCase()) ? word.toLowerCase() : word.charAt(0).toUpperCase() + word.slice(1)))
+    .map((word, index) =>
+      ACRONYMS.has(word.toLowerCase())
+        ? word.toUpperCase()
+        : index > 0 && SMALL_WORDS.has(word.toLowerCase())
+          ? word.toLowerCase()
+          : word.charAt(0).toUpperCase() + word.slice(1),
+    )
     .join(" ");
 }
 
@@ -128,7 +137,9 @@ export function knownNameIn(term: string): { name: string; rest: string[] } | nu
  * What a mined term should be called on screen. A phrase built around a known
  * name leads with it: "unboxing super mario" is "Super Mario Unboxing".
  */
-export function displayNicheName(term: string): string {
+export function displayNicheName(raw: string): string {
+  // Hashtag pairs like "#fortnite #fortnite" mine as "fortnite fortnite": one word, said once.
+  const term = raw.trim().split(/\s+/).filter((word, i, words) => i === 0 || word.toLowerCase() !== words[i - 1]!.toLowerCase()).join(" ");
   const exact = canonicalNiche(term);
   if (exact) return exact;
   const known = knownNameIn(term);
