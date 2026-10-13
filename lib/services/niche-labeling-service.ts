@@ -76,8 +76,10 @@ export class NicheLabelingService {
     // Most channels share a handful of games and categories: look each entity up once per run.
     const entityIds = new Map<string, Promise<string>>();
     for (const { channel, label } of ruled) {
-      if (options.signal?.aborted) break;
       const ai = aiLabels.get(channel.id);
+      // Out of time: still keep what the AI already answered (a few quick writes), skip the rest.
+      // The free models can take most of a run for one batch, and throwing that away meant nothing was ever labeled.
+      if (options.signal?.aborted && !ai && !reviewed.has(channel.id)) continue;
       // Already labeled by rules and the AI didn't get to it (limits, outage): nothing changed, so
       // don't rewrite the row. Rewriting hundreds of identical rows every run just bloats the table.
       if (!ai && !reviewed.has(channel.id) && channel.niche_labeled_at) continue;

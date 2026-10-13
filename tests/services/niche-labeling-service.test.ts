@@ -107,6 +107,25 @@ describe("NicheLabelingService", () => {
     expect(saved.get("c")).toMatchObject({ nicheId: "niche-terraria" });
   });
 
+  it("keeps the AI's finished batches when the run runs out of time on a later one", async () => {
+    const controller = new AbortController();
+    const { service, saved } = setup({
+      ai: true,
+      pending: [vagueChannel("a"), vagueChannel("b"), vagueChannel("c"), vagueChannel("d")],
+      respond: (call) => {
+        if (call === 1) return { channels: [aiLabel("c1", "Minecraft"), aiLabel("c2", "Terraria")] };
+        controller.abort();
+        return new DOMException("The operation was aborted due to timeout", "TimeoutError");
+      },
+    });
+    const result = await service.labelPending({ maxChannels: 10, now: () => NOW, signal: controller.signal });
+
+    expect(result).toMatchObject({ labeled: 2, byAi: 2 });
+    expect(saved.get("a")).toMatchObject({ nicheId: "niche-minecraft" });
+    // The timed-out batch is left for the next run.
+    expect(saved.has("c")).toBe(false);
+  });
+
   it("keeps the rule labels when AI fails or skips a channel", async () => {
     const skipped = setup({ ai: true, pending: [vagueChannel("a"), vagueChannel("b")], respond: () => ({ channels: [aiLabel("c2", "   ")] }) });
     expect(await skipped.service.labelPending({ maxChannels: 10, now: () => NOW })).toMatchObject({ labeled: 2, byAi: 0 });
