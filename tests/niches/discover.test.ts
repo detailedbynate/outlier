@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { NicheChannel, NicheVideo } from "@/lib/niches/analysis";
-import { easeFor, libraryWeights, looksLikeNiche, monthlyViewsOf, newcomersIn, rpmTierOf, sortDiscovered, type DiscoveredNiche } from "@/lib/niches/discover";
+import { easeFor, libraryWeights, looksLikeNiche, monthlyViewsOf, newcomersIn, rpmTierOf, sortDiscovered, totalScore, type DiscoveredNiche } from "@/lib/niches/discover";
 import { adjustRpm, audienceAdjustment } from "@/lib/niches/revenue";
 
 const NOW = new Date("2026-10-07T00:00:00Z");
@@ -112,5 +112,18 @@ describe("discover", () => {
     const travel = easeFor("van life", "Travel & Outdoors", "long_form", 25);
     expect(facts.score).toBeGreaterThan(travel.score);
     expect(travel.note).toMatch(/filming/);
+  });
+});
+
+describe("totalScore", () => {
+  it("drags a niche down for one weak part instead of averaging it away", () => {
+    const even = totalScore({ rpm: 60, views: 60, audience: 60, untapped: 60, easy: 60 });
+    const lopsided = totalScore({ rpm: 5, views: 80, audience: 80, untapped: 80, easy: 80 });
+    expect(lopsided).toBeLessThan(even);
+  });
+
+  it("spreads strong and weak niches apart", () => {
+    expect(totalScore({ rpm: 85, views: 85, audience: 85, untapped: 85, easy: 85 })).toBeGreaterThanOrEqual(95);
+    expect(totalScore({ rpm: 30, views: 30, audience: 30, untapped: 30, easy: 30 })).toBeLessThanOrEqual(15);
   });
 });

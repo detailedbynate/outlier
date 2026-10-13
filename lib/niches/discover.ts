@@ -8,7 +8,7 @@
 
 import { NICHE_CATEGORIES, type NicheCategory } from "./labeling";
 import { topicAliases, type NicheChannel, type NicheVideo } from "./analysis";
-import { normalizeName } from "./naming";
+import { isDictionaryName, normalizeName } from "./naming";
 import { adjustRpm, audienceAdjustment, categoryFor, rpmFor } from "./revenue";
 import { examplesFor } from "./examples";
 import { assessNiche, findUnderratedNiches, type UnderratedNiche } from "./underrated";
@@ -247,7 +247,7 @@ export function scoreNiche(
     untapped: Math.round(untapped * 100),
     easy: Math.round(easy * 100),
   };
-  const total = Math.round(0.25 * scores.rpm + 0.15 * scores.views + 0.15 * scores.audience + 0.25 * scores.untapped + 0.2 * scores.easy);
+  const total = totalScore(scores);
   return {
     ...niche,
     format,
@@ -264,6 +264,25 @@ export function scoreNiche(
     startNote: proven === null ? null : `${newcomers.hits} of ${newcomers.channels} channels started this year got a ${formatBar(newcomers.bar)}+ video`,
     total,
   };
+}
+
+const TOTAL_WEIGHTS = { rpm: 0.25, views: 0.15, audience: 0.15, untapped: 0.25, easy: 0.2 } as const;
+
+/**
+ * One 0-100 number for a niche. A plain average let a niche that pays nothing or
+ * that nobody watches sit mid-table on its other strengths, and left the whole
+ * board within a few points. A niche is only as good as its weakest part, so the
+ * total is a weighted geometric mean (a 0 doesn't zero it: each part counts from 5),
+ * then spread so a niche good at everything reaches the 80s and 90s.
+ */
+export function totalScore(scores: Record<keyof typeof TOTAL_WEIGHTS, number>): number {
+  let log = 0;
+  for (const [part, weight] of Object.entries(TOTAL_WEIGHTS) as [keyof typeof TOTAL_WEIGHTS, number][]) {
+    log += weight * Math.log(Math.max(scores[part], 5) / 100);
+  }
+  const mean = Math.exp(log) * 100;
+  // 35 -> 20, 50 -> 45, 65 -> 70, 80+ -> 95+: a stretch around the middle of what real niches score.
+  return Math.round(Math.max(0, Math.min(100, 45 + (mean - 50) * (5 / 3))));
 }
 
 /**
@@ -309,7 +328,7 @@ export function discoverNiches(
   // Mine wide, then keep only names with a known category: that drops title words
   // like "hero" or "david" and gives every niche a real RPM band.
   const categories = new Map<string, NicheCategory>();
-  const mined = findUnderratedNiches(slice, channels, { max: options.max ?? 250, now, minViewsPerDay }).filter((niche) => {
+  const mined = findUnderratedNiches(slice, channels, { max: options.max ?? 400, now, minViewsPerDay, maxDominance: MAX_DOMINANCE, minSmallShare: MIN_SMALL_SHARE }).filter((niche) => {
     const category = categoryFor(niche.term) ?? channelCategory(niche, slice, channels);
     if (category) categories.set(niche.term, category);
     return category !== null;
@@ -330,16 +349,19 @@ export function discoverNiches(
   // Hashtags like "allinmlbb" mine the same videos as "Mobile Legends": keep the best-named one,
   // which is a name the dictionary knows over one that only borrowed its channels' subject.
   const known = (n: UnderratedNiche) => categoryFor(n.term) !== null;
-  const ranked = [...mined].sort((a, b) => Number(known(b)) - Number(known(a)));
+  // A dictionary name beats one that only matched a category hint ("Monsters Paironormal" is My Singing Monsters).
+  const rank = (n: UnderratedNiche) => (isDictionaryName(n.term) ? 2 : known(n) ? 1 : 0);
+  const ranked = [...mined].sort((a, b) => rank(b) - rank(a));
   const kept: { niche: UnderratedNiche; ids: Set<string>; videos: NicheVideo[]; videoIds: Set<string> }[] = [];
   for (const found of ranked) {
     const videos = byTerm(found.term);
+    if (NOT_NICHES.has(normalizeName(found.term))) continue;
     if (!known(found) && !looksLikeNiche(found.term, videos, channels)) continue;
     // The miner found it under a title word ("ball", "show") that the name stands for; the
     // numbers and examples come from the uploads that actually name it ("Blade Ball", "MLB The Show"),
     // not every video with that word in it.
     if (videos.length < MIN_NICHE_VIDEOS || new Set(videos.map((v) => v.channel_id)).size < MIN_NICHE_CHANNELS) continue;
-    const niche = assessNiche(found.term, videos, channels, { now, minViewsPerDay, maxDominance: 0.6 });
+    const niche = assessNiche(found.term, videos, channels, { now, minViewsPerDay, maxDominance: MAX_DOMINANCE, minSmallShare: MIN_SMALL_SHARE });
     if (!niche) continue;
     // Examples say the name in the title where they can; a hashtag-only match ("#zelda" on a GTA 6 meme) reads as a mismatch.
     const phrases = phrasesOf(found.term);
@@ -353,7 +375,8 @@ export function discoverNiches(
     }
     const ids = new Set(niche.examples.map((e) => e.youtubeVideoId));
     const videoIds = new Set(videos.map((v) => v.id));
-    const twin = kept.find((k) => sameNiche(k.niche, niche, k.ids, ids) || mostlyShared(k.videoIds, videoIds));
+    // Shared examples alone aren't enough: one tag-stuffed upload can top "Tech Reviews" and "Super Mario" both.
+    const twin = kept.find((k) => mostlyShared(k.videoIds, videoIds) || (sameNiche(k.niche, niche, k.ids, ids) && mostlyShared(k.videoIds, videoIds, 0.5)));
     if (!twin) kept.push({ niche, ids, videos, videoIds });
   }
   // Back in the miner's order.
@@ -365,9 +388,18 @@ export function discoverNiches(
 /** Adult and bait spam that slips in under ordinary words ("japan movie"). */
 const SPAM = /\b(s[e3]x|sexy|nsfw|erotic|onlyfans|nude|kissing (?:massage|scene)|hot kiss(?:ing)?|hot videos?|young wife|oil massage|hot massage)\b/i;
 
+/** Mined phrases that pass every test and still aren't something to start a channel on. */
+const NOT_NICHES = new Set(["explains", "explained", "person business", "camera phone", "30th anniversary", "sales", "lifestyle", "easter egg", "admin abuse", "iso hemlock", "software", "beginner friendly", "tech reviews"]);
+
 /** Uploads that must name a niche, and channels posting them, before it's shown. Same floor as the miner. */
 const MIN_NICHE_VIDEOS = 6;
 const MIN_NICHE_CHANNELS = 4;
+/**
+ * Only shut out niches a newcomer has next to no chance in. A crowded niche with
+ * big money still belongs on the board, scored down on "Untapped", not hidden.
+ */
+const MAX_DOMINANCE = 0.8;
+const MIN_SMALL_SHARE = 0.1;
 
 /** Channels that have to say a name in their titles, not just hashtag it, before it's a niche. */
 const MIN_TITLE_CHANNELS = 3;
@@ -402,13 +434,13 @@ function creatorKey(title: string): string {
 }
 
 /** Most of the smaller set's uploads are in the bigger one: the same niche under two names. */
-function mostlyShared(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
+function mostlyShared(a: ReadonlySet<string>, b: ReadonlySet<string>, share = 0.85): boolean {
   const [small, big] = a.size <= b.size ? [a, b] : [b, a];
   if (small.size < 3) return false;
   let shared = 0;
   for (const id of small) if (big.has(id)) shared += 1;
   // Hashtag twins share nearly everything; Elden Ring and Dark Souls share a lot and are still two niches.
-  return shared / small.size >= 0.85;
+  return shared / small.size >= share;
 }
 
 /** Labeled channels a niche needs before their subject can stand in for its own. */

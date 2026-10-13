@@ -40,6 +40,8 @@ export interface UnderratedOptions {
   minFocusedChannels?: number;
   /** Median views per day a niche must reach to count as alive. */
   minViewsPerDay?: number;
+  /** Share of views small channels must get; below it the audience only watches the big accounts. */
+  minSmallShare?: number;
   now?: Date;
 }
 
@@ -87,7 +89,7 @@ export function assessNiche(
   term: string,
   videos: readonly NicheVideo[],
   channels: ReadonlyMap<string, NicheChannel>,
-  options: { now: Date; minViewsPerDay: number; maxDominance: number },
+  options: { now: Date; minViewsPerDay: number; maxDominance: number; minSmallShare?: number },
 ): UnderratedNiche | null {
   const metrics = computeNicheMetrics(videos, channels, options.now);
   if (metrics.medianViewsPerDay < options.minViewsPerDay) return null;
@@ -103,7 +105,7 @@ export function assessNiche(
   }
   const smallChannelViewShare = totalViews > 0 ? smallViews / totalViews : 0;
   // Saturated: the audience only watches the big accounts.
-  if (smallChannelViewShare < 0.25) return null;
+  if (smallChannelViewShare < (options.minSmallShare ?? 0.25)) return null;
 
   const demand = clamp01(Math.log10(metrics.medianViewsPerDay + 1) / 5);
   const growth = metrics.growth === null ? 0.5 : clamp01((metrics.growth + 0.5) / 1.5);
@@ -130,7 +132,7 @@ export function findUnderratedNiches(
   channels: ReadonlyMap<string, NicheChannel>,
   options: UnderratedOptions = {},
 ): UnderratedNiche[] {
-  const { maxDominance = 0.6, minViewsPerDay = 300, max = 12, now = new Date() } = options;
+  const { maxDominance = 0.6, minViewsPerDay = 300, max = 12, now = new Date(), minSmallShare } = options;
   // Four channels is the floor: with three, the "top 3" is everyone.
   const minVideos = options.minVideos ?? 6;
   const minChannels = options.minChannels ?? 4;
@@ -166,7 +168,7 @@ export function findUnderratedNiches(
     // Show niches, not title words: known names and labels pass, a bare word has to read like a name.
     if (!isUsefulNiche(term, { labeled, titles: entry.videos.map((v) => v.title) })) continue;
 
-    const niche = assessNiche(term, entry.videos, channels, { now, minViewsPerDay, maxDominance });
+    const niche = assessNiche(term, entry.videos, channels, { now, minViewsPerDay, maxDominance, minSmallShare });
     if (niche) candidates.push(niche);
   }
 

@@ -1,6 +1,6 @@
 import { NICHE_DICTIONARY } from "./dictionary";
 import type { NicheCategory } from "./labeling";
-import { normalizeName } from "./naming";
+import { dictionaryName, normalizeName } from "./naming";
 
 /**
  * Rough YouTube earnings for a niche. RPM is what a creator keeps per 1,000
@@ -79,7 +79,8 @@ export function categoryFor(...names: string[]): NicheCategory | null {
   for (const name of names) {
     const key = normalizeName(name);
     if (!key) continue;
-    const entry = NICHE_DICTIONARY.find((e) => normalizeName(e.name) === key || e.aliases.some((a) => normalizeName(a) === key));
+    const proper = dictionaryName(name);
+    const entry = NICHE_DICTIONARY.find((e) => e.name === proper || normalizeName(e.name) === key || e.aliases.some((a) => normalizeName(a) === key));
     if (entry) return entry.category;
   }
   for (const name of names) {

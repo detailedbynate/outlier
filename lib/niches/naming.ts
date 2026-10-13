@@ -25,6 +25,8 @@ export function normalizeName(value: string): string {
     .trim();
 }
 
+const LINK_WORDS = new Set(["a", "an", "and", "of", "the", "vs", "at", "in", "on"]);
+
 /** Every name and alias the dictionary knows, mapped to the proper name. Hashtag spellings included. */
 const BY_PHRASE = new Map<string, string>();
 /** Single words to the dictionary names that contain them: "mario" -> Super Mario, "super" -> two names. */
@@ -41,6 +43,9 @@ for (const entry of NICHE_DICTIONARY) {
     for (const squashed of [key.replace(/ /g, ""), key.replace(/ (?:\d+|ii|iii|iv|v|vi)$/, "").replace(/ /g, "")]) {
       if (squashed !== key && squashed.length >= 4 && !BY_PHRASE.has(squashed)) BY_PHRASE.set(squashed, entry.name);
     }
+    // Mined bigrams skip little words: "sea thieves" is Sea of Thieves, "mlb show" MLB The Show.
+    const content = key.split(" ").filter((w) => !LINK_WORDS.has(w)).join(" ");
+    if (content !== key && content.includes(" ") && !BY_PHRASE.has(content)) BY_PHRASE.set(content, entry.name);
   }
   for (const word of normalizeName(entry.name).split(" ")) {
     if (word.length < 4) continue;
@@ -57,6 +62,17 @@ for (const entry of NICHE_DICTIONARY) {
  * is Super Mario). A word shared by several ("super") is a fragment, not a
  * niche, so it stays unknown and gets dropped.
  */
+/** The dictionary's name for a term that is one of its names or aliases, else null. */
+export function dictionaryName(term: string): string | null {
+  const key = normalizeName(term);
+  if (!key) return null;
+  return BY_PHRASE.get(key) ?? BY_PHRASE.get(key.replace(/ /g, "")) ?? null;
+}
+
+export function isDictionaryName(term: string): boolean {
+  return dictionaryName(term) !== null;
+}
+
 export function canonicalNiche(term: string): string | null {
   const key = normalizeName(term);
   if (!key) return null;

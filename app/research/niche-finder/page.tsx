@@ -146,7 +146,7 @@ export default async function NicheFinderPage({ searchParams }: { searchParams: 
   // Strong on everything next to the rest of what's shown.
   const allRound = new Set([...allRoundScores(shown)].flatMap(([n, r]) => (r.weakest >= 0.5 ? [n.term] : [])));
   // On the default sort, niches in the creator's own games lead.
-  const discoverList = (view.sort === "bets" ? mineFirst(sorted, personal.games, (n) => gameIn(n.term)) : sorted).slice(0, 24);
+  const discoverList = (view.sort === "bets" ? mineFirst(sorted, personal.games, (n) => gameIn(n.term)) : sorted).slice(0, 60);
   const mine = gaming ? personal.games : [];
   // Saved games get what's moved for them: views, breakouts, climbing Steam or Roblox.
   const savedGames = result ? [] : savedList.filter((n) => gameIn(n.topic));
