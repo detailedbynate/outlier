@@ -3,6 +3,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type { z } from "zod";
 import { AppError } from "@/lib/core/errors";
 import { AiBalanceEmptyError, isCreditBalanceError, reportBalanceEmpty } from "./balance";
+import type { SpendBudget } from "./budget";
 import type { TextGenerationRequest, TextGenerationResult, TextProvider, TokenUsage } from "./types";
 
 export const DEFAULT_ANTHROPIC_MODEL = "claude-opus-5";
@@ -25,12 +26,15 @@ export class AnthropicTextProvider implements TextProvider {
   readonly name = "anthropic";
   private readonly client: Anthropic;
 
-  constructor(options: { apiKey?: string; model?: string; client?: Anthropic } = {}) {
+  constructor(options: { apiKey?: string; model?: string; client?: Anthropic; budget?: SpendBudget } = {}) {
     this.client = options.client ?? new Anthropic(options.apiKey ? { apiKey: options.apiKey } : {});
     this.model = options.model ?? DEFAULT_ANTHROPIC_MODEL;
+    this.budget = options.budget ?? null;
   }
 
   private readonly model: string;
+  /** Daily spend cap; when it's used up, calls fail fast so a fallback chain moves on. */
+  private readonly budget: SpendBudget | null;
 
   async generateText(request: TextGenerationRequest): Promise<TextGenerationResult> {
     const response = await this.send(request);
@@ -57,8 +61,11 @@ export class AnthropicTextProvider implements TextProvider {
 
   /** The API call, with a spent prepaid balance turned into its own error and an alert to the owner. */
   private async create(...args: Parameters<Anthropic["beta"]["messages"]["create"]>): Promise<BetaMessage> {
+    await this.budget?.check();
     try {
-      return (await this.client.beta.messages.create(...args)) as BetaMessage;
+      const response = (await this.client.beta.messages.create(...args)) as BetaMessage;
+      await this.budget?.record(response.model, response.usage);
+      return response;
     } catch (error) {
       if (!isCreditBalanceError(error)) throw error;
       reportBalanceEmpty(error instanceof Error ? error.message : "credit balance too low");

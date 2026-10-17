@@ -181,6 +181,12 @@ const serverEnvSchema = z.object({
   EMAIL_FROM: z.string().trim().default("Outlier <no-reply@useoutlier.online>"),
 
   ANTHROPIC_API_KEY: optionalString,
+  /**
+   * Most the script writer spends on Claude per UTC day, in dollars. Past it,
+   * scripts come from the free models until tomorrow. 0.30 makes a $5 top-up
+   * last about 2½ weeks of steady use. 0 turns Claude off.
+   */
+  ANTHROPIC_DAILY_BUDGET_USD: z.coerce.number().min(0).default(0.3),
   OPENAI_API_KEY: optionalString,
 
   /** Google AI Studio key: the free Gemini tier gives unsure channels an AI second opinion. */
@@ -198,12 +204,11 @@ const serverEnvSchema = z.object({
   /** Comma-separated OpenRouter models, tried in order. Blank uses a built-in list of free ones. */
   OPENROUTER_MODELS: optionalString,
   /**
-   * Who gives unsure channels a second opinion: "auto" uses Claude first, then Gemini, then OpenRouter's
-   * free models, whichever keys are set; otherwise rules only. "rules" never calls an AI.
+   * Who gives unsure channels a second opinion: "auto" uses Gemini, then OpenRouter's free models,
+   * whichever keys are set; otherwise rules only. "rules" never calls an AI. Claude is kept for
+   * scripts, so "anthropic" now means "auto".
    */
   NICHE_LABEL_PROVIDER: z.enum(["auto", "gemini", "openrouter", "anthropic", "rules"]).default("auto"),
-  /** Claude model for niche labeling when Anthropic is the provider. */
-  NICHE_LABEL_MODEL: z.string().trim().min(1).default("claude-haiku-4-5"),
   /** Channels per model call when labeling. */
   // Small: the free models answer eight channels well inside a tick, twenty often not at all.
   NICHE_LABEL_BATCH_SIZE: z.coerce.number().int().min(1).max(50).default(8),

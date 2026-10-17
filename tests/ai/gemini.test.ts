@@ -69,20 +69,17 @@ describe("GeminiTextProvider", () => {
 });
 
 describe("labelingProvider", () => {
-  const base = { NICHE_LABEL_PROVIDER: "auto" as const, GEMINI_MODEL: "gemini-2.5-flash", NICHE_LABEL_MODEL: "claude-opus-5" };
+  const base = { NICHE_LABEL_PROVIDER: "auto" as const, GEMINI_MODEL: "gemini-2.5-flash" };
 
-  it("prefers Claude, backed by the free models, then the free models alone, then rules only", () => {
-    expect(labelingProvider({ ...base, GEMINI_API_KEY: "g", OPENROUTER_API_KEY: "o", ANTHROPIC_API_KEY: "a" })?.name).toBe("anthropic+gemini+openrouter");
-    expect(labelingProvider({ ...base, OPENROUTER_API_KEY: "o", ANTHROPIC_API_KEY: "a" })?.name).toBe("anthropic+openrouter");
+  it("uses the free models only, then rules only", () => {
     expect(labelingProvider({ ...base, GEMINI_API_KEY: "g", OPENROUTER_API_KEY: "o" })?.name).toBe("gemini+openrouter");
     expect(labelingProvider({ ...base, OPENROUTER_API_KEY: "o" })?.name).toBe("openrouter");
-    expect(labelingProvider({ ...base, ANTHROPIC_API_KEY: "a" })?.name).toBe("anthropic");
     expect(labelingProvider(base)).toBeNull();
   });
 
-  it("follows an explicit choice", () => {
-    expect(labelingProvider({ ...base, NICHE_LABEL_PROVIDER: "anthropic", GEMINI_API_KEY: "g", ANTHROPIC_API_KEY: "a" })?.name).toBe("anthropic");
-    expect(labelingProvider({ ...base, NICHE_LABEL_PROVIDER: "gemini", ANTHROPIC_API_KEY: "a" })).toBeNull();
+  it("follows an explicit choice, with anthropic meaning auto since Claude is kept for scripts", () => {
+    expect(labelingProvider({ ...base, NICHE_LABEL_PROVIDER: "anthropic", GEMINI_API_KEY: "g" })?.name).toBe("gemini");
+    expect(labelingProvider({ ...base, NICHE_LABEL_PROVIDER: "gemini" })).toBeNull();
     expect(labelingProvider({ ...base, NICHE_LABEL_PROVIDER: "rules", GEMINI_API_KEY: "g" })).toBeNull();
   });
 });

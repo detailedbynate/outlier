@@ -41,7 +41,7 @@ import { JobQueue } from "@/lib/jobs/queue";
 import type { JobRegistry } from "@/lib/jobs/registry";
 import { JobScheduler } from "@/lib/jobs/scheduler";
 import { labelingProvider, scriptProvider } from "@/lib/ai/select";
-import { AnthropicTextProvider } from "@/lib/ai/anthropic";
+import { DailySpendBudget } from "@/lib/ai/budget";
 import { SavedScriptRepository } from "@/lib/database/repositories/saved-scripts";
 import { StyleSampleRepository } from "@/lib/database/repositories/style-samples";
 import { TranscriptRepository } from "@/lib/database/repositories/transcripts";
@@ -162,7 +162,7 @@ export function getServices(): Services {
     logger.error("anthropic balance is empty", { detail });
     if (!emailEnabled()) return;
     const lines = [
-      "Outlier's Anthropic balance ran out, so the Script Writer is paused for members and labeling has fallen back to the free models.",
+      "Outlier's Anthropic balance ran out, so the Script Writer is paused for members.",
       "Top up at https://console.anthropic.com/settings/billing and everything resumes on its own.",
       `Anthropic said: ${detail}`,
     ];
@@ -276,6 +276,8 @@ export function getServices(): Services {
 
   // Niche labeling is rule-based and free; an AI provider only gives unsure channels a second opinion.
   const text = labelingProvider(config);
+  // Claude is for scripts only, capped per day so a top-up lasts weeks.
+  const claudeBudget = new DailySpendBudget(repositories.usage, config.ANTHROPIC_DAILY_BUDGET_USD);
   if (text && !getAIProviders().has("text")) getAIProviders().register("text", text);
   const nicheLabeling = new NicheLabelingService(
     { text, channels: repositories.channels, niches: repositories.niches },
@@ -420,15 +422,15 @@ export function getServices(): Services {
         ai: text,
         picks: repositories.radar,
         offload: shouldOffloadBoards() ? runBoardProcess : null,
-        // Haiku alone, not a free fallback chain: this runs while someone waits for the page.
-        namer: config.ANTHROPIC_API_KEY ? new AnthropicTextProvider({ apiKey: config.ANTHROPIC_API_KEY, model: "claude-haiku-4-5" }) : null,
+        // Off: the Anthropic balance is kept for scripts, and the free chain is too slow while someone waits for the page.
+        namer: null,
       },
       { dailyYoutubeRefreshes: config.NICHE_DAILY_YOUTUBE_REFRESHES, language: quality.language, regionCode },
     ),
     transcripts,
     radar,
     // Its own provider: scripts are worth a paid model where labeling isn't.
-    scripts: new ScriptService({ ai: scriptProvider(config), premiumAi: scriptProvider(config, { premium: true }), basicAi: scriptProvider(config, { claude: false }), saved: repositories.savedScripts, styles: repositories.styleSamples }),
+    scripts: new ScriptService({ ai: scriptProvider(config, { budget: claudeBudget }), premiumAi: scriptProvider(config, { premium: true, budget: claudeBudget }), basicAi: scriptProvider(config, { claude: false }), saved: repositories.savedScripts, styles: repositories.styleSamples }),
     dashboard: new DashboardService({
       channels: repositories.channels,
       videos: repositories.videos,

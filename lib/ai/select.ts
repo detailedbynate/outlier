@@ -1,16 +1,16 @@
 import { AnthropicTextProvider } from "./anthropic";
 import { AiBalanceEmptyError } from "./balance";
+import type { SpendBudget } from "./budget";
 import { FallbackTextProvider } from "./fallback";
 import { GeminiTextProvider } from "./gemini";
 import { OpenRouterTextProvider } from "./openrouter";
 import type { TextProvider } from "./types";
 
 /**
- * Claude (Haiku by default) first when there's a key, then the free models.
- *
- * Free used to go first, but the hourly job gets 40 seconds and the free
- * reasoning models routinely took longer on a batch, so nothing was labeled
- * for days. Haiku answers a batch in seconds for well under a cent.
+ * The free models only. Claude used to go first here, but the hourly job ate
+ * the prepaid balance meant for scripts, so the Anthropic key is reserved for
+ * the script writer. "anthropic" is still accepted as a setting and means the
+ * same as "auto".
  */
 export function labelingProvider(config: {
   NICHE_LABEL_PROVIDER: "auto" | "gemini" | "openrouter" | "anthropic" | "rules";
@@ -18,8 +18,6 @@ export function labelingProvider(config: {
   GEMINI_MODEL: string;
   OPENROUTER_API_KEY?: string | undefined;
   OPENROUTER_MODELS?: string | undefined;
-  ANTHROPIC_API_KEY?: string | undefined;
-  NICHE_LABEL_MODEL: string;
 }): TextProvider | null {
   const gemini = () => (config.GEMINI_API_KEY ? new GeminiTextProvider({ apiKey: config.GEMINI_API_KEY, model: config.GEMINI_MODEL }) : null);
   const openrouter = () =>
@@ -32,7 +30,6 @@ export function labelingProvider(config: {
             .filter(Boolean),
         })
       : null;
-  const claude = () => (config.ANTHROPIC_API_KEY ? new AnthropicTextProvider({ apiKey: config.ANTHROPIC_API_KEY, model: config.NICHE_LABEL_MODEL }) : null);
   switch (config.NICHE_LABEL_PROVIDER) {
     case "rules":
       return null;
@@ -40,10 +37,8 @@ export function labelingProvider(config: {
       return gemini();
     case "openrouter":
       return openrouter();
-    case "anthropic":
-      return claude();
     default: {
-      const chain: TextProvider[] = [claude(), gemini(), openrouter()].filter((p) => p !== null);
+      const chain: TextProvider[] = [gemini(), openrouter()].filter((p) => p !== null);
       if (chain.length > 1) return new FallbackTextProvider(chain);
       return chain[0] ?? null;
     }
@@ -79,7 +74,7 @@ export function scriptProvider(config: {
   GEMINI_MODEL: string;
   OPENROUTER_API_KEY?: string | undefined;
   OPENROUTER_MODELS?: string | undefined;
-}, options: { premium?: boolean; claude?: boolean } = {}): TextProvider | null {
+}, options: { premium?: boolean; claude?: boolean; budget?: SpendBudget } = {}): TextProvider | null {
   const chain: TextProvider[] = [];
   const named = config.SCRIPT_MODEL?.trim();
   // Pro writes without Claude: Gemini first, then the OpenRouter models.
@@ -88,7 +83,7 @@ export function scriptProvider(config: {
   if (useClaude && config.ANTHROPIC_API_KEY) {
     // A Claude id in SCRIPT_MODEL picks the standard model; anything else is meant for OpenRouter.
     const model = options.premium ? PREMIUM_SCRIPT_MODEL : named?.startsWith("claude-") ? named : DEFAULT_SCRIPT_MODEL;
-    chain.push(new AnthropicTextProvider({ apiKey: config.ANTHROPIC_API_KEY, model }));
+    chain.push(new AnthropicTextProvider({ apiKey: config.ANTHROPIC_API_KEY, model, ...(options.budget ? { budget: options.budget } : {}) }));
   }
   if (named && !named.startsWith("claude-") && config.OPENROUTER_API_KEY) {
     chain.push(new OpenRouterTextProvider({ apiKey: config.OPENROUTER_API_KEY, models: [named] }));
