@@ -5,6 +5,7 @@ import { getAdminDatabase } from "@/lib/database";
 import { createSessionClient } from "@/lib/auth/session";
 import { logger } from "@/lib/core/logger";
 import { getServices } from "@/lib/services";
+import { hasNeverSignedIn } from "@/lib/billing/signup";
 
 export interface SignupState {
   error: string | null;
@@ -14,12 +15,12 @@ export interface SignupState {
 const MIN_PASSWORD = 10;
 
 /**
- * Finish a paid signup: check the one-time invite, set the password, spend the
- * invite, and sign them straight in.
+ * Finish a paid signup: check the invite, set the password, retire the invite,
+ * and sign them straight in.
  *
- * The invite is spent before the password is set, because the conditional update
- * is what stops two submissions from both going through. If setting the password
- * then fails, they ask for a fresh link rather than sharing a live one.
+ * The invite is retired only after the password is saved, so a hiccup setting it
+ * leaves the link working and they can just try again. Until then the link can
+ * be opened any number of times.
  */
 export async function completeSignup(_prev: SignupState, formData: FormData): Promise<SignupState> {
   const token = String(formData.get("token") ?? "");
@@ -30,15 +31,22 @@ export async function completeSignup(_prev: SignupState, formData: FormData): Pr
   if (password !== confirm) return { error: "Those passwords don't match." };
 
   const invites = getServices().repositories.signupInvites;
-  const invite = await invites.consume(token);
-  if (!invite) return { error: "This link has already been used or has expired. Ask for a new one below." };
+  const invite = await invites.find(token);
+  if (!invite) return { error: "Your account is already set up. Sign in instead." };
+  // Got in some other way since the page loaded: the account is set up, so this link can't set the password.
+  if (!(await hasNeverSignedIn(invite.user_id))) {
+    await invites.retire(invite.user_id);
+    return { error: "Your account is already set up. Sign in instead." };
+  }
 
   const admin = getAdminDatabase();
   const { error } = await admin.auth.admin.updateUserById(invite.user_id, { password, email_confirm: true });
   if (error) {
     logger.error("signup password update failed", { userId: invite.user_id, reason: error.message });
-    return { error: "Something went wrong setting your password. Try the link again in a minute." };
+    return { error: "Something went wrong setting your password. Try again in a minute — this link still works." };
   }
+  // The account is set up now: this link, and any other they were sent, stops working.
+  await invites.retire(invite.user_id);
 
   const supabase = await createSessionClient();
   const signedIn = await supabase.auth.signInWithPassword({ email: invite.email, password });

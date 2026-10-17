@@ -71,7 +71,7 @@ export function passwordResetEmail(input: { url: string }): { subject: string; h
 }
 
 /** The email a new subscriber gets: one button, one link, and what happens next. */
-export function signupEmail(input: { planName: string; url: string; days: number }): { subject: string; html: string; text: string } {
+export function signupEmail(input: { planName: string; url: string }): { subject: string; html: string; text: string } {
   const url = escape(input.url);
   const subject = `Set up your Outlier account`;
   const text = [
@@ -80,7 +80,7 @@ export function signupEmail(input: { planName: string; url: string; days: number
     `Finish setting up your account here — you'll pick a password, and it takes a few seconds:`,
     input.url,
     ``,
-    `This link works once and expires in ${input.days} days. If it runs out, ask for a new one from the sign-in page.`,
+    `This link keeps working until your account is set up, so you can come back to it any time.`,
     ``,
     `Outlier · useoutlier.online`,
   ].join("\n");
@@ -97,7 +97,7 @@ export function signupEmail(input: { planName: string; url: string; days: number
           <a href="${url}" style="display:inline-block;background:#8b5cf6;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:13px 26px;border-radius:999px;">Set up my account</a>
         </td></tr>
         <tr><td style="color:rgba(255,255,255,0.45);font-size:12.5px;line-height:1.6;padding-top:14px;">
-          This link works once and expires in ${input.days} days. If the button doesn't work, paste this into your browser:<br>
+          This link keeps working until your account is set up. If the button doesn't work, paste this into your browser:<br>
           <a href="${url}" style="color:#a78bfa;word-break:break-all;">${url}</a>
         </td></tr>
       </table>

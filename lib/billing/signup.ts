@@ -5,7 +5,6 @@ import { logger } from "@/lib/core/logger";
 import { getAdminDatabase } from "@/lib/database";
 import { getServices } from "@/lib/services";
 import { env } from "@/lib/core/env";
-import { INVITE_TTL_MS } from "@/lib/auth/signup-invites";
 import { emailEnabled, sendEmail, signupEmail } from "@/lib/email/send";
 import { planOrFree } from "./plans";
 import { applySubscription, planForSubscription } from "./subscriptions";
@@ -60,8 +59,8 @@ export async function fulfillPublicSubscription(session: Stripe.Checkout.Session
   return { email };
 }
 
-/** Has this account never been signed into? Then it has no password worth keeping. */
-async function hasNeverSignedIn(userId: string): Promise<boolean> {
+/** Has this account never been signed into? Then it has no password worth keeping, and its signup link should still work. */
+export async function hasNeverSignedIn(userId: string): Promise<boolean> {
   try {
     const { data, error } = await getAdminDatabase().auth.admin.getUserById(userId);
     if (error || !data.user) return true;
@@ -95,7 +94,6 @@ export async function sendSignupInvite(userId: string, email: string, planName: 
     const { subject, html, text } = signupEmail({
       planName,
       url: `${env().SITE_URL ?? "https://www.useoutlier.online"}/signup?token=${encodeURIComponent(token)}`,
-      days: Math.round(INVITE_TTL_MS / 86_400_000),
     });
     await sendEmail({ to: email, subject, html, text });
     return true;

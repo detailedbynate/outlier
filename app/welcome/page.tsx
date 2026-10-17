@@ -49,7 +49,7 @@ export default async function WelcomePage({ searchParams }: { searchParams: Sear
                 account — open it, pick a password, and you&apos;re in.
               </p>
               <p className="muted">
-                Can&apos;t find it? Check your spam folder. The link works once and lasts a week.
+                Can&apos;t find it? Check your spam folder. The link keeps working until your account is set up.
               </p>
             </>
           )}
