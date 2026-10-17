@@ -70,6 +70,43 @@ export function passwordResetEmail(input: { url: string }): { subject: string; h
   return { subject, html, text };
 }
 
+/** Sent once a new subscriber has set their password: where to go for help. */
+export function welcomeEmail(input: { discordUrl: string }): { subject: string; html: string; text: string } {
+  const url = escape(input.discordUrl);
+  const subject = "Welcome to Outlier — join the Discord";
+  const text = [
+    `Your Outlier account is all set.`,
+    ``,
+    `Got a question, stuck on something, or want tips from other creators? Join the Outlier Discord — it's the fastest way to get help:`,
+    input.discordUrl,
+    ``,
+    `Outlier · useoutlier.online`,
+  ].join("\n");
+
+  const html = `<!doctype html><html><body style="margin:0;padding:0;background:#0b0b10;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0b0b10;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#14141c;border:1px solid rgba(255,255,255,0.08);border-radius:18px;padding:36px 32px;">
+        <tr><td style="color:#ffffff;font-size:22px;font-weight:700;padding-bottom:14px;">Your account is all set.</td></tr>
+        <tr><td style="color:rgba(255,255,255,0.72);font-size:15px;line-height:1.6;padding-bottom:12px;">
+          Got a question, stuck on something, or want tips from other creators? Join the Outlier Discord — it's the fastest way to get help.
+        </td></tr>
+        <tr><td style="padding:18px 0 8px;">
+          <a href="${url}" style="display:inline-block;background:#5865f2;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:13px 26px;border-radius:999px;">Join the Discord</a>
+        </td></tr>
+        <tr><td style="color:rgba(255,255,255,0.45);font-size:12.5px;line-height:1.6;padding-top:14px;">
+          If the button doesn't work, paste this into your browser:<br>
+          <a href="${url}" style="color:#a78bfa;word-break:break-all;">${url}</a>
+        </td></tr>
+      </table>
+      <div style="color:rgba(255,255,255,0.3);font-size:12px;padding-top:18px;">Outlier · useoutlier.online</div>
+    </td></tr>
+  </table>
+</body></html>`;
+
+  return { subject, html, text };
+}
+
 /** The email a new subscriber gets: one button, one link, and what happens next. */
 export function signupEmail(input: { planName: string; url: string }): { subject: string; html: string; text: string } {
   const url = escape(input.url);

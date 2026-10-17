@@ -2,7 +2,6 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { CreatorCodeEntry } from "@/components/creator-code-entry";
 import { BrandMark } from "@/components/icons";
-import { env } from "@/lib/core/env";
 import { logger } from "@/lib/core/logger";
 import { getServices } from "@/lib/services";
 import { LandingHeader } from "./landing-header";
@@ -16,9 +15,7 @@ import { priceCentsFor, sellablePlans } from "@/lib/billing/subscriptions";
 import { startPublicSubscription } from "./checkout";
 import { LaunchVideo } from "./launch-video";
 import { TrialOffer } from "./trial-offer";
-
-/** Community invite; DISCORD_INVITE_URL overrides it. */
-const DISCORD_INVITE = "https://discord.gg/4SwnX4DR6q";
+import { discordInviteUrl } from "@/lib/discord/invite";
 
 /** Hide small numbers rather than advertising an empty waitlist. */
 const SHOW_WAITLIST_COUNT_FROM = 25;
@@ -318,7 +315,7 @@ function popupCode(code: LandingCreatorCode | null) {
 
 /** The floating Discord button, bottom corner. */
 function DiscordFab() {
-  const discordUrl = env().DISCORD_INVITE_URL ?? DISCORD_INVITE;
+  const discordUrl = discordInviteUrl();
   return discordUrl ? (
     <a href={discordUrl} target="_blank" rel="noreferrer" className="discord-fab" aria-label="Join the Outlier Discord">
       <DiscordIcon />
