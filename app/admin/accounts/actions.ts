@@ -11,6 +11,8 @@ import { getServices } from "@/lib/services";
 import { findPlan, type PlanId } from "@/lib/billing/plans";
 import { CHANGELOG_REPUBLISH_EVENT, forgetChangelogVersion } from "@/lib/changelog-version";
 import { MAX_TRIAL_MS, TRIAL_STATUS } from "@/lib/billing/trial";
+import { resendSignupLink } from "@/lib/billing/signup";
+import { getAdminDatabase } from "@/lib/database";
 
 export interface AccountFormState {
   status: "idle" | "ok" | "error";
@@ -146,6 +148,32 @@ export async function newSignInLink(_prev: AccountFormState, formData: FormData)
   } catch (error) {
     logger.warn("new sign-in link failed", { userId, error });
     return { status: "error", message: isAppError(error) && error.expose ? error.message : "Couldn't create a link.", link: null };
+  }
+}
+
+/**
+ * Resend the set-a-password link to a subscriber who never got in. The link
+ * keeps working until they set a password. Only for accounts that have never
+ * been signed into, so it can't be used to take over one that's in use.
+ */
+export async function resendSignup(_prev: AccountFormState, formData: FormData): Promise<AccountFormState> {
+  await requireAdmin();
+  const userId = text(formData, "userId");
+  if (!UUID_PATTERN.test(userId)) return { status: "error", message: "Invalid account.", link: null };
+  try {
+    const { data, error } = await getAdminDatabase().auth.admin.getUserById(userId);
+    if (error || !data.user?.email) return { status: "error", message: "Account not found.", link: null };
+    if (data.user.last_sign_in_at) return { status: "error", message: "They've already signed in, so they have a password.", link: null };
+    const plan = await getServices().subscriptions.stateFor(userId).catch(() => null);
+    const { url, emailed } = await resendSignupLink(userId, data.user.email, plan?.plan.name ?? "Outlier");
+    return {
+      status: "ok",
+      message: emailed ? `Emailed to ${data.user.email}. It works until they set a password.` : "Email isn't set up, so send this yourself. It works until they set a password.",
+      link: url,
+    };
+  } catch (error) {
+    logger.warn("resend signup link failed", { userId, error });
+    return { status: "error", message: isAppError(error) && error.expose ? error.message : "Couldn't resend the link.", link: null };
   }
 }
 

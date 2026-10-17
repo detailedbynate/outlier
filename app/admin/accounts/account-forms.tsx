@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import type { AccountRole } from "@/types/database";
 import { PLANS } from "@/lib/billing/plans";
-import { adjustCredits, createAccount, newSignInLink, republishChangelog, setAccountPlan, startTrial, updateAccount, type AccountFormState, type RepublishState } from "./actions";
+import { adjustCredits, createAccount, newSignInLink, republishChangelog, resendSignup, setAccountPlan, startTrial, updateAccount, type AccountFormState, type RepublishState } from "./actions";
 
 const initial: AccountFormState = { status: "idle", message: null, link: null };
 
@@ -124,6 +124,20 @@ export function NewSignInLinkForm({ userId, email }: { userId: string; email: st
       <input type="hidden" name="email" value={email} />
       <button type="submit" className="button-ghost button-small" disabled={pending}>
         {pending ? "Creating…" : "New sign-in link"}
+      </button>
+      <Status state={state} />
+    </form>
+  );
+}
+
+/** For a subscriber who never set a password: emails a fresh signup link that works until they do. */
+export function ResendSignupForm({ userId }: { userId: string }) {
+  const [state, action, pending] = useActionState(resendSignup, initial);
+  return (
+    <form action={action} className="account-edit sign-in-link">
+      <input type="hidden" name="userId" value={userId} />
+      <button type="submit" className="button-small" disabled={pending}>
+        {pending ? "Sending…" : "Resend signup link"}
       </button>
       <Status state={state} />
     </form>

@@ -12,7 +12,8 @@ import { getServices } from "@/lib/services";
 import type { AccountRole } from "@/types/database";
 import { CHANGELOG } from "@/lib/changelog";
 import { CHANGELOG_REPUBLISH_EVENT } from "@/lib/changelog-version";
-import { AdjustCreditsForm, CreateAccountForm, EditAccountForm, NewSignInLinkForm, PlanForm, RepublishChangelogForm, TrialForm } from "./account-forms";
+import { AdjustCreditsForm, CreateAccountForm, EditAccountForm, NewSignInLinkForm, PlanForm, RepublishChangelogForm, ResendSignupForm, TrialForm } from "./account-forms";
+import { getAdminDatabase } from "@/lib/database";
 import { moderateAccounts } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -96,6 +97,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Sea
     visible.map((r) => (r.role === "owner" ? null : services.subscriptions.stateFor(r.id).catch(() => null))),
   );
   const emailById = new Map(users.map((u) => [u.id, u.email]));
+  const lastSignIn = await lastSignInById();
 
   return (
     <div className="stack">
@@ -179,7 +181,14 @@ export default async function AccountsPage({ searchParams }: { searchParams: Sea
                           <strong>{row.email}</strong>
                           <div className="stat-note">
                             <span className={`badge role-${row.role}`}>{ROLE_LABEL[row.role]}</span> · joined {timeAgo(row.created_at)}
+                            {lastSignIn.has(row.id) ? (lastSignIn.get(row.id) ? ` · last in ${timeAgo(lastSignIn.get(row.id)!)}` : null) : null}
                           </div>
+                          {lastSignIn.has(row.id) && !lastSignIn.get(row.id) ? (
+                            <>
+                              <div className="form-error">Never signed in — no password yet</div>
+                              {protectedRow ? null : <ResendSignupForm userId={row.id} />}
+                            </>
+                          ) : null}
                         </td>
                         <td>
                           <span className="status-badge" data-status={row.state.status} title={row.state.reason ?? undefined}>
@@ -270,4 +279,19 @@ export default async function AccountsPage({ searchParams }: { searchParams: Sea
       </section>
     </div>
   );
+}
+
+/**
+ * When each account last signed in, from Supabase Auth: null means never, which
+ * for a subscriber means they never set a password. Empty if Auth can't be
+ * reached, so the page still loads and just shows nothing.
+ */
+async function lastSignInById(): Promise<Map<string, string | null>> {
+  try {
+    const { data, error } = await getAdminDatabase().auth.admin.listUsers({ perPage: 1000 });
+    if (error) return new Map();
+    return new Map(data.users.map((u) => [u.id, u.last_sign_in_at ?? null]));
+  } catch {
+    return new Map();
+  }
 }

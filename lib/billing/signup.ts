@@ -83,22 +83,37 @@ export async function sendSignupInvite(userId: string, email: string, planName: 
     return false;
   }
   try {
-    const invites = getServices().repositories.signupInvites;
     // Fulfilment runs twice by design (webhook and return page). One email each
     // time would be two emails and one confused subscriber.
-    if (await invites.hasActive(userId)) {
+    if (await getServices().repositories.signupInvites.hasActive(userId)) {
       logger.info("signup link already sent, not sending another", { userId });
       return true;
     }
-    const { token } = await invites.create(userId, email);
-    const { subject, html, text } = signupEmail({
-      planName,
-      url: `${env().SITE_URL ?? "https://www.useoutlier.online"}/signup?token=${encodeURIComponent(token)}`,
-    });
-    await sendEmail({ to: email, subject, html, text });
+    await mailSignupLink(userId, email, planName);
     return true;
   } catch (error) {
     logger.error("signup invite email failed", { userId, error });
     return false;
   }
+}
+
+/**
+ * Admin resend: mint a fresh signup link, email it when email is set up, and
+ * hand the link back so it can be sent by hand too. Earlier links keep working.
+ */
+export async function resendSignupLink(userId: string, email: string, planName: string): Promise<{ url: string; emailed: boolean }> {
+  if (!emailEnabled()) return { url: await signupLink(userId, email), emailed: false };
+  return { url: await mailSignupLink(userId, email, planName), emailed: true };
+}
+
+async function signupLink(userId: string, email: string): Promise<string> {
+  const { token } = await getServices().repositories.signupInvites.create(userId, email);
+  return `${env().SITE_URL ?? "https://www.useoutlier.online"}/signup?token=${encodeURIComponent(token)}`;
+}
+
+async function mailSignupLink(userId: string, email: string, planName: string): Promise<string> {
+  const url = await signupLink(userId, email);
+  const { subject, html, text } = signupEmail({ planName, url });
+  await sendEmail({ to: email, subject, html, text });
+  return url;
 }
