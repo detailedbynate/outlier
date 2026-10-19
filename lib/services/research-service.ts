@@ -6,8 +6,12 @@ import type { VideoPreview, VideoRepository } from "@/lib/database/repositories/
 import type { EnqueueOptions } from "@/lib/jobs/queue";
 import { DEFAULT_QUALITY, rejectReason, underratedScore, type QualityConfig } from "@/lib/research/quality";
 import { keywordTokens, mentionsKeywords } from "@/lib/research/relevance";
+import { parseChannelIdentifier } from "@/lib/youtube/parse";
 import type { YouTubeService } from "@/lib/youtube/service";
-import type { ShortsChannelRow } from "@/types/database";
+import type { ChannelRow, ShortsChannelRow, VideoFeedRow } from "@/types/database";
+import type { ChannelTraitRepository } from "@/lib/database/repositories/traits";
+import { yppEligible } from "./channel-traits-service";
+import type { SimilarChannelsService } from "./similar-channels-service";
 import type { StorageBudgetService } from "./storage-budget-service";
 
 export const SHORTS_DISCOVERY_EVENT = "research.shorts_discovery";
@@ -23,7 +27,26 @@ const MAX_SEARCH_PASSES = 3;
 
 const DEFAULT_KEYWORDS = ["motivation", "cooking", "minecraft", "fitness", "facts", "roblox", "skincare", "finance", "pets", "comedy"];
 
-export type ShortsChannelWithPreviews = ShortsChannelRow & { recentShorts: VideoPreview[] };
+export type ShortsChannelWithPreviews = ShortsChannelRow & {
+  recentShorts: VideoPreview[];
+  /** Judged from thumbnails; null until checked or when unsure. */
+  faceless?: boolean | null;
+  /** Meets the Partner Program Shorts bar (estimated from its recent Shorts). */
+  ypp?: boolean;
+  /** 0–1, in "similar to" mode. */
+  similarity?: number;
+};
+
+/** Channels considered for a "similar to" list before the page's filters narrow it. */
+const SIMILAR_CANDIDATES = 300;
+/** Peers whose breakouts feed "what to make next". */
+const PEER_CHANNELS = 40;
+
+/** Whether a search box entry names one channel (@handle, channel URL, UC id) rather than keywords. */
+export function looksLikeChannelReference(query: string): boolean {
+  const q = query.trim();
+  return /^@[A-Za-z0-9._-]{3,30}$/.test(q) || /^UC[A-Za-z0-9_-]{22}$/.test(q) || /(^|\/\/|\.)youtube\.com\/(@|channel\/|c\/|user\/)/i.test(q);
+}
 
 /** Split "recipe, cooking, food" into up to 3 distinct search terms. */
 export function parseSearchTerms(query: string): string[] {
@@ -81,7 +104,9 @@ export class ResearchService {
       youtube: YouTubeService;
       channels: ChannelRepository;
       usage: UsageRepository;
-      videos?: Pick<VideoRepository, "latestShortsByChannel">;
+      videos?: Pick<VideoRepository, "latestShortsByChannel" | "feed">;
+      similar?: Pick<SimilarChannelsService, "similarTo">;
+      traits?: Pick<ChannelTraitRepository, "forChannels" | "idsWhereFaceless" | "shortsViews90d">;
       storage: Pick<StorageBudgetService, "assertCapacity">;
       enqueue: (type: string, payload: unknown, options?: EnqueueOptions) => Promise<unknown>;
     },
@@ -108,15 +133,95 @@ export class ResearchService {
   ): Promise<{ channels: ShortsChannelWithPreviews[]; terms: string[] }> {
     const terms = parseSearchTerms(query);
     const match = terms.length > 0 ? await this.channelIdsFor(query, terms, now) : null;
-    const rows = sortNewestFirst(await this.deps.channels.searchShortsChannels({ ...filters, channelIds: match?.ids }), match?.newestFirst ?? []);
-    const previews =
-      previewsPerChannel > 0 && this.deps.videos
-        ? await this.deps.videos.latestShortsByChannel(rows.map((r) => r.channel_id), previewsPerChannel)
-        : new Map<string, VideoPreview[]>();
-    return {
-      terms,
-      channels: rows.map((row) => ({ ...row, recentShorts: previews.get(row.channel_id) ?? [] })),
-    };
+    const channelIds = await this.withFaceFilter(filters.faceless, match?.ids);
+    const rows = sortNewestFirst(await this.deps.channels.searchShortsChannels({ ...filters, channelIds }), match?.newestFirst ?? []);
+    return { terms, channels: await this.decorate(rows, previewsPerChannel) };
+  }
+
+  /** Narrow to channels judged faceless / on camera, when that filter is on. */
+  private async withFaceFilter(faceless: boolean | undefined, ids: string[] | undefined): Promise<string[] | undefined> {
+    if (faceless === undefined || !this.deps.traits) return ids;
+    // No traits table yet (migration not applied): skip the filter rather than fail the page.
+    const found = await this.deps.traits.idsWhereFaceless(faceless).catch(() => null);
+    if (!found) return ids;
+    const judged = new Set(found);
+    return ids ? ids.filter((id) => judged.has(id)) : [...judged];
+  }
+
+  /** Latest Shorts and badges (faceless, YPP eligible) for a page of channels. */
+  private async decorate<T extends ShortsChannelRow>(rows: T[], previewsPerChannel: number): Promise<(T & { recentShorts: VideoPreview[]; faceless: boolean | null; ypp: boolean })[]> {
+    const ids = rows.map((r) => r.channel_id);
+    const [previews, traits, views] = await Promise.all([
+      previewsPerChannel > 0 && this.deps.videos ? this.deps.videos.latestShortsByChannel(ids, previewsPerChannel) : new Map<string, VideoPreview[]>(),
+      this.deps.traits && ids.length > 0 ? this.deps.traits.forChannels(ids).catch(() => new Map()) : new Map(),
+      this.deps.traits && ids.length > 0 ? this.deps.traits.shortsViews90d(ids).catch(() => new Map<string, number>()) : new Map<string, number>(),
+    ]);
+    return rows.map((row) => ({
+      ...row,
+      recentShorts: previews.get(row.channel_id) ?? [],
+      faceless: traits.get(row.channel_id)?.faceless ?? null,
+      ypp: yppEligible(row.subscriber_count, views.get(row.channel_id)),
+    }));
+  }
+
+  /** The library's row for a pasted @handle, channel URL or id; null when we don't have it (or it isn't one). */
+  async findChannelByReference(reference: string): Promise<ChannelRow | null> {
+    let identifier;
+    try {
+      identifier = parseChannelIdentifier(reference);
+    } catch {
+      return null;
+    }
+    if (identifier.type === "id") return this.deps.channels.findByYouTubeId(identifier.value);
+    if (identifier.type === "handle") return this.deps.channels.findByHandle(identifier.value);
+    return null;
+  }
+
+  /**
+   * Shorts channels most like `channelId`, best match first, within the page's
+   * filters. The filters (size, views, country…) narrow the matches rather than
+   * re-sorting them: "smaller channels like this one" is the usual ask.
+   */
+  async similarShortsChannels(
+    channelId: string,
+    filters: Omit<ShortsChannelFilters, "channelIds">,
+    previewsPerChannel: number,
+  ): Promise<ShortsChannelWithPreviews[]> {
+    const matches = (await this.deps.similar?.similarTo(channelId, SIMILAR_CANDIDATES)) ?? [];
+    if (matches.length === 0) return [];
+    const similarity = new Map(matches.map((m) => [m.channelId, m.similarity]));
+    const channelIds = await this.withFaceFilter(filters.faceless, [...similarity.keys()]);
+    const rows = (await this.deps.channels.searchShortsChannels({ ...filters, channelIds, limit: SIMILAR_CANDIDATES }))
+      .sort((a, b) => (similarity.get(b.channel_id) ?? 0) - (similarity.get(a.channel_id) ?? 0))
+      .slice(0, filters.limit);
+    return (await this.decorate(rows, previewsPerChannel)).map((row) => ({ ...row, similarity: similarity.get(row.channel_id) }));
+  }
+
+  /**
+   * Shorts beating their channel's usual views on the channels most like this
+   * one, in the last 30 days: what's working for peers right now.
+   */
+  async peerBreakouts(channelId: string, limit = 24, now: Date = new Date()): Promise<VideoFeedRow[]> {
+    if (!this.deps.videos) return [];
+    const matches = (await this.deps.similar?.similarTo(channelId, PEER_CHANNELS)) ?? [];
+    if (matches.length === 0) return [];
+    const rows = await this.deps.videos.feed({
+      channelIds: matches.map((m) => m.channelId),
+      format: "short",
+      orderBy: "outlier_score",
+      publishedAfter: new Date(now.getTime() - 30 * 86_400_000),
+      limit: limit * 3,
+    });
+    // A couple per channel, so one viral channel doesn't fill the list.
+    const perChannel = new Map<string, number>();
+    return rows
+      .filter((row) => (row.outlier_score ?? 0) >= 1.5)
+      .filter((row) => {
+        const n = perChannel.get(row.channel_id) ?? 0;
+        perChannel.set(row.channel_id, n + 1);
+        return n < 2;
+      })
+      .slice(0, limit);
   }
 
   /**

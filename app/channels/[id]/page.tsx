@@ -11,6 +11,8 @@ import { paidFeaturesLocked } from "@/lib/billing/feature-gate";
 import { PAID_FEATURES } from "@/lib/billing/features";
 import { getServices } from "@/lib/services";
 import { CHANNEL_ID_PATTERN } from "@/lib/youtube/parse";
+import { CREDIT_COSTS } from "@/lib/services/credits-service";
+import { AddChannel } from "../../research/shorts-channels/add-channel";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +25,14 @@ export default async function ChannelPage({ params }: { params: Promise<{ id: st
 
   const { repositories } = getServices();
   const channel = await repositories.channels.findByYouTubeId(id);
-  if (!channel) notFound();
+  // Any channel can be opened: one we don't have yet is pulled in on request.
+  if (!channel) {
+    return (
+      <div className="stack">
+        <AddChannel reference={id} cost={CREDIT_COSTS.add_channel} then="channel" />
+      </div>
+    );
+  }
 
   const [snapshots, videos] = await Promise.all([
     repositories.channels.listSnapshots(channel.id, daysAgo(365)),

@@ -1,10 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { requireAdmin, requireApprovedUser } from "@/lib/auth/session";
 import { isAppError } from "@/lib/core/errors";
 import { logger } from "@/lib/core/logger";
 import { JobWorker } from "@/lib/jobs/worker";
+import { writerAccess } from "@/lib/scripts/access";
+import type { PeerPlan } from "@/lib/scripts/peer-ideas";
 import { getServices } from "@/lib/services";
 import { asBackground, asUser } from "@/lib/youtube/quota-context";
 
@@ -47,6 +50,37 @@ export async function repickTrending(): Promise<void> {
     logger.warn("trending re-pick failed", { error });
   }
   revalidatePath("/research/shorts-channels");
+}
+
+export interface AddChannelState {
+  error: string | null;
+}
+
+/**
+ * Pull in a channel we don't have yet (pasted as @handle or link), then show
+ * the channels most like it. Costs what tracking a channel costs.
+ */
+export async function addChannelForSimilar(_prev: AddChannelState, formData: FormData): Promise<AddChannelState> {
+  const { user } = await requireApprovedUser();
+  const reference = String(formData.get("reference") ?? "").trim().slice(0, 300);
+  if (!reference) return { error: "Paste a channel's @handle or link." };
+  const services = getServices();
+  let channelId: string;
+  let youtubeChannelId: string;
+  try {
+    await services.credits.assertAvailable(user.id, "add_channel");
+    const { channel } = await asUser(user.id, "action:add_channel", () => services.channels.refreshChannel(reference));
+    await services.credits.charge(user.id, "add_channel", channel.youtube_channel_id);
+    channelId = channel.id;
+    youtubeChannelId = channel.youtube_channel_id;
+    // Embedded now so the matches are there when the page loads.
+    await services.similar.embedChannels([channel.id]).catch((error: unknown) => logger.warn("embedding a new channel failed", { channelId, error }));
+  } catch (error) {
+    logger.warn("add channel for similar failed", { reference, error });
+    return { error: isAppError(error) && error.expose ? error.message : "Couldn't find that channel on YouTube. Check the handle or link." };
+  }
+  revalidatePath("/", "layout");
+  redirect(formData.get("then") === "channel" ? `/channels/${youtubeChannelId}` : `/research/shorts-channels?similar=${channelId}`);
 }
 
 export interface DiscoverState {
@@ -93,5 +127,52 @@ export async function discoverShortsChannels(_prev: DiscoverState, formData: For
   } catch (error) {
     logger.warn("shorts discovery failed", { keyword, error });
     return { message: null, error: isAppError(error) && error.expose ? error.message : "Discovery failed. Try again." };
+  }
+}
+
+export interface PeerPlanState {
+  plan: PeerPlan | null;
+  error: string | null;
+  charged: number;
+}
+
+/**
+ * "What to make next" for a channel: Claude reads the breakouts on its most
+ * similar channels for shared topics and title formats. On the Script Writer's plans.
+ */
+export async function findPeerPlan(_prev: PeerPlanState, formData: FormData): Promise<PeerPlanState> {
+  const current = await requireApprovedUser();
+  const channelId = String(formData.get("channelId") ?? "");
+  if (!UUID_PATTERN.test(channelId)) return { plan: null, error: "Pick a channel first.", charged: 0 };
+  const access = await writerAccess(current);
+  if (!access) return { plan: null, error: "Suggestions are on the Pro and Expert plans.", charged: 0 };
+  const services = getServices();
+  try {
+    await services.credits.assertAvailable(current.user.id, "peer_ideas");
+    if (access.limit === "scriptUser") await services.rateLimits.enforce("scriptIdeasUser", current.user.id);
+    const [channel, breakouts, [source]] = await Promise.all([
+      services.repositories.channels.findById(channelId),
+      services.research.peerBreakouts(channelId, 30),
+      services.repositories.embeddings.sources([channelId], 15),
+    ]);
+    if (!channel) return { plan: null, error: "That channel isn't in Outlier.", charged: 0 };
+    const plan = await services.scripts.peerPlan(
+      {
+        channel: channel.title,
+        ownTitles: source?.recent_titles ?? [],
+        breakouts: breakouts.map((b) => ({ title: b.title, channel: b.channel_title, views: b.view_count, multiplier: b.outlier_score })),
+      },
+      { premium: access.premium, basic: access.basic },
+    );
+    const { charged } = await services.credits.charge(current.user.id, "peer_ideas");
+    revalidatePath("/", "layout");
+    return { plan, error: null, charged };
+  } catch (error) {
+    logger.warn("peer plan failed", { channelId, error });
+    return {
+      plan: null,
+      error: isAppError(error) && (error.expose || error.code === "RATE_LIMITED" || error.code === "VALIDATION_ERROR") ? error.message : "Couldn't put suggestions together just then. Try again in a moment.",
+      charged: 0,
+    };
   }
 }

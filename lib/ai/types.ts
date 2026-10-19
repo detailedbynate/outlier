@@ -16,6 +16,8 @@ export interface TokenUsage {
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+  /** Image URLs shown before the text. Only providers that can see images use them. */
+  images?: string[];
 }
 
 export interface TextGenerationRequest {

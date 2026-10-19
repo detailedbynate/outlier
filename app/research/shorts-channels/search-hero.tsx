@@ -16,6 +16,7 @@ const PLACEHOLDERS = [
   'Try "minecraft, roblox" to search two niches at once',
   'Try "skincare" or "gym motivation"',
   'Try "my singing monsters"',
+  'Paste a channel link or @handle to find channels like it',
 ] as const;
 
 /** Auto-find is on unless this browser turned it off. */
@@ -52,10 +53,13 @@ export function SearchHero({
   query,
   hidden,
   searchesLeft,
+  channelSearch = false,
 }: {
   query: string;
   hidden: { name: string; value: string }[];
   searchesLeft: number;
+  /** The query is a channel (@handle or link): the page shows channels like it, so no keyword discovery. */
+  channelSearch?: boolean;
 }) {
   const router = useRouter();
   const [keyword, setKeyword] = useState(query);
@@ -70,11 +74,11 @@ export function SearchHero({
 
   // A search from the URL runs discovery once, so results include new channels.
   useEffect(() => {
-    if (!auto || pending || query.trim().length < 2 || searchesLeft <= 0) return;
+    if (!auto || channelSearch || pending || query.trim().length < 2 || searchesLeft <= 0) return;
     if (searchedFor.current === query) return;
     searchedFor.current = query;
     formRef.current?.requestSubmit();
-  }, [auto, pending, query, searchesLeft]);
+  }, [auto, channelSearch, pending, query, searchesLeft]);
 
   // Show the channels that discovery just added.
   const done = !pending && Boolean(state.message);

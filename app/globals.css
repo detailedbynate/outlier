@@ -2002,6 +2002,50 @@ tr:last-child td {
   white-space: nowrap;
 }
 
+.match-badge {
+  margin-left: 4px;
+  padding: 1px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #4ade80;
+  background: rgba(74, 222, 128, 0.1);
+  border: 1px solid rgba(74, 222, 128, 0.3);
+  white-space: nowrap;
+}
+
+.similar-target,
+.similar-missing {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  flex-wrap: wrap;
+}
+
+.similar-target > div,
+.similar-missing > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.similar-missing > div {
+  flex: 1;
+}
+
+.similar-target-name {
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--text);
+}
+
+.similar-target-note {
+  margin-left: auto;
+  font-size: 12px;
+}
+
 /* You vs competitors */
 .compare-form {
   display: flex;
@@ -17548,4 +17592,192 @@ body.app-body {
   background: rgba(157, 107, 255, 0.12);
   border-color: rgba(157, 107, 255, 0.4);
   color: var(--accent-text);
+}
+
+/* Removed Channels */
+.removed-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 6px 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+  max-width: 640px;
+}
+
+.removed-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  padding: 8px 0;
+}
+
+.removed-search input:focus {
+  outline: none;
+}
+
+/* What to make next (similar channels) */
+.peer-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.peer-plan-ask {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 14px 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-2);
+}
+
+.peer-plan-ask > div {
+  flex: 1;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.peer-plan-result {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.peer-plan-result section {
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-2);
+}
+
+.peer-plan-result h3 {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+
+.peer-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.peer-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 13px;
+}
+
+.peer-examples {
+  font-size: 12px;
+  color: var(--accent-text);
+}
+
+/* Channel trait badges */
+.trait-badge {
+  margin-left: 4px;
+  padding: 1px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted, #a1a1aa);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.trait-badge.trait-ypp {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.08);
+  border-color: rgba(251, 191, 36, 0.28);
+}
+
+/* Connect AI (MCP) */
+.mcp-tools,
+.mcp-token-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.mcp-token-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.mcp-token-list li:last-child {
+  border-bottom: 0;
+}
+
+.mcp-token-list li > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.mcp-create {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.mcp-create .field {
+  flex: 1;
+  min-width: 220px;
+}
+
+.mcp-token {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--accent-track);
+  background: var(--accent-wash);
+}
+
+.mcp-setup h3 {
+  margin: 6px 0 6px;
+  font-size: 13px;
+}
+
+.mcp-code-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.mcp-code-row code,
+.mcp-code-row pre {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  overflow-x: auto;
+  white-space: pre;
+  word-break: normal;
 }

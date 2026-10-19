@@ -92,7 +92,12 @@ export class AnthropicTextProvider implements TextProvider {
               ],
             }
           : {}),
-        messages: request.messages.map((m) => ({ role: m.role, content: m.content })),
+        messages: request.messages.map((m) => ({
+          role: m.role,
+          content: m.images?.length
+            ? [...m.images.map((url) => ({ type: "image" as const, source: { type: "url" as const, url } })), { type: "text" as const, text: m.content }]
+            : m.content,
+        })),
         output_config: {
           ...(effort ? { effort } : {}),
           ...(format ? { format } : {}),

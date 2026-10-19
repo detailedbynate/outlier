@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element -- YouTube images are already CDN-optimized */
 import Link from "next/link";
 import { Dropdown } from "@/components/dropdown";
 import { ChevronDownIcon, FlameIcon, ShortsIcon, SlidersIcon, SortIcon, VideoIcon, VideoOffIcon, ZapIcon } from "@/components/icons";
@@ -7,6 +8,12 @@ import { env } from "@/lib/core/env";
 import { timeAgo } from "@/lib/format";
 import { qualityConfigFrom } from "@/lib/research/quality";
 import { getServices } from "@/lib/services";
+import { CREDIT_COSTS } from "@/lib/services/credits-service";
+import { looksLikeChannelReference } from "@/lib/services/research-service";
+import { VideoCard } from "@/components/video-card";
+import { writerAccess } from "@/lib/scripts/access";
+import { AddChannel } from "./add-channel";
+import { PeerPlan } from "./peer-plan";
 import { clearTrendingPicks, repickTrending } from "./actions";
 import { ChannelCard } from "./channel-card";
 import { TrendingCard } from "./trending-card";
@@ -22,6 +29,7 @@ import {
   countAdvanced,
   isRealtimeSort,
   COUNTRIES,
+  FACE,
   label,
   MARKETS,
   MAX_LIMIT,
@@ -42,22 +50,38 @@ export const maxDuration = 60;
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 export default async function ShortsChannelsPage({ searchParams }: { searchParams: SearchParams }) {
-  const { isAdmin, user } = await requireApprovedUser();
+  const current = await requireApprovedUser();
+  const { isAdmin, user } = current;
   const state = parseState(await searchParams);
   const showVideos = state.videos !== "hide";
 
   const advancedCount = countAdvanced(state);
   const quick = activeQuickFilter(state);
   // Trending picks show on the default view, before the user searches or filters.
-  const isDefaultView = !state.q && advancedCount === 0 && !quick;
+  const isDefaultView = !state.q && !state.similar && advancedCount === 0 && !quick;
 
-  const { research, trending, repositories } = getServices();
+  const { research, trending, repositories, similar } = getServices();
   const targetCountries = qualityConfigFrom(env()).countries;
-  const [{ channels, terms }, popular, searchesLeft, picks] = await Promise.all([
-    research.browseShortsChannels(state.q, toFilters(state, targetCountries, user.id), showVideos ? 8 : 0),
+  const filters = toFilters(state, targetCountries, user.id);
+  // "Channels like X": picked from a card (?similar=id), or a pasted @handle or channel link.
+  const reference = !state.similar && looksLikeChannelReference(state.q) ? state.q.trim() : null;
+  const similarMode = Boolean(state.similar || reference) && similar.enabled;
+  const target = !similarMode
+    ? null
+    : state.similar
+      ? await repositories.channels.findById(state.similar)
+      : await research.findChannelByReference(reference!);
+  const [{ channels, terms }, popular, searchesLeft, picks, breakouts, canPlan] = await Promise.all([
+    similarMode
+      ? target
+        ? research.similarShortsChannels(target.id, filters, showVideos ? 8 : 0).then((rows) => ({ channels: rows, terms: [] as string[] }))
+        : Promise.resolve({ channels: [], terms: [] as string[] })
+      : research.browseShortsChannels(state.q, filters, showVideos ? 8 : 0),
     research.popularKeywords(10),
     research.discoverySearchesLeftToday(),
     isDefaultView ? trending.currentPicks() : Promise.resolve([]),
+    target && similarMode ? research.peerBreakouts(target.id, 8) : Promise.resolve([]),
+    target && similarMode ? writerAccess(current).then(Boolean) : Promise.resolve(false),
   ]);
   // Tracking is per-user, so the bookmark state comes from this user's follows
   // rather than the shared flag on the row.
@@ -71,6 +95,7 @@ export default async function ShortsChannelsPage({ searchParams }: { searchParam
         !(
           key === "q" ||
           key === "limit" ||
+          key === "similar" ||
           (value === "any" && key !== "market") ||
           (key === "market" && value === "en") ||
           (key === "sort" && value === DEFAULT_SORT) ||
@@ -82,7 +107,7 @@ export default async function ShortsChannelsPage({ searchParams }: { searchParam
   const select = (name: string, options: { key: string; label: string }[], value: string) => (
     <label className="field">
       <span>{
-        { subs: "Subscribers", views: "Average views", age: "Channel age", active: "Last upload", share: "Shorts share", country: "Country", market: "Language" }[name]
+        { subs: "Subscribers", views: "Average views", age: "Channel age", active: "Last upload", share: "Shorts share", face: "Creator on camera", country: "Country", market: "Language" }[name]
       }</span>
       <select name={name} defaultValue={value}>
         {options.map((o) => (
@@ -97,7 +122,7 @@ export default async function ShortsChannelsPage({ searchParams }: { searchParam
   return (
     <div className="research-page">
       <PageHeader icon={ShortsIcon} title="Shorts Channels" subtitle="Find channels winning with Shorts, by niche, size, and momentum." />
-      <SearchHero query={state.q} hidden={hiddenFilters} searchesLeft={searchesLeft} />
+      <SearchHero query={state.q} hidden={hiddenFilters} searchesLeft={searchesLeft} channelSearch={similarMode} />
 
       <div className="popular-row">
         <span className="muted">Popular this week:</span>
@@ -176,6 +201,7 @@ export default async function ShortsChannelsPage({ searchParams }: { searchParam
           >
             <form method="get" action="/research/shorts-channels" className="advanced-form">
               {state.q ? <input type="hidden" name="q" value={state.q} /> : null}
+              {state.similar ? <input type="hidden" name="similar" value={state.similar} /> : null}
               {state.sort !== DEFAULT_SORT ? <input type="hidden" name="sort" value={state.sort} /> : null}
               {state.videos === "hide" ? <input type="hidden" name="videos" value="hide" /> : null}
               {select("subs", SUBSCRIBERS, state.subs)}
@@ -183,6 +209,7 @@ export default async function ShortsChannelsPage({ searchParams }: { searchParam
               {select("age", CHANNEL_AGE, state.age)}
               {select("active", ACTIVITY, state.active)}
               {select("share", SHORTS_SHARE, state.share)}
+              {select("face", FACE, state.face)}
               {select("country", COUNTRIES, state.country)}
               {select("market", MARKETS, state.market)}
               <label className="checkbox-field">
@@ -249,31 +276,72 @@ export default async function ShortsChannelsPage({ searchParams }: { searchParam
 
       {isDefaultView && picks.length > 0 ? <h2 className="section-title">All Shorts channels</h2> : null}
 
+      {similarMode && target ? (
+        <div className="card similar-target">
+          {target.thumbnail_url ? <img className="avatar" src={target.thumbnail_url} alt="" width={40} height={40} /> : null}
+          <div>
+            <span className="stat-note">Channels like</span>
+            <Link href={`/channels/${target.youtube_channel_id}`} className="similar-target-name">
+              {target.title}
+            </Link>
+          </div>
+          <span className="muted similar-target-note">Matched on what they post: upload titles, topics and niche. Filters narrow the list.</span>
+        </div>
+      ) : null}
+      {similarMode && target && breakouts.length > 0 ? (
+        <section className="peer-section" aria-labelledby="peer-title">
+          <div className="section-head">
+            <span className="section-icon">
+              <FlameIcon size={16} />
+            </span>
+            <div>
+              <h2 id="peer-title">Working for channels like this</h2>
+              <p className="stat-note">Shorts from the last 30 days beating their channel&apos;s usual views</p>
+            </div>
+          </div>
+          <div className="video-grid">
+            {breakouts.map((video) => (
+              <VideoCard key={video.video_id} video={video} />
+            ))}
+          </div>
+          {breakouts.length >= 3 ? <PeerPlan channelId={target.id} cost={CREDIT_COSTS.peer_ideas} available={canPlan} /> : null}
+        </section>
+      ) : null}
+      {similarMode && reference && !target ? <AddChannel reference={reference} cost={CREDIT_COSTS.add_channel} /> : null}
+
       <div className="results-meta">
         <span>
           {channels.length === 0
             ? "No channels found"
-            : `${canLoadMore ? `Top ${channels.length}` : channels.length} ${channels.length === 1 ? "channel" : "channels"}`}
+            : `${canLoadMore ? `Top ${channels.length}` : channels.length} ${similarMode ? "similar " : ""}${channels.length === 1 ? "channel" : "channels"}`}
           {terms.length > 0 ? ` matching ${terms.map((t) => `“${t}”`).join(", ")}` : ""}
         </span>
         {isRealtimeSort(state.sort) ? <span className="muted">Growth since the snapshot ~24h/48h earlier · channels without history yet are listed last</span> : null}
-        {advancedCount > 0 || state.q ? (
+        {advancedCount > 0 || state.q || state.similar ? (
           <Link href="/research/shorts-channels" className="muted">
             Clear all
           </Link>
         ) : null}
       </div>
 
-      {channels.length === 0 ? (
+      {channels.length === 0 && similarMode && !target ? null : channels.length === 0 ? (
         <div className="card empty">
-          {terms.length > 0
+          {similarMode
+            ? "No similar Shorts channels match yet. Matches fill in as the library is indexed; loosen the filters or check back later."
+            : terms.length > 0
             ? "No saved Shorts channels match yet. Use “Find new on YouTube” above to pull some in."
             : "No Shorts channels match these filters."}
         </div>
       ) : (
         <div className="channel-list">
           {channels.map((channel) => (
-            <ChannelCard key={channel.channel_id} channel={{ ...channel, tracked: followed.has(channel.channel_id) }} showVideos={showVideos} highlightGrowth={isRealtimeSort(state.sort)} />
+            <ChannelCard
+              key={channel.channel_id}
+              channel={{ ...channel, tracked: followed.has(channel.channel_id) }}
+              showVideos={showVideos}
+              highlightGrowth={isRealtimeSort(state.sort)}
+              findSimilar={similar.enabled}
+            />
           ))}
         </div>
       )}

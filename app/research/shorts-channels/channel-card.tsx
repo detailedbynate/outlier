@@ -4,6 +4,7 @@ import { Dropdown } from "@/components/dropdown";
 import {
   BookmarkIcon,
   CalendarIcon,
+  CompassIcon,
   ExternalIcon,
   EyeIcon,
   FilmIcon,
@@ -13,6 +14,7 @@ import {
   UsersIcon,
   ZapIcon,
 } from "@/components/icons";
+import { matchPercent } from "@/lib/services/similar-channels-service";
 import { formatCompact, formatMultiplier, hoursSince, timeAgo } from "@/lib/format";
 import type { ShortsChannelWithPreviews } from "@/lib/services/research-service";
 import { setChannelTracked } from "./actions";
@@ -22,6 +24,7 @@ export function ChannelCard({
   showVideos,
   badge,
   highlightGrowth = false,
+  findSimilar = false,
 }: {
   channel: ShortsChannelWithPreviews;
   showVideos: boolean;
@@ -29,6 +32,8 @@ export function ChannelCard({
   highlightGrowth?: boolean;
   /** e.g. the niche a trending pick was found in. */
   badge?: string;
+  /** Offer "Find similar channels" (needs embeddings switched on). */
+  findSimilar?: boolean;
 }) {
   const youtubeUrl = `https://www.youtube.com/channel/${channel.youtube_channel_id}`;
   const topMultiplier = numberOrNull(channel.top_multiplier);
@@ -51,6 +56,21 @@ export function ChannelCard({
                 <ExternalIcon size={14} />
               </a>
               {badge ? <span className="niche-badge">{badge}</span> : null}
+              {channel.faceless ? (
+                <span className="trait-badge" title="No recurring creator on camera, judged from its Shorts thumbnails">
+                  Faceless
+                </span>
+              ) : null}
+              {channel.ypp ? (
+                <span className="trait-badge trait-ypp" title="1,000+ subscribers and about 10M+ Shorts views in 90 days: the Partner Program bar (estimated from its recent Shorts)">
+                  YPP eligible
+                </span>
+              ) : null}
+              {channel.similarity !== undefined ? (
+                <span className="match-badge" title="How closely this channel's uploads, topics and niche match">
+                  {matchPercent(channel.similarity)}% match
+                </span>
+              ) : null}
             </div>
             <div className="channel-meta">
               <UsersIcon size={13} />
@@ -94,6 +114,16 @@ export function ChannelCard({
               <BookmarkIcon size={15} filled={channel.tracked} />
             </button>
           </form>
+          {findSimilar ? (
+            <Link
+              href={`/research/shorts-channels?similar=${channel.channel_id}`}
+              className="icon-button"
+              title="Find similar channels"
+              aria-label={`Find channels like ${channel.title}`}
+            >
+              <CompassIcon size={15} />
+            </Link>
+          ) : null}
           <Dropdown label={<MoreIcon size={16} />} align="end" className="icon-dropdown">
             <Link href={`/channels/${channel.youtube_channel_id}`} className="dropdown-item">
               View channel details

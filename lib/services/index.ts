@@ -6,6 +6,11 @@ import { emailEnabled, sendEmail } from "@/lib/email/send";
 import { SupabaseAccountProvisioner, SupabaseAuthModeration, SupabaseInviteSender } from "@/lib/auth/invites";
 import { ModerationRepository } from "@/lib/database/repositories/moderation";
 import { NicheRepository } from "@/lib/database/repositories/niches";
+import { EmbeddingRepository } from "@/lib/database/repositories/embeddings";
+import { ChannelTraitRepository } from "@/lib/database/repositories/traits";
+import { McpTokenRepository } from "@/lib/database/repositories/mcp-tokens";
+import { ChannelTraitsService } from "./channel-traits-service";
+import { OpenRouterEmbeddingProvider } from "@/lib/ai/embeddings";
 import { RadarRepository } from "@/lib/database/repositories/radar";
 import { DataForSeoClient } from "@/lib/radar/demand";
 import { RedditClient } from "@/lib/radar/reddit";
@@ -36,7 +41,7 @@ import {
   UsageRepository,
   VideoRepository,
 } from "@/lib/database";
-import { createJobRegistry, DISCORD_SYNC_JOB_TYPE, LIBRARY_FEATURED_JOB_TYPE, LIBRARY_GROWTH_JOB_TYPE, NICHE_LABEL_JOB_TYPE } from "@/lib/jobs/definitions";
+import { createJobRegistry, DISCORD_SYNC_JOB_TYPE, EMBED_CHANNELS_JOB_TYPE, FACELESS_JOB_TYPE, LIBRARY_FEATURED_JOB_TYPE, LIBRARY_GROWTH_JOB_TYPE, NICHE_LABEL_JOB_TYPE } from "@/lib/jobs/definitions";
 import { JobQueue } from "@/lib/jobs/queue";
 import type { JobRegistry } from "@/lib/jobs/registry";
 import { JobScheduler } from "@/lib/jobs/scheduler";
@@ -72,6 +77,7 @@ import { CompareService } from "./compare-service";
 import { OnboardingService } from "./onboarding-service";
 import { RateLimitService } from "./rate-limit-service";
 import { ResearchService } from "./research-service";
+import { SimilarChannelsService } from "./similar-channels-service";
 import { StorageBudgetService } from "./storage-budget-service";
 import { TRENDING_JOB_TYPE, TRENDING_REFRESH_JOB_TYPE, TrendingService } from "./trending-service";
 import { DiscordService, discordConfigFrom } from "./discord-service";
@@ -110,6 +116,10 @@ export interface Services {
   trending: TrendingService;
   monitoring: MonitoringService;
   nicheLabeling: NicheLabelingService;
+  /** Similar channels by embedding (match %). */
+  similar: SimilarChannelsService;
+  /** Faceless badges, judged from thumbnails. */
+  traits: ChannelTraitsService;
   libraryGrowth: LibraryGrowthService;
   /** YouTube quota budgets and usage reports. */
   quota: QuotaManager;
@@ -143,6 +153,9 @@ export interface Services {
     styleSamples: StyleSampleRepository;
     competitors: CompetitorRepository;
     youtubeCache: YouTubeCacheRepository;
+    embeddings: EmbeddingRepository;
+    traits: ChannelTraitRepository;
+    mcpTokens: McpTokenRepository;
   };
 }
 
@@ -218,6 +231,9 @@ export function getServices(): Services {
     radar: lazy(() => new RadarRepository(lazyDb())),
     competitors: lazy(() => new CompetitorRepository(lazyDb())),
     youtubeCache: lazy(() => new YouTubeCacheRepository(lazyDb())),
+    embeddings: lazy(() => new EmbeddingRepository(lazyDb())),
+    traits: lazy(() => new ChannelTraitRepository(lazyDb())),
+    mcpTokens: lazy(() => new McpTokenRepository(lazyDb())),
   };
   const accounts = new AccountService(
     {
@@ -273,14 +289,20 @@ export function getServices(): Services {
     enqueue,
   });
 
+  const similar = new SimilarChannelsService({
+    embedder: config.OPENROUTER_API_KEY ? new OpenRouterEmbeddingProvider({ apiKey: config.OPENROUTER_API_KEY }) : null,
+    embeddings: repositories.embeddings,
+    storage,
+  });
   const research = new ResearchService(
-    { youtube, channels: repositories.channels, videos: repositories.videos, usage: repositories.usage, storage, enqueue },
+    { youtube, channels: repositories.channels, videos: repositories.videos, usage: repositories.usage, storage, enqueue, similar, traits: repositories.traits },
     { discoveryDailyLimit: config.DISCOVERY_DAILY_LIMIT, discoveryMaxChannels: config.DISCOVERY_MAX_CHANNELS, quality, regionCode },
   );
 
   // Claude is capped per month at what's prepaid; background jobs get a share of it, paced per day.
   const claudeBudget = new MonthlySpendBudget(repositories.usage, config.ANTHROPIC_MONTHLY_BUDGET_USD);
   const backgroundBudget = new MonthlySpendBudget(repositories.usage, config.ANTHROPIC_MONTHLY_BUDGET_USD, { shareUsd: config.ANTHROPIC_BACKGROUND_BUDGET_USD });
+  const traits = new ChannelTraitsService({ vision: backgroundClaude(config, backgroundBudget), traits: repositories.traits, videos: repositories.videos });
   // Niche labeling is rule-based and free; an AI provider only gives unsure channels a second opinion.
   const text = labelingProvider(config, backgroundBudget);
   if (text && !getAIProviders().has("text")) getAIProviders().register("text", text);
@@ -343,6 +365,8 @@ export function getServices(): Services {
 
   const jobRegistry = createJobRegistry({
     discord,
+    similar,
+    traits,
     monitoring,
     nicheLabeling,
     libraryGrowth,
@@ -368,6 +392,8 @@ export function getServices(): Services {
       monitorMaxVideosPerRun: config.MONITOR_MAX_VIDEOS_PER_RUN,
       monitorMaxChannelsPerRun: config.MONITOR_MAX_CHANNELS_PER_RUN,
       nicheLabelMaxPerRun: config.NICHE_LABEL_MAX_PER_RUN,
+      embedMaxPerRun: config.EMBED_MAX_PER_RUN,
+      facelessMaxPerRun: config.FACELESS_MAX_PER_RUN,
     },
   });
   const queue = new JobQueue(repositories.jobs, jobRegistry);
@@ -384,6 +410,8 @@ export function getServices(): Services {
     { type: MONITOR_VIDEOS_JOB_TYPE, everyHours: 1 },
     { type: MONITOR_CHANNELS_JOB_TYPE, everyHours: 1 },
     { type: NICHE_LABEL_JOB_TYPE, everyHours: 1 },
+    ...(config.OPENROUTER_API_KEY && config.EMBED_MAX_PER_RUN > 0 ? [{ type: EMBED_CHANNELS_JOB_TYPE, everyHours: 1 }] : []),
+    ...(config.ANTHROPIC_API_KEY && config.FACELESS_MAX_PER_RUN > 0 ? [{ type: FACELESS_JOB_TYPE, everyHours: 1 }] : []),
     ...(config.LIBRARY_GROWTH_SEARCHES_PER_RUN > 0 || config.LIBRARY_FEATURED_CHECKS_PER_RUN > 0 ? [{ type: LIBRARY_GROWTH_JOB_TYPE, everyHours: 1 }] : []),
     ...(config.LIBRARY_FEATURED_CHECKS_PER_RUN > 0 ? [{ type: LIBRARY_FEATURED_JOB_TYPE, everyHours: 1 }] : []),
   ]);
@@ -472,6 +500,8 @@ export function getServices(): Services {
     trending,
     monitoring,
     nicheLabeling,
+    similar,
+    traits,
     libraryGrowth,
     quota: lazy(() => getQuotaManager()),
     research,

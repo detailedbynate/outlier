@@ -26,6 +26,8 @@ export async function trackChannel(_prev: TrackChannelState, formData: FormData)
     const { channel } = await asUser(user.id, "action:track_channel", () => services.channels.refreshChannel(identifier, { followedBy: user.id }));
     await services.credits.charge(user.id, "track_channel", channel.youtube_channel_id);
     youtubeChannelId = channel.youtube_channel_id;
+    // Embedded now so "Find similar" works on it straight away.
+    await services.similar.embedChannels([channel.id]).catch((error: unknown) => logger.warn("embedding a tracked channel failed", { identifier, error }));
   } catch (error) {
     if (isQuotaUnavailable(error)) return queueWhenQuotaReturns(identifier, error.message);
     logger.warn("track channel failed", { identifier, error });

@@ -47,6 +47,12 @@ export const SHORTS_SHARE = [
   { key: "95", label: "Shorts only (95%+)", min: 0.95 },
 ] satisfies (Option & { min?: number })[];
 
+export const FACE = [
+  { key: "any", label: "Faceless or on camera" },
+  { key: "faceless", label: "Faceless only", faceless: true },
+  { key: "camera", label: "On camera only", faceless: false },
+] satisfies (Option & { faceless?: boolean })[];
+
 export const COUNTRIES = [
   { key: "any", label: "Any country" },
   ...["US", "GB", "CA", "AU", "IN", "BR", "MX", "DE", "FR", "ES", "IT", "PH", "ID", "JP", "KR"].map((code) => ({ key: code, label: code })),
@@ -92,11 +98,14 @@ export interface ShortsPageState {
   age: string;
   active: string;
   share: string;
+  face: string;
   country: string;
   tracked: string;
   market: string;
   videos: string;
   limit: string;
+  /** A channel's id: list the channels most like it, by match. */
+  similar: string;
 }
 
 /** Underrated creators first: the point of the tool. Big channels are one sort away. */
@@ -110,15 +119,17 @@ const DEFAULTS: ShortsPageState = {
   age: "any",
   active: "any",
   share: "any",
+  face: "any",
   country: "any",
   tracked: "any",
   market: "en",
   videos: "show",
   limit: String(PAGE_SIZE),
+  similar: "",
 };
 
 /** Filters counted on the "Advanced Filters" badge. */
-export const ADVANCED_KEYS = ["subs", "views", "age", "active", "share", "country", "tracked", "market"] as const;
+export const ADVANCED_KEYS = ["subs", "views", "age", "active", "share", "face", "country", "tracked", "market"] as const;
 
 export const QUICK_FILTERS: { key: string; label: string; description: string; params: Partial<ShortsPageState> }[] = [
   { key: "rising", label: "Rising new channels", description: "Under 3 months old, 10K+ avg views", params: { age: "90d", views: "10k" } },
@@ -144,11 +155,13 @@ export function parseState(params: Record<string, string | string[] | undefined>
     age: pickKey(CHANNEL_AGE, str("age")),
     active: pickKey(ACTIVITY, str("active")),
     share: pickKey(SHORTS_SHARE, str("share")),
+    face: pickKey(FACE, str("face")),
     country: pickKey(COUNTRIES, str("country")),
     tracked: str("tracked") === "yes" ? "yes" : "any",
     market: pickKey(MARKETS, str("market")),
     videos: str("videos") === "hide" ? "hide" : "show",
     limit: String(Number.isInteger(limit) && limit >= PAGE_SIZE && limit <= MAX_LIMIT ? limit : PAGE_SIZE),
+    similar: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str("similar") ?? "") ? str("similar")! : "",
   };
 }
 
@@ -160,6 +173,7 @@ export function toFilters(state: ShortsPageState, targetCountries: readonly stri
   const age = find(CHANNEL_AGE, state.age) as { days?: number };
   const active = find(ACTIVITY, state.active) as { days?: number };
   const share = find(SHORTS_SHARE, state.share) as { min?: number };
+  const face = find(FACE, state.face) as { faceless?: boolean };
   return {
     minSubscribers: subs.min,
     maxSubscribers: subs.max,
@@ -167,6 +181,7 @@ export function toFilters(state: ShortsPageState, targetCountries: readonly stri
     createdAfter: age.days ? daysAgo(age.days) : undefined,
     activeSince: active.days ? daysAgo(active.days) : undefined,
     minShortsShare: share.min,
+    faceless: face.faceless,
     country: state.country === "any" ? undefined : state.country,
     followedBy: state.tracked === "yes" ? userId : undefined,
     // A specific country choice overrides the market filter's country list.

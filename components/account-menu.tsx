@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { CoinsIcon, GiftIcon, LogOutIcon, MoreIcon, SlidersIcon } from "./icons";
+import { CoinsIcon, GiftIcon, LogOutIcon, MoreIcon, PlugIcon, SlidersIcon } from "./icons";
 
 const LINKS = [
   { href: "/billing", label: "Plans & credits", icon: CoinsIcon },
   { href: "/settings/preferences", label: "Preferences", icon: SlidersIcon },
+  { href: "/settings/connect-ai", label: "Connect AI (MCP)", icon: PlugIcon },
   { href: "/referrals", label: "Refer friends", icon: GiftIcon },
 ];
 

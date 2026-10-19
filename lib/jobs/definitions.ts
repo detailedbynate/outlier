@@ -8,6 +8,8 @@ import type { DiscordService } from "@/lib/services/discord-service";
 import type { LibraryGrowthService } from "@/lib/services/library-growth-service";
 import { MONITOR_CHANNELS_JOB_TYPE, MONITOR_VIDEOS_JOB_TYPE, type MonitoringService } from "@/lib/services/monitoring-service";
 import type { NicheLabelingService } from "@/lib/services/niche-labeling-service";
+import type { ChannelTraitsService } from "@/lib/services/channel-traits-service";
+import type { SimilarChannelsService } from "@/lib/services/similar-channels-service";
 import type { StorageBudgetService } from "@/lib/services/storage-budget-service";
 import { TRENDING_JOB_TYPE, TRENDING_REFRESH_JOB_TYPE, type TrendingService } from "@/lib/services/trending-service";
 import type { VideoService } from "@/lib/services/video-service";
@@ -25,6 +27,8 @@ export interface JobDependencies {
   trending: TrendingService;
   monitoring: MonitoringService;
   nicheLabeling: NicheLabelingService;
+  similar: Pick<SimilarChannelsService, "embedPending">;
+  traits: Pick<ChannelTraitsService, "classifyPending">;
   libraryGrowth: LibraryGrowthService;
   /** Housekeeping for the YouTube response cache and quota ledger. */
   youtubeHousekeeping: { pruneCache: () => Promise<void>; pruneQuotaHistory: () => Promise<void> };
@@ -42,10 +46,14 @@ export interface JobDependencies {
     monitorMaxVideosPerRun: number;
     monitorMaxChannelsPerRun: number;
     nicheLabelMaxPerRun: number;
+    embedMaxPerRun: number;
+    facelessMaxPerRun: number;
   };
 }
 
 export const NICHE_LABEL_JOB_TYPE = "niches.label_channels";
+export const EMBED_CHANNELS_JOB_TYPE = "channels.embed";
+export const FACELESS_JOB_TYPE = "channels.faceless";
 export const LIBRARY_GROWTH_JOB_TYPE = "library.grow";
 export const LIBRARY_FEATURED_JOB_TYPE = "library.featured";
 export const DISCORD_SYNC_JOB_TYPE = "discord.sync_roles";
@@ -296,6 +304,24 @@ export function createJobRegistry(deps: JobDependencies): JobRegistry {
         payloadSchema: emptyPayload,
         maxAttempts: 1,
         handler: async (_payload, { signal }) => ({ ...(await deps.nicheLabeling.labelPending({ maxChannels: deps.config.nicheLabelMaxPerRun, signal })) }),
+      }),
+    )
+    .register(
+      defineJob({
+        type: EMBED_CHANNELS_JOB_TYPE,
+        description: "Scheduled: embed channels for similar-channel search (OpenRouter embeddings, about $0.01 per thousand channels).",
+        payloadSchema: emptyPayload,
+        maxAttempts: 1,
+        handler: (_payload, { signal }) => skipIfOverBudget(async () => ({ ...(await deps.similar.embedPending({ maxChannels: deps.config.embedMaxPerRun, signal })) })),
+      }),
+    )
+    .register(
+      defineJob({
+        type: FACELESS_JOB_TYPE,
+        description: "Scheduled: Claude Haiku looks at a few Shorts thumbnails per channel to tell faceless channels from on-camera ones (background budget).",
+        payloadSchema: emptyPayload,
+        maxAttempts: 1,
+        handler: async (_payload, { signal }) => ({ ...(await deps.traits.classifyPending({ maxChannels: deps.config.facelessMaxPerRun, signal })) }),
       }),
     )
     .register(

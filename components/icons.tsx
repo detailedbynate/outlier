@@ -57,6 +57,20 @@ export const CheckIcon = (p: P) => (
     <path d="m5 12.5 4.5 4.5L19 7.5" />
   </Icon>
 );
+export const PlugIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M9 3v5M15 3v5" />
+    <path d="M6 8h12v3a6 6 0 0 1-12 0V8Z" />
+    <path d="M12 17v4" />
+  </Icon>
+);
+export const ArchiveIcon = (p: P) => (
+  <Icon {...p}>
+    <rect x="3" y="4" width="18" height="4" rx="1" />
+    <path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8" />
+    <path d="M10 12h4" />
+  </Icon>
+);
 export const ClockIcon = (p: P) => (
   <Icon {...p}>
     <circle cx="12" cy="12" r="9" />

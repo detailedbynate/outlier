@@ -18,6 +18,8 @@ export const CREDIT_COSTS = {
   discover_channels_deep: 25,
   /** Channel + uploads + Shorts playlist + video stats. */
   track_channel: 3,
+  /** Pulling in a channel we don't have so its similar channels can be found: the same fetch as tracking. */
+  add_channel: 3,
   /** Video + channel + recent uploads for the baseline. */
   analyze_video: 2,
   /** Niche Finder fresh research: one search + batched stats (only charged when YouTube is called). */
@@ -30,6 +32,8 @@ export const CREDIT_COSTS = {
   write_script: 8,
   /** Six ideas for a niche: one model call, and much less output than a script. */
   find_ideas: 3,
+  /** "What to make next" from similar channels' breakouts: one model call, like ideas. */
+  peer_ideas: 3,
 } as const;
 
 export type CreditAction = keyof typeof CREDIT_COSTS;

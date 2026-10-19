@@ -394,6 +394,36 @@ export type DiscordLinkRow = {
   synced_at: string | null;
 };
 
+/** A channel's embedding; `embedding` comes back from PostgREST as a "[0.1,...]" string. */
+export type ChannelEmbeddingRow = {
+  channel_id: string;
+  embedding: string;
+  model: string;
+  source_hash: string;
+  embedded_at: string;
+};
+
+/** Badges judged per channel (supabase/migrations/20261019000040_channel_traits.sql). */
+export type ChannelTraitRow = {
+  channel_id: string;
+  faceless: boolean | null;
+  faceless_checked_at: string | null;
+  model: string | null;
+};
+
+/** A personal MCP token; only its hash is stored. */
+export type McpTokenRow = {
+  id: string;
+  user_id: string;
+  token_hash: string;
+  prefix: string;
+  label: string;
+  staff: boolean;
+  created_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+};
+
 export type CreatorCommissionRow = {
   id: string;
   code_id: string;
@@ -722,6 +752,9 @@ export type Database = {
       creator_commissions: TableDef<CreatorCommissionRow, "code_id" | "stripe_invoice_id" | "amount_cents" | "commission_cents" | "paid_at">;
       site_events: TableDef<SiteEventRow, "kind">;
       discord_links: TableDef<DiscordLinkRow, "user_id" | "discord_id" | "discord_username">;
+      channel_embeddings: TableDef<ChannelEmbeddingRow, "channel_id" | "embedding" | "model" | "source_hash">;
+      channel_traits: TableDef<ChannelTraitRow, "channel_id">;
+      mcp_tokens: TableDef<McpTokenRow, "user_id" | "token_hash" | "prefix">;
       referral_rewards: TableDef<ReferralRewardRow, "code" | "referred_user_id">;
       credit_grants: TableDef<CreditGrantRow, "user_id" | "amount" | "reason">;
       credit_ledger: TableDef<CreditLedgerRow, "user_id" | "amount" | "kind">;
@@ -763,6 +796,35 @@ export type Database = {
       };
     };
     Functions: {
+      match_similar_channels: {
+        Args: { target: string; match_count?: number };
+        Returns: { channel_id: string; similarity: number }[];
+      };
+      channels_to_embed: {
+        Args: { batch_size: number; stale_before: string };
+        Returns: string[];
+      };
+      channels_for_faceless_check: {
+        Args: { batch_size: number; stale_before: string };
+        Returns: string[];
+      };
+      channel_shorts_views_90d: {
+        Args: { ids: string[] };
+        Returns: { channel_id: string; views: number }[];
+      };
+      channel_embedding_sources: {
+        Args: { ids: string[]; titles_per_channel?: number };
+        Returns: {
+          channel_id: string;
+          title: string;
+          handle: string | null;
+          description: string | null;
+          keywords: string[];
+          niche_category: string | null;
+          niche_labels: string[];
+          recent_titles: string[];
+        }[];
+      };
       refresh_niche_channel_counts: {
         Args: Record<string, never>;
         Returns: undefined;

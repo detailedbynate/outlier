@@ -228,6 +228,10 @@ const serverEnvSchema = z.object({
   NICHE_LABEL_PROVIDER: z.enum(["auto", "gemini", "openrouter", "anthropic", "rules"]).default("auto"),
   /** Channels per model call when labeling. */
   // Small: the free models answer eight channels well inside a tick, twenty often not at all.
+  /** Channels embedded per hourly run for similar-channel search; 0 turns it off. Needs OPENROUTER_API_KEY. */
+  EMBED_MAX_PER_RUN: z.coerce.number().int().min(0).max(2000).default(1000),
+  /** Channels per hour Claude Haiku checks for faceless, from the background budget. 0 turns it off. */
+  FACELESS_MAX_PER_RUN: z.coerce.number().int().min(0).max(500).default(20),
   NICHE_LABEL_BATCH_SIZE: z.coerce.number().int().min(1).max(50).default(8),
   /** Channels labeled per hourly run. */
   NICHE_LABEL_MAX_PER_RUN: z.coerce.number().int().min(0).max(5_000).default(200),

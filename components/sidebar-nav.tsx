@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ComponentType } from "react";
 import {
+  ArchiveIcon,
   BookmarkIcon,
   ChartIcon,
   ClipboardIcon,
@@ -18,6 +19,7 @@ import {
   LockIcon,
   MicIcon,
   PenIcon,
+  PlugIcon,
   SearchIcon,
   ShortsIcon,
   SlidersIcon,
@@ -53,6 +55,7 @@ const SECTIONS: NavSection[] = [
       { href: "/research/niche-finder", label: "Niche Finder", icon: CompassIcon, paid: true },
       { href: "/research/shorts-channels", label: "Shorts Channels", icon: ShortsIcon },
       { href: "/viral", label: "Viral Videos", icon: FlameIcon, paid: true },
+      { href: "/research/removed-channels", label: "Removed Channels", icon: ArchiveIcon, paid: true },
       { href: "/analyze", label: "Analyze Video", icon: ChartIcon, paid: true },
       { href: "/research/scriptwriter", label: "Script Writer", icon: PenIcon, badge: "New", ownerOnly: true },
       { href: "/voice", label: "Voice Studio", icon: MicIcon, badge: "New", ownerOnly: true },
@@ -72,6 +75,7 @@ const SECTIONS: NavSection[] = [
     items: [
       { href: "/billing", label: "Plans & credits", icon: CoinsIcon },
       { href: "/settings/preferences", label: "Preferences", icon: SlidersIcon },
+      { href: "/settings/connect-ai", label: "Connect AI (MCP)", icon: PlugIcon },
       { href: "/referrals", label: "Refer friends", icon: GiftIcon, badge: "Earn" },
     ],
   },

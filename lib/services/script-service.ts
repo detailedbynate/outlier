@@ -4,6 +4,7 @@ import type { TextProvider } from "@/lib/ai/types";
 import type { SavedScriptRepository } from "@/lib/database/repositories/saved-scripts";
 import type { StyleSampleRepository } from "@/lib/database/repositories/style-samples";
 import { IDEAS, IDEA_COUNT, ideaSystemPrompt, ideaUserPrompt, type IdeaResult } from "@/lib/scripts/ideas";
+import { PEER_PLAN, peerPlanSystemPrompt, peerPlanUserPrompt, type PeerPlan, type PeerPlanRequest } from "@/lib/scripts/peer-ideas";
 import { scriptSystemPrompt, scriptUserPrompt } from "@/lib/scripts/prompt";
 import { SCRIPT, type ScriptRequest, type ScriptResult } from "@/lib/scripts/schema";
 
@@ -154,6 +155,25 @@ export class ScriptService {
 
     this.log.info("ideas found", { topic: niche, ideas: object.ideas.length, knownTitles: alreadyMade.length, model, inputTokens: usage?.inputTokens, outputTokens: usage?.outputTokens });
     return { ideas: object.ideas, model };
+  }
+
+  /** Topics, title formats and ideas read off what's breaking out on similar channels. */
+  async peerPlan(request: PeerPlanRequest, options: WriterOptions = {}): Promise<PeerPlan & { model: string }> {
+    if (request.breakouts.length < 3) throw new ValidationError("Not enough breakouts on similar channels yet to read a pattern from.");
+    const ai = this.writer(options);
+    if (!ai) throw new AppError("CONFIG_ERROR", "Suggestions aren't available right now.", { expose: true });
+    const { object, model, usage } = await ai.generateObject({
+      system: peerPlanSystemPrompt(),
+      messages: [{ role: "user", content: peerPlanUserPrompt(request) }],
+      schema: PEER_PLAN,
+      schemaName: "peer_plan",
+      temperature: 0.7,
+      effort: "low",
+      maxOutputTokens: 3_000,
+      cacheSystem: false,
+    });
+    this.log.info("peer plan", { channel: request.channel, breakouts: request.breakouts.length, model, inputTokens: usage?.inputTokens, outputTokens: usage?.outputTokens });
+    return { ...object, model };
   }
 
 }

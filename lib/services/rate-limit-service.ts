@@ -25,6 +25,8 @@ export const RATE_LIMITS = {
   scriptUser: { windowSeconds: 21_600, maxHits: 1 },
   /** Pro: idea searches, kept apart from scripts so looking for an idea never uses up the script. */
   scriptIdeasUser: { windowSeconds: 21_600, maxHits: 3 },
+  /** MCP tool calls per token: plenty for an assistant, not enough to scrape the library. */
+  mcpToken: { windowSeconds: 3600, maxHits: 300 },
   /** Expert: four scripts a day. */
   scriptExpert: { windowSeconds: 86_400, maxHits: 4 },
 } as const;

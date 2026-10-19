@@ -7,7 +7,7 @@
  * pages check it again, so a locked tool never spends credits or quota.
  */
 
-export type PaidFeature = "dashboard" | "niche-finder" | "viral" | "analyze" | "tracked" | "competitors";
+export type PaidFeature = "dashboard" | "niche-finder" | "viral" | "analyze" | "tracked" | "competitors" | "removed" | "mcp";
 
 export interface FeatureCopy {
   title: string;
@@ -37,6 +37,18 @@ export const PAID_FEATURES: Record<PaidFeature, FeatureCopy> = {
     hook: "See which Shorts are blowing up right now",
     pitch: "The Shorts pulling far more views than their channel normally gets, as they happen.",
     points: ["Outliers ranked by how far they beat their channel", "Filter by niche, size and how recent", "See the pattern before everyone copies it"],
+  },
+  removed: {
+    title: "Removed Channels",
+    hook: "See the channels YouTube took down",
+    pitch: "Channels that were deleted or terminated, with the numbers and uploads they had before they went.",
+    points: ["What they were posting and how it performed", "Big channels gone overnight, newest first", "Gaps in a niche someone else can now fill"],
+  },
+  mcp: {
+    title: "Connect AI",
+    hook: "Ask Claude about any niche, with Outlier's data",
+    pitch: "Connect Claude or any AI assistant to Outlier's library through the Outlier MCP server.",
+    points: ["Search channels and find look-alikes from a chat", "See what's working for similar channels", "Viral Shorts and removed channels, on request"],
   },
   analyze: {
     title: "Analyze Video",

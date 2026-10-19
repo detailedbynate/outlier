@@ -613,6 +613,8 @@ export class ChannelRepository {
     }
     // Their views come from other people's work, so they'd crowd out real creators.
     if (filters.excludeLowQuality !== false) query = query.not("quality_flags", "ov", "{reupload,compilation,spam_or_misleading}");
+    // A removed channel links to a dead page, so it only shows in the archive.
+    query = filters.removed === "only" ? query.contains("quality_flags", [REMOVED_FLAG]) : query.not("quality_flags", "cs", `{${REMOVED_FLAG}}`);
     if (filters.targetMarket) {
       query = query.eq("is_target_language", true);
       if (filters.targetMarket.countries.length > 0) {
@@ -722,6 +724,10 @@ export interface ShortsChannelFilters {
   targetMarket?: { countries: readonly string[] };
   /** Leave out channels flagged as reuploads, compilations or spam (default true). */
   excludeLowQuality?: boolean;
+  /** Faceless (true) or on camera (false), as judged so far. Applied by ResearchService, which holds the traits. */
+  faceless?: boolean;
+  /** Channels YouTube removed or terminated: left out by default, or "only" for the archive. */
+  removed?: "exclude" | "only";
   orderBy:
     | "underrated_score"
     | "avg_short_views"
@@ -738,7 +744,9 @@ export interface ShortsChannelFilters {
     | "avg_engagement"
     | "shorts_per_week"
     | "recent_vph"
-    | "live_vph";
+    | "live_vph"
+    // Removal is noticed on the last refresh, so for removed channels this is roughly when they went.
+    | "last_synced_at";
   limit: number;
 }
 
