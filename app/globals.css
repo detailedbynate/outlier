@@ -12904,8 +12904,7 @@ body.app-body {
   ) {
   text-transform: none;
   letter-spacing: 0;
-  /* Labels get their own face; everything else stays DM Sans. */
-  font-family: var(--font-app), var(--font);
+  font-family: var(--font);
 }
 
 .app .nav-section-title {

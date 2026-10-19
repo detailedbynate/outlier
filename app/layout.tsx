@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { DM_Sans, Schibsted_Grotesk } from "next/font/google";
+import { Outfit } from "next/font/google";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { AccountMenu } from "@/components/account-menu";
@@ -26,9 +26,7 @@ import "./globals.css";
 import { writerOpenTo } from "@/lib/scripts/access";
 import { LANDING_HEADER } from "@/lib/landing-link";
 
-const dmSans = DM_Sans({ subsets: ["latin"], display: "swap", variable: "--font-sans" });
-// Small labels in the signed-in app (menu sections, table headings); body text stays DM Sans.
-const appFont = Schibsted_Grotesk({ subsets: ["latin"], display: "swap", variable: "--font-app" });
+const outfit = Outfit({ subsets: ["latin"], display: "swap", variable: "--font-sans" });
 
 export const metadata: Metadata = {
   title: "Outlier",
@@ -67,7 +65,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
 
   if (!current?.approved || landingLink) {
     return (
-      <html lang="en" className={dmSans.variable}>
+      <html lang="en" className={outfit.variable}>
         <body>
           <div className="ambient" aria-hidden="true" />
           <div className="shell">
@@ -107,7 +105,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const plan: SidebarPlan | undefined = current.isOwner ? "owner" : subscription ? subscription.plan.id : undefined;
 
   return (
-    <html lang="en" className={`${dmSans.variable} ${appFont.variable}`}>
+    <html lang="en" className={outfit.variable}>
       <body className="app-body">
         <div className="ambient" aria-hidden="true" />
         <div className="app">
