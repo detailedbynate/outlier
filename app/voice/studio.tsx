@@ -40,16 +40,20 @@ export function Studio({
   scripts,
   initialText,
   maxCharacters,
-  cost,
-  limitNote,
+  allowance,
+  used: initialUsed,
+  resetsOn,
   model,
 }: {
   voices: Voice[];
   scripts: ScriptOption[];
   initialText: string;
   maxCharacters: number;
-  cost: number;
-  limitNote: string | null;
+  /** Characters a month on this plan, or null for no limit. */
+  allowance: number | null;
+  used: number;
+  /** When the allowance resets, e.g. "Nov 1". */
+  resetsOn: string;
   model: { name: string; note: string };
 }) {
   const [text, setText] = useState(initialText);
@@ -60,12 +64,16 @@ export function Studio({
   const [clips, setClips] = useState<Clip[]>([]);
   const [current, setCurrent] = useState<Clip | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [used, setUsed] = useState(initialUsed);
   const [pending, start] = useTransition();
   const nextId = useRef(1);
   const voice = voices.find((v) => v.id === voiceId) ?? voices[0];
 
   const length = text.replace(/\s+/g, " ").trim().length;
+  const left = allowance === null ? null : Math.max(0, allowance - used);
   const over = length > maxCharacters;
+  // Past what's left this month: the button stays off and the meter says why.
+  const overAllowance = left !== null && length > left;
   const seconds = Math.max(1, Math.round(length / CHARS_PER_SECOND / settings.speed));
 
   // Blob URLs hold audio in memory until they're let go.
@@ -73,10 +81,11 @@ export function Studio({
   useEffect(() => () => urls.current.forEach((u) => URL.revokeObjectURL(u)), []);
 
   const generate = () => {
-    if (!voice || !length || over || pending) return;
+    if (!voice || !length || over || overAllowance || pending) return;
     start(async () => {
       setError(null);
       const result = await generateVoice({ text, voiceId: voice.id, ...settings });
+      if (result.used !== null) setUsed(result.used);
       if (!result.audio) {
         setError(result.error);
         return;
@@ -139,10 +148,8 @@ export function Studio({
             {length > 0 ? <em> · about {seconds}s</em> : null}
           </span>
           <div className="vs-generate">
-            <small>
-              {cost} credits{limitNote ? ` · ${limitNote}` : ""}
-            </small>
-            <button type="button" className="btn btn-primary vs-go" onClick={generate} disabled={!voice || !length || over || pending}>
+            {allowance !== null && left !== null ? <AllowanceMeter left={left} allowance={allowance} resetsOn={resetsOn} short={overAllowance} /> : null}
+            <button type="button" className="btn btn-primary vs-go" onClick={generate} disabled={!voice || !length || over || overAllowance || pending}>
               {pending ? (
                 <>
                   <span className="vs-spinner" aria-hidden="true" /> Generating…
@@ -332,5 +339,19 @@ function History({ clips, current, onPick }: { clips: Clip[]; current: Clip | nu
         </li>
       ))}
     </ul>
+  );
+}
+
+/** What's left of this month's characters, as a line and a thin bar like ElevenLabs' quota meter. */
+function AllowanceMeter({ left, allowance, resetsOn, short }: { left: number; allowance: number; resetsOn: string; short: boolean }) {
+  const fmt = (n: number) => n.toLocaleString("en-US");
+  const share = allowance > 0 ? left / allowance : 0;
+  return (
+    <div className="vs-allowance" data-low={share < 0.1 ? "" : undefined} title={`Resets on ${resetsOn}`}>
+      <small>{short ? (left === 0 ? `All used · resets ${resetsOn}` : `Only ${fmt(left)} left this month`) : `${fmt(left)} / ${fmt(allowance)} characters left`}</small>
+      <span className="vs-allowance-bar" aria-hidden="true">
+        <span style={{ width: `${Math.round(share * 100)}%` }} />
+      </span>
+    </div>
   );
 }

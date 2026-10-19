@@ -16796,6 +16796,37 @@ body.app-body {
   font-size: 0.76rem;
 }
 
+.vs-allowance {
+  display: grid;
+  gap: 5px;
+  justify-items: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.vs-allowance-bar {
+  width: 140px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.vs-allowance-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+
+.vs-allowance[data-low] small {
+  color: #f87171;
+}
+
+.vs-allowance[data-low] .vs-allowance-bar span {
+  background: #f87171;
+}
+
 .vs-go {
   display: inline-flex;
   align-items: center;

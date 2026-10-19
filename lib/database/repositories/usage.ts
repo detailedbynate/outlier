@@ -27,6 +27,15 @@ export class UsageRepository {
     return rows.reduce((sum, row) => sum + row.quantity, 0);
   }
 
+  /** One person's total quantity of an event type since a point in time (for monthly allowances). */
+  async userCountSince(userId: string, eventType: string, since: Date): Promise<number> {
+    const rows = unwrap(
+      await this.db.from("usage_events").select("quantity").eq("user_id", userId).eq("event_type", eventType).gte("occurred_at", since.toISOString()),
+      "usage_events.userCountSince",
+    );
+    return rows.reduce((sum, row) => sum + row.quantity, 0);
+  }
+
   async creditsSpentSince(userId: string, since: Date): Promise<number> {
     const rows = unwrap(
       await this.db

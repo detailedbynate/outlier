@@ -23,16 +23,20 @@ interface WriterTerms {
   basic: boolean;
   /** The limit on scripts, or null for none. */
   limit: RateLimitPolicy | null;
-  /** The limit on voiceovers, or null for none. */
-  voiceLimit: RateLimitPolicy | null;
+  /**
+   * Voice Studio characters a month, or null for none. About 500 is a 30s Short
+   * and ElevenLabs costs Outlier ~$0.055 per 1,000, so Pro's 10,000 (~20 Shorts)
+   * and Expert's 30,000 (~2 a day) each cost about 5.5% of the plan's price.
+   */
+  voiceCharacters: number | null;
   /** What the form says about the limit. */
   limitNote: string | null;
 }
 
-const OWNER_TERMS: WriterTerms = { premium: true, basic: false, limit: null, voiceLimit: null, limitNote: null };
-const PRO_TERMS: WriterTerms = { premium: false, basic: true, limit: "scriptUser", voiceLimit: "voiceUser", limitNote: "one script every 6 hours" };
+const OWNER_TERMS: WriterTerms = { premium: true, basic: false, limit: null, voiceCharacters: null, limitNote: null };
+const PRO_TERMS: WriterTerms = { premium: false, basic: true, limit: "scriptUser", voiceCharacters: 10_000, limitNote: "one script every 6 hours" };
 const PLAN_TERMS: Partial<Record<PlanId, WriterTerms>> = {
-  expert: { premium: true, basic: false, limit: "scriptExpert", voiceLimit: "voiceExpert", limitNote: "4 scripts a day" },
+  expert: { premium: true, basic: false, limit: "scriptExpert", voiceCharacters: 30_000, limitNote: "4 scripts a day" },
   pro: PRO_TERMS,
 };
 

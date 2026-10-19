@@ -8,6 +8,9 @@ const log = createLogger({ module: "voice" });
 /** usage_events type for ElevenLabs use; quantity is the credits ElevenLabs charged. */
 export const VOICE_CREDITS_EVENT = "voice.credits";
 
+/** usage_events type for each person's monthly allowance; quantity is the characters read out. */
+export const VOICE_CHARACTERS_EVENT = "voice.characters";
+
 /**
  * Longest text one generation takes: about a minute read out, twice a 30s
  * Short. It keeps every generation one flat price, and a long piece can still
@@ -31,7 +34,18 @@ const ESTIMATE_PER_CHARACTER = 0.5;
 /** The voice list barely changes, so it's fetched once an hour rather than on every page load. */
 const VOICES_TTL_MS = 60 * 60 * 1000;
 
-const clamp = (value: number, min: number, max: number, fallback: number): number =>
+/** Allowances reset on the 1st of each month (UTC). */
+export function voiceMonthStart(now: Date): Date {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+}
+
+/** When this month's allowance resets, e.g. "Nov 1". */
+export function voiceResetLabel(now: Date): string {
+  const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  return next.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+}
+
+const clamp =(value: number, min: number, max: number, fallback: number): number =>
   Number.isFinite(value) ? Math.min(Math.max(value, min), max) : fallback;
 
 /** Whatever the browser sent, made into settings ElevenLabs accepts. */
@@ -46,9 +60,11 @@ export function cleanSettings(raw: Partial<Record<keyof VoiceSettings, unknown>>
 /**
  * Voice Studio: text read out by ElevenLabs' stock voices.
  *
- * Every call spends credits on the owner's ElevenLabs plan, so besides each
- * person's credits and daily limit there's one cap for the whole app: a share
- * of the plan's credits in any 30 days, counted from what ElevenLabs reports.
+ * Every call spends credits on the owner's ElevenLabs plan. Each person gets a
+ * monthly allowance of characters rather than paying Outlier credits
+ * (ElevenLabs bills by the character, so the allowance tracks the real cost),
+ * and there's one cap for the whole app: a share of the plan's credits in any
+ * 30 days, counted from what ElevenLabs reports.
  */
 export class VoiceService {
   private voiceCache: { at: number; voices: Voice[] } | null = null;
@@ -56,7 +72,7 @@ export class VoiceService {
   constructor(
     private readonly deps: {
       client: Pick<ElevenLabsClient, "listVoices" | "speak" | "model"> | null;
-      usage: Pick<UsageRepository, "countSince" | "record">;
+      usage: Pick<UsageRepository, "countSince" | "userCountSince" | "record">;
       /** Most ElevenLabs credits the whole app may use in any 30 days. */
       creditCap: number;
     },
@@ -85,8 +101,16 @@ export class VoiceService {
     }
   }
 
-  /** Read the text out. Returns MP3 bytes. */
-  async speak(userId: string, rawText: string, voiceId: string, settings: VoiceSettings, now: Date = new Date()): Promise<{ audio: Uint8Array; characters: number }> {
+  /** Characters this person has had read out since the 1st. */
+  async charactersUsed(userId: string, now: Date = new Date()): Promise<number> {
+    return this.deps.usage.userCountSince(userId, VOICE_CHARACTERS_EVENT, voiceMonthStart(now));
+  }
+
+  /**
+   * Read the text out. Returns MP3 bytes. `allowance` is the characters this
+   * person may use a month, or null for no limit (the owner).
+   */
+  async speak(userId: string, rawText: string, voiceId: string, settings: VoiceSettings, allowance: number | null, now: Date = new Date()): Promise<{ audio: Uint8Array; characters: number }> {
     const client = this.deps.client;
     if (!client || !this.enabled) throw new AppError("NOT_IMPLEMENTED", "Voice Studio isn't switched on yet.", { expose: true });
 
@@ -97,6 +121,20 @@ export class VoiceService {
     const voices = await this.voices(now.getTime());
     if (!voices.some((v) => v.id === voiceId)) throw new ValidationError("Pick one of the voices in the list.");
 
+    if (allowance !== null) {
+      const left = Math.max(0, allowance - (await this.charactersUsed(userId, now)));
+      if (text.length > left) {
+        const fmt = (n: number) => n.toLocaleString("en-US");
+        throw new AppError(
+          "QUOTA_EXCEEDED",
+          left === 0
+            ? `You've used all ${fmt(allowance)} characters for this month. They reset on ${voiceResetLabel(now)}.`
+            : `That's ${fmt(text.length)} characters and you have ${fmt(left)} left this month. Shorten it, or wait until ${voiceResetLabel(now)}.`,
+          { expose: true },
+        );
+      }
+    }
+
     const estimate = Math.ceil(text.length * ESTIMATE_PER_CHARACTER);
     const used = await this.deps.usage.countSince(VOICE_CREDITS_EVENT, new Date(now.getTime() - WINDOW_MS));
     if (used + estimate > this.deps.creditCap) {
@@ -104,11 +142,14 @@ export class VoiceService {
     }
 
     const { audio, credits } = await client.speak(voiceId, text, settings, AbortSignal.timeout(45_000));
-    try {
-      await this.deps.usage.record({ event_type: VOICE_CREDITS_EVENT, user_id: userId, quantity: Math.max(1, Math.ceil(credits ?? estimate)), resource_id: voiceId, occurred_at: now.toISOString() });
-    } catch (error) {
-      // The audio already came back; losing one line of accounting beats failing the request.
-      log.warn("could not record voice usage", { error });
+    // Recorded separately so one failing doesn't lose the other. The audio
+    // already came back; losing a line of accounting beats failing the request.
+    const recorded = await Promise.allSettled([
+      this.deps.usage.record({ event_type: VOICE_CHARACTERS_EVENT, user_id: userId, quantity: text.length, resource_id: voiceId, occurred_at: now.toISOString() }),
+      this.deps.usage.record({ event_type: VOICE_CREDITS_EVENT, user_id: userId, quantity: Math.max(1, Math.ceil(credits ?? estimate)), resource_id: voiceId, occurred_at: now.toISOString() }),
+    ]);
+    for (const result of recorded) {
+      if (result.status === "rejected") log.warn("could not record voice usage", { error: result.reason });
     }
     return { audio, characters: text.length };
   }

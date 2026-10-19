@@ -4,9 +4,7 @@ import { requireApprovedUser } from "@/lib/auth/session";
 import { writerOpenTo, writerTerms } from "@/lib/scripts/access";
 import { scriptText } from "@/lib/scripts/schema";
 import { getServices } from "@/lib/services";
-import { CREDIT_COSTS } from "@/lib/services/credits-service";
-import { RATE_LIMITS } from "@/lib/services/rate-limit-service";
-import { VOICE_MAX_CHARACTERS } from "@/lib/services/voice-service";
+import { VOICE_MAX_CHARACTERS, voiceResetLabel } from "@/lib/services/voice-service";
 import { modelLabel } from "@/lib/voice/elevenlabs";
 import { ComingSoonLock } from "../research/scriptwriter/coming-soon";
 import { orbStyle } from "./orb";
@@ -25,9 +23,15 @@ export default async function VoicePage({ searchParams }: { searchParams: Promis
   const canUse = writerOpenTo(plan?.plan.id, current.isOwner);
   const onFreePlan = !current.isOwner && (plan?.plan.id ?? "free") === "free";
 
-  const [voices, saved] = canUse
-    ? await Promise.all([services.voice.enabled ? services.voice.voices() : [], services.repositories.savedScripts.listForUser(current.user.id, 30)])
-    : [[], []];
+  const terms = writerTerms(plan?.plan.id, current.isOwner);
+  const allowance = terms?.voiceCharacters ?? null;
+  const [voices, saved, used] = canUse
+    ? await Promise.all([
+        services.voice.enabled ? services.voice.voices() : [],
+        services.repositories.savedScripts.listForUser(current.user.id, 30),
+        allowance === null ? 0 : services.voice.charactersUsed(current.user.id).catch(() => 0),
+      ])
+    : [[], [], 0];
 
   const scripts: ScriptOption[] = saved.map((row) => {
     const text = scriptText(row.script);
@@ -36,9 +40,6 @@ export default async function VoicePage({ searchParams }: { searchParams: Promis
   });
   // "Voice it" from the Script Writer lands here with that script already in.
   const initialText = (script && scripts.find((s) => s.id === script)?.text) || "";
-
-  const terms = writerTerms(plan?.plan.id, current.isOwner);
-  const limitNote = terms?.voiceLimit ? `${RATE_LIMITS[terms.voiceLimit].maxHits} a day` : null;
 
   return (
     <div className="dash vs-page">
@@ -59,7 +60,7 @@ export default async function VoicePage({ searchParams }: { searchParams: Promis
       ) : voices.length === 0 ? (
         <div className="dash-empty">Voice Studio can&apos;t reach its voices right now. Try again in a minute.</div>
       ) : (
-        <Studio voices={voices} scripts={scripts} initialText={initialText} maxCharacters={VOICE_MAX_CHARACTERS} cost={CREDIT_COSTS.voiceover} limitNote={limitNote} model={modelLabel(services.voice.model ?? "")} />
+        <Studio voices={voices} scripts={scripts} initialText={initialText} maxCharacters={VOICE_MAX_CHARACTERS} allowance={allowance} used={used} resetsOn={voiceResetLabel(new Date())} model={modelLabel(services.voice.model ?? "")} />
       )}
     </div>
   );
