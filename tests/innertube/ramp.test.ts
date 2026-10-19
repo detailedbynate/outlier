@@ -1,5 +1,9 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { clampState, decide, DEFAULT_RAMP_STEPS, initialState, parseSteps, type RampState } from "@/lib/innertube/ramp";
+import { clampState, decide, DEFAULT_RAMP_STEPS, FileRampStore, initialState, parseSteps, type RampState } from "@/lib/innertube/ramp";
+import { createLogger } from "@/lib/core/logger";
 
 const STEPS = [4, 6, 9, 12];
 const START = new Date("2026-09-20T00:00:00Z");
@@ -70,7 +74,7 @@ describe("ramp", () => {
   it("thaws after a long clean stretch, but won't climb back into the ceiling", () => {
     const blocked = run(state({ step: 2 }), 1, later(30)).state;
     const thawed = run(blocked, 0, later(30 + 24 * 7));
-    expect(thawed).toMatchObject({ rate: 6, change: null });
+    expect(thawed).toMatchObject({ rate: 6, change: "thaw" });
     expect(thawed.reason).toContain("thawed");
     expect(thawed.state).toMatchObject({ step: 1, frozen: false, ceiling: 9 });
 
@@ -90,6 +94,40 @@ describe("ramp", () => {
 
     const next = run(thawed, 0, later(2 + 24 * 5));
     expect(next).toMatchObject({ rate: 6, change: "up" });
+  });
+
+  it("survives restarts once thawed: the thaw is saved and the step's clock keeps running", async () => {
+    // The production case: blocked at the bottom rung, then restarted far more
+    // often than a rung takes. The scraper saves a decision only when it reports
+    // a change, so a thaw that reported none was never saved: every restart read
+    // the old freeze back, thawed it again in memory and restarted the clock.
+    const dir = await mkdtemp(join(tmpdir(), "ramp-"));
+    try {
+      const boot = async () => {
+        const store = new FileRampStore(dir, createLogger({ module: "test" }));
+        return { store, state: clampState((await store.read()) ?? initialState(START), STEPS, START) };
+      };
+      // What scripts/scraper.ts does with each round's decision.
+      const round = async (hours: number) => {
+        const { store, state } = await boot();
+        const decision = decide(state, { blocks: 0, now: later(hours), steps: STEPS, cleanHours: 6, thawHours: 72 });
+        if (decision.change) await store.write(decision.state);
+        return decision;
+      };
+
+      const first = await boot();
+      await first.store.write(decide(first.state, { blocks: 1, now: later(0), steps: STEPS, cleanHours: 6 }).state);
+
+      expect((await round(80)).change).toBe("thaw");
+      // Each later round is a fresh process, two hours apart: none lives six hours.
+      expect((await round(82)).change).toBeNull();
+      expect((await round(84)).change).toBeNull();
+      const climbed = await round(86);
+      expect(climbed).toMatchObject({ rate: 6, change: "up" });
+      expect((await boot()).state).toMatchObject({ step: 1, frozen: false });
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 
   it("keeps stepping down if the lower rate is blocked too", () => {

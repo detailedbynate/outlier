@@ -362,7 +362,14 @@ export class NicheService {
     if (hit && Math.abs(now.getTime() - hit.at) < 10 * 60_000) return hit.load;
     const load = this.deps.niches.recentSample(underratedWindow(now, this.config.sampleDays), SAMPLE_SIZE, format === "shorts" ? "short" : "long_form", { spread: true });
     this.samples.set(format, { at: now.getTime(), load });
-    load.catch(() => this.samples.delete(format));
+    // Dropped once too old to reuse, not just replaced on the next read: in the
+    // scraper, which works the boards out once a day, two of these sat in a
+    // small heap for good.
+    const forget = () => {
+      if (this.samples.get(format)?.load === load) this.samples.delete(format);
+    };
+    setTimeout(forget, 10 * 60_000).unref?.();
+    load.catch(forget);
     return load;
   }
 

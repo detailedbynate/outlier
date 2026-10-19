@@ -41,8 +41,12 @@ export const DEFAULT_THAW_HOURS = 72;
 export interface RampDecision {
   state: RampState;
   rate: number;
-  /** Set when the step changed, for the log line. */
-  change: "up" | "down" | null;
+  /**
+   * Set whenever the state changed and has to be saved, for the log line too.
+   * A thaw keeps the rate but must be saved: left in memory only, every restart
+   * read the old freeze back, thawed again and restarted the clock on the step.
+   */
+  change: "up" | "down" | "thaw" | null;
   reason: string;
 }
 
@@ -96,7 +100,7 @@ export function decide(
     return {
       state: { ...state, frozen: false, frozenAt: null, since: now.toISOString() },
       rate: at(state.step),
-      change: null,
+      change: "thaw",
       reason: `thawed after ${Math.round(frozenFor / 3_600_000)}h clean`,
     };
   }

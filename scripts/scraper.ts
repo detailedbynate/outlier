@@ -24,7 +24,7 @@
  * transcript is a scrape slot: paced by the same gate, bulk reading would blow
  * through the cron tick's time budget and starve every other job behind it.
  *
- * Speed ramps itself: one clean day at a rate earns the next step up the ladder
+ * Speed ramps itself: a clean stretch at a rate earns the next step up the ladder
  * (INNERTUBE_RAMP_STEPS), and a bot check gives the step back and settles one
  * rung below what YouTube refused. INNERTUBE_RAMP_STEPS=4 alone pins the rate.
  * SCRAPER_BATCH sets how many channels a round picks up.
@@ -85,6 +85,7 @@ async function main(): Promise<void> {
   const { fetchSuggestions } = await import("@/lib/radar/suggest");
   const { sortDiscovered } = await import("@/lib/niches/discover");
   const { clampState, decide, DEFAULT_THAW_HOURS, FileRampStore, initialState, parseSteps } = await import("@/lib/innertube/ramp");
+  const { FileDailyMarks } = await import("@/lib/innertube/daily");
 
   const config = env();
   getAdminDatabase();
@@ -157,7 +158,8 @@ async function main(): Promise<void> {
     comments: (videoId) => commentReader.top(videoId),
   });
   let radarSeeded = false;
-  let librarySeededAt = 0;
+  // Kept on disk: in memory, every restart made the day's heavy jobs due again.
+  const daily = new FileDailyMarks();
   // Autocomplete growth and the daily Reddit / Stack Exchange sweeps take minutes and
   // don't touch YouTube's gate, so they run beside the rounds instead of inside them.
   let expanding: Promise<void> | null = null;
@@ -184,11 +186,13 @@ async function main(): Promise<void> {
         if (added > 0) logger.info("radar seeded", { added });
       }
       // Once a day the library's best niches become seeds too: proven topics whose
-      // searches the radar then combs for openings.
-      if (Date.now() - librarySeededAt > 86_400_000) {
-        librarySeededAt = Date.now();
-        const boards = await Promise.all([services.niches.discover("shorts"), services.niches.discover("long_form")]);
-        const terms = boards.flatMap((board) => sortDiscovered(board, "best").slice(0, 40).map((n) => n.term));
+      // searches the radar then combs for openings. One format at a time: each
+      // board reads a 40K-upload sample, and both at once ran the heap out.
+      if (await daily.claim("library-seeds", 24 * HOUR)) {
+        const terms: string[] = [];
+        for (const format of ["shorts", "long_form"] as const) {
+          terms.push(...sortDiscovered(await services.niches.discover(format), "best").slice(0, 40).map((n) => n.term));
+        }
         const added = await radar.addSeeds(terms, "library");
         if (added > 0) logger.info("radar seeded from library", { added });
       }
@@ -212,7 +216,8 @@ async function main(): Promise<void> {
           // Comment pages go through YouTube's gate, so they wait while it's open.
           gate.state().open ? Promise.resolve(null) : radar.collectRequestsOnce({ signal }),
           radar.collectGamesOnce({ signal }),
-          services.niches.trackPicksOnce(),
+          // Reads library samples like the boards do: once a day, not once per restart.
+          daily.claim("niche-picks", 24 * HOUR).then((due) => (due ? services.niches.trackPicksOnce() : null)),
         ]);
         const value = (r: PromiseSettledResult<unknown>) => (r.status === "fulfilled" ? r.value : { error: String(r.reason).slice(0, 200) });
         const all = { reddit: value(reddit), stack: value(stack), translated: value(translated), launches: value(launches), requests: value(requests), games: value(games), picks: value(picks) };
@@ -305,19 +310,18 @@ async function main(): Promise<void> {
       }
     }
 
-    await readTranscripts();
-    await runRadar();
-
-    const state = gate.state();
     const stats = gate.takeStats();
     logger.info("scraper round", { due: due.length, refreshed, reads: source.takeCounts(), gate: stats });
 
     // Step up after a clean stretch, step down the moment YouTube pushes back.
+    // Settled before the transcripts and radar: when those took the process
+    // down, no round ever reached this line and the ladder sat still for days.
+    // Their own pushback counts toward the next round instead.
     const decision = decide(ramp, { blocks: stats.blocks, now: new Date(), steps, cleanHours, thawHours });
     if (decision.change) {
       gate.setRequestsPerMinute(decision.rate);
       await rampStore.write(decision.state);
-      const log = decision.change === "up" ? logger.info : logger.warn;
+      const log = decision.change === "down" ? logger.warn : logger.info;
       log("scraper ramp", {
         change: decision.change,
         perMinute: decision.rate,
@@ -329,7 +333,11 @@ async function main(): Promise<void> {
     }
     ramp = decision.state;
 
+    await readTranscripts();
+    await runRadar();
+
     // While the gate is paused, don't spin: the worker's API refresh covers channels meanwhile.
+    const state = gate.state();
     if (state.open && state.openUntil) {
       const pause = Math.max(state.openUntil.getTime() - Date.now(), MINUTE);
       logger.warn("scraper waiting for InnerTube to reopen", { minutes: Math.round(pause / MINUTE), trips: state.trips });
