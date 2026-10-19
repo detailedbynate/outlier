@@ -1,12 +1,12 @@
 "use client";
 
 import { useActionState, useState, type CSSProperties } from "react";
-import { PenIcon } from "@/components/icons";
+import Link from "next/link";
+import { MicIcon, PenIcon } from "@/components/icons";
 import { DURATIONS, TONES, WORDS_PER_SECOND, scriptText, type ScriptResult } from "@/lib/scripts/schema";
 import { soundsRecent } from "@/lib/scripts/prompt";
 import { writeScript } from "./actions";
 import { emptyScriptState } from "./state";
-import { Voiceover, voiceFileName, type VoiceOptions } from "./voiceover";
 
 const TONE_LABEL: Record<(typeof TONES)[number], string> = {
   energetic: "Energetic",
@@ -26,15 +26,12 @@ export function ScriptForm({
   cost,
   limitNote,
   seed,
-  voice,
 }: {
   cost: number;
   /** "4 scripts a day", or null when there's no limit. */
   limitNote: string | null;
   /** An idea picked from the finder above, which wins over whatever was last submitted. */
   seed?: { topic: string; idea: string } | null;
-  /** Voiceover picker, or null when ElevenLabs isn't set up. */
-  voice?: VoiceOptions | null;
 }) {
   const [state, submit, pending] = useActionState(writeScript, emptyScriptState);
   // Held in React so the readout and the filled part of the track can follow it.
@@ -136,7 +133,7 @@ export function ScriptForm({
 
       {state.error ? <div className="dash-empty sw-error">{state.error}</div> : null}
       {pending ? <PendingScript /> : null}
-      {state.result && !pending ? <ScriptView result={state.result} charged={state.charged} voice={voice ?? null} /> : null}
+      {state.result && !pending ? <ScriptView result={state.result} charged={state.charged} /> : null}
     </>
   );
 }
@@ -178,7 +175,7 @@ export function Copyable({ text, label }: { text: string; label: string }) {
 }
 
 /** The script, and the titles to put on it. Nothing else — it's made to be read out. */
-function ScriptView({ result, charged, voice }: { result: ScriptResult; charged: number; voice: VoiceOptions | null }) {
+function ScriptView({ result, charged }: { result: ScriptResult; charged: number }) {
   const text = scriptText(result.script.script);
   const seconds = Math.round(result.words / WORDS_PER_SECOND);
 
@@ -187,7 +184,14 @@ function ScriptView({ result, charged, voice }: { result: ScriptResult; charged:
       <section className="sw-script">
         <header className="sw-script-head">
           <span className="dash-eyebrow">Your script</span>
-          <Copyable text={text} label="Copy script" />
+          <span className="sw-head-actions">
+            {result.id ? (
+              <Link href={`/voice?script=${result.id}`} className="sw-copy sw-voice-link">
+                <MicIcon size={12} /> Voice it
+              </Link>
+            ) : null}
+            <Copyable text={text} label="Copy script" />
+          </span>
         </header>
         <p className="sw-line">{text}</p>
       </section>
@@ -202,8 +206,6 @@ function ScriptView({ result, charged, voice }: { result: ScriptResult; charged:
           ))}
         </ul>
       </section>
-
-      {voice && result.id ? <Voiceover scriptId={result.id} options={voice} fileName={voiceFileName(text)} /> : null}
 
       <p className="sw-footnote">
         {result.words} spoken words · about {seconds}s out loud · {charged} credits · {result.model}

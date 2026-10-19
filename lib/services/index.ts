@@ -94,7 +94,7 @@ export interface Services {
   dashboard: DashboardService;
   niches: NicheService;
   scripts: ScriptService;
-  /** ElevenLabs voiceovers of saved scripts. */
+  /** Voice Studio: ElevenLabs text to speech. */
   voice: VoiceService;
   /** Transcript backfill. Driven by the scraper process, which owns the scrape budget. */
   transcripts: TranscriptService;
@@ -437,9 +437,8 @@ export function getServices(): Services {
     scripts: new ScriptService({ ai: scriptProvider(config, { budget: claudeBudget }), premiumAi: scriptProvider(config, { premium: true, budget: claudeBudget }), basicAi: scriptProvider(config, { claude: false }), saved: repositories.savedScripts, styles: repositories.styleSamples }),
     voice: new VoiceService({
       client: config.ELEVENLABS_API_KEY ? new ElevenLabsClient(config.ELEVENLABS_API_KEY, config.ELEVENLABS_MODEL) : null,
-      scripts: repositories.savedScripts,
       usage: repositories.usage,
-      monthlyCharacters: config.ELEVENLABS_MONTHLY_CHARACTERS,
+      creditCap: Math.floor(config.ELEVENLABS_PLAN_CREDITS * config.ELEVENLABS_MAX_SHARE),
     }),
     dashboard: new DashboardService({
       channels: repositories.channels,

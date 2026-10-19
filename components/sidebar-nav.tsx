@@ -16,6 +16,7 @@ import {
   GiftIcon,
   GridIcon,
   LockIcon,
+  MicIcon,
   PenIcon,
   SearchIcon,
   ShortsIcon,
@@ -54,6 +55,7 @@ const SECTIONS: NavSection[] = [
       { href: "/viral", label: "Viral Videos", icon: FlameIcon, paid: true },
       { href: "/analyze", label: "Analyze Video", icon: ChartIcon, paid: true },
       { href: "/research/scriptwriter", label: "Script Writer", icon: PenIcon, badge: "New", ownerOnly: true },
+      { href: "/voice", label: "Voice Studio", icon: MicIcon, badge: "New", ownerOnly: true },
     ],
   },
   {

@@ -4,7 +4,6 @@ import { useActionState, useRef, useState, type CSSProperties } from "react";
 import { ScriptForm } from "./script-form";
 import { findIdeas } from "./actions";
 import { emptyIdeaState } from "./state";
-import type { VoiceOptions } from "./voiceover";
 
 /**
  * The ideas panel and the writer, together.
@@ -13,7 +12,7 @@ import type { VoiceOptions } from "./voiceover";
  * form below rather than opening anything, because the whole point is that
  * finding an idea and writing it are the same sitting.
  */
-export function Writer({ cost, ideaCost, limitNote, voice }: { cost: number; ideaCost: number; limitNote: string | null; voice: VoiceOptions | null }) {
+export function Writer({ cost, ideaCost, limitNote }: { cost: number; ideaCost: number; limitNote: string | null }) {
   const [seed, setSeed] = useState<{ topic: string; idea: string } | null>(null);
   // Bumped on every pick so the form remounts and picks up the new defaults.
   const [seedKey, setSeedKey] = useState(0);
@@ -29,7 +28,7 @@ export function Writer({ cost, ideaCost, limitNote, voice }: { cost: number; ide
     <>
       <IdeaFinder cost={ideaCost} onUse={use} />
       <div ref={formRef}>
-        <ScriptForm key={seedKey} cost={cost} limitNote={limitNote} seed={seed} voice={voice} />
+        <ScriptForm key={seedKey} cost={cost} limitNote={limitNote} seed={seed} />
       </div>
     </>
   );

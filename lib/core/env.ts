@@ -189,14 +189,17 @@ const serverEnvSchema = z.object({
   ANTHROPIC_DAILY_BUDGET_USD: z.coerce.number().min(0).default(0.3),
   OPENAI_API_KEY: optionalString,
 
-  /** ElevenLabs key: script voiceovers. Blank hides the voiceover button. */
+  /** ElevenLabs key: Voice Studio. Blank hides it. */
   ELEVENLABS_API_KEY: optionalString,
-  ELEVENLABS_MODEL: z.string().trim().min(1).default("eleven_v4"),
+  /** v4 Turbo: half the credits of v4 (the same as Flash) and still expressive. */
+  ELEVENLABS_MODEL: z.string().trim().min(1).default("eleven_v4_turbo"),
+  /** Credits the ElevenLabs plan includes each month (Creator: 121k). */
+  ELEVENLABS_PLAN_CREDITS: z.coerce.number().int().min(0).default(121_000),
   /**
-   * Most characters all voiceovers together may use per UTC month. Pro includes
-   * about 1.2M; 1M leaves room for the owner's own use. A 30s script is ~500.
+   * Share of those credits Outlier may use in any 30 days, so the rest stays
+   * the owner's. A 30s Short costs about 90 credits on v4 Turbo.
    */
-  ELEVENLABS_MONTHLY_CHARACTERS: z.coerce.number().int().min(0).default(1_000_000),
+  ELEVENLABS_MAX_SHARE: z.coerce.number().min(0).max(1).default(0.6),
 
   /** Google AI Studio key: the free Gemini tier gives unsure channels an AI second opinion. */
   GEMINI_API_KEY: optionalString,

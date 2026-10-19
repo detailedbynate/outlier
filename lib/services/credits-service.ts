@@ -30,7 +30,7 @@ export const CREDIT_COSTS = {
   write_script: 8,
   /** Six ideas for a niche: one model call, and much less output than a script. */
   find_ideas: 3,
-  /** A script read out by ElevenLabs: paid per character, about half a cent for a 30s Short. */
+  /** One Voice Studio generation (up to 1,000 characters): ElevenLabs is paid per character, under a cent each. */
   voiceover: 4,
 } as const;
 
