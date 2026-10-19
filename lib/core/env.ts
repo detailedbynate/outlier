@@ -182,11 +182,16 @@ const serverEnvSchema = z.object({
 
   ANTHROPIC_API_KEY: optionalString,
   /**
-   * Most the script writer spends on Claude per UTC day, in dollars. Past it,
-   * scripts come from the free models until tomorrow. 0.30 makes a $5 top-up
-   * last about 2½ weeks of steady use. 0 turns Claude off.
+   * Most Outlier spends on Claude per UTC calendar month, in dollars: what's
+   * prepaid for the month. Past it, everything moves to the free models until
+   * the 1st. 0 turns Claude off.
    */
-  ANTHROPIC_DAILY_BUDGET_USD: z.coerce.number().min(0).default(0.3),
+  ANTHROPIC_MONTHLY_BUDGET_USD: z.coerce.number().min(0).default(5),
+  /**
+   * The part of the month background jobs (niche labeling, radar, sub-niche
+   * names) may use, spread evenly over the days; the rest stays for scripts.
+   */
+  ANTHROPIC_BACKGROUND_BUDGET_USD: z.coerce.number().min(0).default(2),
   OPENAI_API_KEY: optionalString,
 
   /** ElevenLabs key: Voice Studio. Blank hides it. */

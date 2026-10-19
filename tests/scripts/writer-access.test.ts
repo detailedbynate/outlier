@@ -70,7 +70,7 @@ describe("writeScript access", () => {
     expect(write).not.toHaveBeenCalled();
   });
 
-  it("writes for Pro without Claude, one every six hours", async () => {
+  it("writes for Pro with Claude, one every six hours", async () => {
     currentUser = { user: { id: "member-1" }, isOwner: false };
     const { writeScript } = await import("@/app/research/scriptwriter/actions");
     const { emptyScriptState } = await import("@/app/research/scriptwriter/state");
@@ -78,7 +78,7 @@ describe("writeScript access", () => {
     const state = await writeScript(emptyScriptState, form(valid));
 
     expect(state.error).toBeNull();
-    expect(write).toHaveBeenCalledWith(expect.anything(), "member-1", { premium: false, basic: true });
+    expect(write).toHaveBeenCalledWith(expect.anything(), "member-1", { premium: false, basic: false });
     expect(enforce).toHaveBeenCalledWith("scriptUser", "member-1");
   });
 

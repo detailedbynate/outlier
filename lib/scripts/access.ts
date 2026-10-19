@@ -17,9 +17,9 @@ export const WRITER_PLANS: readonly PlanId[] = ["pro", "expert"];
 
 /** How each plan uses the writer: which model, and how often. */
 interface WriterTerms {
-  /** Claude's deeper model (Expert and the owner). */
+  /** The premium writer (Expert and the owner); Haiku 5.5 for now, like Pro. */
   premium: boolean;
-  /** No Claude at all: Gemini, then the OpenRouter models (Pro). */
+  /** No Claude at all: Gemini, then the OpenRouter models. No plan uses it now. */
   basic: boolean;
   /** The limit on scripts, or null for none. */
   limit: RateLimitPolicy | null;
@@ -34,7 +34,7 @@ interface WriterTerms {
 }
 
 const OWNER_TERMS: WriterTerms = { premium: true, basic: false, limit: null, voiceCharacters: null, limitNote: null };
-const PRO_TERMS: WriterTerms = { premium: false, basic: true, limit: "scriptUser", voiceCharacters: 10_000, limitNote: "one script every 6 hours" };
+const PRO_TERMS: WriterTerms = { premium: false, basic: false, limit: "scriptUser", voiceCharacters: 10_000, limitNote: "one script every 6 hours" };
 const PLAN_TERMS: Partial<Record<PlanId, WriterTerms>> = {
   expert: { premium: true, basic: false, limit: "scriptExpert", voiceCharacters: 30_000, limitNote: "4 scripts a day" },
   pro: PRO_TERMS,

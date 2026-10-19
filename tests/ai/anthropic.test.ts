@@ -61,7 +61,22 @@ describe("AnthropicTextProvider", () => {
     expect(create.mock.calls[0]![0].system).toEqual([{ type: "text", text: "Write a script." }]);
   });
 
-  it("leaves out settings a cheaper model would reject", async () => {
+  it("sends effort to Haiku 5.5, and no sampling settings or server-side fallback", async () => {
+    const { client, create } = fakeClient({ content: [{ type: "text", text: '{"channels":[]}' }] });
+    await new AnthropicTextProvider({ client, model: "claude-haiku-5-5" }).generateObject({
+      messages: [{ role: "user", content: "x" }],
+      schema,
+      schemaName: "labels",
+      effort: "low",
+      temperature: 0.8,
+    });
+    const params = create.mock.calls[0]![0];
+    expect(params.output_config).toMatchObject({ effort: "low" });
+    expect(params).not.toHaveProperty("fallbacks");
+    expect(params).not.toHaveProperty("temperature");
+  });
+
+  it("leaves out settings an older Haiku would reject", async () => {
     const { client, create } = fakeClient({ content: [{ type: "text", text: '{"channels":[]}' }] });
     await new AnthropicTextProvider({ client, model: "claude-haiku-4-5" }).generateObject({
       messages: [{ role: "user", content: "x" }],

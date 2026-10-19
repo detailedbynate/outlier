@@ -81,7 +81,8 @@ export class ScriptService {
       // The free models reason against the output budget and a half-written
       // script is worth nothing, so the budget goes to the words.
       effort: "low",
-      maxOutputTokens: 4_000,
+      // Haiku 5.5 thinks inside this budget too, so it leaves room past the script.
+      maxOutputTokens: 6_000,
       // One person, one script: the cache would expire before anyone read it back.
       cacheSystem: false,
     });
@@ -147,7 +148,7 @@ export class ScriptService {
       schemaName: "short_ideas",
       temperature: 0.9,
       effort: "low",
-      maxOutputTokens: 2_000,
+      maxOutputTokens: 3_000,
       cacheSystem: false,
     });
 

@@ -13,7 +13,7 @@ const FALLBACK_MODELS = new Set(["claude-opus-5", "claude-fable-5-1", "claude-my
 
 /** Haiku 4.5 and pre-4.6 Sonnet reject the effort setting. */
 function supportsEffort(model: string): boolean {
-  return !model.startsWith("claude-haiku") && !model.startsWith("claude-sonnet-4-5");
+  return !model.startsWith("claude-haiku-4") && !model.startsWith("claude-sonnet-4-5");
 }
 
 /**
@@ -33,7 +33,7 @@ export class AnthropicTextProvider implements TextProvider {
   }
 
   private readonly model: string;
-  /** Daily spend cap; when it's used up, calls fail fast so a fallback chain moves on. */
+  /** Spend cap; when it's used up, calls fail fast so a fallback chain moves on. */
   private readonly budget: SpendBudget | null;
 
   async generateText(request: TextGenerationRequest): Promise<TextGenerationResult> {

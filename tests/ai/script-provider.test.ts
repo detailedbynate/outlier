@@ -22,10 +22,10 @@ describe("scriptProvider", () => {
     expect(names(provider)).toEqual(["anthropic", "gemini", "openrouter"]);
   });
 
-  it("gives members Haiku and keeps Sonnet for the premium writer", () => {
+  it("writes with Haiku 5.5 for members and the premium writer alike", () => {
     const model = (provider: ReturnType<typeof scriptProvider>) => (provider as unknown as { model: string }).model;
-    expect(model(scriptProvider({ ...base, ANTHROPIC_API_KEY: "k" }))).toBe("claude-haiku-4-5");
-    expect(model(scriptProvider({ ...base, ANTHROPIC_API_KEY: "k" }, { premium: true }))).toBe("claude-sonnet-5");
+    expect(model(scriptProvider({ ...base, ANTHROPIC_API_KEY: "k" }))).toBe("claude-haiku-5-5");
+    expect(model(scriptProvider({ ...base, ANTHROPIC_API_KEY: "k" }, { premium: true }))).toBe("claude-haiku-5-5");
   });
 
   it("leaves Claude out entirely for the plans that write without it", () => {

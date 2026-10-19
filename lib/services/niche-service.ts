@@ -756,7 +756,8 @@ export class NicheService {
         messages: [{ role: "user", content: `Topic: ${topic}` }],
         schema: discoveryPlanSchema,
         schemaName: "niche_discovery_plan",
-        maxOutputTokens: 400,
+        // Room for Haiku 5.5's thinking as well as the short plan.
+        maxOutputTokens: 1_200,
         effort: "low",
       });
       const tidy = (values: string[]) =>

@@ -53,6 +53,7 @@ export async function refineSubNiches(
     schema: REFINED,
     schemaName: "niche_names",
     maxOutputTokens: 1_500,
+    effort: "low",
     signal: AbortSignal.timeout(REFINE_TIMEOUT_MS),
   });
 

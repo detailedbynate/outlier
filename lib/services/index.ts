@@ -40,8 +40,8 @@ import { createJobRegistry, DISCORD_SYNC_JOB_TYPE, LIBRARY_FEATURED_JOB_TYPE, LI
 import { JobQueue } from "@/lib/jobs/queue";
 import type { JobRegistry } from "@/lib/jobs/registry";
 import { JobScheduler } from "@/lib/jobs/scheduler";
-import { labelingProvider, scriptProvider } from "@/lib/ai/select";
-import { DailySpendBudget } from "@/lib/ai/budget";
+import { backgroundClaude, labelingProvider, scriptProvider } from "@/lib/ai/select";
+import { MonthlySpendBudget } from "@/lib/ai/budget";
 import { SavedScriptRepository } from "@/lib/database/repositories/saved-scripts";
 import { StyleSampleRepository } from "@/lib/database/repositories/style-samples";
 import { TranscriptRepository } from "@/lib/database/repositories/transcripts";
@@ -278,10 +278,11 @@ export function getServices(): Services {
     { discoveryDailyLimit: config.DISCOVERY_DAILY_LIMIT, discoveryMaxChannels: config.DISCOVERY_MAX_CHANNELS, quality, regionCode },
   );
 
+  // Claude is capped per month at what's prepaid; background jobs get a share of it, paced per day.
+  const claudeBudget = new MonthlySpendBudget(repositories.usage, config.ANTHROPIC_MONTHLY_BUDGET_USD);
+  const backgroundBudget = new MonthlySpendBudget(repositories.usage, config.ANTHROPIC_MONTHLY_BUDGET_USD, { shareUsd: config.ANTHROPIC_BACKGROUND_BUDGET_USD });
   // Niche labeling is rule-based and free; an AI provider only gives unsure channels a second opinion.
-  const text = labelingProvider(config);
-  // Claude is for scripts only, capped per day so a top-up lasts weeks.
-  const claudeBudget = new DailySpendBudget(repositories.usage, config.ANTHROPIC_DAILY_BUDGET_USD);
+  const text = labelingProvider(config, backgroundBudget);
   if (text && !getAIProviders().has("text")) getAIProviders().register("text", text);
   const nicheLabeling = new NicheLabelingService(
     { text, channels: repositories.channels, niches: repositories.niches },
@@ -426,8 +427,8 @@ export function getServices(): Services {
         ai: text,
         picks: repositories.radar,
         offload: shouldOffloadBoards() ? runBoardProcess : null,
-        // Off: the Anthropic balance is kept for scripts, and the free chain is too slow while someone waits for the page.
-        namer: null,
+        // Claude alone: the free chain is too slow while someone waits for the page, and a failure keeps the mined names.
+        namer: backgroundClaude(config, backgroundBudget),
       },
       { dailyYoutubeRefreshes: config.NICHE_DAILY_YOUTUBE_REFRESHES, language: quality.language, regionCode },
     ),
