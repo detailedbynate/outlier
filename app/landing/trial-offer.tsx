@@ -132,7 +132,7 @@ export function TrialOffer({ days, plans, code = null }: { days: number; plans: 
           ) : null}
 
           <input type="hidden" name="planId" value={plan.id} />
-          {code ? null : <input type="hidden" name="trial" value="1" />}
+          {code ? <input type="hidden" name="code" value={code.code} /> : <input type="hidden" name="trial" value="1" />}
           <button type="submit" className="paywall-cta trial-offer-cta">
             {code ? `Claim ${code.percent}% off ${plan.name}` : "Start my free trial"}
           </button>

@@ -9,7 +9,12 @@ import { getStripe } from "./stripe";
 
 /** The live creator code this visitor came in through, if any. */
 export async function activeCreatorCode(): Promise<CreatorCodeRow | null> {
-  const code = normalizeCreatorCode((await cookies()).get(CREATOR_CODE_COOKIE)?.value);
+  return liveCreatorCode((await cookies()).get(CREATOR_CODE_COOKIE)?.value);
+}
+
+/** A code, if it exists and is switched on. */
+export async function liveCreatorCode(raw: string | null | undefined): Promise<CreatorCodeRow | null> {
+  const code = normalizeCreatorCode(raw);
   if (!code) return null;
   try {
     const row = await getServices().repositories.creatorCodes.find(code);

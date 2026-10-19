@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { FREE_TRIAL_DAYS, findPlan } from "@/lib/billing/plans";
 import { getStripe } from "@/lib/billing/stripe";
-import { activeCreatorCode, creatorCheckoutFields } from "@/lib/billing/creator-codes";
+import { creatorCheckoutFields, liveCreatorCode } from "@/lib/billing/creator-codes";
 import { checkoutVisitorMetadata, recordSiteEvent } from "@/lib/analytics/site-events";
 import { fullPriceIdFor, priceIdFor } from "@/lib/billing/subscriptions";
 import { env } from "@/lib/core/env";
@@ -38,9 +38,10 @@ export async function startPublicSubscription(formData: FormData): Promise<void>
   let url: string | null = null;
   try {
     await getServices().rateLimits.enforce("checkoutIp", clientIpFrom(h));
-    // Came in on a creator's link (or typed their code): their discount applies wherever they check out from,
-    // so the creator gets credit. Not on the free trial, though: whoever clicks that gets the trial they picked.
-    const code = freeTrial ? null : await activeCreatorCode();
+    // A creator's discount applies only when the page they bought from showed it (their link, or the code they typed),
+    // so the price on the button is the price Stripe charges. A code remembered from an earlier visit doesn't follow
+    // them onto the plain front page. Not on the free trial either: whoever clicks that gets the trial they picked.
+    const code = freeTrial ? null : await liveCreatorCode(String(formData.get("code") ?? ""));
     const creator = code ? await creatorCheckoutFields(code) : null;
     // A creator's discount comes off the full price, not the launch price.
     const billed = creator ? ((await fullPriceIdFor(plan)) ?? price) : price;
