@@ -23,14 +23,16 @@ interface WriterTerms {
   basic: boolean;
   /** The limit on scripts, or null for none. */
   limit: RateLimitPolicy | null;
+  /** The limit on voiceovers, or null for none. */
+  voiceLimit: RateLimitPolicy | null;
   /** What the form says about the limit. */
   limitNote: string | null;
 }
 
-const OWNER_TERMS: WriterTerms = { premium: true, basic: false, limit: null, limitNote: null };
-const PRO_TERMS: WriterTerms = { premium: false, basic: true, limit: "scriptUser", limitNote: "one script every 6 hours" };
+const OWNER_TERMS: WriterTerms = { premium: true, basic: false, limit: null, voiceLimit: null, limitNote: null };
+const PRO_TERMS: WriterTerms = { premium: false, basic: true, limit: "scriptUser", voiceLimit: "voiceUser", limitNote: "one script every 6 hours" };
 const PLAN_TERMS: Partial<Record<PlanId, WriterTerms>> = {
-  expert: { premium: true, basic: false, limit: "scriptExpert", limitNote: "4 scripts a day" },
+  expert: { premium: true, basic: false, limit: "scriptExpert", voiceLimit: "voiceExpert", limitNote: "4 scripts a day" },
   pro: PRO_TERMS,
 };
 

@@ -145,3 +145,34 @@ export async function findIdeas(_previous: IdeaState, formData: FormData): Promi
     };
   }
 }
+
+/**
+ * Read one of their saved scripts out with ElevenLabs. Returns the MP3 as
+ * base64 so the browser can play and download it without a second request.
+ * Charged only when audio comes back.
+ */
+export async function voiceScript(scriptId: string, voiceId: string): Promise<{ audio: string | null; error: string | null; charged: number }> {
+  const current = await requireApprovedUser();
+  const access = await writerAccess(current);
+  if (!access) return { audio: null, error: "Voiceovers are on the Pro and Expert plans.", charged: 0 };
+  const id = String(scriptId).slice(0, 40);
+  const voice = String(voiceId).slice(0, 40);
+  if (!id || !voice) return { audio: null, error: "Pick a voice first.", charged: 0 };
+
+  const services = getServices();
+  try {
+    await services.credits.assertAvailable(current.user.id, "voiceover");
+    if (access.voiceLimit) await services.rateLimits.enforce(access.voiceLimit, current.user.id);
+    const { audio } = await services.voice.voiceover(current.user.id, id, voice);
+    const { charged } = await services.credits.charge(current.user.id, "voiceover");
+    revalidatePath("/", "layout");
+    return { audio: Buffer.from(audio).toString("base64"), error: null, charged };
+  } catch (error) {
+    logger.warn("voiceover failed", { scriptId: id, error });
+    return {
+      audio: null,
+      error: isAppError(error) && (error.expose || error.code === "RATE_LIMITED") ? error.message : "Couldn't make that voiceover. Try again in a moment.",
+      charged: 0,
+    };
+  }
+}

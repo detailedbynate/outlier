@@ -77,6 +77,8 @@ import { TRENDING_JOB_TYPE, TRENDING_REFRESH_JOB_TYPE, TrendingService } from ".
 import { DiscordService, discordConfigFrom } from "./discord-service";
 import { VideoService } from "./video-service";
 import { WaitlistService } from "./waitlist-service";
+import { VoiceService } from "./voice-service";
+import { ElevenLabsClient } from "@/lib/voice/elevenlabs";
 
 export { ChannelService, CreditsService, SubscriptionService, DiscoveryService, JobService, ResearchService, StorageBudgetService, VideoService };
 
@@ -92,6 +94,8 @@ export interface Services {
   dashboard: DashboardService;
   niches: NicheService;
   scripts: ScriptService;
+  /** ElevenLabs voiceovers of saved scripts. */
+  voice: VoiceService;
   /** Transcript backfill. Driven by the scraper process, which owns the scrape budget. */
   transcripts: TranscriptService;
   radar: NicheRadarService;
@@ -431,6 +435,12 @@ export function getServices(): Services {
     radar,
     // Its own provider: scripts are worth a paid model where labeling isn't.
     scripts: new ScriptService({ ai: scriptProvider(config, { budget: claudeBudget }), premiumAi: scriptProvider(config, { premium: true, budget: claudeBudget }), basicAi: scriptProvider(config, { claude: false }), saved: repositories.savedScripts, styles: repositories.styleSamples }),
+    voice: new VoiceService({
+      client: config.ELEVENLABS_API_KEY ? new ElevenLabsClient(config.ELEVENLABS_API_KEY, config.ELEVENLABS_MODEL) : null,
+      scripts: repositories.savedScripts,
+      usage: repositories.usage,
+      monthlyCharacters: config.ELEVENLABS_MONTHLY_CHARACTERS,
+    }),
     dashboard: new DashboardService({
       channels: repositories.channels,
       videos: repositories.videos,

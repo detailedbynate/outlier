@@ -25,6 +25,12 @@ export class SavedScriptRepository {
     return rows[0] ?? null;
   }
 
+  /** One of their scripts, or null. Scoped by user like delete. */
+  async getForUser(userId: string, id: string): Promise<SavedScriptRow | null> {
+    const rows = unwrap(await this.db.from("saved_scripts").select("*").eq("user_id", userId).eq("id", id).limit(1), "saved_scripts.getForUser");
+    return rows[0] ?? null;
+  }
+
   /** Scoped by user so one person's id can't delete another's script. */
   async delete(userId: string, id: string): Promise<void> {
     unwrap(await this.db.from("saved_scripts").delete().eq("user_id", userId).eq("id", id).select("id"), "saved_scripts.delete");

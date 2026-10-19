@@ -5,6 +5,7 @@ import { scriptText, WORDS_PER_SECOND } from "@/lib/scripts/schema";
 import type { SavedScriptRow } from "@/types/database";
 import { deleteSavedScript } from "./actions";
 import { Copyable } from "./script-form";
+import { Voiceover, voiceFileName, type VoiceOptions } from "./voiceover";
 
 /**
  * Every script written, newest first.
@@ -13,7 +14,7 @@ import { Copyable } from "./script-form";
  * lines are distinct in a way "Minecraft, 30s" never is. Expanding is local
  * state rather than a link, so reading an old script never costs a page load.
  */
-export function SavedScripts({ scripts }: { scripts: SavedScriptRow[] }) {
+export function SavedScripts({ scripts, voice }: { scripts: SavedScriptRow[]; voice: VoiceOptions | null }) {
   if (scripts.length === 0) {
     return (
       <section className="sw-saved">
@@ -30,14 +31,14 @@ export function SavedScripts({ scripts }: { scripts: SavedScriptRow[] }) {
       </h2>
       <ul className="sw-saved-list">
         {scripts.map((row, i) => (
-          <SavedScript key={row.id} row={row} index={i} />
+          <SavedScript key={row.id} row={row} index={i} voice={voice} />
         ))}
       </ul>
     </section>
   );
 }
 
-function SavedScript({ row, index }: { row: SavedScriptRow; index: number }) {
+function SavedScript({ row, index, voice }: { row: SavedScriptRow; index: number; voice: VoiceOptions | null }) {
   const [open, setOpen] = useState(false);
   const text = scriptText(row.script);
   // The opening sentence is how you recognise a script in a list.
@@ -80,6 +81,7 @@ function SavedScript({ row, index }: { row: SavedScriptRow; index: number }) {
               {row.words} words · about {seconds}s · {row.tone}
             </span>
           </div>
+          {voice ? <Voiceover scriptId={row.id} options={voice} fileName={voiceFileName(text)} /> : null}
         </div>
       ) : null}
     </li>

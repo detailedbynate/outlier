@@ -23,12 +23,16 @@ export default async function ScriptwriterPage() {
   const canWrite = writerOpenTo(plan?.plan.id, current.isOwner);
   const onFreePlan = !current.isOwner && (plan?.plan.id ?? "free") === "free";
 
-  const [saved, styles] = canWrite
+  const voice = getServices().voice;
+  const [saved, styles, voices] = canWrite
     ? await Promise.all([
         getServices().repositories.savedScripts.listForUser(current.user.id),
         getServices().repositories.styleSamples.listForUser(current.user.id),
+        voice.enabled ? voice.voices() : [],
       ])
-    : [[], []];
+    : [[], [], []];
+  // No key, or ElevenLabs unreachable: the voiceover panel just isn't shown.
+  const voiceOptions = voices.length > 0 ? { voices, cost: CREDIT_COSTS.voiceover } : null;
 
   return (
     <div className="dash sw">
@@ -47,9 +51,9 @@ export default async function ScriptwriterPage() {
       {canWrite ? (
         <>
           {showScriptTour(current.user.user_metadata, new Date()) ? <ScriptTour ideaCost={CREDIT_COSTS.find_ideas} scriptCost={cost} /> : null}
-          <Writer cost={cost} ideaCost={CREDIT_COSTS.find_ideas} limitNote={writerTerms(plan?.plan.id, current.isOwner)?.limitNote ?? null} />
+          <Writer cost={cost} ideaCost={CREDIT_COSTS.find_ideas} limitNote={writerTerms(plan?.plan.id, current.isOwner)?.limitNote ?? null} voice={voiceOptions} />
           <StyleSamples samples={styles} />
-          <SavedScripts scripts={saved} />
+          <SavedScripts scripts={saved} voice={voiceOptions} />
         </>
       ) : (
         <ComingSoonLock mode={onFreePlan ? "upgrade" : "soon"}>{<LockedPreview cost={cost} />}</ComingSoonLock>

@@ -30,6 +30,8 @@ export const CREDIT_COSTS = {
   write_script: 8,
   /** Six ideas for a niche: one model call, and much less output than a script. */
   find_ideas: 3,
+  /** A script read out by ElevenLabs: paid per character, about half a cent for a 30s Short. */
+  voiceover: 4,
 } as const;
 
 export type CreditAction = keyof typeof CREDIT_COSTS;

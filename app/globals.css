@@ -16636,3 +16636,86 @@ body.app-body {
   letter-spacing: 0.02em;
   color: var(--text-secondary);
 }
+
+/* Script voiceover (ElevenLabs) */
+.sw-voice {
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--glass-bg);
+}
+
+.sw-saved-body .sw-voice {
+  margin-top: 14px;
+}
+
+.sw-voice-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.sw-voice-head h3 {
+  margin: 0;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+}
+
+.sw-voice-head small,
+.sw-voice-row small {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+}
+
+.sw-voice-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sw-voice-row select {
+  flex: 1;
+  min-width: 0;
+  max-width: 100%;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border-strong);
+  background: var(--control-bg);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.88rem;
+}
+
+.sw-voice-row select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.sw-voice-out {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.sw-voice-out audio {
+  flex: 1;
+  min-width: 220px;
+  height: 40px;
+}
+
+.sw-voice-out a.sw-copy {
+  text-decoration: none;
+}
+
+@media (max-width: 640px) {
+  .sw-voice-row select {
+    flex-basis: 100%;
+  }
+}

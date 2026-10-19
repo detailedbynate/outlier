@@ -27,6 +27,9 @@ export const RATE_LIMITS = {
   scriptIdeasUser: { windowSeconds: 21_600, maxHits: 3 },
   /** Expert: four scripts a day. */
   scriptExpert: { windowSeconds: 86_400, maxHits: 4 },
+  /** Voiceovers: room to try a few voices on each script, not to run a TTS service. */
+  voiceUser: { windowSeconds: 86_400, maxHits: 5 },
+  voiceExpert: { windowSeconds: 86_400, maxHits: 15 },
 } as const;
 
 export type RateLimitPolicy = keyof typeof RATE_LIMITS;

@@ -189,6 +189,15 @@ const serverEnvSchema = z.object({
   ANTHROPIC_DAILY_BUDGET_USD: z.coerce.number().min(0).default(0.3),
   OPENAI_API_KEY: optionalString,
 
+  /** ElevenLabs key: script voiceovers. Blank hides the voiceover button. */
+  ELEVENLABS_API_KEY: optionalString,
+  ELEVENLABS_MODEL: z.string().trim().min(1).default("eleven_v4"),
+  /**
+   * Most characters all voiceovers together may use per UTC month. Pro includes
+   * about 1.2M; 1M leaves room for the owner's own use. A 30s script is ~500.
+   */
+  ELEVENLABS_MONTHLY_CHARACTERS: z.coerce.number().int().min(0).default(1_000_000),
+
   /** Google AI Studio key: the free Gemini tier gives unsure channels an AI second opinion. */
   GEMINI_API_KEY: optionalString,
   GEMINI_MODEL: z.string().trim().min(1).default("gemini-3.6-flash"),
