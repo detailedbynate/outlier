@@ -7,6 +7,7 @@
 :root {
   color-scheme: dark;
   --font: var(--font-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-buttons: var(--font-ui), var(--font);
 
   --page: #000000;
   --surface-solid: #0c0c11;
@@ -850,6 +851,7 @@ input[type="text"] {
 
 button {
   font: inherit;
+  font-family: var(--font-buttons);
   font-weight: 600;
   color: var(--on-accent);
   background: var(--accent);
@@ -17257,4 +17259,14 @@ body.app-body {
   .vs-time {
     display: none;
   }
+}
+
+/* Buttons and button-styled links use Inter, like algrow.online; text stays DM Sans.
+   :root lifts it over the many button rules that reset to `font: inherit`. */
+:root button,
+:root .btn,
+:root .pill-button,
+:root .button-ghost,
+:root .toolbar-button {
+  font-family: var(--font-buttons);
 }

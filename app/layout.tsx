@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { Outfit } from "next/font/google";
+import { DM_Sans, Inter } from "next/font/google";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { AccountMenu } from "@/components/account-menu";
@@ -26,7 +26,9 @@ import "./globals.css";
 import { writerOpenTo } from "@/lib/scripts/access";
 import { LANDING_HEADER } from "@/lib/landing-link";
 
-const outfit = Outfit({ subsets: ["latin"], display: "swap", variable: "--font-sans" });
+// Same pairing as algrow.online: DM Sans for text and headings, Inter for buttons.
+const dmSans = DM_Sans({ subsets: ["latin"], display: "swap", variable: "--font-sans" });
+const inter = Inter({ subsets: ["latin"], display: "swap", variable: "--font-ui" });
 
 export const metadata: Metadata = {
   title: "Outlier",
@@ -65,7 +67,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
 
   if (!current?.approved || landingLink) {
     return (
-      <html lang="en" className={outfit.variable}>
+      <html lang="en" className={`${dmSans.variable} ${inter.variable}`}>
         <body>
           <div className="ambient" aria-hidden="true" />
           <div className="shell">
@@ -105,7 +107,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const plan: SidebarPlan | undefined = current.isOwner ? "owner" : subscription ? subscription.plan.id : undefined;
 
   return (
-    <html lang="en" className={outfit.variable}>
+    <html lang="en" className={`${dmSans.variable} ${inter.variable}`}>
       <body className="app-body">
         <div className="ambient" aria-hidden="true" />
         <div className="app">
