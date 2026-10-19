@@ -17301,3 +17301,251 @@ body.app-body {
 :root .toolbar-button {
   font-family: var(--font-buttons);
 }
+
+/* ===========================================================================
+   App theme, fourth pass (the owner's dashboard reference): black, lighter-black cards instead
+   of black, flat solid cards with hairline borders, neutral greys, and one
+   violet accent for what's active or highlighted. The sidebar sits flush
+   against the page, split off by a hairline, rather than floating as a card.
+   Scoped to the signed-in app; comes last so it wins over the earlier passes.
+=========================================================================== */
+body.app-body {
+  background: #000000;
+}
+
+.app {
+  --page: #000000;
+  --card: #0e0e0e;
+  --card-top: #0e0e0e;
+  --card-sheen: #0e0e0e;
+  --surface-solid: #0e0e0e;
+  --surface-2: rgba(255, 255, 255, 0.04);
+  --surface-3: rgba(255, 255, 255, 0.07);
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.14);
+  --grid: rgba(255, 255, 255, 0.05);
+  --axis: rgba(255, 255, 255, 0.14);
+  --text-primary: #f2f2f2;
+  --text-secondary: #a6a6a6;
+  --text-muted: #767676;
+  --glass-bg: #0e0e0e;
+  --glass-border: rgba(255, 255, 255, 0.07);
+  --glass-shadow: none;
+  --control-bg: #141414;
+  --control-bg-hover: #1a1a1a;
+  --menu-bg: #131313;
+  --accent: #9d6bff;
+  --accent-gradient: #9d6bff;
+  --accent-text: #c8b4ff;
+  --accent-wash: rgba(157, 107, 255, 0.12);
+  --accent-track: rgba(157, 107, 255, 0.18);
+  --dash-violet: #9d6bff;
+  --dash-pink: #ec4899;
+  --dash-surface: #0e0e0e;
+  --dash-surface-hover: #131313;
+  --radius-sm: 8px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  background: #000000;
+}
+
+.app .home {
+  --dash-surface: #0e0e0e;
+  --dash-surface-hover: #131313;
+}
+
+/* Cards: flat lighter black, one hairline, no sheen, glow or blur. */
+.app :is(.glass, .card, .panel, .dash-panel, .channel-card, .skeleton-card) {
+  background: #0e0e0e;
+  border: 1px solid var(--border);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.app :is(.dash-panel, .card) {
+  border-radius: 14px;
+}
+
+.app :is(.home-spark-line, .intel-spark path, .home-ring-fill) {
+  filter: none;
+}
+
+.app .home-spark-area {
+  fill: rgba(157, 107, 255, 0.1);
+}
+
+/* Sidebar: flush with the page, a hairline on its right, no card around it. */
+@media (min-width: 901px) {
+  .app {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+
+  .app .sidebar {
+    top: 0;
+    height: 100vh;
+    margin: 0;
+    border: 0;
+    border-right: 1px solid var(--border);
+    border-radius: 0;
+    background: #000000;
+    padding: 18px 14px 14px;
+  }
+
+  .app .sidebar-foot {
+    background: #000000;
+    box-shadow: 0 -14px 16px -6px #000000 !important;
+  }
+}
+
+.app .sidebar-brand,
+.app .sidebar-brand:hover {
+  background: none;
+  border-color: transparent;
+  padding: 4px 6px 10px;
+}
+
+.app .sidebar-brand-mark {
+  width: 32px;
+  height: 32px;
+  background: none;
+  border: 0;
+}
+
+.app .sidebar-search {
+  height: 36px;
+  border-radius: 9px;
+  background: #0e0e0e;
+  border-color: rgba(255, 255, 255, 0.05);
+}
+
+.app .sidebar-search:focus-within {
+  border-color: rgba(157, 107, 255, 0.5);
+}
+
+.app .nav-section-title {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  color: #6b6b6b;
+}
+
+.app .nav-link {
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: #a6a6a6;
+  font-weight: 500;
+}
+
+.app .nav-link::before {
+  display: none;
+}
+
+.app .nav-icon,
+.app .nav-link:hover .nav-icon {
+  width: 20px;
+  height: 20px;
+  background: none;
+  box-shadow: none;
+  transform: none;
+  color: inherit;
+}
+
+.app .nav-link:hover .nav-label {
+  transform: none;
+}
+
+.app .nav-link:hover {
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--text-primary);
+}
+
+/* The page you're on: a slightly lifted tile, its icon and name in violet. */
+.app .nav-link[aria-current="page"] {
+  background: #131313;
+  border-color: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.app .nav-link[aria-current="page"] .nav-icon {
+  background: none;
+  box-shadow: none;
+  color: var(--accent);
+}
+
+.app .nav-badge {
+  background: rgba(157, 107, 255, 0.14);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.app .sidebar .credits-icon,
+.app .account-avatar {
+  background: rgba(157, 107, 255, 0.12);
+  color: var(--accent-text);
+}
+
+/* Page headers: a calmer greeting-sized title over a muted line. */
+.app h1,
+.app .dash-hero h1 {
+  font-size: clamp(22px, 2.2vw, 26px);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.app .dash-hero p {
+  color: var(--text-muted);
+}
+
+.app .dash-panel-titles h2 {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* Controls: solid black, no glass. */
+.app :is(input, select, textarea) {
+  background: #0a0a0a;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.app .button-ghost {
+  background: #141414;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  color: var(--text-primary);
+}
+
+.app .button-ghost:hover {
+  background: #1a1a1a;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.app .button-brand {
+  background: var(--accent);
+}
+
+.app .icon-button {
+  background: #141414;
+  border-color: rgba(255, 255, 255, 0.07);
+}
+
+.app .icon-button.is-active {
+  box-shadow: none;
+}
+
+.app :is(.chip, .keyword-chip) {
+  background: #141414;
+  border-color: rgba(255, 255, 255, 0.07);
+}
+
+.app .chip[aria-current="true"],
+.app .chip[aria-pressed="true"] {
+  background: rgba(157, 107, 255, 0.12);
+  border-color: rgba(157, 107, 255, 0.4);
+  color: var(--accent-text);
+}
