@@ -96,6 +96,11 @@ async function main(): Promise<void> {
   const batch = numberSetting("SCRAPER_BATCH", 20, 1, 200);
   const transcriptsPerRound = numberSetting("SCRAPER_TRANSCRIPTS_PER_ROUND", 10, 0, 200);
   const gate = getGate();
+  // The gate caches whole parsed pages, 2-4 MB a refreshed channel. Its default
+  // of 500 is more than this process's heap, which is what still ran it out of
+  // memory every hour or so. The cache only needs to bridge the reads of one
+  // refresh (and repeat searches), so a few channels' worth is plenty.
+  gate.setCacheLimit(numberSetting("SCRAPER_CACHE_ENTRIES", 40, 0, 500));
   // A refresh the scraper can't get from YouTube's pages is worth one API read:
   // the quota manager still decides whether that read happens.
   const source = createHybridSource({ apiFallback: true });
@@ -313,7 +318,7 @@ async function main(): Promise<void> {
     }
 
     const stats = gate.takeStats();
-    logger.info("scraper round", { due: due.length, refreshed, reads: source.takeCounts(), gate: stats });
+    logger.info("scraper round", { due: due.length, refreshed, reads: source.takeCounts(), gate: { ...stats, cached: gate.cacheSize } });
 
     // Step up after a clean stretch, step down the moment YouTube pushes back.
     // Settled before the transcripts and radar: when those took the process

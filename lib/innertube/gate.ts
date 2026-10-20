@@ -235,6 +235,22 @@ export class InnerTubeGate {
     this.options.requestsPerMinute = perMinute;
   }
 
+  /** Reads held in the cache right now, for the scraper's round log. */
+  get cacheSize(): number {
+    return this.cache.size;
+  }
+
+  /**
+   * Change how many reads the cache keeps, dropping the oldest past the new limit.
+   * Entries are whole parsed pages, a channel's about a megabyte or more each, so
+   * the default suits a roomy web server, not the scraper's small heap.
+   */
+  setCacheLimit(entries: number): void {
+    if (!(entries >= 0)) throw new Error(`maxCacheEntries must be zero or more, got ${entries}`);
+    this.options.maxCacheEntries = entries;
+    this.trimCache();
+  }
+
   takeStats(): GateStats {
     const stats = this.stats;
     this.stats = { requests: 0, cacheHits: 0, retries: 0, failures: 0, blocks: 0, refused: 0 };
@@ -292,6 +308,14 @@ export class InnerTubeGate {
     if (ttlMs <= 0 || this.options.maxCacheEntries <= 0) return;
     this.cache.delete(key);
     this.cache.set(key, { value, expiresAt: this.now() + ttlMs });
+    this.trimCache();
+  }
+
+  private trimCache(): void {
+    // Stale entries go now, not when their key is asked for again: most never are,
+    // and each held a parsed page until the size limit finally pushed it out.
+    const now = this.now();
+    for (const [key, entry] of this.cache) if (entry.expiresAt <= now) this.cache.delete(key);
     // Map keeps insertion order, so the first key is the oldest write.
     while (this.cache.size > this.options.maxCacheEntries) {
       const oldest = this.cache.keys().next().value;

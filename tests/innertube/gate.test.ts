@@ -104,6 +104,31 @@ describe("InnerTubeGate", () => {
     expect(fn).toHaveBeenCalledOnce();
   });
 
+  it("lets go of stale entries on the next write, not only when their key comes back", async () => {
+    // Each entry is a parsed page of a megabyte or more. Most keys are never asked
+    // for again, so waiting for a repeat (or for the size limit) kept hundreds of them.
+    const { gate: g, clock: c } = gate({ cacheTtlMs: 60_000, maxCacheEntries: 500 });
+    for (const key of ["a", "b", "c"]) await read(g, key, async () => key, key);
+    expect(g.cacheSize).toBe(3);
+    c.advance(61_000);
+    await read(g, "d", async () => "d", "d");
+    expect(g.cacheSize).toBe(1);
+  });
+
+  it("trims to a lower cache limit at once", async () => {
+    const { gate: g } = gate({ maxCacheEntries: 500 });
+    for (const key of ["a", "b", "c", "d"]) await read(g, key, async () => key, key);
+    g.setCacheLimit(2);
+    expect(g.cacheSize).toBe(2);
+    // The newest two stay; the oldest were dropped.
+    const fn = vi.fn(async () => "again");
+    await read(g, "d", fn, "d");
+    expect(fn).not.toHaveBeenCalled();
+    await read(g, "a", fn, "a");
+    expect(fn).toHaveBeenCalledOnce();
+    expect(() => g.setCacheLimit(-1)).toThrow();
+  });
+
   it("retries a transient failure with doubling backoff", async () => {
     const { gate: g, clock: c } = gate({ maxRetries: 2, minBackoffMs: 1_000, requestsPerMinute: 6_000 });
     const fn = vi.fn<() => Promise<string>>()
