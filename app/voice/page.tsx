@@ -49,7 +49,7 @@ export default async function VoicePage({ searchParams }: { searchParams: Promis
             <MicIcon size={13} /> Creation tool
           </span>
           <h1>Voice Studio</h1>
-          <p>Turn your script into a voiceover in seconds. Pick from 20+ natural voices, tune how they read it, and download an MP3 ready for your edit.</p>
+          <p>Turn your script into a voiceover in seconds. Pick from 40+ natural voices, tune how they read it, and download an MP3 ready for your edit.</p>
         </div>
       </header>
 

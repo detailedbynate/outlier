@@ -3,7 +3,7 @@ import { VOICE_CHARACTERS_EVENT, VOICE_CREDITS_EVENT, VOICE_MAX_CHARACTERS, Voic
 import { DEFAULT_VOICE_SETTINGS, type VoiceSettings } from "@/lib/voice/elevenlabs";
 
 const now = new Date("2026-10-19T12:00:00Z");
-const voices = [{ id: "v1", name: "Roger", gender: "male", accent: "american", age: "middle aged", tone: "classy", useCase: "conversational", previewUrl: null }];
+const voices = [{ id: "v1", name: "Roger", gender: "male", accent: "american", age: "middle aged", tone: "classy", useCase: "conversational", previewUrl: null, library: false }];
 
 function setup(opts: { used?: number; cap?: number; userUsed?: number } = {}) {
   const spoken: { voiceId: string; text: string; settings: VoiceSettings | undefined }[] = [];

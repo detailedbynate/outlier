@@ -4,9 +4,10 @@ import { UpstreamError } from "@/lib/core/errors";
  * The two ElevenLabs calls Outlier makes: which stock voices there are, and
  * turning text into an MP3.
  *
- * Only ElevenLabs' own premade voices are offered. They're licensed for
- * commercial use on a paid plan, and they mean nobody can upload someone
- * else's voice to clone it.
+ * Offered: ElevenLabs' premade voices, plus voices the account added from
+ * the Voice Library (licensed for commercial use on a paid plan). The
+ * account owner's own clones are never listed, so they can't be used, and
+ * nobody can upload someone else's voice to clone it.
  */
 
 const BASE = "https://api.elevenlabs.io";
@@ -23,6 +24,8 @@ export interface Voice {
   useCase: string | null;
   /** A short sample ElevenLabs hosts, so a voice can be heard before spending anything. */
   previewUrl: string | null;
+  /** Added from the Voice Library rather than one of ElevenLabs' stock voices. */
+  library: boolean;
 }
 
 /** How it's read. Each 0–1 except speed (0.7–1.2, 1 is normal). */
@@ -37,7 +40,7 @@ export interface VoiceSettings {
 export const DEFAULT_VOICE_SETTINGS: VoiceSettings = { stability: 0.5, style: 0, speed: 1 };
 
 interface VoicesResponse {
-  voices?: { voice_id: string; name: string; labels?: Record<string, string> | null; preview_url?: string | null }[];
+  voices?: { voice_id: string; name: string; category?: string; sharing?: { status?: string } | null; labels?: Record<string, string> | null; preview_url?: string | null }[];
 }
 
 export class ElevenLabsClient {
@@ -48,24 +51,28 @@ export class ElevenLabsClient {
   ) {}
 
   async listVoices(signal?: AbortSignal): Promise<Voice[]> {
-    const response = await this.fetcher(`${BASE}/v2/voices?category=premade&page_size=100`, {
+    const response = await this.fetcher(`${BASE}/v2/voices?page_size=100`, {
       headers: { "xi-api-key": this.apiKey },
       signal,
     });
     if (!response.ok) throw new UpstreamError("ElevenLabs", `couldn't list voices (${response.status})`, { expose: false });
     const body = (await response.json()) as VoicesResponse;
-    return (body.voices ?? []).map((v) => {
+    const offered = (body.voices ?? []).filter((v) => v.category === "premade" || v.sharing?.status === "copied");
+    // Library voices first: they're the better picks for narration.
+    const stock = (v: { category?: string }) => (v.category === "premade" ? 1 : 0);
+    return offered.sort((a, b) => stock(a) - stock(b)).map((v) => {
       const labels = v.labels ?? {};
       return {
         id: v.voice_id,
-        // Premade names come as "Roger - Laid-Back, Casual"; the part before the dash is the name.
-        name: v.name.split(/\s+-\s+/)[0]!.trim(),
+        // Names come as "Roger - Laid-Back, Casual" (library ones sometimes "Jake – Deep" or "Henry- Upbeat"); the part before the dash is the name.
+        name: v.name.split(/\s*[-–—]\s+/)[0]!.trim(),
         gender: label(labels.gender),
         accent: label(labels.accent),
         age: label(labels.age),
         tone: label(labels.descriptive ?? labels.description),
         useCase: label(labels.use_case ?? labels.use_cases),
         previewUrl: v.preview_url ?? null,
+        library: v.category !== "premade",
       };
     });
   }
