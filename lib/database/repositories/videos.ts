@@ -1,5 +1,6 @@
 import type { DatabaseClient } from "@/lib/database/client";
 import { assertOk, unwrap, unwrapMaybe } from "@/lib/database/errors";
+import { isPromoted } from "@/lib/analytics/metrics";
 import type { TablesInsert, VideoFeedRow, VideoFormat, VideoPerformanceRow, VideoRow, VideoSnapshotRow } from "@/types/database";
 import type { YouTubeVideo } from "@/types/youtube";
 import { MAX_DESCRIPTION_CHARS, truncateText } from "./channels";
@@ -192,14 +193,15 @@ export class VideoRepository {
   async fastMoving(options: { since: Date; limit: number; format?: VideoFormat; titleTerms?: string[] }, now: Date = new Date()): Promise<FastVideo[]> {
     let query = this.db
       .from("videos")
-      .select("id, youtube_video_id, channel_id, title, view_count, published_at, views_per_hour, view_acceleration, format")
+      .select("id, youtube_video_id, channel_id, title, view_count, like_count, published_at, views_per_hour, view_acceleration, format")
       .gte("published_at", options.since.toISOString());
     if (options.format) query = query.eq("format", options.format);
     const terms = (options.titleTerms ?? []).map((t) => t.replace(/[\\%_*,()"]/g, "").trim()).filter((t) => t.length >= 2);
     if (terms.length > 0) query = query.or(terms.map((t) => `title.ilike."*${t}*"`).join(","));
     const rows = unwrap(await query.order("view_count", { ascending: false }).limit(200), "videos.fastMoving");
     return rows
-      .map((row) => {
+      .filter((row) => !isPromoted(row.view_count, row.like_count))
+      .map(({ like_count: _likes, ...row }) => {
         const ageHours = Math.max((now.getTime() - Date.parse(row.published_at)) / 3_600_000, 1);
         return { ...row, vph: row.views_per_hour !== null ? Number(row.views_per_hour) : row.view_count / ageHours, live: row.views_per_hour !== null };
       })
@@ -222,17 +224,27 @@ export class VideoRepository {
     youtubeChannelId?: string;
     /** Restrict to these channel UUIDs. */
     channelIds?: string[];
+    /**
+     * Finding videos across other channels (Viral Videos, peers): leaves out
+     * paid ads and upcoming premieres, and ranks "outlier" by viral_score so a
+     * channel that usually gets 30 views can't top the list with 80K. The
+     * returned outlier_score is that viral_score.
+     */
+    discovery?: boolean;
   }): Promise<VideoFeedRow[]> {
     if (options.channelIds?.length === 0) return [];
     let query = this.db.from("video_feed").select("*");
+    if (options.discovery) {
+      query = query.eq("promoted", false);
+      if (!options.format) query = query.neq("format", "upcoming");
+    }
     if (options.channelIds) query = query.in("channel_id", options.channelIds);
     if (options.publishedAfter) query = query.gte("published_at", options.publishedAfter.toISOString());
     if (options.format) query = query.eq("format", options.format);
     if (options.youtubeChannelId) query = query.eq("youtube_channel_id", options.youtubeChannelId);
-    return unwrap(
-      await query.order(options.orderBy, { ascending: false, nullsFirst: false }).limit(options.limit),
-      "video_feed.list",
-    );
+    const orderBy = options.discovery && options.orderBy === "outlier_score" ? "viral_score" : options.orderBy;
+    const rows = unwrap(await query.order(orderBy, { ascending: false, nullsFirst: false }).limit(options.limit), "video_feed.list");
+    return options.discovery ? rows.map((row) => ({ ...row, outlier_score: row.viral_score })) : rows;
   }
 
   async upsertPerformance(rows: TablesInsert<"video_performance">[]): Promise<VideoPerformanceRow[]> {

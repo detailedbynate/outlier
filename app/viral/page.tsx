@@ -53,6 +53,7 @@ export default async function ViralPage({ searchParams }: { searchParams: Search
     limit: 60,
     publishedAfter: range === "all" ? undefined : daysAgo(Number(range)),
     format: format === "all" ? undefined : (format as VideoFormat),
+    discovery: true,
   });
 
   const href = (overrides: Record<string, string>) => {

@@ -176,7 +176,7 @@ async function callTool(name: ToolName, args: unknown, deps: McpDeps): Promise<u
     }
     case "viral_shorts": {
       const i = TOOLS.viral_shorts.input.parse(args ?? {});
-      const videos = await deps.videos.feed({ orderBy: "outlier_score", format: "short", publishedAfter: new Date(Date.now() - i.days * 86_400_000), limit: i.limit });
+      const videos = await deps.videos.feed({ orderBy: "outlier_score", format: "short", publishedAfter: new Date(Date.now() - i.days * 86_400_000), limit: i.limit, discovery: true });
       return { days: i.days, shorts: videos.map(videoOut) };
     }
     case "removed_channels": {

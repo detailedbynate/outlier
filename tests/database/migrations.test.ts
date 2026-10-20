@@ -197,14 +197,27 @@ describe("supabase migrations", () => {
        values ('feedvideo01', $1, 'Feed video', now(), 500) returning id`,
       [rows[0]!.id],
     );
-    await db.query(`insert into public.video_performance (video_id, views_per_day, outlier_score) values ($1, 100, 4.5)`, [
+    // Stored per-day and outlier numbers are stale; the feed works them out live.
+    await db.query(`insert into public.video_performance (video_id, views_per_day, outlier_score, channel_median_views) values ($1, 99999, 99, 200)`, [
       video.rows[0]!.id,
     ]);
-    const feed = await db.query<{ channel_title: string; outlier_score: string }>(
-      `select channel_title, outlier_score from public.video_feed where youtube_video_id = 'feedvideo01'`,
+    const feed = await db.query<{ channel_title: string; outlier_score: string; viral_score: string; views_per_day: string; promoted: boolean }>(
+      `select channel_title, outlier_score, viral_score, views_per_day, promoted from public.video_feed where youtube_video_id = 'feedvideo01'`,
     );
-    expect(feed.rows[0]!.channel_title).toBe("Feed");
-    expect(Number(feed.rows[0]!.outlier_score)).toBe(4.5);
+    expect(feed.rows[0]).toMatchObject({ channel_title: "Feed", promoted: false });
+    expect(Number(feed.rows[0]!.outlier_score)).toBe(2.5);
+    // Baseline floored at 1,000 views for discovery ranking.
+    expect(Number(feed.rows[0]!.viral_score)).toBe(0.5);
+    // Under a day old: per-day is just its views, not extrapolated.
+    expect(Number(feed.rows[0]!.views_per_day)).toBe(500);
+
+    await db.query(
+      `insert into public.videos (youtube_video_id, channel_id, title, published_at, view_count, like_count)
+       values ('feedvideo02', $1, 'Brand ad', now() - interval '10 days', 50000000, 31)`,
+      [rows[0]!.id],
+    );
+    const ad = await db.query<{ promoted: boolean }>(`select promoted from public.video_feed where youtube_video_id = 'feedvideo02'`);
+    expect(ad.rows[0]!.promoted).toBe(true);
   });
 
   it("prunes snapshots to one per day recently, one per week later, none past retention", async () => {

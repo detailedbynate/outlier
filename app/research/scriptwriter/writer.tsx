@@ -12,8 +12,8 @@ import { emptyIdeaState } from "./state";
  * form below rather than opening anything, because the whole point is that
  * finding an idea and writing it are the same sitting.
  */
-export function Writer({ cost, ideaCost, limitNote }: { cost: number; ideaCost: number; limitNote: string | null }) {
-  const [seed, setSeed] = useState<{ topic: string; idea: string } | null>(null);
+export function Writer({ cost, ideaCost, limitNote, initialSeed = null }: { cost: number; ideaCost: number; limitNote: string | null; initialSeed?: { topic: string; idea: string } | null }) {
+  const [seed, setSeed] = useState<{ topic: string; idea: string } | null>(initialSeed);
   // Bumped on every pick so the form remounts and picks up the new defaults.
   const [seedKey, setSeedKey] = useState(0);
   const formRef = useRef<HTMLDivElement>(null);

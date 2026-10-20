@@ -15,8 +15,15 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 export const metadata: Metadata = { title: "Script Writer · Outlier" };
 
-export default async function ScriptwriterPage() {
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+export default async function ScriptwriterPage({ searchParams }: { searchParams: SearchParams }) {
   const current = await requireApprovedUser();
+  // Linked from elsewhere (e.g. a proven idea on Removed Channels) with the form filled in.
+  const params = await searchParams;
+  const text = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
+  const initialIdea = text(params.idea, 300);
+  const initialSeed = initialIdea ? { topic: text(params.topic, 80), idea: initialIdea } : null;
   const cost = CREDIT_COSTS.write_script;
   // Pro and Expert (and the owner) get the writer; Free sees what it does and an upgrade.
   const plan = current.isOwner ? null : await getServices().subscriptions.stateFor(current.user.id).catch(() => null);
@@ -47,7 +54,7 @@ export default async function ScriptwriterPage() {
       {canWrite ? (
         <>
           {showScriptTour(current.user.user_metadata, new Date()) ? <ScriptTour ideaCost={CREDIT_COSTS.find_ideas} scriptCost={cost} /> : null}
-          <Writer cost={cost} ideaCost={CREDIT_COSTS.find_ideas} limitNote={writerTerms(plan?.plan.id, current.isOwner)?.limitNote ?? null} />
+          <Writer cost={cost} ideaCost={CREDIT_COSTS.find_ideas} limitNote={writerTerms(plan?.plan.id, current.isOwner)?.limitNote ?? null} initialSeed={initialSeed} />
           <StyleSamples samples={styles} />
           <SavedScripts scripts={saved} />
         </>

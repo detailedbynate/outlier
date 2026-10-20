@@ -211,6 +211,7 @@ export class ResearchService {
       orderBy: "outlier_score",
       publishedAfter: new Date(now.getTime() - 30 * 86_400_000),
       limit: limit * 3,
+      discovery: true,
     });
     // A couple per channel, so one viral channel doesn't fill the list.
     const perChannel = new Map<string, number>();

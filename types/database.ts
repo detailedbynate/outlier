@@ -661,6 +661,10 @@ export type VideoFeedRow = {
   views_delta_24h: number | null;
   views_delta_7d: number | null;
   computed_at: string | null;
+  /** 100K+ views with almost no likes: a brand video run as a paid ad. */
+  promoted: boolean;
+  /** outlier_score against a baseline of at least 1,000 views, for ranking discovery feeds. */
+  viral_score: number | null;
 };
 
 export type ShortsChannelRow = {

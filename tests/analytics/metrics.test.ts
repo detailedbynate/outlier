@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  isPromoted,
   computeVideoPerformance,
   deltaOverWindow,
   engagementRate,
@@ -79,5 +80,16 @@ describe("analytics metrics", () => {
       viewsDelta7d: null,
       viewsDelta30d: null,
     });
+  });
+});
+
+describe("isPromoted", () => {
+  it("flags big videos with almost no likes as paid ads", () => {
+    expect(isPromoted(50_254_559, 31)).toBe(true);
+    expect(isPromoted(1_236_299, 146)).toBe(true);
+    expect(isPromoted(3_277_850, 10_427)).toBe(false);
+    // Small videos and hidden likes aren't judged.
+    expect(isPromoted(90_000, 0)).toBe(false);
+    expect(isPromoted(5_000_000, null)).toBe(false);
   });
 });

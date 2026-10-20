@@ -17781,3 +17781,24 @@ body.app-body {
   white-space: pre;
   word-break: normal;
 }
+
+/* Removed Channels: proven ideas */
+.proven-ideas { display: grid; gap: 14px; }
+.proven-head h2 { margin: 0 0 4px; font-size: 1.05rem; }
+.proven-head p { margin: 0; font-size: 0.85rem; }
+.proven-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.proven-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 4px;
+  border-top: 1px solid var(--border);
+}
+.proven-list li:first-child { border-top: 0; }
+.proven-text { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.proven-text strong { font-weight: 600; overflow-wrap: anywhere; }
+.proven-text span { font-size: 0.8rem; }
+.proven-write { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; flex-shrink: 0; }
+@media (max-width: 560px) {
+  .proven-list li { flex-direction: column; align-items: flex-start; }
+}

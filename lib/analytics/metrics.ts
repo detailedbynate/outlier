@@ -31,6 +31,15 @@ export function viewsPerDay(viewCount: number, publishedAt: string | Date, now: 
   return round(viewCount / ageInDays(publishedAt, now), 4);
 }
 
+/**
+ * A brand video run as a paid YouTube ad: 100K+ views with almost no likes
+ * (under 0.15% of views; real videos get 0.3-4%). Hidden likes don't count
+ * against a video. Same rule as `promoted` on the video_feed view.
+ */
+export function isPromoted(viewCount: number, likeCount: number | null): boolean {
+  return viewCount >= 100_000 && likeCount !== null && likeCount < viewCount * 0.0015;
+}
+
 /** (likes + comments) / views. Null when views are zero or both signals are hidden. */
 export function engagementRate(viewCount: number, likeCount: number | null, commentCount: number | null): number | null {
   if (viewCount <= 0 || (likeCount === null && commentCount === null)) return null;
