@@ -39,7 +39,8 @@ interface NavItem {
 }
 
 interface NavSection {
-  title: string;
+  /** Left out for a section that needs no heading. */
+  title?: string;
   items: NavItem[];
   /** Only shown while searching. */
   searchOnly?: boolean;
@@ -47,25 +48,28 @@ interface NavSection {
   collapsible?: boolean;
 }
 
+// Few labels, so the whole menu fits the window without scrolling: Dashboard
+// needs no heading, the channel library is research too, and the two tools
+// that make something get their own.
 const SECTIONS: NavSection[] = [
-  { title: "Overview", items: [{ href: "/", label: "Dashboard", icon: GridIcon, paid: true }] },
+  { items: [{ href: "/", label: "Dashboard", icon: GridIcon, paid: true }] },
   {
-    title: "Research tools",
+    title: "Research",
     items: [
       { href: "/research/niche-finder", label: "Niche Finder", icon: CompassIcon, paid: true },
       { href: "/research/shorts-channels", label: "Shorts Channels", icon: ShortsIcon },
       { href: "/viral", label: "Viral Videos", icon: FlameIcon, paid: true },
       { href: "/research/removed-channels", label: "Removed Channels", icon: ArchiveIcon, paid: true },
       { href: "/analyze", label: "Analyze Video", icon: ChartIcon, paid: true },
-      { href: "/research/scriptwriter", label: "Script Writer", icon: PenIcon, badge: "New", ownerOnly: true },
-      { href: "/voice", label: "Voice Studio", icon: MicIcon, badge: "New", ownerOnly: true },
+      { href: "/channels", label: "Tracked Channels", icon: BookmarkIcon, paid: true },
+      { href: "/compare", label: "Competitors", icon: TargetIcon, paid: true },
     ],
   },
   {
-    title: "Library",
+    title: "Create",
     items: [
-      { href: "/channels", label: "Tracked Channels", icon: BookmarkIcon, paid: true },
-      { href: "/compare", label: "Competitors", icon: TargetIcon, paid: true },
+      { href: "/research/scriptwriter", label: "Script Writer", icon: PenIcon, badge: "New", ownerOnly: true },
+      { href: "/voice", label: "Voice Studio", icon: MicIcon, badge: "New", ownerOnly: true },
     ],
   },
   {
@@ -163,15 +167,15 @@ export function SidebarNav({
       </label>
       {sections.length === 0 ? <p className="sidebar-search-empty">No pages match</p> : null}
       {sections.map((section) => (
-        <div key={section.title} className="nav-section">
+        <div key={section.title ?? section.items[0]?.href} className="nav-section">
           {section.collapsible && !needle ? (
             <button type="button" className="nav-section-title nav-section-toggle" aria-expanded={isOpen(section)} onClick={() => setFolded(isOpen(section))}>
               {section.title}
               <ChevronDownIcon size={13} />
             </button>
-          ) : (
+          ) : section.title ? (
             <div className="nav-section-title">{section.title}</div>
-          )}
+          ) : null}
           {(isOpen(section) ? section.items : []).map((item) => {
             const active = isActive(pathname, item.href);
             const Icon = item.icon;
