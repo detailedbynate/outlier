@@ -67,12 +67,13 @@ export function clampState(state: RampState, steps: readonly number[], now: Date
  * Decide the rate for the next round.
  *
  * `blocks` is how many times the circuit breaker tripped during the last round.
+ * `quotaShort` means the round stopped because the YouTube API budget ran out.
  */
 export function decide(
   state: RampState,
-  input: { blocks: number; now: Date; steps: readonly number[]; cleanHours: number; thawHours?: number },
+  input: { blocks: number; now: Date; steps: readonly number[]; cleanHours: number; thawHours?: number; quotaShort?: boolean },
 ): RampDecision {
-  const { blocks, now, steps, cleanHours, thawHours = DEFAULT_THAW_HOURS } = input;
+  const { blocks, now, steps, cleanHours, thawHours = DEFAULT_THAW_HOURS, quotaShort = false } = input;
   const at = (step: number) => steps[Math.min(Math.max(step, 0), steps.length - 1)]!;
   const floor = steps[0]!;
 
@@ -84,6 +85,21 @@ export function decide(
       rate: at(step),
       change: "down",
       reason: `YouTube pushed back at ${blockedAt}/min`,
+    };
+  }
+
+  // Each synced channel spends an API unit for exact counts, so a faster rate
+  // only empties the day's budget sooner (Oct 20 ran dry by 10am while the
+  // ladder kept climbing). Not YouTube pushing back: no ceiling, no freeze,
+  // but one rung slower and the clock restarts, since a starved stretch
+  // proved nothing about the rate.
+  if (quotaShort) {
+    const step = Math.max(state.step - 1, 0);
+    return {
+      state: { ...state, step, since: now.toISOString() },
+      rate: at(step),
+      change: "down",
+      reason: `API quota ran out at ${at(state.step)}/min`,
     };
   }
 

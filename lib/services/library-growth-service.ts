@@ -5,7 +5,7 @@ import type { YouTubeService } from "@/lib/youtube/service";
 import type { NicheRepository } from "@/lib/database/repositories/niches";
 import type { UsageRepository } from "@/lib/database/repositories/usage";
 import { nicheSlug } from "@/lib/niches/labeling";
-import { isQuotaUnavailable } from "@/lib/youtube/quota-manager";
+import { isQuotaUnavailable, nextQuotaReset } from "@/lib/youtube/quota-manager";
 import { LIBRARY_GROWTH_EVENT, longSeedKey, type ResearchService } from "./research-service";
 
 export interface LibraryGrowthConfig {
@@ -166,8 +166,9 @@ export class LibraryGrowthService {
 
   /** Discovery searches for the seeds the library is thinnest on. */
   private async search(result: GrowthRunResult, now: Date, signal?: AbortSignal): Promise<GrowthRunResult["stoppedBy"]> {
-    const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-    const usedToday = await this.deps.usage.countSince(LIBRARY_GROWTH_EVENT, today);
+    // YouTube's quota day starts at Pacific midnight; a UTC day straddled two of them.
+    const quotaDayStart = nextQuotaReset(new Date(now.getTime() - 24 * 3_600_000));
+    const usedToday = await this.deps.usage.countSince(LIBRARY_GROWTH_EVENT, quotaDayStart);
     const allowed = Math.min(this.config.searchesPerRun, this.config.dailySearches - usedToday);
     if (allowed <= 0) return "daily_cap";
 

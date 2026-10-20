@@ -287,6 +287,7 @@ async function main(): Promise<void> {
     }
 
     let refreshed = 0;
+    let quotaRetryAt: Date | null = null;
     for (const channel of due) {
       if (controller.signal.aborted) break;
       try {
@@ -298,6 +299,7 @@ async function main(): Promise<void> {
         skipUntil.set(channel.youtube_channel_id, Date.now() + SKIP_FAILED_FOR);
         // The gate paused scraping and the API couldn't cover this read either: stop the round.
         if (error instanceof InnerTubeBlockedError || isQuotaUnavailable(error)) {
+          if (isQuotaUnavailable(error)) quotaRetryAt = error.retryAt;
           logger.warn("scraper round cut short", { channelId: channel.youtube_channel_id, error: error.message });
           break;
         }
@@ -317,7 +319,7 @@ async function main(): Promise<void> {
     // Settled before the transcripts and radar: when those took the process
     // down, no round ever reached this line and the ladder sat still for days.
     // Their own pushback counts toward the next round instead.
-    const decision = decide(ramp, { blocks: stats.blocks, now: new Date(), steps, cleanHours, thawHours });
+    const decision = decide(ramp, { blocks: stats.blocks, now: new Date(), steps, cleanHours, thawHours, quotaShort: quotaRetryAt !== null });
     if (decision.change) {
       gate.setRequestsPerMinute(decision.rate);
       await rampStore.write(decision.state);
@@ -341,6 +343,13 @@ async function main(): Promise<void> {
     if (state.open && state.openUntil) {
       const pause = Math.max(state.openUntil.getTime() - Date.now(), MINUTE);
       logger.warn("scraper waiting for InnerTube to reopen", { minutes: Math.round(pause / MINUTE), trips: state.trips });
+      await sleep(pause, controller.signal);
+    } else if (quotaRetryAt) {
+      // Every refresh needs the API until the quota day resets at Pacific
+      // midnight; retrying every 30s only piled up denials. Wake hourly at most,
+      // in case user-lane headroom or a raised limit frees units sooner.
+      const pause = Math.min(Math.max(quotaRetryAt.getTime() - Date.now(), MINUTE), HOUR);
+      logger.warn("scraper waiting for API quota", { minutes: Math.round(pause / MINUTE), resetsAt: quotaRetryAt.toISOString() });
       await sleep(pause, controller.signal);
     }
   }

@@ -52,6 +52,12 @@ describe("ramp", () => {
     expect(rates).toEqual([6, 9, 12, 12, 12]);
   });
 
+  it("slows one rung without freezing when the API quota runs out", () => {
+    const decision = decide(state({ step: 2, ceiling: 12 }), { blocks: 0, now: later(30), steps: STEPS, cleanHours: 24, quotaShort: true });
+    expect(decision).toMatchObject({ rate: 6, change: "down", reason: "API quota ran out at 9/min" });
+    expect(decision.state).toMatchObject({ step: 1, since: later(30).toISOString(), ceiling: 12, frozen: false });
+  });
+
   it("stops at the top of the ladder", () => {
     const decision = run(state({ step: 3 }), 0, later(48));
     expect(decision).toMatchObject({ rate: 12, change: null, reason: "at the top of the ladder" });

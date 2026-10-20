@@ -241,7 +241,8 @@ const serverEnvSchema = z.object({
    * inside the background quota lane, so these can sit well above the old API-era 3/12.
    */
   LIBRARY_GROWTH_SEARCHES_PER_RUN: z.coerce.number().int().min(0).max(50).default(4),
-  LIBRARY_GROWTH_DAILY_SEARCHES: z.coerce.number().int().min(0).max(500).default(48),
+  // 12 searches is ~1,200-3,600 of the 7,000 background units a day; 48 left the scraper nothing by mid-morning.
+  LIBRARY_GROWTH_DAILY_SEARCHES: z.coerce.number().int().min(0).max(500).default(12),
   /** Days before a seed niche is searched again. */
   LIBRARY_GROWTH_RESEED_DAYS: z.coerce.number().int().min(1).max(365).default(14),
   /** Growth through channels creators feature: checks per run (1 unit each), new creators queued per run, and the size cap for channels it follows. */
