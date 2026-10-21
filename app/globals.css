@@ -22349,3 +22349,246 @@ body.app-body {
     transition: none;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Phone shell: a compact top bar (the page you're on, the bell, your
+   account) and a tab bar along the bottom for the pages used most. Menu
+   opens the full sidebar as a sheet. Desktop is untouched.
+--------------------------------------------------------------------------- */
+.mobile-tabs {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .app .sidebar:not([data-open]) {
+    display: none;
+  }
+
+  .app:has(.onboarding-root) .mobile-tabs {
+    display: none;
+  }
+
+  .app-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    height: calc(54px + env(safe-area-inset-top));
+    padding: env(safe-area-inset-top) 14px 0 16px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(0, 0, 0, 0.78);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    backdrop-filter: blur(16px) saturate(140%);
+  }
+
+  .app-topbar .topbar-paste,
+  .app-topbar .topbar-crumb-group,
+  .app-topbar .topbar-crumb-sep {
+    display: none;
+  }
+
+  .app-topbar .topbar-crumb {
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  .app-topbar .topbar-crumb-page {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .app-topbar .topbar-tools {
+    gap: 8px;
+  }
+
+  /* Popovers sit under the bar, full width less a gutter, instead of hanging off one edge. */
+  .app-topbar .topbar-pop {
+    position: fixed;
+    top: calc(60px + env(safe-area-inset-top));
+    left: 12px;
+    right: 12px;
+    width: auto;
+    min-width: 0;
+    max-height: calc(100dvh - 160px);
+    overflow-y: auto;
+  }
+
+  .mobile-tabs {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 35;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    padding: 6px 6px max(6px, env(safe-area-inset-bottom));
+    border-top: 1px solid var(--border);
+    background: rgba(0, 0, 0, 0.86);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    backdrop-filter: blur(16px) saturate(140%);
+  }
+
+  .mobile-tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-width: 0;
+    height: 52px;
+    padding: 0;
+    border: 0;
+    border-radius: 12px;
+    background: none;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: color 0.15s ease;
+  }
+
+  .mobile-tab span {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-tab svg {
+    transition: transform 0.2s var(--ease);
+  }
+
+  .mobile-tab:active svg {
+    transform: scale(0.9);
+  }
+
+  .mobile-tab[aria-current="page"] {
+    color: var(--text-primary);
+  }
+
+  .mobile-tab[aria-current="page"] svg {
+    color: var(--accent-text);
+  }
+
+  .mobile-tab:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+
+  /* Room under the last thing on the page for the tab bar. */
+  .app .main {
+    padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  }
+
+  /* The open menu covers the bars. */
+  .app .sidebar[data-open] {
+    z-index: 70;
+  }
+
+  /* Page titles sized for a phone. */
+  .app .main .page-header h1 {
+    font-size: 24px;
+  }
+
+  .app .main .page-header p {
+    font-size: 13.5px;
+  }
+}
+
+/* Phone top bar brand; desktop shows the crumb instead. */
+.topbar-brand {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .app-topbar .topbar-crumb {
+    display: none;
+  }
+
+  /* Sticky save bars and floating buttons clear the tab bar. */
+  .app .prefs-actions {
+    bottom: calc(80px + env(safe-area-inset-bottom));
+  }
+
+  .app .discord-fab {
+    bottom: calc(80px + env(safe-area-inset-bottom));
+  }
+
+  /* No keyboard shortcut on a phone. */
+  .sidebar-search kbd {
+    display: none;
+  }
+
+  .app-topbar .topbar-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 16px;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
+    text-decoration: none;
+  }
+
+  /* Suggestion chips: one row that swipes sideways instead of four that wrap. */
+  .app .main :is(.dash-topics) {
+    flex-wrap: nowrap;
+    margin-inline: -14px;
+    padding-inline: 14px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    scroll-padding-inline: 14px;
+  }
+
+  .app .main :is(.dash-topics)::-webkit-scrollbar {
+    display: none;
+  }
+
+  .app .main .dash-topics > * {
+    flex: none;
+  }
+
+  /* Video feeds: two to a row, like a phone's video app. */
+  .app .main .video-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .app .main .video-grid .video-card {
+    padding: 8px;
+    border-radius: 14px;
+  }
+
+  .app .main .video-grid .video-card:hover {
+    transform: none;
+  }
+
+  .app .main .video-grid .thumb {
+    margin-bottom: 8px;
+    border-radius: 9px;
+  }
+
+  .app .main .video-grid .video-title {
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  .app .main .video-grid .row {
+    flex-wrap: wrap;
+    gap: 0 4px;
+    font-size: 11.5px;
+  }
+
+  .app .main .video-grid .metric-line {
+    flex-wrap: wrap;
+    gap: 2px 8px;
+    font-size: 11.5px;
+  }
+}

@@ -10,6 +10,7 @@ import { LowCreditsPrompt } from "@/components/low-credits-prompt";
 import { LOW_CREDITS_THRESHOLD } from "@/lib/services/credits-service";
 import { BrandMark } from "@/components/icons";
 import { MobileMenuToggle } from "@/components/mobile-menu-toggle";
+import { MobileTabBar } from "@/components/mobile-tab-bar";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { SiteTracker } from "@/components/site-tracker";
 import { TrialReminder, type TrialReminderProps } from "@/components/trial-reminder";
@@ -148,6 +149,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             {children}
           </main>
           </div>
+          <MobileTabBar />
           {showChangelog ? <WhatsNew version={changelogVersion} /> : null}
           {trialReminder ? <TrialReminder {...trialReminder} /> : null}
           {!showChangelog && !trialReminder && credits.limit < 1_000_000 && current.moderation.status !== "restricted" ? (

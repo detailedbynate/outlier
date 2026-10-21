@@ -7,7 +7,7 @@ import { markChangelogSeen } from "@/app/changelog-actions";
 import { CHANGELOG, CHANGELOG_SEEN_EVENT, changelogStorageKey } from "@/lib/changelog";
 import { ACCOUNT_LINKS } from "./account-menu";
 import { parseVideoId } from "@/lib/youtube/parse";
-import { BellIcon, ChevronRightIcon, LinkIcon, LogOutIcon } from "./icons";
+import { BellIcon, BrandMark, ChevronRightIcon, LinkIcon, LogOutIcon } from "./icons";
 import { pageFor } from "./nav-items";
 
 /**
@@ -38,6 +38,11 @@ export function AppTopbar({
 
   return (
     <header className="app-topbar">
+      {/* Phones: the page's own title sits right below, so the bar carries the brand instead of the crumb. */}
+      <Link href="/" className="topbar-brand" aria-label="Outlier home">
+        <BrandMark size={22} />
+        <span>Outlier</span>
+      </Link>
       <div className="topbar-crumb">
         {page && Icon ? (
           <>
