@@ -113,7 +113,7 @@ export default async function CompetitorProfilePage({ params }: { params: Promis
           </dl>
         </Panel>
 
-        <Panel icon={ChartIcon} title="Upload frequency & formats" subtitle="Last 8 weeks · pink Shorts, blue long-form" tone="green" index={1}>
+        <Panel icon={ChartIcon} title="Upload frequency & formats" subtitle="Last 8 weeks · violet Shorts, grey long-form" tone="green" index={1}>
           <WeeklyBars weeks={detail.weekly} />
           <dl className="niche-metrics is-compact">
             <div><dt>Shorts sampled</dt><dd>{shorts.length}</dd></div>

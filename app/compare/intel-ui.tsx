@@ -157,6 +157,18 @@ export function VideoTable({
   );
 }
 
+/** A channel picture, or its first letter when there is none. */
+export function Avatar({ channel, size = 28 }: { channel: { title: string; thumbnail_url: string | null }; size?: number }) {
+  const style = { width: size, height: size };
+  return channel.thumbnail_url ? (
+    <img className="cx-avatar" src={channel.thumbnail_url} alt="" loading="lazy" style={style} />
+  ) : (
+    <span className="cx-avatar" style={style} aria-hidden>
+      {channel.title.slice(0, 1).toUpperCase()}
+    </span>
+  );
+}
+
 export function ChannelCell({ channel, href }: { channel: { title: string; thumbnail_url: string | null; subscriber_count: number | null; hidden_subscriber_count?: boolean }; href?: string }) {
   const body = (
     <>
