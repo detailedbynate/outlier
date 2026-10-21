@@ -17884,6 +17884,52 @@ body.app-body {
   transform: rotate(180deg);
 }
 
+/* A group folds open and shut instead of popping: its space grows (a grid row
+   going from 0fr to 1fr) while its pages fade in and slide down into it. The
+   chevron turns on the same curve. */
+.nav-sub-clip {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.nav-group[data-open] > .nav-sub-clip {
+  grid-template-rows: 1fr;
+}
+
+.nav-sub-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.nav-sub-clip .nav-sub {
+  opacity: 0;
+  transform: translateY(-6px);
+  transition:
+    opacity 0.2s ease,
+    transform 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.nav-group[data-open] .nav-sub {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 0.26s ease 0.06s,
+    transform 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.app .nav-group .nav-chevron {
+  transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-sub-clip,
+  .nav-sub-clip .nav-sub,
+  .app .nav-group .nav-chevron {
+    transition: none;
+  }
+}
+
 .nav-sub {
   display: flex;
   flex-direction: column;

@@ -135,7 +135,7 @@ export function SidebarNav({
               const GroupIcon = entry.icon;
               return (
                 <div key={entry.id} className="nav-group" data-open={expanded || undefined}>
-                  <button type="button" className="nav-link nav-group-toggle" aria-expanded={expanded} onClick={() => toggle(entry.id)}>
+                  <button type="button" className="nav-link nav-group-toggle" aria-expanded={expanded} aria-controls={`nav-group-${entry.id}`} onClick={() => toggle(entry.id)}>
                     <span className="nav-icon">
                       <GroupIcon size={17} />
                     </span>
@@ -144,7 +144,12 @@ export function SidebarNav({
                       <ChevronDownIcon size={14} />
                     </span>
                   </button>
-                  {expanded ? <div className="nav-sub">{entry.items.map((item) => link(item))}</div> : null}
+                  {/* Always rendered so it can fold open and shut; inert while shut, so its links can't be tabbed to. */}
+                  <div className="nav-sub-clip" id={`nav-group-${entry.id}`} inert={!expanded}>
+                    <div className="nav-sub-inner">
+                      <div className="nav-sub">{entry.items.map((item) => link(item))}</div>
+                    </div>
+                  </div>
                 </div>
               );
             })}
