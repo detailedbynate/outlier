@@ -272,3 +272,21 @@ export const DownloadIcon = (p: P) => (
     <path d="M5 20h14" />
   </Icon>
 );
+export const TrendingDownIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="m3 7 6 6 4-4 8 8" />
+    <path d="M15 17h6v-6" />
+  </Icon>
+);
+export const InfoIcon = (p: P) => (
+  <Icon {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 11v5M12 8h.01" />
+  </Icon>
+);
+export const ThumbsUpIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M7 10v11H4a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1z" />
+    <path d="M7 10l4-7a2.5 2.5 0 0 1 3 3l-1 4h5.5a2 2 0 0 1 2 2.3l-1.3 7A2 2 0 0 1 17.2 21H7" />
+  </Icon>
+);

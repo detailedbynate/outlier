@@ -186,4 +186,4 @@ export function videoInsights(
   };
 }
 
-export { WEEKDAYS };
+export { WEEKDAYS, TRAITS as TITLE_TRAITS };
