@@ -19,7 +19,7 @@ const RANGES = [
   { key: "90d", label: "90d", long: "90 days", days: 90 },
 ] as const;
 
-const PALETTE = ["#8b5cf6", "#ec4899", "#38bdf8", "#34d399", "#fbbf24", "#f97316", "#64748b"];
+const PALETTE = ["#9d6bff", "#c4f542", "#c8b4ff", "#6d4bc2", "#a3a3a3", "#5c5c5c", "#3a3a3a"];
 
 
 const count = (n: number) => n.toLocaleString("en-US");

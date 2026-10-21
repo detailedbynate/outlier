@@ -132,10 +132,10 @@ function scale(stops: readonly string[], t: number): string {
   return `rgb(${a.map((v, k) => Math.round(v + (b[k]! - v) * f)).join(" ")})`;
 }
 
-/** Slow to hot: dim brown through amber to orange-red. */
-const HEAT = ["#78350f", "#d97706", "#fbbf24", "#f97316", "#ef4444"] as const;
+/** Slow to hot: dim violet up to bright lilac. */
+const HEAT = ["#2a1f4d", "#4a3590", "#7350d8", "#9d6bff", "#c8b4ff"] as const;
 /** Competitors, smallest to biggest. */
-const PINK = ["#5b1f3d", "#9d2b66", "#db2777", "#f472b6"] as const;
+const GREY = ["#262626", "#3a3a3a", "#575757", "#8a8a8a"] as const;
 /** You, same idea in violet. */
 const VIOLET = ["#3b1f78", "#6d28d9", "#8b5cf6", "#c4b5fd"] as const;
 
@@ -696,7 +696,7 @@ export async function CompetitorWatchSection({ userId, ownChannel, competitors }
                     </span>
                     <span className="home-versus-bar" aria-hidden="true">
                       {/* Length is to scale; colour uses the square root so the smaller channels still differ from each other. */}
-                      <span style={barStyle(r.you ? VIOLET : PINK, Math.sqrt(r.subs / top), `${Math.max((r.subs / top) * 100, 2)}%`)} />
+                      <span style={barStyle(r.you ? VIOLET : GREY, Math.sqrt(r.subs / top), `${Math.max((r.subs / top) * 100, 2)}%`)} />
                     </span>
                   </span>
                   <span className="home-versus-value">

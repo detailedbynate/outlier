@@ -18461,3 +18461,366 @@ body.app-body {
   font-size: 12.5px;
   animation: pop-in 0.14s var(--ease) both;
 }
+
+/* ---------------------------------------------------------------------------
+   Every page in the menu's voice: flat cards; the title set left over a muted
+   line; a section's note beside its title; each set of options as one
+   segmented bar, the choice lifted in violet like the page you're on in the
+   menu; and colour only where it means something (violet for you and what's
+   picked, lime for a breakout, green and red for up and down).
+--------------------------------------------------------------------------- */
+.app {
+  --accent-2: #c8b4ff;
+  --dash-pink: #c8b4ff;
+}
+
+/* Page titles: one size everywhere, no icon beside them (the top bar has it). */
+.app .main :is(.page-header, .intel-title, .dash-hero-text) h1 {
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+}
+
+.app .main :is(.page-header .subtitle, .intel-title p, .dash-hero-text > p) {
+  margin-top: 4px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.app .main .intel-title > .dash-icon {
+  display: none;
+}
+
+.app .billing-page > .spread {
+  justify-content: flex-start;
+}
+
+.app .billing-page > .spread .page-header {
+  flex-direction: row;
+  text-align: left;
+}
+
+/* Section titles: one size, and the note sits beside the title when it fits. */
+.app .main :is(.card > h2, .dash-panel-titles h2, .intel-card-head h2, .proven-head h2, .sw-saved-head, .section-title, .traffic-card-title) {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.app .main :is(.dash-panel-titles, .intel-card-head > div, .proven-head) {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 10px;
+  row-gap: 2px;
+}
+
+.app .main :is(.dash-panel-titles, .intel-card-head > div, .proven-head) > p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Options: one segmented bar per set. */
+.app .main :is(.chips, .discover-filters .dash-topics, .intel-sort-links, .sw-tones, .discover-tabs) {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  gap: 2px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #0a0a0a;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.app .main :is(.chips .chip, .discover-filters .dash-topic, .intel-sort-links .intel-chip, .sw-tones .sw-tone, .discover-tabs a) {
+  flex: none;
+  padding: 5px 11px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  box-shadow: none;
+  transform: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 18px;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.app .main :is(.chips .chip, .discover-filters .dash-topic, .intel-sort-links .intel-chip, .sw-tones .sw-tone, .discover-tabs a):hover {
+  background: rgba(255, 255, 255, 0.04);
+  border: 0;
+  box-shadow: none;
+  transform: none;
+  color: var(--text-primary);
+}
+
+.app .main :is(.chips .chip[aria-current="true"], .discover-filters .dash-topic[data-mine="true"], .intel-sort-links .intel-chip[aria-current="true"], .sw-tones .sw-tone[data-on], .discover-tabs a[aria-current="page"]),
+.app .main :is(.chips .chip[aria-current="true"], .discover-filters .dash-topic[data-mine="true"], .intel-sort-links .intel-chip[aria-current="true"], .sw-tones .sw-tone[data-on], .discover-tabs a[aria-current="page"]):hover {
+  background: var(--accent-wash);
+  box-shadow: inset 0 0 0 1px rgba(157, 107, 255, 0.22);
+  color: var(--accent-text);
+  font-weight: 500;
+}
+
+.app .main .discover-filters {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.app .main .intel-tab[aria-current="page"] {
+  background: var(--accent-wash);
+  box-shadow: none;
+  color: var(--accent-text);
+}
+
+/* Stat cards: flat, the label muted, no tint per card. */
+.app .intel-glance-item,
+.app .intel-glance-item:hover {
+  background: #0e0e0e;
+  border-color: var(--border);
+  box-shadow: none;
+  transform: none;
+}
+
+.app .intel-glance-item:hover {
+  border-color: var(--border-strong);
+}
+
+.app .intel-glance-label {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.app .intel-insights li {
+  border-left-width: 1px;
+  border-left-color: var(--border);
+  background: #0b0b0b;
+}
+
+.app .traffic-insights {
+  background: #0e0e0e;
+  border-color: rgba(157, 107, 255, 0.35);
+  box-shadow: none;
+}
+
+.app .traffic-insights::after {
+  display: none;
+}
+
+/* Multipliers and scores: lime when it's a breakout, violet when it's good, grey when it isn't. */
+.app :is(.intel-mult, .niche-score, .niche-saved-score, .home-niche-score) {
+  font-family: var(--font-numbers);
+  letter-spacing: -0.02em;
+}
+
+.app .intel-mult[data-band="hot"] {
+  color: var(--signal-text);
+  background: var(--signal-wash);
+  border-color: rgba(196, 245, 66, 0.4);
+  box-shadow: none;
+}
+
+.app .intel-mult[data-band="warm"] {
+  color: var(--accent-text);
+  border-color: rgba(157, 107, 255, 0.35);
+}
+
+.app .niche-score {
+  border-radius: 10px;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+.app .niche-score[data-band="high"] {
+  --tone: var(--signal);
+}
+
+.app .niche-score[data-band="low"] {
+  --tone: var(--text-muted);
+}
+
+.app :is(.niche-saved-score, .home-niche-score) {
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.app :is(.niche-saved-score, .home-niche-score)[data-band="high"] {
+  color: var(--signal-text);
+}
+
+.app :is(.niche-saved-score, .home-niche-score)[data-band="low"] {
+  color: var(--text-muted);
+}
+
+/* Dashboard: a breakout alert is lime; views-per-hour tags lose the pink. */
+.app .home-alert[data-tone="good"] {
+  border-left-color: var(--signal);
+}
+
+.app .dash-vph {
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow: none;
+}
+
+/* Script Writer: "learning from 2" in violet; each saved script's hook on the left, chevron on the right. */
+.app .sw-style-state[data-on] {
+  border-color: rgba(157, 107, 255, 0.35);
+  background: var(--accent-wash);
+  color: var(--accent-text);
+}
+
+.app .sw-saved-hook {
+  grid-column: 1;
+  grid-row: 1;
+  text-align: left;
+}
+
+.app .sw-saved-meta {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.app .sw-chevron {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+/* Shorts Channels: the section tile without its pink glow. */
+.app .section-icon {
+  box-shadow: none;
+}
+
+/* Dashboard panel heads: the titles take the free width, so a short note fits beside its title. */
+.app .main .dash-panel-head > .dash-panel-titles {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Section tabs (Competitors): the same segmented bar as the options. */
+.app .main .intel-tabs {
+  width: fit-content;
+  max-width: 100%;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 10px;
+  background: #0a0a0a;
+}
+
+.app .main .intel-tab {
+  padding: 6px 12px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.app .main .intel-tab:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+}
+
+.app .main .intel-tab[aria-current="page"] {
+  box-shadow: inset 0 0 0 1px rgba(157, 107, 255, 0.22);
+}
+
+.app .main .intel-tab-count {
+  border: 0;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-secondary);
+  font-family: var(--font-numbers);
+  font-weight: 500;
+}
+
+.app .main .intel-tab[aria-current="page"] .intel-tab-count {
+  background: rgba(157, 107, 255, 0.2);
+  color: var(--accent-text);
+}
+
+/* Tables: quiet sentence-case headers; numbers in mono. */
+.app .main thead th,
+.app .main .intel-table thead .num {
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-muted);
+}
+
+.app .main td.num {
+  font-family: var(--font-numbers);
+  letter-spacing: -0.02em;
+}
+
+.app .main .intel-table td.num {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* Refer friends: the counts in mono, like every other stat. */
+.app .dash:not(.intel) .intel-glance-value {
+  font-family: var(--font-numbers);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+/* Credits: the balance reads left to right like the rest, split by hairlines. */
+.app .billing-page .billing-balance {
+  text-align: left;
+}
+
+@media (min-width: 601px) {
+  .app .billing-page .billing-balance > div + div {
+    border-left: 1px solid var(--border);
+    padding-left: 20px;
+  }
+}
+
+.app .billing-balance strong {
+  font-family: var(--font-numbers);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+/* Preferences: a picked option is outlined in violet, not filled; its icon on a violet wash. */
+.app .prefs-form .option-card.is-selected,
+.app .prefs-form .option-card.is-selected:hover {
+  background: rgba(157, 107, 255, 0.06);
+  border-color: rgba(157, 107, 255, 0.5);
+  box-shadow: none;
+}
+
+.app .prefs-form .option-card.is-selected .option-icon {
+  background: rgba(157, 107, 255, 0.16);
+  color: var(--accent-text);
+  transform: none;
+}
+
+/* Niche Finder: "Discover niches" is a section title like the rest. */
+.app .main .niche-ideas > .dash-subhead {
+  margin: 8px 0 2px;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--text-primary);
+}
+
+.app .main td.num :is(input, select, textarea, button) {
+  font-family: var(--font);
+  letter-spacing: normal;
+}
+
+/* Script Writer: the same 20px between sections as every other page. */
+.app .main .dash.sw > :is(.sw-ideas, .sw-styles, .sw-saved) {
+  margin-top: 0;
+  margin-bottom: 0;
+}
