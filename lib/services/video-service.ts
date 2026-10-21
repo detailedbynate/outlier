@@ -1,5 +1,5 @@
 import { computeVideoPerformance, type VideoPerformanceMetrics } from "@/lib/analytics/metrics";
-import { videoInsights, type VideoInsights } from "@/lib/analytics/video-insights";
+import { settledPeers, videoInsights, type VideoInsights } from "@/lib/analytics/video-insights";
 import { createLogger, type Logger } from "@/lib/core/logger";
 import type { TranscriptRepository } from "@/lib/database/repositories/transcripts";
 import type { VideoRepository } from "@/lib/database/repositories/videos";
@@ -12,7 +12,7 @@ export interface VideoAnalysis {
   video: YouTubeVideo;
   channel: YouTubeChannel;
   metrics: VideoPerformanceMetrics;
-  /** How many of the channel's recent same-format videos formed the baseline. */
+  /** How many of the channel's settled recent same-format videos formed the baseline. */
   baselineSampleSize: number;
   /** Those recent uploads (this video excluded), newest first. */
   peers: YouTubeVideo[];
@@ -67,6 +67,8 @@ export class VideoService {
     ]);
 
     const peers = recent.items.filter((v) => v.id !== video.id);
+    // The baseline is a typical upload's total, so only uploads old enough to have one count.
+    const baseline = settledPeers(peers, now);
     const [snapshots, hook] = await Promise.all([this.snapshots(stored?.id ?? null), this.hook(video, stored?.id ?? null)]);
     const metrics = computeVideoPerformance(
       {
@@ -74,14 +76,14 @@ export class VideoService {
         likeCount: video.statistics.likeCount,
         commentCount: video.statistics.commentCount,
         publishedAt: video.publishedAt,
-        channelRecentViewCounts: peers.map((v) => v.statistics.viewCount),
+        channelRecentViewCounts: baseline.map((v) => v.statistics.viewCount),
         viewSnapshots: snapshots.map((s) => ({ capturedAt: s.t, value: s.views })),
       },
       now,
     );
     const insights = videoInsights(video, channel.statistics.subscriberCount, peers, { last24h: metrics.viewsDelta24h, last7d: metrics.viewsDelta7d }, now);
 
-    return { video, channel, metrics, baselineSampleSize: peers.length, peers, insights, history: snapshots, hook, analyzedAt: now.toISOString() };
+    return { video, channel, metrics, baselineSampleSize: baseline.length, peers, insights, history: snapshots, hook, analyzedAt: now.toISOString() };
   }
 
   private async storedRow(youtubeVideoId: string): Promise<{ id: string } | null> {

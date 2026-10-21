@@ -1,4 +1,4 @@
-import { CalendarIcon, ChartIcon, ClockIcon, LinkIcon, PenIcon, TargetIcon } from "@/components/icons";
+import { ChartIcon, LinkIcon } from "@/components/icons";
 import { PageHeader } from "@/components/page-header";
 import { isAppError } from "@/lib/core/errors";
 import { requireApprovedUser } from "@/lib/auth/session";
@@ -40,7 +40,7 @@ export default async function AnalyzePage({ searchParams }: { searchParams: Prom
 
   return (
     <div className="stack dash az">
-      <PageHeader icon={ChartIcon} title="Analyze Video" subtitle="Paste any YouTube video or Short to see how it did against its own channel, and what stands out · 2 credits" />
+      <PageHeader icon={ChartIcon} title="Analyze Video" subtitle="Paste any YouTube video or Short to see how it did against its own channel · 2 credits" />
 
       <form className="card av-form" method="get">
         <div className="av-form-row">
@@ -62,25 +62,22 @@ export default async function AnalyzePage({ searchParams }: { searchParams: Prom
 }
 
 const FEATURES = [
-  { icon: TargetIcon, title: "Breakout score", body: "How many times the channel's typical views it got, and how many of its recent uploads it beat." },
-  { icon: ChartIcon, title: "Full breakdown", body: "Views, daily pace, like and comment rates, each next to the channel's usual." },
-  { icon: CalendarIcon, title: "What works there", body: "The channel's best posting day and video length, from its own recent uploads." },
-  { icon: PenIcon, title: "Title and hook", body: "Which title styles pay off on the channel, and what the video says in its first 3 seconds." },
-  { icon: ClockIcon, title: "Momentum", body: "Views gained in the last day and week, when Outlier has been checking the video." },
+  { title: "A fair verdict", body: "How it did against a typical upload on its own channel. New uploads get an early read instead of a ranking." },
+  { title: "Against its uploads", body: "Every recent upload on one chart, so you can see where this one landed." },
+  { title: "Takeaways", body: "The few things that stand out: reach past subscribers, likes, comments, length." },
+  { title: "What works there", body: "The channel's best uploads, posting day, length and title styles, when you want the detail." },
 ];
 
 function WhatYouGet() {
   return (
-    <section className="av-empty" aria-label="What an analysis shows">
-      {FEATURES.map(({ icon: Icon, title, body }) => (
-        <div key={title} className="av-empty-item">
-          <span className="av-empty-icon">
-            <Icon size={16} />
-          </span>
+    <ol className="av-empty" aria-label="What an analysis shows">
+      {FEATURES.map(({ title, body }, i) => (
+        <li key={title}>
+          <span>{String(i + 1).padStart(2, "0")}</span>
           <strong>{title}</strong>
           <p>{body}</p>
-        </div>
+        </li>
       ))}
-    </section>
+    </ol>
   );
 }

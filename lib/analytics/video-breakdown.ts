@@ -1,33 +1,13 @@
 import { median } from "@/lib/analytics/metrics";
-import { TITLE_TRAITS, type TitleTraitKey, type VideoInsights } from "@/lib/analytics/video-insights";
+import { isSettled, settledPeers, TITLE_TRAITS, type TitleTraitKey, type VideoInsights } from "@/lib/analytics/video-insights";
 import type { YouTubeVideo } from "@/types/youtube";
 
 /**
  * The detailed read on one analyzed video: where it lands among the channel's
- * recent uploads, each measure next to the channel's usual, and what has worked
+ * settled recent uploads, and what has worked
  * on the channel (posting day, length, title traits). Pure: it only reorganizes
  * what the analysis already fetched, so it costs nothing extra.
  */
-
-const DAY = 86_400_000;
-/** Uploads younger than this are still climbing, so they'd drag down any "what works" average. */
-const SETTLED_DAYS = 3;
-
-export interface BreakdownMeasure {
-  key: "views" | "pace" | "likes" | "comments";
-  value: number | null;
-  usual: number | null;
-  /** value / usual; null when either side is missing. */
-  ratio: number | null;
-}
-
-export interface StripPoint {
-  id: string;
-  title: string;
-  views: number;
-  /** 0..1 across the strip, on a log scale. */
-  pos: number;
-}
 
 export interface GroupStat {
   label: string;
@@ -48,13 +28,10 @@ export interface TraitStat {
 }
 
 export interface VideoBreakdown {
-  /** How many of the channel's other recent uploads this one out-viewed. */
+  /** How many of the channel's settled recent uploads this one out-viewed. Null while the video is too new to compare. */
   beats: { count: number; of: number } | null;
-  /** Share of the others it out-viewed, 0..1. */
+  /** Share of them it out-viewed, 0..1. */
   percentile: number | null;
-  measures: BreakdownMeasure[];
-  /** Every recent upload on one log-scale line, this one marked. Null without enough uploads. */
-  strip: { points: StripPoint[]; self: number; median: number | null; min: number; max: number } | null;
   /** The channel's best recent uploads by multiple, settled ones only. */
   top: { video: YouTubeVideo; multiple: number }[];
   /** Posting day of the week (UTC), Sunday first. */
@@ -82,8 +59,6 @@ const LONG_BUCKETS: { label: string; max: number }[] = [
   { label: "40m+", max: Infinity },
 ];
 
-const ratio = (value: number | null, usual: number | null) => (value === null || usual === null || usual <= 0 ? null : value / usual);
-
 /** Best group: the highest median multiple among groups with at least two uploads, when it clearly leads. */
 function bestOf(groups: GroupStat[]): number | null {
   let best: number | null = null;
@@ -101,7 +76,6 @@ export function videoBreakdown(
     insights: VideoInsights;
     /** The channel's typical upload, the outlier baseline. */
     medianViews: number | null;
-    viewsPerDay: number;
     growth: { last24h: number | null; last7d: number | null };
   },
   now: Date = new Date(),
@@ -109,31 +83,12 @@ export function videoBreakdown(
   const { video, peers, insights, medianViews } = input;
   const views = video.statistics.viewCount;
   const multiple = (v: YouTubeVideo) => (medianViews && medianViews > 0 ? v.statistics.viewCount / medianViews : null);
-  const settled = peers.filter((p) => now.getTime() - Date.parse(p.publishedAt) >= SETTLED_DAYS * DAY);
+  // Uploads still climbing would drag down any "what works" average.
+  const settled = peers.filter((p) => isSettled(p, now));
+  const compared = settledPeers(peers, now);
 
-  const beats = peers.length >= 3 ? { count: peers.filter((p) => p.statistics.viewCount < views).length, of: peers.length } : null;
+  const beats = !insights.early && compared.length >= 3 ? { count: compared.filter((p) => p.statistics.viewCount < views).length, of: compared.length } : null;
 
-  const measures: BreakdownMeasure[] = [
-    { key: "views", value: views, usual: medianViews },
-    { key: "pace", value: input.viewsPerDay, usual: insights.channel.medianViewsPerDay },
-    { key: "likes", value: insights.likeRate, usual: insights.channel.likeRate },
-    { key: "comments", value: insights.commentRate, usual: insights.channel.commentRate },
-  ].map((m) => ({ ...(m as Omit<BreakdownMeasure, "ratio">), ratio: ratio(m.value, m.usual) }));
-
-  let strip: VideoBreakdown["strip"] = null;
-  if (peers.length >= 5) {
-    const all = [views, ...peers.map((p) => p.statistics.viewCount)].map((n) => Math.max(n, 1));
-    const lo = Math.log10(Math.min(...all));
-    const hi = Math.log10(Math.max(...all));
-    const pos = (n: number) => (hi === lo ? 0.5 : (Math.log10(Math.max(n, 1)) - lo) / (hi - lo));
-    strip = {
-      points: peers.map((p) => ({ id: p.id, title: p.title, views: p.statistics.viewCount, pos: pos(p.statistics.viewCount) })),
-      self: pos(views),
-      median: medianViews ? pos(medianViews) : null,
-      min: Math.min(...all),
-      max: Math.max(...all),
-    };
-  }
 
   const top = settled
     .map((v) => ({ video: v, multiple: multiple(v) }))
@@ -182,8 +137,6 @@ export function videoBreakdown(
   return {
     beats,
     percentile: beats && beats.of > 0 ? beats.count / beats.of : null,
-    measures,
-    strip,
     top,
     weekdays,
     lengths,

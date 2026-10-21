@@ -10,15 +10,22 @@ import type { YouTubeVideo } from "@/types/youtube";
 export type TitleTraitKey = "number" | "question" | "caps" | "you" | "emoji";
 
 export interface VideoInsights {
-  /** Where it ranks by views among the recent uploads (1 = most viewed). */
+  /** Hours since upload. */
+  ageHours: number;
+  /**
+   * Too new to judge: its views so far can't be set against older uploads'
+   * totals, so rankings and "below usual" verdicts wait until it settles.
+   */
+  early: boolean;
+  /** Where it ranks by views among the settled recent uploads (1 = most viewed); null while early. */
   rank: { position: number; of: number } | null;
   /** Views divided by subscribers: above 1 means it reached well past the channel's own audience. */
   viewsPerSubscriber: number | null;
   likeRate: number | null;
   commentRate: number | null;
   channel: {
+    /** Median views of the settled recent uploads: the typical upload. */
     medianViews: number | null;
-    medianViewsPerDay: number | null;
     likeRate: number | null;
     commentRate: number | null;
     durationSeconds: number | null;
@@ -39,7 +46,26 @@ export interface Highlight {
 }
 
 const DAY = 86_400_000;
+const HOUR = 3_600_000;
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+/** A Short gets most of its views in its first few days, a long video in its first week; before that its total isn't comparable. */
+export function settleDays(format: YouTubeVideo["format"]): number {
+  return format === "short" ? 3 : 7;
+}
+
+export function isSettled(video: Pick<YouTubeVideo, "format" | "publishedAt">, now: Date = new Date()): boolean {
+  return now.getTime() - Date.parse(video.publishedAt) >= settleDays(video.format) * DAY;
+}
+
+/**
+ * The uploads that have had time to collect their views, so the baseline isn't
+ * dragged down by yesterday's upload. All of them when too few have settled.
+ */
+export function settledPeers(peers: readonly YouTubeVideo[], now: Date = new Date()): YouTubeVideo[] {
+  const settled = peers.filter((p) => isSettled(p, now));
+  return settled.length >= 3 ? settled : [...peers];
+}
 
 const TRAITS: { key: TitleTraitKey; test: (title: string) => boolean; label: string }[] = [
   { key: "number", test: (t) => /\d/.test(t), label: "a number" },
@@ -62,6 +88,8 @@ const pct = (n: number, digits = 1) => `${(n * 100).toFixed(digits)}%`;
 const times = (n: number) => `${n >= 10 ? Math.round(n) : n.toFixed(1)}×`;
 const compact = (n: number) => new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(n);
 const duration = (s: number) => (s >= 60 ? `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}` : `${Math.round(s)}s`);
+/** "an hour", "5 hours", "2 days". */
+export const ageText = (hours: number) => (hours < 1.5 ? "an hour" : hours < 36 ? `${Math.round(hours)} hours` : `${Math.round(hours / 24)} days`);
 
 /** Hashtags from the title and description, as written, first mention first. */
 export function hashtagsOf(video: Pick<YouTubeVideo, "title" | "description">): string[] {
@@ -78,22 +106,24 @@ export function videoInsights(
   now: Date = new Date(),
 ): VideoInsights {
   const views = video.statistics.viewCount;
-  const age = (v: YouTubeVideo) => Math.max((now.getTime() - Date.parse(v.publishedAt)) / DAY, 1);
   const kind = video.format === "short" ? "Shorts" : "videos";
+  const one = video.format === "short" ? "Short" : "video";
+  const ageHours = Math.max((now.getTime() - Date.parse(video.publishedAt)) / HOUR, 0);
+  const early = !isSettled(video, now);
+  // Totals only compare with uploads old enough to have collected theirs.
+  const settled = settledPeers(peers, now);
 
-  const all = [video, ...peers];
-  // Ties share the better position, and only a clear lead counts as "most viewed".
-  const rank = peers.length >= 3 ? { position: peers.filter((p) => p.statistics.viewCount > views).length + 1, of: all.length } : null;
-  const clearLead = peers.every((p) => p.statistics.viewCount < views);
+  const rank = !early && settled.length >= 3 ? { position: settled.filter((p) => p.statistics.viewCount > views).length + 1, of: settled.length + 1 } : null;
+  const clearLead = settled.every((p) => p.statistics.viewCount < views);
 
   const likeRate = rate(video.statistics.likeCount, views);
   const commentRate = rate(video.statistics.commentCount, views);
   const peerRates = (pick: (v: YouTubeVideo) => number | null) => peers.map((v) => rate(pick(v), v.statistics.viewCount)).filter((r): r is number => r !== null);
 
+  const all = [video, ...peers];
   const spanDays = peers.length >= 2 ? (Math.max(...all.map((v) => Date.parse(v.publishedAt))) - Math.min(...all.map((v) => Date.parse(v.publishedAt)))) / DAY : 0;
   const channel = {
-    medianViews: median(peers.map((v) => v.statistics.viewCount)),
-    medianViewsPerDay: median(peers.map((v) => v.statistics.viewCount / age(v))),
+    medianViews: median(settled.map((v) => v.statistics.viewCount)),
     likeRate: median(peerRates((v) => v.statistics.likeCount)),
     commentRate: median(peerRates((v) => v.statistics.commentCount)),
     durationSeconds: median(peers.map((v) => v.durationSeconds).filter((d): d is number => typeof d === "number" && d > 0)),
@@ -113,15 +143,27 @@ export function videoInsights(
   const channelTopWeekday = peers.length >= 8 && topCount >= peers.length * 0.25 ? weekdayCounts.indexOf(topCount) : null;
 
   const viewsPerSubscriber = subscribers && subscribers > 0 ? views / subscribers : null;
-  const words = wordCount(video.title);
 
   // What stands out, most telling first. Each line is a measured difference, never a guess at why.
   const highlights: Highlight[] = [];
-  // An old video measured against this month's uploads: say so, and skip the claims that
-  // only mean something for a recent upload (reach, posting day).
+  if (early) {
+    // A new upload's views so far against a typical upload's total: how far along it already is, never "below usual".
+    const typical = channel.medianViews;
+    const age = ageText(ageHours);
+    if (typical && views >= typical) {
+      highlights.push({ tone: "good", text: `Already past a typical ${one}'s views (${compact(typical)}) after ${age}. That's a strong start.` });
+    } else if (typical) {
+      highlights.push({
+        tone: "info",
+        text: `Posted ${age} ago, so it's still collecting views. It has ${Math.round((views / typical) * 100)}% of a typical ${one}'s ${compact(typical)} so far; ${kind} get most of their views in the first ${settleDays(video.format)} days.`,
+      });
+    } else {
+      highlights.push({ tone: "info", text: `Posted ${age} ago, so it's still collecting views. Check back in a few days for a fair comparison.` });
+    }
+  }
+  // An old video measured against this month's uploads: say so, and skip the reach claim.
   const oldestPeer = peers.length ? Math.min(...peers.map((p) => Date.parse(p.publishedAt))) : null;
   const outdated = oldestPeer !== null && Date.parse(video.publishedAt) < oldestPeer - 60 * DAY;
-  const ageDays = age(video);
   if (outdated) {
     const month = new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
     highlights.push({
@@ -134,15 +176,16 @@ export function videoInsights(
     else if (rank.position > 1 && rank.position <= Math.ceil(rank.of * 0.2)) highlights.push({ tone: "good", text: `#${rank.position} by views out of the channel's ${rank.of} most recent ${kind}.` });
     else if (rank.position > rank.of * 0.8) highlights.push({ tone: "bad", text: `Near the bottom by views: #${rank.position} out of the channel's ${rank.of} most recent ${kind}.` });
   }
-  if (viewsPerSubscriber !== null && viewsPerSubscriber >= 1.5 && !outdated && ageDays <= 120) {
+  if (viewsPerSubscriber !== null && viewsPerSubscriber >= 1.5 && !outdated && ageHours <= 120 * 24) {
     highlights.push({ tone: "good", text: `Views are ${times(viewsPerSubscriber)} the channel's subscriber count, so most viewers weren't subscribers. It was pushed well beyond the channel's own audience.` });
   }
-  if (likeRate !== null && channel.likeRate) {
+  // Rates need enough views, and enough comments, to mean anything.
+  if (likeRate !== null && channel.likeRate && views >= 1000) {
     const ratio = likeRate / channel.likeRate;
     if (ratio >= 1.4) highlights.push({ tone: "good", text: `Viewers liked it more than usual: ${pct(likeRate)} like rate vs ${pct(channel.likeRate)} normally.` });
     else if (ratio <= 0.65) highlights.push({ tone: "bad", text: `Fewer likes per view than usual: ${pct(likeRate)} vs ${pct(channel.likeRate)} normally.` });
   }
-  if (commentRate !== null && channel.commentRate) {
+  if (commentRate !== null && channel.commentRate && views >= 1000 && (video.statistics.commentCount ?? 0) >= 20) {
     const ratio = commentRate / channel.commentRate;
     if (ratio >= 1.8) highlights.push({ tone: "good", text: `It got people talking: ${times(ratio)} the channel's usual comments per view.` });
   }
@@ -158,27 +201,16 @@ export function videoInsights(
       });
     }
   }
-  if (channel.titleWords !== null && Math.abs(words - channel.titleWords) >= 3) {
-    highlights.push({ tone: "info", text: `A ${words < channel.titleWords ? "shorter" : "longer"} title than usual: ${words} words vs ${channel.titleWords} normally.` });
-  }
-  for (const trait of titleTraits) {
-    if (trait.has && trait.channelShare !== null && trait.channelShare <= 0.3) {
-      const label = TRAITS.find((t) => t.key === trait.key)!.label;
-      highlights.push({ tone: "info", text: `The title uses ${label}, which only ${Math.round(trait.channelShare * 100)}% of the channel's recent titles do.` });
-    }
-  }
-  if (!outdated && channelTopWeekday !== null && channelTopWeekday !== published.getUTCDay()) {
-    highlights.push({ tone: "info", text: `Posted on a ${WEEKDAYS[published.getUTCDay()]}; the channel posts most on ${WEEKDAYS[channelTopWeekday]}s (UTC).` });
-  }
-  if (ageDays < 3) highlights.push({ tone: "info", text: `Only ${ageDays < 1.5 ? "a day" : `${Math.round(ageDays)} days`} old, so these numbers will still move.` });
 
   return {
+    ageHours,
+    early,
     rank,
     viewsPerSubscriber,
     likeRate,
     commentRate,
     channel,
-    title: { words, traits: titleTraits },
+    title: { words: wordCount(video.title), traits: titleTraits },
     hashtags: hashtagsOf(video),
     posted: { weekday: published.getUTCDay(), hourUtc: published.getUTCHours(), channelTopWeekday },
     growth,

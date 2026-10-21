@@ -34,7 +34,7 @@ function video(id: string, overrides: Partial<YouTubeVideo> = {}, stats: Partial
 
 function run(target: YouTubeVideo, peers: YouTubeVideo[], medianViews = 10_000, growth = { last24h: null as number | null, last7d: null as number | null }) {
   const insights = videoInsights(target, 50_000, peers, growth, NOW);
-  return videoBreakdown({ video: target, peers, insights, medianViews, viewsPerDay: 20_000, growth }, NOW);
+  return videoBreakdown({ video: target, peers, insights, medianViews, growth }, NOW);
 }
 
 // Mondays get 20K, Thursdays 5K; questions do well, short ones (≤15s) too.
@@ -44,23 +44,22 @@ const peers = [
 ];
 
 describe("videoBreakdown", () => {
-  it("counts the uploads it beat and lays every one on the strip", () => {
+  it("counts the settled uploads it beat", () => {
     const out = run(video("hit", { publishedAt: daysAgo(5) }, { viewCount: 15_000 }), peers);
     expect(out.beats).toEqual({ count: 5, of: 10 });
     expect(out.percentile).toBe(0.5);
-    expect(out.strip?.points).toHaveLength(10);
-    expect(out.strip?.min).toBe(5_000);
-    expect(out.strip?.max).toBe(20_000);
-    expect(out.strip?.self).toBeGreaterThan(0);
-    expect(out.strip?.self).toBeLessThan(1);
   });
 
-  it("puts each measure next to the channel's usual", () => {
-    const out = run(video("hit", {}, { viewCount: 30_000 }), peers);
-    const views = out.measures.find((m) => m.key === "views")!;
-    expect(views.value).toBe(30_000);
-    expect(views.usual).toBe(10_000);
-    expect(views.ratio).toBe(3);
+  it("doesn't rank a Short still in its first days", () => {
+    const out = run(video("new", { publishedAt: new Date(NOW.getTime() - 5 * 3_600_000).toISOString() }, { viewCount: 800 }), peers);
+    expect(out.beats).toBeNull();
+    expect(out.percentile).toBeNull();
+  });
+
+  it("leaves uploads still collecting views out of the count", () => {
+    const fresh = Array.from({ length: 4 }, (_, i) => video(`fresh${i}`, { publishedAt: daysAgo(1) }, { viewCount: 300 }));
+    const out = run(video("hit", { publishedAt: daysAgo(5) }, { viewCount: 15_000 }), [...peers, ...fresh]);
+    expect(out.beats).toEqual({ count: 5, of: 10 });
   });
 
   it("finds the posting day and length that work, from settled uploads", () => {

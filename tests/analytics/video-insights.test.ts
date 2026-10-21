@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hashtagsOf, videoInsights } from "@/lib/analytics/video-insights";
+import { hashtagsOf, settledPeers, videoInsights } from "@/lib/analytics/video-insights";
 import type { YouTubeVideo } from "@/types/youtube";
 
 const NOW = new Date("2026-09-30T12:00:00Z");
@@ -48,7 +48,6 @@ describe("videoInsights", () => {
     expect(text).toContain("comments per view");
     expect(text).toContain("Still climbing");
     expect(text).toContain("Shorter than the channel's usual");
-    expect(text).toContain("a question");
   });
 
   it("stays quiet about an ordinary upload", () => {
@@ -58,6 +57,39 @@ describe("videoInsights", () => {
 
   it("skips the rank without enough history", () => {
     expect(videoInsights(video("x"), null, peers.slice(0, 2), { last24h: null, last7d: null }, NOW).rank).toBeNull();
+  });
+});
+
+describe("new uploads", () => {
+  const hoursAgo = (h: number) => new Date(NOW.getTime() - h * 3_600_000).toISOString();
+
+  it("gives a Short posted hours ago an early read, never a 'below usual' verdict", () => {
+    const fresh = video("fresh", { publishedAt: hoursAgo(5) }, { viewCount: 2_500, likeCount: 100, commentCount: 5 });
+    const out = videoInsights(fresh, 50_000, peers, { last24h: null, last7d: null }, NOW);
+    expect(out.early).toBe(true);
+    expect(out.rank).toBeNull();
+    expect(out.highlights.some((h) => h.tone === "bad")).toBe(false);
+    expect(out.highlights[0]!.text).toContain("Posted 5 hours ago");
+    expect(out.highlights[0]!.text).toContain("25% of a typical Short");
+  });
+
+  it("calls a fast start when a new Short already passed a typical one", () => {
+    const fresh = video("fast", { publishedAt: hoursAgo(20) }, { viewCount: 40_000 });
+    const out = videoInsights(fresh, 50_000, peers, { last24h: null, last7d: null }, NOW);
+    expect(out.highlights[0]).toMatchObject({ tone: "good" });
+    expect(out.highlights[0]!.text).toContain("Already past a typical Short");
+  });
+
+  it("gives long videos a week before comparing", () => {
+    const long = video("long", { format: "long_form", publishedAt: daysAgo(5), durationSeconds: 900 } as Partial<YouTubeVideo>);
+    expect(videoInsights(long, 50_000, peers, { last24h: null, last7d: null }, NOW).early).toBe(true);
+  });
+
+  it("leaves uploads still collecting views out of the typical upload", () => {
+    const fresh = Array.from({ length: 5 }, (_, i) => video(`f${i}`, { publishedAt: hoursAgo(10) }, { viewCount: 100 }));
+    expect(settledPeers([...peers, ...fresh], NOW)).toHaveLength(10);
+    const out = videoInsights(video("x"), 50_000, [...peers, ...fresh], { last24h: null, last7d: null }, NOW);
+    expect(out.channel.medianViews).toBe(10_000);
   });
 });
 
