@@ -5,7 +5,8 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { CoinsIcon, GiftIcon, LogOutIcon, MoreIcon, PlugIcon, SlidersIcon } from "./icons";
 
-const LINKS = [
+/** The account pages in its menu; the top bar's avatar opens the same ones. */
+export const ACCOUNT_LINKS = [
   { href: "/billing", label: "Plans & credits", icon: CoinsIcon },
   { href: "/settings/preferences", label: "Preferences", icon: SlidersIcon },
   { href: "/settings/connect-ai", label: "Connect AI (MCP)", icon: PlugIcon },
@@ -56,7 +57,7 @@ export function AccountMenu({ email, signOut }: { email: string; signOut: () => 
       </button>
       {open ? (
         <div className="account-menu" role="menu">
-          {LINKS.map(({ href, label, icon: Icon }) => (
+          {ACCOUNT_LINKS.map(({ href, label, icon: Icon }) => (
             <Link key={href} href={href} role="menuitem" aria-current={pathname.startsWith(href) ? "page" : undefined}>
               <Icon size={15} />
               {label}

@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { DM_Sans, Inter } from "next/font/google";
+import { Inter } from "next/font/google";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { AccountMenu } from "@/components/account-menu";
+import { AppTopbar } from "@/components/app-topbar";
 import type { SidebarPlan } from "@/components/credits-meter";
 import { LowCreditsPrompt } from "@/components/low-credits-prompt";
 import { LOW_CREDITS_THRESHOLD } from "@/lib/services/credits-service";
@@ -26,8 +27,7 @@ import "./globals.css";
 import { writerOpenTo } from "@/lib/scripts/access";
 import { LANDING_HEADER } from "@/lib/landing-link";
 
-// Same pairing as algrow.online: DM Sans for text and headings, Inter for buttons.
-const dmSans = DM_Sans({ subsets: ["latin"], display: "swap", variable: "--font-sans" });
+// Inter throughout, as in Algrow's app.
 const inter = Inter({ subsets: ["latin"], display: "swap", variable: "--font-ui" });
 
 export const metadata: Metadata = {
@@ -67,7 +67,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
 
   if (!current?.approved || landingLink) {
     return (
-      <html lang="en" className={`${dmSans.variable} ${inter.variable}`}>
+      <html lang="en" className={inter.variable}>
         <body>
           <div className="ambient" aria-hidden="true" />
           <div className="shell">
@@ -107,7 +107,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const plan: SidebarPlan | undefined = current.isOwner ? "owner" : subscription ? subscription.plan.id : undefined;
 
   return (
-    <html lang="en" className={`${dmSans.variable} ${inter.variable}`}>
+    <html lang="en" className={inter.variable}>
       <body className="app-body">
         <div className="ambient" aria-hidden="true" />
         <div className="app">
@@ -127,6 +127,14 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             </div>
             </div>
           </aside>
+          <div className="app-column">
+          <AppTopbar
+            email={current.email}
+            isAdmin={current.isAdmin}
+            changelogVersion={changelogVersion}
+            unread={shouldShowChangelog(current.user, changelogVersion)}
+            signOut={signOut}
+          />
           <main className="main">
             {current.moderation.status === "restricted" ? (
               <div className="restricted-banner" role="status">
@@ -138,6 +146,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             ) : null}
             {children}
           </main>
+          </div>
           {showChangelog ? <WhatsNew version={changelogVersion} /> : null}
           {trialReminder ? <TrialReminder {...trialReminder} /> : null}
           {!showChangelog && !trialReminder && credits.limit < 1_000_000 && current.moderation.status !== "restricted" ? (

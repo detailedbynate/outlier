@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { markChangelogSeen } from "@/app/changelog-actions";
-import { CHANGELOG } from "@/lib/changelog";
+import { CHANGELOG, CHANGELOG_SEEN_EVENT, changelogStorageKey } from "@/lib/changelog";
 import { ZapIcon } from "./icons";
 
 /** How long after the page has loaded before it comes in, so it doesn't land on a half-drawn page. */
@@ -16,7 +16,7 @@ const EXIT_MS = 260;
  * doesn't bring it back on the next page.
  */
 export function WhatsNew({ version }: { version: string }) {
-  const key = `outlier:changelog:${version}`;
+  const key = changelogStorageKey(version);
   const [open, setOpen] = useState(false);
   // The entrance is a CSS animation that plays on mount; "out" runs the exit.
   const [phase, setPhase] = useState<"in" | "out">("in");
@@ -60,6 +60,7 @@ export function WhatsNew({ version }: { version: string }) {
     } catch {
       // Nothing to remember it in.
     }
+    window.dispatchEvent(new Event(CHANGELOG_SEEN_EVENT));
     setPhase("out");
     setTimeout(() => setOpen(false), EXIT_MS);
     void markChangelogSeen().catch(() => undefined);

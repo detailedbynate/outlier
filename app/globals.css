@@ -6,7 +6,7 @@
 
 :root {
   color-scheme: dark;
-  --font: var(--font-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font: var(--font-ui), system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-buttons: var(--font-ui), var(--font);
 
   --page: #000000;
@@ -17336,7 +17336,7 @@ body.app-body {
   }
 }
 
-/* Buttons and button-styled links use Inter, like algrow.online; text stays DM Sans.
+/* Buttons and button-styled links use Inter, like the rest of the app.
    :root lifts it over the many button rules that reset to `font: inherit`. */
 :root button,
 :root .btn,
@@ -17940,6 +17940,7 @@ body.app-body {
 
   .app .sidebar .nav-link {
     padding: 3px 10px;
+    line-height: 20px;
   }
 
   .nav-sub {
@@ -17950,4 +17951,323 @@ body.app-body {
   .app .nav-account {
     padding-top: 4px;
   }
+}
+
+/* ---------------------------------------------------------------------------
+   Inter set the way Algrow's app sets it: 14px menu rows at weight 500, drawn
+   a hair tight. The page you're on in a group lights up its stretch of the
+   guide line in violet.
+--------------------------------------------------------------------------- */
+.app .sidebar .nav-link {
+  font-size: 14px;
+  letter-spacing: -0.1px;
+}
+
+.app .nav-sub .nav-link[aria-current="page"] {
+  position: relative;
+}
+
+.app .nav-sub .nav-link[aria-current="page"]::before {
+  content: "";
+  display: block;
+  position: absolute;
+  left: -10px;
+  top: 7px;
+  bottom: 7px;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--accent);
+  box-shadow: 0 0 8px rgba(157, 107, 255, 0.6);
+}
+
+/* ---------------------------------------------------------------------------
+   Top bar above every app page: where you are on the left (the menu group,
+   then the page, on a violet tile); the changelog bell and your account on
+   the right. Frosted over the page as it scrolls under, with a violet trace
+   along its bottom edge. Desktop only: on phones the menu bar is on top.
+--------------------------------------------------------------------------- */
+.app-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.app-topbar {
+  display: none;
+}
+
+@media (min-width: 901px) {
+  .app-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    height: 56px;
+    padding: 0 24px 0 32px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(0, 0, 0, 0.72);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    backdrop-filter: blur(14px) saturate(140%);
+  }
+
+  .app-topbar::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: -1px;
+    width: min(360px, 40%);
+    height: 1px;
+    background: linear-gradient(90deg, rgba(157, 107, 255, 0.55), rgba(157, 107, 255, 0));
+    pointer-events: none;
+  }
+
+  /* The Discord preview pins itself below the bar instead of under it. */
+  .app .dc-preview-wrap {
+    top: 74px;
+  }
+}
+
+.app:has(.onboarding-root) .app-topbar {
+  display: none;
+}
+
+.topbar-crumb {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  font-size: 14px;
+  letter-spacing: -0.1px;
+}
+
+.topbar-crumb-icon {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--accent-wash);
+  color: var(--accent-text);
+  box-shadow: inset 0 0 0 1px rgba(157, 107, 255, 0.22);
+}
+
+.topbar-crumb-group {
+  color: var(--text-muted);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.topbar-crumb-sep {
+  flex: none;
+  margin: 0 -4px;
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+.topbar-crumb-page {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.topbar-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.topbar-pop-anchor {
+  position: relative;
+}
+
+.topbar-icon,
+.topbar-avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.topbar-icon {
+  position: relative;
+  border: 1px solid var(--border);
+  background: #0e0e0e;
+  color: var(--text-secondary);
+  transition:
+    color 0.15s var(--ease),
+    border-color 0.15s var(--ease),
+    background 0.15s var(--ease);
+}
+
+.topbar-icon:hover,
+.topbar-icon[aria-expanded="true"] {
+  border-color: var(--border-strong);
+  background: #141414;
+  color: var(--text-primary);
+}
+
+.topbar-dot {
+  position: absolute;
+  top: 7px;
+  right: 8px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow:
+    0 0 0 2px #0e0e0e,
+    0 0 10px rgba(157, 107, 255, 0.7);
+}
+
+.topbar-avatar {
+  border: 0;
+  background: linear-gradient(135deg, #9d6bff, #5b3bd6);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+  transition: box-shadow 0.15s var(--ease);
+}
+
+.topbar-avatar:hover,
+.topbar-avatar[aria-expanded="true"] {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.18),
+    0 0 0 3px rgba(157, 107, 255, 0.25);
+}
+
+.topbar-pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 40;
+  min-width: 240px;
+  padding: 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--menu-bg);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
+  animation: pop-in 0.16s var(--ease) both;
+}
+
+.topbar-pop-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+  padding: 8px 10px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.topbar-pop-head strong {
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.topbar-pop-head span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.topbar-updates {
+  width: 340px;
+}
+
+.topbar-updates ul {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: min(420px, 70vh);
+  margin: 0;
+  padding: 0 4px 4px;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.topbar-updates li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 6px 8px 16px;
+}
+
+.topbar-updates li::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 15px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.topbar-updates li strong {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.topbar-updates li span {
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.topbar-account-head {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.topbar-account-head span {
+  max-width: 220px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.topbar-pop-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 13.5px;
+  font-weight: 500;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.topbar-pop-link:hover,
+.topbar-pop-link[aria-current="page"] {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+.topbar-account form {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+
+.topbar-signout:hover {
+  color: var(--critical);
 }

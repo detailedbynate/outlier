@@ -31,6 +31,12 @@ export const CHANGELOG = {
 
 export const CHANGELOG_SEEN_KEY = "changelog_seen";
 
+/** Where a browser remembers it has shown this version, so a slow account save doesn't bring it back. */
+export const changelogStorageKey = (version: string) => `outlier:changelog:${version}`;
+
+/** Fired when the changelog is read, so the top bar's bell drops its dot without a reload. */
+export const CHANGELOG_SEEN_EVENT = "outlier:changelog-seen";
+
 /** Whether this account should see the changelog at `version`. */
 export function shouldShowChangelog(user: { created_at?: string; user_metadata?: Record<string, unknown> }, version: string): boolean {
   if (user.user_metadata?.[CHANGELOG_SEEN_KEY] === version) return false;
