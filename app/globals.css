@@ -18323,12 +18323,14 @@ body.app-body {
 
 /* ---------------------------------------------------------------------------
    Outlier's own look, so it reads as its own product:
-   - Numbers (views, multipliers, credits, stats) are set in Geist Mono.
+   - Numbers (views, multipliers, credits, stats) use the same Inter as the
+     text, with even-width figures so columns of numbers line up.
    - Outlier scores get one colour of their own, a lime "signal" next to the
      violet, so a breakout is the first thing you see on any page.
 --------------------------------------------------------------------------- */
 .app {
-  --font-numbers: var(--font-mono), ui-monospace, "SFMono-Regular", Consolas, monospace;
+  --font-numbers: var(--font);
+  font-variant-numeric: tabular-nums;
   --signal: #c4f542;
   --signal-text: #d6fa78;
   --signal-wash: rgba(196, 245, 66, 0.1);
