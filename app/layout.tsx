@@ -9,7 +9,6 @@ import type { SidebarPlan } from "@/components/credits-meter";
 import { LowCreditsPrompt } from "@/components/low-credits-prompt";
 import { LOW_CREDITS_THRESHOLD } from "@/lib/services/credits-service";
 import { BrandMark } from "@/components/icons";
-import { MobileMenuToggle } from "@/components/mobile-menu-toggle";
 import { MobileTabBar } from "@/components/mobile-tab-bar";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { SiteTracker } from "@/components/site-tracker";
@@ -114,7 +113,6 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <div className="app">
           <aside className="sidebar glass">
             <SidebarBrand plan={plan} />
-            <MobileMenuToggle />
             <div id="app-sidebar-menu" className="sidebar-menu">
             <SidebarNav
               isAdmin={current.isAdmin}
@@ -149,7 +147,15 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             {children}
           </main>
           </div>
-          <MobileTabBar />
+          <MobileTabBar
+            email={current.email}
+            plan={plan}
+            isAdmin={current.isAdmin}
+            writerOpen={writerOpenTo(subscription?.plan.id, current.isOwner)}
+            freePlan={!current.isAdmin && subscription?.plan.priceCents === 0}
+            credits={{ remaining: credits.remaining, limit: credits.limit }}
+            signOut={signOut}
+          />
           {showChangelog ? <WhatsNew version={changelogVersion} /> : null}
           {trialReminder ? <TrialReminder {...trialReminder} /> : null}
           {!showChangelog && !trialReminder && credits.limit < 1_000_000 && current.moderation.status !== "restricted" ? (

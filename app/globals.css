@@ -7997,145 +7997,12 @@ a.dash-row:hover {
   }
 }
 
-/* ---------------------------------------------------------------------------
-   Mobile app menu (phones only; desktop layout is untouched)
---------------------------------------------------------------------------- */
+/* The sidebar's pages, in one block on desktop; phones use the Menu tab instead. */
 .sidebar-menu {
   display: contents;
 }
 
-.mobile-menu-toggle {
-  display: none;
-}
-
-@keyframes mobile-menu-in {
-  from {
-    opacity: 0;
-    transform: translateY(-6px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
 @media (max-width: 900px) {
-  .sidebar {
-    flex-wrap: nowrap;
-    justify-content: space-between;
-    padding: 10px 14px;
-    padding-top: max(10px, env(safe-area-inset-top));
-  }
-
-  .mobile-menu-toggle {
-    display: inline-grid;
-    place-items: center;
-    width: 40px;
-    height: 40px;
-    margin-left: auto;
-    border-radius: 12px;
-  }
-
-  .mm-line {
-    transition:
-      transform 0.25s var(--ease),
-      opacity 0.2s var(--ease);
-    transform-origin: 12px 12px;
-  }
-
-  .mobile-menu-toggle[aria-expanded="true"] .mm-top {
-    transform: translateY(5px) rotate(45deg);
-  }
-
-  .mobile-menu-toggle[aria-expanded="true"] .mm-mid {
-    opacity: 0;
-  }
-
-  .mobile-menu-toggle[aria-expanded="true"] .mm-bot {
-    transform: translateY(-5px) rotate(-45deg);
-  }
-
-  .sidebar-menu {
-    display: none;
-  }
-
-  /* Open: a full-screen menu with the same sections as the desktop sidebar. */
-  .sidebar[data-open] {
-    position: fixed;
-    inset: 0;
-    z-index: 60;
-    height: 100dvh;
-    flex-wrap: wrap;
-    align-content: flex-start;
-    border-radius: 0;
-    overflow-y: auto;
-    background: var(--page);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-  }
-
-  .sidebar[data-open] .sidebar-menu {
-    display: flex;
-    flex-direction: column;
-    gap: 22px;
-    width: 100%;
-    padding: 14px 2px max(24px, env(safe-area-inset-bottom));
-    animation: mobile-menu-in 0.25s var(--ease) both;
-  }
-
-  .sidebar[data-open] .sidebar-nav {
-    order: 0;
-    width: 100%;
-    flex-direction: column;
-    gap: 20px;
-    overflow: visible;
-  }
-
-  .sidebar[data-open] .nav-section {
-    flex-direction: column;
-  }
-
-  .sidebar[data-open] .nav-section-title {
-    display: block;
-  }
-
-  .sidebar[data-open] .nav-badge {
-    display: inline-flex;
-  }
-
-  .sidebar[data-open] .nav-link {
-    padding: 12px 10px;
-    font-size: 15.5px;
-  }
-
-  .sidebar[data-open] .sidebar-foot {
-    margin-left: 0;
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .sidebar[data-open] .credits {
-    padding: 12px;
-  }
-
-  .sidebar[data-open] .credits-head {
-    display: flex;
-  }
-
-  .sidebar[data-open] .credits-bar,
-  .sidebar[data-open] .credits-foot {
-    display: block;
-  }
-
-  .sidebar[data-open] .account-email {
-    display: inline;
-  }
-
-  html.menu-open,
-  html.menu-open body {
-    overflow: hidden;
-  }
-
   .main {
     padding: 18px 14px 56px;
   }
@@ -22353,14 +22220,14 @@ body.app-body {
 /* ---------------------------------------------------------------------------
    Phone shell: a compact top bar (the page you're on, the bell, your
    account) and a tab bar along the bottom for the pages used most. Menu
-   opens the full sidebar as a sheet. Desktop is untouched.
+   opens every other page. Desktop is untouched.
 --------------------------------------------------------------------------- */
 .mobile-tabs {
   display: none;
 }
 
 @media (max-width: 900px) {
-  .app .sidebar:not([data-open]) {
+  .app .sidebar {
     display: none;
   }
 
@@ -22486,11 +22353,6 @@ body.app-body {
     padding-bottom: calc(96px + env(safe-area-inset-bottom));
   }
 
-  /* The open menu covers the bars. */
-  .app .sidebar[data-open] {
-    z-index: 70;
-  }
-
   /* Page titles sized for a phone. */
   .app .main .page-header h1 {
     font-size: 24px;
@@ -22590,5 +22452,309 @@ body.app-body {
     flex-wrap: wrap;
     gap: 2px 8px;
     font-size: 11.5px;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Phone menu: every page on one screen, grouped like the sidebar, opened
+   and closed from the tab bar's Menu tab (which stays on top of it).
+--------------------------------------------------------------------------- */
+.mm-sheet {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .mm-sheet {
+    position: fixed;
+    inset: 0;
+    z-index: 34;
+    display: block;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    background: var(--page);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(14px);
+    transition:
+      opacity 0.18s var(--ease),
+      transform 0.26s var(--ease),
+      visibility 0s linear 0.26s;
+  }
+
+  .mm-sheet[data-open] {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    transition:
+      opacity 0.18s var(--ease),
+      transform 0.26s var(--ease);
+  }
+
+  .mm-body {
+    display: flex;
+    flex-direction: column;
+    gap: 26px;
+    padding: calc(env(safe-area-inset-top) + 18px) 16px calc(96px + env(safe-area-inset-bottom));
+  }
+
+  .mm-account {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--dash-surface);
+    color: var(--text-primary);
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mm-account:active {
+    background: var(--surface-2);
+  }
+
+  .mm-avatar {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
+    color: var(--accent-text);
+    font-size: 17px;
+    font-weight: 650;
+  }
+
+  .mm-account-text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .mm-account-text strong,
+  .mm-account-text span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mm-account-text strong {
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  .mm-account-text span {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  .mm-account > svg,
+  .mm-row > svg:last-child:not(:first-child) {
+    flex: none;
+    color: var(--text-muted);
+  }
+
+  .mm-section h2 {
+    margin: 0 0 10px 4px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .mm-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .mm-tile {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    min-height: 92px;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--dash-surface);
+    color: var(--text-primary);
+    font-size: 14.5px;
+    font-weight: 550;
+    line-height: 1.25;
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      background 0.15s ease,
+      transform 0.15s var(--ease);
+  }
+
+  .mm-tile:active {
+    transform: scale(0.97);
+    background: var(--surface-2);
+  }
+
+  .mm-tile[aria-current="page"] {
+    border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+    background: color-mix(in srgb, var(--accent) 10%, var(--dash-surface));
+  }
+
+  .mm-tile-icon {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    background: var(--surface-2);
+    color: var(--text-secondary);
+  }
+
+  .mm-tile[aria-current="page"] .mm-tile-icon {
+    background: color-mix(in srgb, var(--accent) 20%, transparent);
+    color: var(--accent-text);
+  }
+
+  .mm-tile .mm-badge {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+  }
+
+  .mm-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 18%, transparent);
+    color: var(--accent-text);
+    font-size: 10.5px;
+    font-weight: 600;
+  }
+
+  .mm-badge[data-locked] {
+    background: var(--surface-2);
+    color: var(--text-muted);
+  }
+
+  .mm-list {
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--dash-surface);
+  }
+
+  .mm-list form {
+    margin: 0;
+  }
+
+  .mm-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 52px;
+    padding: 0 14px;
+    border: 0;
+    border-top: 1px solid var(--border);
+    background: none;
+    color: var(--text-primary);
+    font: inherit;
+    font-size: 15px;
+    text-align: left;
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mm-list > .mm-row:first-child {
+    border-top: 0;
+  }
+
+  .mm-row:active {
+    background: var(--surface-2);
+  }
+
+  .mm-row > svg:first-child {
+    flex: none;
+    color: var(--text-secondary);
+  }
+
+  .mm-row[aria-current="page"] > svg:first-child {
+    color: var(--accent-text);
+  }
+
+  .mm-row-label {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .mm-row-value {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  .mm-row-value[data-level="empty"],
+  .mm-row.mm-signout,
+  .mm-row.mm-signout > svg:first-child {
+    color: var(--critical);
+  }
+
+  /* While the menu is open, the Menu tab is the one lit, and its lines turn into a close X. */
+  .mobile-tabs[data-menu] .mobile-tab[aria-current="page"] {
+    color: var(--text-muted);
+  }
+
+  .mobile-tabs[data-menu] .mobile-tab[aria-current="page"] svg {
+    color: inherit;
+  }
+
+  .mobile-tab-menu[data-here],
+  .mobile-tab-menu[aria-expanded="true"] {
+    color: var(--text-primary);
+  }
+
+  .mobile-tab-menu[data-here] svg,
+  .mobile-tab-menu[aria-expanded="true"] svg {
+    color: var(--accent-text);
+  }
+
+  .mobile-tab-menu .mm-line {
+    transform-origin: 12px 12px;
+    transition:
+      transform 0.25s var(--ease),
+      opacity 0.2s var(--ease);
+  }
+
+  .mobile-tab-menu[aria-expanded="true"] .mm-top {
+    transform: translateY(5px) rotate(45deg);
+  }
+
+  .mobile-tab-menu[aria-expanded="true"] .mm-mid {
+    opacity: 0;
+  }
+
+  .mobile-tab-menu[aria-expanded="true"] .mm-bot {
+    transform: translateY(-5px) rotate(-45deg);
+  }
+
+  html.menu-open,
+  html.menu-open body {
+    overflow: hidden;
+  }
+}
+
+@media (max-width: 900px) and (prefers-reduced-motion: reduce) {
+  .mm-sheet,
+  .mm-sheet[data-open],
+  .mobile-tab-menu .mm-line {
+    transition: none;
   }
 }

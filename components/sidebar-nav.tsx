@@ -11,8 +11,15 @@ export interface SidebarCredits {
   limit: number;
 }
 
+/** Whether a page is locked for this account, and the badge it carries: a Pro lock on Free, "Soon" for owner-only tools. */
+export function navAccess(item: NavItem, freePlan: boolean, writerOpen: boolean): { locked: boolean; proLocked: boolean; badge?: string } {
+  const proLocked = freePlan && (item.paid === true || item.ownerOnly === true);
+  const locked = proLocked || (item.ownerOnly === true && !writerOpen);
+  return { locked, proLocked, badge: proLocked ? "Pro" : locked ? "Soon" : item.badge };
+}
+
 /** What the credits row says on its right: the balance, or that there's no limit. */
-function creditsLabel(credits: SidebarCredits): { text: string; level: "ok" | "low" | "empty" } {
+export function creditsLabel(credits: SidebarCredits): { text: string; level: "ok" | "low" | "empty" } {
   if (credits.limit >= 1_000_000) return { text: "Unlimited", level: "ok" };
   const share = credits.limit === 0 ? 0 : credits.remaining / credits.limit;
   return { text: `${credits.remaining.toLocaleString("en-US")} left`, level: credits.remaining <= 0 ? "empty" : share <= 0.2 ? "low" : "ok" };
@@ -70,9 +77,7 @@ export function SidebarNav({
     const active = isActive(pathname, item.href);
     const Icon = item.icon;
     // Locked items say so in their own colour: this is about access, not novelty.
-    const proLocked = freePlan && (item.paid === true || item.ownerOnly === true);
-    const locked = proLocked || (item.ownerOnly === true && !writerOpen);
-    const badge = proLocked ? "Pro" : locked ? "Soon" : item.badge;
+    const { locked, proLocked, badge } = navAccess(item, freePlan, writerOpen);
     return (
       <Link key={item.href} href={item.href} className="nav-link" onClick={() => setQuery("")} aria-current={active ? "page" : undefined}>
         <span className="nav-icon">
