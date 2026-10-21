@@ -39,6 +39,30 @@ export function NavLink({ href, active, group, className, children, current }: {
   );
 }
 
+/** A dropdown for options with too many choices for chips; picking one loads that board. */
+export function NavSelect({ label, value, options }: { label: string; value: string; options: { value: string; label: string; href: string }[] }) {
+  const { target, go } = useContext(NavState);
+  const chosen = options.find((o) => o.href === target)?.value ?? value;
+  return (
+    <label className="nf-select" data-set={chosen !== options[0]?.value || undefined}>
+      <span>{label}</span>
+      <select
+        value={chosen}
+        onChange={(event) => {
+          const next = options.find((o) => o.value === event.target.value);
+          if (next) go(next.href);
+        }}
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 export function BoardBody({ children }: { children: ReactNode }) {
   const { pending } = useContext(NavState);
   return (
