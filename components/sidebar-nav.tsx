@@ -39,9 +39,9 @@ export function SidebarNav({
   const main = isAdmin ? [...MAIN, ADMIN] : MAIN;
   const groups = main.filter(isGroup);
   // One group open at a time, so the menu always fits the window: the one holding
-  // the page you're on, or Research Tools on a page in none.
+  // the page you're on, or Find on a page in none.
   const activeGroup = groups.find((group) => group.items.some((item) => isActive(pathname, item.href)))?.id ?? null;
-  const [open, setOpen] = useState<string | null>(activeGroup ?? "research");
+  const [open, setOpen] = useState<string | null>(activeGroup ?? "find");
   // Moving into a folded group opens it, so the page you're on is always in view.
   const [openedFor, setOpenedFor] = useState(activeGroup);
   if (openedFor !== activeGroup) {

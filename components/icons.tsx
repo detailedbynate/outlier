@@ -39,6 +39,12 @@ export const ChevronRightIcon = (p: P) => (
     <path d="m9 6 6 6-6 6" />
   </Icon>
 );
+export const LinkIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+  </Icon>
+);
 export const BellIcon = (p: P) => (
   <Icon {...p}>
     <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />

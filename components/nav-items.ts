@@ -33,7 +33,7 @@ export interface NavItem {
   paid?: boolean;
 }
 
-/** A heading that folds its pages away, like Algrow's menu. */
+/** A heading that folds its pages away: what you're doing (find, watch, make), not which tool it is. */
 export interface NavGroup {
   id: string;
   label: string;
@@ -48,22 +48,29 @@ export const isGroup = (entry: NavEntry): entry is NavGroup => "items" in entry;
 export const MAIN: NavEntry[] = [
   { href: "/", label: "Dashboard", icon: GridIcon, paid: true },
   {
-    id: "research",
-    label: "Research Tools",
+    id: "find",
+    label: "Find",
     icon: CompassIcon,
     items: [
       { href: "/research/niche-finder", label: "Niche Finder", icon: CompassIcon, paid: true },
-      { href: "/research/shorts-channels", label: "Shorts Channels", icon: ShortsIcon },
       { href: "/viral", label: "Viral Videos", icon: FlameIcon, paid: true },
+      { href: "/research/shorts-channels", label: "Shorts Channels", icon: ShortsIcon },
       { href: "/research/removed-channels", label: "Removed Channels", icon: ArchiveIcon, paid: true },
-      { href: "/analyze", label: "Analyze Video", icon: ChartIcon, paid: true },
-      { href: "/channels", label: "Tracked Channels", icon: BookmarkIcon, paid: true },
-      { href: "/compare", label: "Competitors", icon: TargetIcon, paid: true },
     ],
   },
   {
-    id: "create",
-    label: "Creation Tools",
+    id: "watch",
+    label: "Watch",
+    icon: EyeIcon,
+    items: [
+      { href: "/channels", label: "Tracked Channels", icon: BookmarkIcon, paid: true },
+      { href: "/compare", label: "Competitors", icon: TargetIcon, paid: true },
+      { href: "/analyze", label: "Analyze Video", icon: ChartIcon, paid: true },
+    ],
+  },
+  {
+    id: "make",
+    label: "Make",
     icon: PenIcon,
     items: [
       { href: "/research/scriptwriter", label: "Script Writer", icon: PenIcon, badge: "New", ownerOnly: true },

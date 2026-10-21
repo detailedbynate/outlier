@@ -1,23 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { markChangelogSeen } from "@/app/changelog-actions";
 import { CHANGELOG, CHANGELOG_SEEN_EVENT, changelogStorageKey } from "@/lib/changelog";
 import { ACCOUNT_LINKS } from "./account-menu";
-import { BellIcon, ChevronRightIcon, LogOutIcon } from "./icons";
+import { parseVideoId } from "@/lib/youtube/parse";
+import { BellIcon, ChevronRightIcon, LinkIcon, LogOutIcon } from "./icons";
 import { pageFor } from "./nav-items";
 
 /**
  * The bar above every app page: where you are (the menu group, then the page)
- * on the left; what's new and your account on the right.
+ * on the left, a box to paste any YouTube video into in the middle, and what's
+ * new and your account on the right.
  */
 export function AppTopbar({
   email,
   isAdmin,
   changelogVersion,
   unread,
+  metered,
   signOut,
 }: {
   email: string;
@@ -25,6 +28,8 @@ export function AppTopbar({
   changelogVersion: string;
   /** The account hasn't seen this changelog yet. */
   unread: boolean;
+  /** Credits run out on this plan, so the paste box says what an analysis costs. */
+  metered: boolean;
   signOut: () => Promise<void>;
 }) {
   const pathname = usePathname();
@@ -49,11 +54,70 @@ export function AppTopbar({
           </>
         ) : null}
       </div>
+      <PasteBar metered={metered} />
       <div className="topbar-tools">
         <UpdatesBell version={changelogVersion} unreadOnAccount={unread} />
         <AvatarMenu email={email} signOut={signOut} />
       </div>
     </header>
+  );
+}
+
+/** Paste a video or Short from anywhere and it opens in Analyze Video. Anything else gets a hint instead. */
+function PasteBar({ metered }: { metered: boolean }) {
+  const router = useRouter();
+  const [value, setValue] = useState("");
+  const [hint, setHint] = useState<string | null>(null);
+
+  const submit = (input: HTMLInputElement) => {
+    const raw = value.trim();
+    if (!raw) return;
+    let videoId: string;
+    try {
+      videoId = parseVideoId(raw);
+    } catch {
+      setHint(/youtube\.com\/(@|channel\/|c\/|user\/)/i.test(raw) ? "That's a channel. Add it in Tracked Channels to follow it." : "Paste a YouTube video or Short link.");
+      return;
+    }
+    setValue("");
+    setHint(null);
+    input.blur();
+    router.push(`/analyze?v=${videoId}`);
+  };
+
+  return (
+    <form
+      className="topbar-paste"
+      role="search"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const input = event.currentTarget.elements.namedItem("v");
+        if (input instanceof HTMLInputElement) submit(input);
+      }}
+    >
+      <LinkIcon size={15} />
+      <input
+        name="v"
+        type="text"
+        value={value}
+        placeholder="Paste a YouTube link to analyze it"
+        aria-label="Paste a YouTube video link to analyze it"
+        aria-invalid={hint ? true : undefined}
+        autoComplete="off"
+        spellCheck={false}
+        onChange={(event) => {
+          setValue(event.target.value);
+          setHint(null);
+        }}
+        onBlur={() => setHint(null)}
+      />
+      {metered ? <span className="topbar-paste-cost">2 credits</span> : null}
+      {hint ? (
+        <p className="topbar-paste-hint" role="alert">
+          {hint}
+        </p>
+      ) : null}
+    </form>
   );
 }
 

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { Inter } from "next/font/google";
+import { Geist_Mono, Inter } from "next/font/google";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { AccountMenu } from "@/components/account-menu";
@@ -27,8 +27,9 @@ import "./globals.css";
 import { writerOpenTo } from "@/lib/scripts/access";
 import { LANDING_HEADER } from "@/lib/landing-link";
 
-// Inter throughout, as in Algrow's app.
+// Inter for text; Geist Mono for the numbers (views, multipliers, credits), which gives the data its own look.
 const inter = Inter({ subsets: ["latin"], display: "swap", variable: "--font-ui" });
+const geistMono = Geist_Mono({ subsets: ["latin"], display: "swap", variable: "--font-mono" });
 
 export const metadata: Metadata = {
   title: "Outlier",
@@ -67,7 +68,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
 
   if (!current?.approved || landingLink) {
     return (
-      <html lang="en" className={inter.variable}>
+      <html lang="en" className={`${inter.variable} ${geistMono.variable}`}>
         <body>
           <div className="ambient" aria-hidden="true" />
           <div className="shell">
@@ -107,7 +108,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const plan: SidebarPlan | undefined = current.isOwner ? "owner" : subscription ? subscription.plan.id : undefined;
 
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en" className={`${inter.variable} ${geistMono.variable}`}>
       <body className="app-body">
         <div className="ambient" aria-hidden="true" />
         <div className="app">
@@ -133,6 +134,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             isAdmin={current.isAdmin}
             changelogVersion={changelogVersion}
             unread={shouldShowChangelog(current.user, changelogVersion)}
+            metered={credits.limit < 1_000_000}
             signOut={signOut}
           />
           <main className="main">

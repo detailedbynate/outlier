@@ -17954,9 +17954,9 @@ body.app-body {
 }
 
 /* ---------------------------------------------------------------------------
-   Inter set the way Algrow's app sets it: 14px menu rows at weight 500, drawn
-   a hair tight. The page you're on in a group lights up its stretch of the
-   guide line in violet.
+   Menu rows in Inter at 14px/500, drawn a hair tight. The page you're on in a
+   group is marked by a violet dot on the guide line: a data point standing
+   out from its line, Outlier's mark.
 --------------------------------------------------------------------------- */
 .app .sidebar .nav-link {
   font-size: 14px;
@@ -17971,13 +17971,16 @@ body.app-body {
   content: "";
   display: block;
   position: absolute;
-  left: -10px;
-  top: 7px;
-  bottom: 7px;
-  width: 3px;
-  border-radius: 3px;
+  left: -12px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
   background: var(--accent);
-  box-shadow: 0 0 8px rgba(157, 107, 255, 0.6);
+  transform: translateY(-50%);
+  box-shadow:
+    0 0 0 3px #000000,
+    0 0 10px 2px rgba(157, 107, 255, 0.65);
 }
 
 /* ---------------------------------------------------------------------------
@@ -18270,4 +18273,145 @@ body.app-body {
 
 .topbar-signout:hover {
   color: var(--critical);
+}
+
+/* ---------------------------------------------------------------------------
+   Outlier's own look, so it reads as its own product:
+   - Numbers (views, multipliers, credits, stats) are set in Geist Mono.
+   - Outlier scores get one colour of their own, a lime "signal" next to the
+     violet, so a breakout is the first thing you see on any page.
+--------------------------------------------------------------------------- */
+.app {
+  --font-numbers: var(--font-mono), ui-monospace, "SFMono-Regular", Consolas, monospace;
+  --signal: #c4f542;
+  --signal-text: #d6fa78;
+  --signal-wash: rgba(196, 245, 66, 0.1);
+}
+
+.app :is(.stat-value, .dash-stat-value, .intel-stat-value, .nav-value, .dash-metric, .dash-mult, .outlier, .outlier-badge, .az-verdict-score, .home-bar-flag, .signal-hot strong) {
+  font-family: var(--font-numbers);
+  letter-spacing: -0.02em;
+}
+
+.app :is(.stat-value, .dash-stat-value, .intel-stat-value) {
+  font-weight: 600;
+}
+
+.app .outlier-badge {
+  background: var(--signal);
+  color: #0b0b0b;
+  box-shadow: 0 4px 14px rgba(196, 245, 66, 0.35);
+}
+
+.app .outlier {
+  color: var(--signal-text);
+}
+
+.app .signal-hot strong {
+  background: none;
+  -webkit-background-clip: border-box;
+  background-clip: border-box;
+  color: var(--signal-text);
+}
+
+.app .dash-metric[data-hot="true"] {
+  color: var(--signal-text);
+  text-shadow: 0 0 12px rgba(196, 245, 66, 0.45);
+}
+
+.app .dash-mult {
+  color: var(--signal-text);
+  border-color: rgba(196, 245, 66, 0.4);
+  box-shadow: 0 0 12px rgba(196, 245, 66, 0.15);
+}
+
+.app .az-verdict[data-band="high"] {
+  --tone: var(--signal);
+}
+
+.app .home-bar-flag {
+  border-color: var(--signal);
+  color: var(--signal-text);
+  box-shadow: 0 0 14px rgba(196, 245, 66, 0.3);
+}
+
+@media (min-width: 901px) {
+  .app-topbar::after {
+    background: linear-gradient(90deg, rgba(157, 107, 255, 0.7), rgba(157, 107, 255, 0.05));
+  }
+}
+
+/* The paste box in the middle of the top bar. */
+.topbar-paste {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 0 1 440px;
+  min-width: 0;
+  height: 36px;
+  margin: 0 auto;
+  padding: 0 10px 0 12px;
+  gap: 9px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #0e0e0e;
+  color: var(--text-muted);
+  transition:
+    border-color 0.15s var(--ease),
+    box-shadow 0.15s var(--ease);
+}
+
+.topbar-paste:focus-within {
+  border-color: rgba(157, 107, 255, 0.55);
+  box-shadow: 0 0 0 3px rgba(157, 107, 255, 0.12);
+}
+
+.topbar-paste:has(input[aria-invalid="true"]) {
+  border-color: color-mix(in srgb, var(--critical) 60%, transparent);
+}
+
+.topbar-paste svg {
+  flex: none;
+}
+
+.app .topbar-paste input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: none;
+  box-shadow: none;
+  color: var(--text-primary);
+  font-size: 13.5px;
+}
+
+.app .topbar-paste input::placeholder {
+  color: var(--text-muted);
+}
+
+.topbar-paste-cost {
+  flex: none;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-family: var(--font-numbers);
+  font-size: 11px;
+}
+
+.topbar-paste-hint {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 7px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--menu-bg);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  animation: pop-in 0.14s var(--ease) both;
 }
