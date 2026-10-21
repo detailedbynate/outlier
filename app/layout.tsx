@@ -4,7 +4,7 @@ import { DM_Sans, Inter } from "next/font/google";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { AccountMenu } from "@/components/account-menu";
-import { CreditsMeter, type SidebarPlan } from "@/components/credits-meter";
+import type { SidebarPlan } from "@/components/credits-meter";
 import { LowCreditsPrompt } from "@/components/low-credits-prompt";
 import { LOW_CREDITS_THRESHOLD } from "@/lib/services/credits-service";
 import { BrandMark } from "@/components/icons";
@@ -115,9 +115,14 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             <SidebarBrand plan={plan} />
             <MobileMenuToggle />
             <div id="app-sidebar-menu" className="sidebar-menu">
-            <SidebarNav isAdmin={current.isAdmin} isOwner={current.isOwner} writerOpen={writerOpenTo(subscription?.plan.id, current.isOwner)} freePlan={!current.isAdmin && subscription?.plan.priceCents === 0} />
+            <SidebarNav
+              isAdmin={current.isAdmin}
+              isOwner={current.isOwner}
+              writerOpen={writerOpenTo(subscription?.plan.id, current.isOwner)}
+              freePlan={!current.isAdmin && subscription?.plan.priceCents === 0}
+              credits={{ remaining: credits.remaining, limit: credits.limit }}
+            />
             <div className="sidebar-foot">
-              <CreditsMeter status={credits} plan={plan} />
               <AccountMenu email={current.email} signOut={signOut} />
             </div>
             </div>

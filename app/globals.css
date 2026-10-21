@@ -17805,9 +17805,8 @@ body.app-body {
 
 /* ---------------------------------------------------------------------------
    Sidebar never scrolls (desktop): the whole menu fits the window. Rows are a
-   touch tighter, the credits balance and "Buy credits" share a line, and short
-   windows tighten further. If a window is shorter still, the menu clips at the
-   bottom and the credits and account row stay in view.
+   touch tighter and short windows tighten further. If a window is shorter
+   still, the menu clips at the bottom and the account row stays in view.
 --------------------------------------------------------------------------- */
 @media (min-width: 901px) {
   .app .sidebar {
@@ -17834,34 +17833,6 @@ body.app-body {
   .app .sidebar .nav-link {
     padding: 5px 10px;
   }
-
-  .app .sidebar .credits {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    column-gap: 8px;
-  }
-
-  .app .sidebar .credits-head,
-  .app .sidebar .credits-bar,
-  .app .sidebar .credits-foot {
-    grid-column: 1 / -1;
-  }
-
-  .app .sidebar .credits-head {
-    grid-row: 1;
-  }
-
-  .app .sidebar .credits-value {
-    grid-row: 2;
-  }
-
-  .app .sidebar .credits-buy {
-    grid-row: 2;
-    grid-column: 2;
-    margin-top: 4px;
-    padding: 5px 10px;
-  }
 }
 
 @media (min-width: 901px) and (max-height: 760px) {
@@ -17886,12 +17857,97 @@ body.app-body {
   .app .sidebar .nav-link {
     padding: 4px 10px;
   }
+}
 
-  .app .sidebar .credits {
-    padding-top: 8px;
+/* ---------------------------------------------------------------------------
+   Sidebar laid out like Algrow's: tool groups that fold, their pages indented
+   under a hairline without icons, and the account pages listed at the bottom
+   with the credits balance on its row.
+--------------------------------------------------------------------------- */
+.app .nav-group-toggle {
+  width: 100%;
+  margin: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nav-chevron {
+  display: inline-flex;
+  margin-left: auto;
+  color: var(--text-muted);
+  transition: transform 0.2s var(--ease);
+}
+
+.nav-group[data-open] .nav-chevron {
+  transform: rotate(180deg);
+}
+
+.nav-sub {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 2px 0 4px 19px;
+  padding-left: 8px;
+  border-left: 1px solid var(--border);
+}
+
+.app .nav-sub .nav-icon {
+  display: none;
+}
+
+.nav-value {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.nav-value[data-level="low"] {
+  color: var(--warning);
+}
+
+.nav-value[data-level="empty"] {
+  color: var(--critical);
+}
+
+.app .sidebar .nav-account .nav-section-title {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 12px;
+}
+
+@media (min-width: 901px) {
+  .app .nav-account {
+    margin-top: auto;
+    padding-top: 10px;
   }
 
-  .app .sidebar .credits-foot {
-    display: none;
+  .app .sidebar-foot {
+    border-top: 1px solid var(--border);
+  }
+
+  .app .sidebar-account {
+    border-top: 0;
+  }
+}
+
+@media (min-width: 901px) and (max-height: 700px) {
+  .app .sidebar-nav {
+    gap: 6px;
+  }
+
+  .app .sidebar .nav-link {
+    padding: 3px 10px;
+  }
+
+  .nav-sub {
+    gap: 0;
+    margin-bottom: 2px;
+  }
+
+  .app .nav-account {
+    padding-top: 4px;
   }
 }
