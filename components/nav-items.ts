@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 import {
   ArchiveIcon,
+  CaptionsIcon,
   BookmarkIcon,
   ChartIcon,
   ClipboardIcon,
@@ -75,6 +76,7 @@ export const MAIN: NavEntry[] = [
     items: [
       { href: "/research/scriptwriter", label: "Script Writer", icon: PenIcon, badge: "New", ownerOnly: true },
       { href: "/voice", label: "Voice Studio", icon: MicIcon, badge: "New", ownerOnly: true },
+      { href: "/transcribe", label: "Transcribe", icon: CaptionsIcon, badge: "New", ownerOnly: true },
     ],
   },
   { href: "/settings/connect-ai", label: "Connect AI", icon: PlugIcon, badge: "New" },

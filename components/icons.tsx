@@ -254,6 +254,18 @@ export const MicIcon = (p: P) => (
     <path d="M12 18v3" />
   </Icon>
 );
+export const CaptionsIcon = (p: P) => (
+  <Icon {...p}>
+    <rect x="3" y="5" width="18" height="14" rx="3" />
+    <path d="M10.5 10.2a2.2 2.2 0 1 0 0 3.6M17 10.2a2.2 2.2 0 1 0 0 3.6" />
+  </Icon>
+);
+export const UploadIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M12 15V4M7.5 8.5 12 4l4.5 4.5" />
+    <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
+  </Icon>
+);
 export const PlayIcon = (p: P) => (
   <Icon {...p} fill="currentColor" stroke="none">
     <path d="M8 5.5v13a1 1 0 0 0 1.5.86l11-6.5a1 1 0 0 0 0-1.72l-11-6.5A1 1 0 0 0 8 5.5z" />

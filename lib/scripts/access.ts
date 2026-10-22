@@ -29,14 +29,19 @@ interface WriterTerms {
    * and Expert's 30,000 (~2 a day) each cost about 5.5% of the plan's price.
    */
   voiceCharacters: number | null;
+  /**
+   * Minutes of audio a day to transcribe, or null for none. Whisper runs on
+   * Outlier's server, so it costs CPU, not money: about 10 Shorts voiceovers on Pro.
+   */
+  transcribeMinutes: number | null;
   /** What the form says about the limit. */
   limitNote: string | null;
 }
 
-const OWNER_TERMS: WriterTerms = { premium: true, basic: false, limit: null, voiceCharacters: null, limitNote: null };
-const PRO_TERMS: WriterTerms = { premium: false, basic: false, limit: "scriptUser", voiceCharacters: 10_000, limitNote: "one script every 6 hours" };
+const OWNER_TERMS: WriterTerms = { premium: true, basic: false, limit: null, voiceCharacters: null, transcribeMinutes: null, limitNote: null };
+const PRO_TERMS: WriterTerms = { premium: false, basic: false, limit: "scriptUser", voiceCharacters: 10_000, transcribeMinutes: 20, limitNote: "one script every 6 hours" };
 const PLAN_TERMS: Partial<Record<PlanId, WriterTerms>> = {
-  expert: { premium: true, basic: false, limit: "scriptExpert", voiceCharacters: 30_000, limitNote: "4 scripts a day" },
+  expert: { premium: true, basic: false, limit: "scriptExpert", voiceCharacters: 30_000, transcribeMinutes: 60, limitNote: "4 scripts a day" },
   pro: PRO_TERMS,
 };
 

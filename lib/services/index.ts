@@ -84,6 +84,8 @@ import { DiscordService, discordConfigFrom } from "./discord-service";
 import { VideoService } from "./video-service";
 import { WaitlistService } from "./waitlist-service";
 import { VoiceService } from "./voice-service";
+import { TranscribeService } from "./transcribe-service";
+import { WhisperEngine } from "@/lib/transcribe/whisper";
 import { ElevenLabsClient } from "@/lib/voice/elevenlabs";
 
 export { ChannelService, CreditsService, SubscriptionService, DiscoveryService, JobService, ResearchService, StorageBudgetService, VideoService };
@@ -102,6 +104,8 @@ export interface Services {
   scripts: ScriptService;
   /** Voice Studio: ElevenLabs text to speech. */
   voice: VoiceService;
+  /** Transcribe: Whisper on this server, audio to captions. */
+  transcribe: TranscribeService;
   /** Transcript backfill. Driven by the scraper process, which owns the scrape budget. */
   transcripts: TranscriptService;
   radar: NicheRadarService;
@@ -469,6 +473,7 @@ export function getServices(): Services {
       usage: repositories.usage,
       creditCap: Math.floor(config.ELEVENLABS_PLAN_CREDITS * config.ELEVENLABS_MAX_SHARE),
     }),
+    transcribe: new TranscribeService({ engine: whisperEngine(), usage: repositories.usage }),
     dashboard: new DashboardService({
       channels: repositories.channels,
       videos: repositories.videos,
@@ -511,4 +516,11 @@ export function getServices(): Services {
     repositories,
   };
   return services;
+}
+
+/** One Whisper per process, however often the services are rebuilt: the model is ~0.9 GB loaded. */
+function whisperEngine(): WhisperEngine {
+  const holder = globalThis as typeof globalThis & { __outlierWhisper?: WhisperEngine };
+  holder.__outlierWhisper ??= new WhisperEngine();
+  return holder.__outlierWhisper;
 }
