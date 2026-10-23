@@ -59,11 +59,14 @@ function download(name: string, body: string, type: string) {
 
 const baseName = (file: string) => file.replace(/\.[^.]+$/, "") || "transcript";
 
+const limitLabel = (seconds: number) => (seconds < 120 ? `${seconds} seconds` : `${seconds / 60} minutes`);
+
 export function Transcriber({
   languages,
   maxSeconds,
   allowance,
   used: initialUsed,
+  endpoint = "/api/transcribe",
 }: {
   languages: { code: string; name: string }[];
   maxSeconds: number;
@@ -71,6 +74,8 @@ export function Transcriber({
   allowance: number | null;
   /** Seconds used today. */
   used: number;
+  /** Where the audio goes: the members' route, or the free tool's. */
+  endpoint?: string;
 }) {
   const [language, setLanguage] = useState("en");
   const [stage, setStage] = useState<Stage>({ kind: "idle" });
@@ -131,12 +136,12 @@ export function Transcriber({
       } catch {
         throw new Error("Couldn't read that file. Try an mp3, wav or m4a.");
       }
-      if (decoded.seconds > maxSeconds + 1) throw new Error(`That's ${clock(decoded.seconds)}. One go takes up to ${maxSeconds / 60} minutes, so trim it or split it.`);
+      if (decoded.seconds > maxSeconds + 1) throw new Error(`That's ${clock(decoded.seconds)}. One go takes up to ${limitLabel(maxSeconds)}, so trim it or split it.`);
       if (left !== null && decoded.seconds > left) {
         throw new Error(left < 1 ? `You've used today's ${allowance} minutes. It resets at midnight UTC.` : `That's ${clock(decoded.seconds)} and you have ${clock(left)} left today.`);
       }
       setStage({ kind: "transcribing", name: file.name, seconds: decoded.seconds, since: Date.now() });
-      const response = await fetch(`/api/transcribe?language=${language}`, {
+      const response = await fetch(`${endpoint}?language=${language}`, {
         method: "POST",
         headers: { "Content-Type": "application/octet-stream" },
         body: decoded.pcm.buffer as ArrayBuffer,
@@ -250,7 +255,7 @@ export function Transcriber({
                   <UploadIcon size={22} />
                 </span>
                 <strong>Drop a voiceover here, or click to pick one</strong>
-                <small>MP3, WAV, M4A or MP4 · up to {maxSeconds / 60} minutes</small>
+                <small>MP3, WAV, M4A or MP4 · up to {limitLabel(maxSeconds)}</small>
               </>
             )}
           </button>

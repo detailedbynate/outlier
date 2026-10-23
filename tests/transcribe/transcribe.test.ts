@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TRANSCRIBE_EVENT, TranscribeService, transcribeDayStart } from "@/lib/services/transcribe-service";
+import { FREE_TRANSCRIBE_DAILY_SECONDS, FREE_TRANSCRIBE_EVENT, TRANSCRIBE_EVENT, TranscribeService, transcribeDayStart } from "@/lib/services/transcribe-service";
 import { SAMPLE_RATE, pcm16ToFloat, splitAtPauses } from "@/lib/transcribe/audio";
 import { clock, toCaptions, toSrt, toVtt, type TimedWord } from "@/lib/transcribe/captions";
 
@@ -125,5 +125,57 @@ describe("TranscribeService", () => {
 
   it("counts the day from midnight UTC", () => {
     expect(transcribeDayStart(now).toISOString()).toBe("2026-10-22T00:00:00.000Z");
+  });
+});
+
+describe("TranscribeService.transcribeFree", () => {
+  const now = new Date("2026-10-22T15:00:00Z");
+
+  function setup({ busy = 0, usedToday = 0 } = {}) {
+    const recorded: { event_type: string; quantity?: number; user_id?: string | null }[] = [];
+    let calls = 0;
+    const service = new TranscribeService({
+      engine: {
+        busy,
+        transcribe: async () => {
+          calls += 1;
+          return { text: "hi", words: [{ text: "hi", start: 0, end: 0.3 }], seconds: 1 };
+        },
+      },
+      usage: {
+        userCountSince: async () => 0,
+        countSince: async () => usedToday,
+        record: async (event) => {
+          recorded.push(event);
+          return event as never;
+        },
+      },
+    });
+    return { service, recorded, calls: () => calls };
+  }
+
+  it("transcribes a short clip and records it with no user", async () => {
+    const { service, recorded } = setup();
+    await expect(service.transcribeFree(audio(20), "en", now)).resolves.toMatchObject({ text: "hi" });
+    expect(recorded).toMatchObject([{ event_type: FREE_TRANSCRIBE_EVENT, quantity: 20 }]);
+    expect(recorded[0]!.user_id).toBeUndefined();
+  });
+
+  it("refuses clips over a minute", async () => {
+    const { service, calls } = setup();
+    await expect(service.transcribeFree(audio(70), "en", now)).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+    expect(calls()).toBe(0);
+  });
+
+  it("never queues behind someone else", async () => {
+    const { service, calls } = setup({ busy: 1 });
+    await expect(service.transcribeFree(audio(10), "en", now)).rejects.toMatchObject({ code: "RATE_LIMITED" });
+    expect(calls()).toBe(0);
+  });
+
+  it("stops at the shared daily budget", async () => {
+    const { service, calls } = setup({ usedToday: FREE_TRANSCRIBE_DAILY_SECONDS - 5 });
+    await expect(service.transcribeFree(audio(10), "en", now)).rejects.toMatchObject({ code: "RATE_LIMITED" });
+    expect(calls()).toBe(0);
   });
 });

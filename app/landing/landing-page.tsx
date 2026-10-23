@@ -342,6 +342,10 @@ function LandingFooter() {
         <span aria-hidden="true">·</span>
         <Link href="/refunds">Refunds</Link>
         <span aria-hidden="true">·</span>
+        <Link href="/tools/srt-generator">Free SRT generator</Link>
+        <span aria-hidden="true">·</span>
+        <Link href="/vs">Compare</Link>
+        <span aria-hidden="true">·</span>
         <span>Not affiliated with YouTube or Google</span>
       </p>
     </footer>

@@ -29,6 +29,8 @@ export const RATE_LIMITS = {
   mcpToken: { windowSeconds: 3600, maxHits: 300 },
   /** Expert: four scripts a day. */
   scriptExpert: { windowSeconds: 86_400, maxHits: 4 },
+  /** The free public caption tool: a few clips a day per IP. */
+  freeCaptionsIp: { windowSeconds: 86_400, maxHits: 3 },
 } as const;
 
 export type RateLimitPolicy = keyof typeof RATE_LIMITS;

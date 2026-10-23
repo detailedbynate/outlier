@@ -23055,3 +23055,43 @@ body.app-body {
     min-height: 240px;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Public SEO pages: /vs comparisons and the free /tools
+--------------------------------------------------------------------------- */
+.seo-page { max-width: 860px; }
+.seo-page h1 { font-size: clamp(28px, 5vw, 40px); letter-spacing: -0.02em; margin: 6px 0 8px; }
+.seo-eyebrow { font-size: 13px; color: var(--text-muted); margin: 0; }
+.prose-card .seo-eyebrow a { align-self: auto; margin: 0; font-size: inherit; color: var(--accent-text); }
+.seo-table-wrap { overflow-x: auto; margin: 24px 0 8px; border: 1px solid var(--border); border-radius: 14px; }
+.seo-table { width: 100%; border-collapse: collapse; font-size: 14.5px; line-height: 1.55; min-width: 520px; }
+.seo-table th, .seo-table td { padding: 14px 16px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+.seo-table tr:last-child th, .seo-table tr:last-child td { border-bottom: 0; }
+.seo-table thead th { font-size: 15px; color: var(--text-primary); background: rgba(255, 255, 255, 0.03); }
+.seo-table tbody th { width: 22%; color: var(--text-muted); font-weight: 600; }
+.seo-table td { color: var(--text-secondary); }
+.seo-table td:nth-child(2) { color: var(--text-primary); }
+.seo-note { color: var(--text-muted); font-size: 12.5px; }
+.seo-cta { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; margin: 32px 0 20px; padding: 24px; border-radius: 18px; border: 1px solid rgba(196, 181, 253, 0.35); background: linear-gradient(135deg, rgba(139, 92, 246, 0.18), rgba(236, 72, 153, 0.12)); }
+.seo-cta strong { font-size: 19px; }
+.seo-cta span { color: var(--text-secondary); }
+.prose-card .seo-button, .seo-button { align-self: flex-start; margin-top: 8px; display: inline-flex; align-items: center; padding: 11px 20px; border-radius: 999px; background: var(--accent); color: #fff; font-weight: 600; font-size: 14.5px; text-decoration: none; }
+.prose-card .seo-button:hover, .seo-button:hover { filter: brightness(1.1); }
+.seo-small { font-size: 13px; }
+.prose-card .seo-small a, .prose-card .seo-list a { align-self: auto; margin: 0; font-size: inherit; color: var(--accent-text); text-decoration: underline; text-underline-offset: 3px; }
+.seo-list { list-style: none; padding: 0 !important; display: grid; gap: 14px; margin: 24px 0; }
+.seo-list li { display: flex; flex-direction: column; gap: 2px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 14px; }
+.prose-card .seo-list a { font-size: 16px; font-weight: 600; text-decoration: none; color: var(--text-primary); }
+.seo-list small { color: var(--text-muted); font-size: 13.5px; line-height: 1.5; }
+.seo-tool { max-width: 1100px; margin: 24px auto; padding: 0 16px; }
+.seo-tool-head { max-width: 720px; margin: 0 auto 24px; text-align: center; }
+.seo-tool-head h1 { font-size: clamp(28px, 5vw, 42px); letter-spacing: -0.02em; margin: 0 0 10px; }
+.seo-tool-head p { color: var(--text-secondary); margin: 0; }
+.seo-tool .seo-cta { max-width: 720px; margin: 32px auto 0; }
+.seo-tool-faq { max-width: 720px; margin: 24px auto 0; }
+.seo-tool-faq h2 { font-size: 18px; margin: 20px 0 6px; }
+.seo-tool .seo-small a { color: var(--accent-text); text-decoration: underline; text-underline-offset: 3px; }
+.seo-tool-faq p { color: var(--text-secondary); margin: 0; line-height: 1.6; }
+@media (max-width: 640px) {
+  .prose-card.seo-page { padding: 20px 16px; margin: 12px 0; }
+}

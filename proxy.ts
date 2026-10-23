@@ -6,7 +6,7 @@ import { LANDING_HEADER } from "./lib/landing-link";
 /** Reachable without signing in. Prefix match for entries ending in "/". */
 // /signup and /welcome are where a paying subscriber lands before they have an
 // account to sign in with, so they can't be behind the sign-in gate.
-const PUBLIC_PATHS = ["/", "/login", "/login/forgot", "/signup", "/welcome", "/privacy", "/terms", "/refunds", "/auth/", "/waitlist/"];
+const PUBLIC_PATHS = ["/", "/login", "/login/forgot", "/signup", "/welcome", "/privacy", "/terms", "/refunds", "/auth/", "/waitlist/", "/vs", "/vs/", "/tools/", "/sitemap.xml", "/robots.txt"];
 
 function isPublic(pathname: string): boolean {
   return PUBLIC_PATHS.some((path) => (path.endsWith("/") && path !== "/" ? pathname.startsWith(path) : pathname === path));

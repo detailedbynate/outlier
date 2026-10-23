@@ -10,6 +10,15 @@ const log = createLogger({ module: "transcribe" });
 /** usage_events type for each transcription; quantity is the seconds of audio. */
 export const TRANSCRIBE_EVENT = "transcribe.seconds";
 
+/** usage_events type for the free public caption tool (no user); quantity is seconds. */
+export const FREE_TRANSCRIBE_EVENT = "transcribe.free_seconds";
+
+/** The free tool takes one short clip at a time. */
+export const FREE_TRANSCRIBE_MAX_SECONDS = 60;
+
+/** All free use together, per UTC day: an hour of audio is ~12 minutes of CPU. */
+export const FREE_TRANSCRIBE_DAILY_SECONDS = 60 * 60;
+
 /** Allowances reset at midnight UTC. */
 export function transcribeDayStart(now: Date): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
@@ -23,8 +32,8 @@ export function transcribeDayStart(now: Date): Date {
 export class TranscribeService {
   constructor(
     private readonly deps: {
-      engine: Pick<WhisperEngine, "transcribe">;
-      usage: Pick<UsageRepository, "userCountSince" | "record">;
+      engine: Pick<WhisperEngine, "transcribe"> & Partial<Pick<WhisperEngine, "busy">>;
+      usage: Pick<UsageRepository, "userCountSince" | "record"> & Partial<Pick<UsageRepository, "countSince">>;
     },
   ) {}
 
@@ -56,6 +65,30 @@ export class TranscribeService {
     await this.deps.usage
       .record({ event_type: TRANSCRIBE_EVENT, user_id: userId, quantity: Math.max(1, Math.round(seconds)), resource_id: language, occurred_at: now.toISOString() })
       .catch((error: unknown) => log.warn("could not record transcription usage", { error }));
+    return transcript;
+  }
+
+  /**
+   * The free public caption tool. It only runs when nobody else is being
+   * transcribed, so paying members never wait behind a free file, and all free
+   * use shares one daily budget. The per-visitor limit is the route's job.
+   */
+  async transcribeFree(samples: Float32Array, language: TranscribeLanguage, now: Date = new Date()): Promise<Transcript> {
+    const seconds = samples.length / SAMPLE_RATE;
+    if (seconds < 0.5) throw new ValidationError("That file has no audio in it.");
+    if (seconds > FREE_TRANSCRIBE_MAX_SECONDS + 1) throw new ValidationError(`The free tool takes up to ${FREE_TRANSCRIBE_MAX_SECONDS} seconds. Trim it, or use Outlier for up to 5 minutes a file.`);
+    if ((this.deps.engine.busy ?? 0) > 0) {
+      throw new AppError("RATE_LIMITED", "The free tool is busy right now. Try again in a minute.", { expose: true, retryable: true });
+    }
+    const usedToday = (await this.deps.usage.countSince?.(FREE_TRANSCRIBE_EVENT, transcribeDayStart(now)).catch(() => 0)) ?? 0;
+    if (usedToday + seconds > FREE_TRANSCRIBE_DAILY_SECONDS) {
+      throw new AppError("RATE_LIMITED", "The free tool has hit today's limit. It resets at midnight UTC.", { expose: true });
+    }
+
+    const transcript = await this.deps.engine.transcribe(samples, { language });
+    await this.deps.usage
+      .record({ event_type: FREE_TRANSCRIBE_EVENT, quantity: Math.max(1, Math.round(seconds)), resource_id: language, occurred_at: now.toISOString() })
+      .catch((error: unknown) => log.warn("could not record free transcription usage", { error }));
     return transcript;
   }
 }
