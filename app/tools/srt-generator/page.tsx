@@ -45,7 +45,7 @@ export default function SrtGeneratorPage() {
         <h2>Which languages work?</h2>
         <p>{TRANSCRIBE_LANGUAGES.map(([, name]) => name).join(", ")}.</p>
         <p className="seo-small" style={{ marginTop: 20 }}>
-          Comparing tools? See <Link href="/vs">Outlier vs vidIQ, 1of10, NexLev and more</Link>.
+          Comparing tools? See <Link href="/vs">Outlier vs vidIQ, 1of10 and NexLev</Link>.
         </p>
       </section>
     </div>

@@ -4,7 +4,7 @@ import { COMPETITORS } from "./competitors";
 import { outlierFacts } from "./outlier-facts";
 
 export const metadata: Metadata = {
-  title: "Outlier vs vidIQ, 1of10, NexLev, TubeLab and more · Outlier",
+  title: "Outlier vs vidIQ, 1of10 and NexLev · Outlier",
   description: "How Outlier compares with other YouTube research tools for Shorts creators, with prices and who each one is for.",
   alternates: { canonical: "/vs" },
 };

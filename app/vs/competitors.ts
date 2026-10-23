@@ -65,50 +65,6 @@ export const COMPETITORS: Competitor[] = [
       "You'd rather pay a monthly price with no course attached",
     ],
   },
-  {
-    slug: "tubelab",
-    name: "TubeLab",
-    site: "https://tubelab.net/pricing",
-    price: "From about $29/mo (less billed yearly)",
-    approx: true,
-    freePlan: false,
-    about: "A niche finder and outlier database with monetization and audience data, AI scripts and avatar videos.",
-    pickThem: ["You want revenue and audience estimates on every niche", "You make long-form faceless videos with AI avatars"],
-    pickOutlier: [
-      "You make Shorts: viral Shorts, Shorts channels and caption tools are the core of Outlier",
-      "You want gaming niches front and center",
-      "You want a lower monthly price",
-    ],
-  },
-  {
-    slug: "outlierkit",
-    name: "OutlierKit",
-    site: "https://outlierkit.com/pricing",
-    price: "Hobby $299/year; Pro $599/year",
-    freePlan: false,
-    about: "Outlier and keyword research with competitor analysis, deep research and an API, sold mainly on yearly plans.",
-    pickThem: ["You want deep competitor research across a whole niche", "You're happy paying yearly up front"],
-    pickOutlier: [
-      "You want to pay month to month",
-      "You make Shorts in gaming or faceless niches",
-      "You want script, voiceover and caption tools included",
-    ],
-  },
-  {
-    slug: "algrow",
-    name: "Algrow",
-    site: "https://algrow.online",
-    price: "From about $18/mo",
-    approx: true,
-    freePlan: false,
-    about: "A niche finder for faceless channels, with AI video generation sold as extra credits.",
-    pickThem: ["You want AI-generated videos from the same tool", "You're focused on faceless long-form niches"],
-    pickOutlier: [
-      "You make Shorts and want to see what's working this week",
-      "You want gaming niches covered",
-      "You want word-by-word captions from your own voiceover, included",
-    ],
-  },
 ];
 
 export function findCompetitor(slug: string): Competitor | null {
