@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FREE_TRANSCRIBE_DAILY_SECONDS, FREE_TRANSCRIBE_EVENT, TRANSCRIBE_EVENT, TranscribeService, transcribeDayStart } from "@/lib/services/transcribe-service";
-import { SAMPLE_RATE, pcm16ToFloat, splitAtPauses } from "@/lib/transcribe/audio";
+import { SAMPLE_RATE, pcm16ToFloat, snapToAudio, splitAtPauses } from "@/lib/transcribe/audio";
 import { clock, toCaptions, toSrt, toVtt, type TimedWord } from "@/lib/transcribe/captions";
 
 /** A tone, with silence between `quiet` [start, end) second ranges. */
@@ -41,6 +41,37 @@ describe("splitAtPauses", () => {
   it("reads 16-bit little-endian PCM", () => {
     const bytes = new Uint8Array(new Int16Array([0, 16384, -32768]).buffer);
     expect([...pcm16ToFloat(bytes)]).toEqual([0, 0.5, -1]);
+  });
+});
+
+describe("snapToAudio", () => {
+  // Sound from 1.0-1.5s and 3.0-3.6s, silence around it.
+  const clip = () => audio(5, [[0, 1], [1.5, 3], [3.6, 5]]);
+
+  it("pulls late starts back to where the sound begins", () => {
+    const [a, b] = snapToAudio(clip(), [{ start: 1.3, end: 2 }, { start: 3.25, end: 4.2 }]);
+    expect(a!.start).toBeCloseTo(1, 1);
+    expect(b!.start).toBeCloseTo(3, 1);
+  });
+
+  it("trims ends that run into the silence after a word", () => {
+    const [a, b] = snapToAudio(clip(), [{ start: 1.3, end: 2.6 }, { start: 3.25, end: 4.4 }]);
+    expect(a!.end).toBeLessThan(1.7);
+    expect(b!.end).toBeLessThan(3.8);
+  });
+
+  it("pulls starts back a little in unbroken speech, never past the word before", () => {
+    const words = snapToAudio(audio(3), [{ start: 0.5, end: 1 }, { start: 1, end: 1.6 }, { start: 1.6, end: 2.2 }]);
+    expect(words[1]!.start).toBeCloseTo(0.88, 2);
+    for (let i = 1; i < words.length; i += 1) {
+      expect(words[i]!.start).toBeGreaterThan(words[i - 1]!.start);
+      expect(words[i - 1]!.end).toBeLessThanOrEqual(words[i]!.start);
+    }
+  });
+
+  it("leaves the words' other fields alone", () => {
+    const [w] = snapToAudio(clip(), [{ text: "hi", start: 1.2, end: 1.5 }]);
+    expect(w!.text).toBe("hi");
   });
 });
 

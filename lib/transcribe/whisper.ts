@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { AppError } from "@/lib/core/errors";
 import { createLogger } from "@/lib/core/logger";
-import { SAMPLE_RATE, splitAtPauses } from "./audio";
+import { SAMPLE_RATE, snapToAudio, splitAtPauses } from "./audio";
 import type { TimedWord } from "./captions";
 
 const log = createLogger({ module: "transcribe.whisper" });
@@ -89,7 +89,7 @@ export class WhisperEngine {
     }
     const seconds = samples.length / SAMPLE_RATE;
     log.info("transcribed", { seconds: Math.round(seconds), took: Date.now() - started, words: words.length });
-    return { text: text.join(" "), words: words.filter((w) => w.text), seconds };
+    return { text: text.join(" "), words: snapToAudio(samples, words.filter((w) => w.text)), seconds };
   }
 
   private load(): Promise<Recognizer> {
