@@ -303,9 +303,10 @@ export function getServices(): Services {
     { discoveryDailyLimit: config.DISCOVERY_DAILY_LIMIT, discoveryMaxChannels: config.DISCOVERY_MAX_CHANNELS, quality, regionCode },
   );
 
-  // Claude is capped per month at what's prepaid; background jobs get a share of it, paced per day.
-  const claudeBudget = new MonthlySpendBudget(repositories.usage, config.ANTHROPIC_MONTHLY_BUDGET_USD);
-  const backgroundBudget = new MonthlySpendBudget(repositories.usage, config.ANTHROPIC_MONTHLY_BUDGET_USD, { shareUsd: config.ANTHROPIC_BACKGROUND_BUDGET_USD });
+  // Claude is capped per month at what's prepaid and per week so it lasts; background jobs get a share, paced per day.
+  const weeklyUsd = config.ANTHROPIC_WEEKLY_BUDGET_USD;
+  const claudeBudget = new MonthlySpendBudget(repositories.usage, config.ANTHROPIC_MONTHLY_BUDGET_USD, { weeklyUsd });
+  const backgroundBudget = new MonthlySpendBudget(repositories.usage, config.ANTHROPIC_MONTHLY_BUDGET_USD, { shareUsd: config.ANTHROPIC_BACKGROUND_BUDGET_USD, weeklyUsd });
   const traits = new ChannelTraitsService({ vision: backgroundClaude(config, backgroundBudget), traits: repositories.traits, videos: repositories.videos });
   // Niche labeling is rule-based and free; an AI provider only gives unsure channels a second opinion.
   const text = labelingProvider(config, backgroundBudget);

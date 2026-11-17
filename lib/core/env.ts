@@ -186,12 +186,14 @@ const serverEnvSchema = z.object({
    * prepaid for the month. Past it, everything moves to the free models until
    * the 1st. 0 turns Claude off.
    */
-  ANTHROPIC_MONTHLY_BUDGET_USD: z.coerce.number().min(0).default(5),
+  ANTHROPIC_MONTHLY_BUDGET_USD: z.coerce.number().min(0).default(50),
+  /** Most spent on Claude in any 7 days running, so one busy week can't use up the month. 0 turns Claude off. */
+  ANTHROPIC_WEEKLY_BUDGET_USD: z.coerce.number().min(0).default(13.5),
   /**
    * The part of the month background jobs (niche labeling, radar, sub-niche
    * names) may use, spread evenly over the days; the rest stays for scripts.
    */
-  ANTHROPIC_BACKGROUND_BUDGET_USD: z.coerce.number().min(0).default(2),
+  ANTHROPIC_BACKGROUND_BUDGET_USD: z.coerce.number().min(0).default(20),
   OPENAI_API_KEY: optionalString,
 
   /** ElevenLabs key: Voice Studio. Blank hides it. */

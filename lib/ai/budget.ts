@@ -65,9 +65,10 @@ export interface SpendBudget {
 
 /**
  * A monthly cap on Claude spend, matched to what's prepaid for the month, so
- * the balance never runs dry mid-month. Counted from usage_events per UTC
- * calendar month; a few calls in flight at once can go slightly over, which
- * is fine for a soft cap.
+ * the balance never runs dry mid-month, and an optional cap on any seven days
+ * in a row, so no single week burns through it. Counted from usage_events per
+ * UTC calendar month and over the last 7×24 hours; a few calls in flight at
+ * once can go slightly over, which is fine for a soft cap.
  *
  * The script writer can use the whole month. Background jobs pass `shareUsd`:
  * they stop at that share of the month, and at an even slice of it per day,
@@ -79,7 +80,7 @@ export class MonthlySpendBudget implements SpendBudget {
   constructor(
     private readonly usage: Pick<UsageRepository, "countSince" | "record">,
     private readonly monthlyUsd: number,
-    private readonly options: { shareUsd?: number } = {},
+    private readonly options: { shareUsd?: number; weeklyUsd?: number } = {},
   ) {
     this.event = options.shareUsd === undefined ? ANTHROPIC_SPEND_EVENT : ANTHROPIC_BACKGROUND_SPEND_EVENT;
   }
@@ -91,6 +92,16 @@ export class MonthlySpendBudget implements SpendBudget {
       this.usage.countSince(ANTHROPIC_BACKGROUND_SPEND_EVENT, month),
     ]);
     if (scripts + background >= this.monthlyUsd * 1_000_000) throw new AiBudgetSpentError();
+
+    const weekly = this.options.weeklyUsd;
+    if (weekly !== undefined) {
+      const since = new Date(now.getTime() - WEEK_MS);
+      const [weekScripts, weekBackground] = await Promise.all([
+        this.usage.countSince(ANTHROPIC_SPEND_EVENT, since),
+        this.usage.countSince(ANTHROPIC_BACKGROUND_SPEND_EVENT, since),
+      ]);
+      if (weekScripts + weekBackground >= weekly * 1_000_000) throw new AiBudgetSpentError("This week's Claude budget is used up.");
+    }
 
     const share = this.options.shareUsd;
     if (share === undefined) return;
@@ -108,6 +119,8 @@ export class MonthlySpendBudget implements SpendBudget {
     }
   }
 }
+
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 function startOfUtcDay(now: Date): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));

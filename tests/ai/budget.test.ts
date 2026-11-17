@@ -51,6 +51,18 @@ describe("MonthlySpendBudget", () => {
     await budget.check(new Date("2026-11-01T00:00:01Z"));
   });
 
+  it("caps any seven days in a row, counting scripts and background together", async () => {
+    const usage = fakeUsage();
+    const budget = new MonthlySpendBudget(usage, 50, { weeklyUsd: 13.5 });
+    usage.rows.push(spend(ANTHROPIC_SPEND_EVENT, 8, new Date("2026-10-12T00:00:00Z")));
+    usage.rows.push(spend(ANTHROPIC_BACKGROUND_SPEND_EVENT, 5, new Date("2026-10-16T00:00:00Z")));
+    await budget.check(now);
+    usage.rows.push(spend(ANTHROPIC_SPEND_EVENT, 0.5));
+    await expect(budget.check(now)).rejects.toThrow("This week's Claude budget is used up.");
+    // Once the $8 day is more than a week old, there's room again.
+    await budget.check(new Date("2026-10-19T00:00:01Z"));
+  });
+
   it("holds background jobs to their share, paced per day", async () => {
     const usage = fakeUsage();
     // A day's slice of a $3.10 share in October is $0.10.
