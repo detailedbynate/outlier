@@ -24,6 +24,8 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { getServices } from "@/lib/services";
 import { signOut } from "./login/actions";
 import "./globals.css";
+import "./motion.css";
+import { PointerLight } from "@/components/pointer-light";
 import { writerOpenTo } from "@/lib/scripts/access";
 import { LANDING_HEADER } from "@/lib/landing-link";
 
@@ -162,6 +164,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             <LowCreditsPrompt remaining={credits.remaining} threshold={LOW_CREDITS_THRESHOLD} month={credits.resetsAt.slice(0, 7)} />
           ) : null}
         </div>
+        <PointerLight />
         {current.isAdmin ? null : <SiteTracker signedIn />}
       </body>
     </html>

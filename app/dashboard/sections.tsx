@@ -23,6 +23,7 @@ import { getServices } from "@/lib/services";
 import type { ChannelSummary } from "@/lib/services/dashboard-service";
 import type { SavedNiche } from "@/lib/niches/saved";
 import { AutoRefresh } from "./auto-refresh";
+import { CountUp } from "@/components/count-up";
 import type { VideoFeedRow } from "@/types/database";
 
 type IconType = ComponentType<{ size?: number }>;
@@ -256,7 +257,7 @@ function ChannelCard({ own }: { own: ChannelSummary }) {
       </header>
 
       <div className="home-big">
-        <span className="home-big-value">{formatCompact(channel.subscriber_count)}</span>
+        <CountUp className="home-big-value" value={formatCompact(channel.subscriber_count)} />
         <span className="home-big-label">
           subscribers <Delta value={growth.subs7d} suffix="this week" />
         </span>
@@ -388,7 +389,7 @@ function KeyNumbers({ own, channelMedian }: { own: ChannelSummary; channelMedian
       {tiles.map((t, i) => (
         <div key={t.label} className="dash-stat home-tile" data-tone={t.tone} style={{ "--i": i + 2 } as CSSProperties}>
           <span className="dash-stat-label">{t.label}</span>
-          <span className="dash-stat-value">{t.value}</span>
+          <CountUp className="dash-stat-value" value={t.value} />
           <span className="dash-stat-note" title={t.note}>
             {t.note}
           </span>

@@ -1,0 +1,562 @@
+/* ===========================================================================
+   Motion and finish, loaded after globals.css.
+   The look stays as it is (black, flat #0e0e0e cards, hairlines, one violet).
+   What changes is how things move and respond: pages settle in, lists cascade,
+   cards answer the cursor, buttons give under a press, panels open smoothly.
+   No glow, no colour washes, no shadows on the page. Everything here switches
+   off under prefers-reduced-motion.
+=========================================================================== */
+
+:root {
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --motion-fast: 160ms;
+  --motion: 260ms;
+  --motion-slow: 620ms;
+  /* Lets height animate to and from `auto` (smooth <details>), where supported. */
+  interpolate-size: allow-keywords;
+}
+
+@keyframes m-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+    filter: blur(5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+@keyframes m-item-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes m-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(28px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes m-pop {
+  0% {
+    transform: scale(0.92);
+  }
+  60% {
+    transform: scale(1.04);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes m-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes m-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Pages settle in: each top-level block rises out of a soft blur, one after
+   another, so a page assembles rather than appears.
+--------------------------------------------------------------------------- */
+.app .main > :not(.onboarding-root, .stack) {
+  animation: m-page-in var(--motion-slow) var(--ease-out-expo) backwards;
+}
+
+/* A page wrapped in one stack: its sections do the settling instead of the wrapper. */
+.app .main > .stack {
+  animation: none;
+}
+
+.app .main > :nth-child(2) {
+  animation-delay: 50ms;
+}
+.app .main > :nth-child(3) {
+  animation-delay: 100ms;
+}
+.app .main > :nth-child(4) {
+  animation-delay: 150ms;
+}
+.app .main > :nth-child(5) {
+  animation-delay: 200ms;
+}
+.app .main > :nth-child(n + 6) {
+  animation-delay: 240ms;
+}
+
+/* Inside a page's stack, sections follow the header in the same rhythm. */
+.app .main > .stack > * {
+  animation: m-page-in var(--motion-slow) var(--ease-out-expo) backwards;
+}
+.app .main > .stack > :nth-child(2) {
+  animation-delay: 70ms;
+}
+.app .main > .stack > :nth-child(3) {
+  animation-delay: 130ms;
+}
+.app .main > .stack > :nth-child(4) {
+  animation-delay: 190ms;
+}
+.app .main > .stack > :nth-child(n + 5) {
+  animation-delay: 240ms;
+}
+
+/* ---------------------------------------------------------------------------
+   Lists and grids cascade: the first dozen items arrive one after another;
+   the rest rise into place as they scroll into view.
+--------------------------------------------------------------------------- */
+.app
+  :is(
+    .video-grid,
+    .channel-list,
+    .grid,
+    .dash-list,
+    .peer-list,
+    .competitor-list,
+    .trend-grid,
+    .nf-list,
+    .niche-idea-grid,
+    .niche-viral-grid,
+    .niche-creator-list,
+    .niche-pattern-grid,
+    .niche-saved-list,
+    .sw-saved-list,
+    .sw-idea-list,
+    .intel-growth-grid,
+    .home-tiles
+  )
+  > * {
+  --n: 12;
+  animation: m-item-in 560ms var(--ease-out-expo) backwards;
+  animation-delay: calc(140ms + var(--n) * 38ms);
+}
+
+.app :is(.video-grid, .channel-list, .grid, .dash-list, .peer-list, .competitor-list, .trend-grid, .nf-list, .niche-idea-grid, .niche-viral-grid, .niche-creator-list, .niche-pattern-grid, .niche-saved-list, .sw-saved-list, .sw-idea-list, .intel-growth-grid, .home-tiles) > :nth-child(1) { --n: 0; }
+.app :is(.video-grid, .channel-list, .grid, .dash-list, .peer-list, .competitor-list, .trend-grid, .nf-list, .niche-idea-grid, .niche-viral-grid, .niche-creator-list, .niche-pattern-grid, .niche-saved-list, .sw-saved-list, .sw-idea-list, .intel-growth-grid, .home-tiles) > :nth-child(2) { --n: 1; }
+.app :is(.video-grid, .channel-list, .grid, .dash-list, .peer-list, .competitor-list, .trend-grid, .nf-list, .niche-idea-grid, .niche-viral-grid, .niche-creator-list, .niche-pattern-grid, .niche-saved-list, .sw-saved-list, .sw-idea-list, .intel-growth-grid, .home-tiles) > :nth-child(3) { --n: 2; }
+.app :is(.video-grid, .channel-list, .grid, .dash-list, .peer-list, .competitor-list, .trend-grid, .nf-list, .niche-idea-grid, .niche-viral-grid, .niche-creator-list, .niche-pattern-grid, .niche-saved-list, .sw-saved-list, .sw-idea-list, .intel-growth-grid, .home-tiles) > :nth-child(4) { --n: 3; }
+.app :is(.video-grid, .channel-list, .grid, .dash-list, .peer-list, .competitor-list, .trend-grid, .nf-list, .niche-idea-grid, .niche-viral-grid, .niche-creator-list, .niche-pattern-grid, .niche-saved-list, .sw-saved-list, .sw-idea-list, .intel-growth-grid, .home-tiles) > :nth-child(5) { --n: 4; }
+.app :is(.video-grid, .channel-list, .grid, .dash-list, .peer-list, .competitor-list, .trend-grid, .nf-list, .niche-idea-grid, .niche-viral-grid, .niche-creator-list, .niche-pattern-grid, .niche-saved-list, .sw-saved-list, .sw-idea-list, .intel-growth-grid, .home-tiles) > :nth-child(6) { --n: 5; }
+.app :is(.video-grid, .channel-list, .grid, .dash-list, .peer-list, .competitor-list, .trend-grid, .nf-list, .niche-idea-grid, .niche-viral-grid, .niche-creator-list, .niche-pattern-grid, .niche-saved-list, .sw-saved-list, .sw-idea-list, .intel-growth-grid, .home-tiles) > :nth-child(7) { --n: 6; }
+.app :is(.video-grid, .channel-list, .grid, .dash-list, .peer-list, .competitor-list, .trend-grid, .nf-list, .niche-idea-grid, .niche-viral-grid, .niche-creator-list, .niche-pattern-grid, .niche-saved-list, .sw-saved-list, .sw-idea-list, .intel-growth-grid, .home-tiles) > :nth-child(8) { --n: 7; }
+.app :is(.video-grid, .channel-list, .grid, .dash-list, .peer-list, .competitor-list, .trend-grid, .nf-list, .niche-idea-grid, .niche-viral-grid, .niche-creator-list, .niche-pattern-grid, .niche-saved-list, .sw-saved-list, .sw-idea-list, .intel-growth-grid, .home-tiles) > :nth-child(9) { --n: 8; }
+.app :is(.video-grid, .channel-list, .grid, .dash-list, .peer-list, .competitor-list, .trend-grid, .nf-list, .niche-idea-grid, .niche-viral-grid, .niche-creator-list, .niche-pattern-grid, .niche-saved-list, .sw-saved-list, .sw-idea-list, .intel-growth-grid, .home-tiles) > :nth-child(10) { --n: 9; }
+.app :is(.video-grid, .channel-list, .grid, .dash-list, .peer-list, .competitor-list, .trend-grid, .nf-list, .niche-idea-grid, .niche-viral-grid, .niche-creator-list, .niche-pattern-grid, .niche-saved-list, .sw-saved-list, .sw-idea-list, .intel-growth-grid, .home-tiles) > :nth-child(11) { --n: 10; }
+
+/* Past the first dozen, items wait for the scroll instead of a timer. */
+@supports (animation-timeline: view()) {
+  .app :is(.video-grid, .channel-list, .dash-list, .peer-list, .competitor-list, .nf-list, .niche-viral-grid, .niche-creator-list, .sw-saved-list) > :nth-child(n + 13) {
+    animation: m-reveal linear backwards;
+    animation-timeline: view();
+    animation-range: entry 0% entry 70%;
+    animation-delay: 0s;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Cards answer the cursor: a gentle lift, a brighter hairline, and a faint
+   light that follows the pointer (components/pointer-light.tsx sets --mx/--my).
+--------------------------------------------------------------------------- */
+.app :is(.video-card, .channel-card, .dash-panel, .card, .nf-row, .niche-idea-card, .sw-saved-card) {
+  transition:
+    transform 420ms var(--ease-out-expo),
+    border-color 260ms var(--ease-out-quart),
+    background-color 260ms var(--ease-out-quart);
+}
+
+.app :is(.video-card, .channel-card, .niche-idea-card, .sw-saved-card):hover {
+  transform: translateY(-3px);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.app :is(.dash-panel, .card:not(.video-card), .nf-row):hover {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .app :is(.video-card, .channel-card, .dash-panel, .card, .niche-idea-card, .sw-saved-card)[data-lit]:not([class*="plan"]) {
+    background-image: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), rgba(255, 255, 255, 0.045), transparent 65%);
+  }
+}
+
+/* Thumbnails: a slow push-in inside their frame on hover. */
+.app .video-card > a:first-child {
+  display: block;
+  overflow: hidden;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  background: #141414;
+  isolation: isolate;
+}
+
+.app .video-card > a:first-child .thumb {
+  margin-bottom: 0;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  transition:
+    transform 900ms var(--ease-out-expo),
+    opacity 400ms var(--ease-out-quart);
+}
+
+.app .video-card:hover > a:first-child .thumb {
+  transform: scale(1.06);
+}
+
+.app .shorts-strip .short-thumb {
+  overflow: hidden;
+  transition:
+    transform 420ms var(--ease-out-expo),
+    border-color 260ms var(--ease-out-quart);
+}
+
+.app .shorts-strip .short-thumb img {
+  transition: transform 900ms var(--ease-out-expo);
+}
+
+.app .shorts-strip .short-thumb:hover {
+  transform: translateY(-3px);
+}
+
+.app .shorts-strip .short-thumb:hover img {
+  transform: scale(1.07);
+}
+
+/* The outlier multiplier lands with a small pop once its card is in. */
+.app .video-card .outlier {
+  display: inline-block;
+  animation: m-pop 520ms var(--ease-spring) backwards;
+  animation-delay: calc(420ms + var(--n, 0) * 38ms);
+}
+
+/* ---------------------------------------------------------------------------
+   Controls: every press gives, every hover eases.
+--------------------------------------------------------------------------- */
+.app :is(button, .button-ghost, .toolbar-button, .icon-button, .chip, .seo-button, a.button) {
+  transition:
+    transform 180ms var(--ease-out-quart),
+    background-color 220ms var(--ease-out-quart),
+    border-color 220ms var(--ease-out-quart),
+    color 220ms var(--ease-out-quart),
+    opacity 220ms var(--ease-out-quart),
+    filter 220ms var(--ease-out-quart);
+}
+
+.app :is(button, .button-ghost, .toolbar-button, .icon-button, .chip, a.button):active:not(:disabled) {
+  transform: scale(0.96);
+  transition-duration: 80ms;
+}
+
+.app .chip:hover:not([aria-current="true"]) {
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.14);
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+/* The chip you just picked settles in with a small spring. */
+.app .chip[aria-current="true"] {
+  animation: m-pop 420ms var(--ease-spring) backwards;
+}
+
+/* Icons inside call-to-action buttons nudge toward where the button takes you. */
+.app :is(button[type="submit"], .button-brand, .seo-button) svg {
+  transition: transform 260ms var(--ease-out-expo);
+}
+
+.app :is(button[type="submit"], .button-brand, .seo-button):hover svg {
+  transform: translateX(1px) scale(1.08);
+}
+
+/* Fields: the focus ring grows in rather than snapping on. */
+.app :is(input, select, textarea) {
+  transition:
+    border-color 220ms var(--ease-out-quart),
+    box-shadow 260ms var(--ease-out-expo),
+    background-color 220ms var(--ease-out-quart);
+}
+
+.app :focus-visible {
+  transition: outline-offset 180ms var(--ease-out-expo);
+}
+
+/* ---------------------------------------------------------------------------
+   Sidebar: rows slide a touch under the cursor; the current page's tile
+   eases in.
+--------------------------------------------------------------------------- */
+.app .nav-link .nav-icon {
+  transition:
+    transform 320ms var(--ease-out-expo),
+    color 220ms var(--ease-out-quart);
+}
+
+.app .nav-link:hover .nav-icon {
+  transform: translateX(2px);
+}
+
+.app .nav-link[aria-current="page"] {
+  animation: m-fade 360ms var(--ease-out-quart) backwards;
+}
+
+.app .nav-link[aria-current="page"] .nav-icon {
+  animation: m-pop 480ms var(--ease-spring) backwards;
+}
+
+/* ---------------------------------------------------------------------------
+   Smooth disclosure panels: "Why it blew up", FAQs, niche rows, more/less.
+   (Dropdown menus keep their own open animation.)
+--------------------------------------------------------------------------- */
+.app :is(.breakdown, .nf-row, .niche-topic-details, .niche-more, .nf-guide, .pick-record, .va-more, .intel-more, .intel-edit, .dc-setup)::details-content {
+  block-size: 0;
+  overflow: clip;
+  opacity: 0;
+  transition:
+    block-size 420ms var(--ease-out-expo),
+    opacity 320ms var(--ease-out-quart),
+    content-visibility 420ms allow-discrete;
+}
+
+.app :is(.breakdown, .nf-row, .niche-topic-details, .niche-more, .nf-guide, .pick-record, .va-more, .intel-more, .intel-edit, .dc-setup)[open]::details-content {
+  block-size: auto;
+  opacity: 1;
+}
+
+.app .breakdown-body > * {
+  transition:
+    opacity 380ms var(--ease-out-quart),
+    transform 480ms var(--ease-out-expo);
+}
+
+.app .breakdown:not([open]) .breakdown-body > * {
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+.app .breakdown[open] .breakdown-body > :nth-child(2) {
+  transition-delay: 40ms;
+}
+.app .breakdown[open] .breakdown-body > :nth-child(3) {
+  transition-delay: 80ms;
+}
+.app .breakdown[open] .breakdown-body > :nth-child(n + 4) {
+  transition-delay: 120ms;
+}
+
+/* ---------------------------------------------------------------------------
+   Loading: skeletons breathe with a light sweep instead of sitting still, and
+   the route bar along the top runs with a bright leading edge.
+--------------------------------------------------------------------------- */
+.app :is(.skeleton, .skeleton-card) {
+  position: relative;
+  overflow: hidden;
+  background-color: #111111;
+  background-image: none;
+}
+
+.app :is(.skeleton, .skeleton-card)::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.045) 50%, transparent 80%);
+  transform: translateX(-100%);
+  animation: m-sweep 1.6s var(--ease-in-out) infinite;
+}
+
+.app .skeleton-card .skeleton {
+  background-color: #171717;
+}
+
+.route-progress {
+  height: 2px;
+}
+
+.route-progress::after {
+  background: var(--accent);
+  animation-duration: 1.3s;
+  animation-timing-function: var(--ease-in-out);
+}
+
+/* ---------------------------------------------------------------------------
+   Numbers that count up (components/count-up.tsx).
+--------------------------------------------------------------------------- */
+.count-up {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (scripting: enabled) {
+  .count-up:not([data-counted]) {
+    visibility: hidden;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Finish: crisper numerals, quieter scrollbars, nothing flashing white.
+--------------------------------------------------------------------------- */
+.app :is(.metric-line, .pill, .growth-tile strong, .dash-stat-value, .home-big-value, .stat-value, .channel-facts strong) {
+  font-variant-numeric: tabular-nums;
+}
+
+.app .main :is(.thumb, .short-thumb img, .avatar) {
+  background-color: #111111;
+}
+
+html {
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+  scrollbar-width: thin;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ---------------------------------------------------------------------------
+   Not found (app/not-found.tsx)
+--------------------------------------------------------------------------- */
+.not-found {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  max-width: 520px;
+  margin: 12vh auto 0;
+  text-align: center;
+  animation: m-page-in var(--motion-slow) var(--ease-out-expo) backwards;
+}
+
+.not-found-code {
+  font-size: clamp(72px, 12vw, 120px);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.06em;
+  color: transparent;
+  -webkit-text-stroke: 1px rgba(255, 255, 255, 0.22);
+  margin-bottom: 8px;
+}
+
+.not-found h1 {
+  margin: 0;
+}
+
+.not-found .subtitle {
+  color: var(--text-muted);
+  max-width: 400px;
+}
+
+.not-found-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.not-found-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  background: #0e0e0e;
+  color: var(--text-secondary);
+  font-weight: 500;
+  transition:
+    transform 320ms var(--ease-out-expo),
+    border-color 220ms var(--ease-out-quart),
+    color 220ms var(--ease-out-quart);
+  animation: m-item-in 560ms var(--ease-out-expo) backwards;
+}
+
+.not-found-links a:nth-child(1) {
+  animation-delay: 220ms;
+}
+.not-found-links a:nth-child(2) {
+  animation-delay: 270ms;
+}
+.not-found-links a:nth-child(3) {
+  animation-delay: 320ms;
+}
+
+.not-found-links a:hover {
+  transform: translateY(-2px);
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.not-found-links a svg {
+  color: var(--accent);
+}
+
+/* ---------------------------------------------------------------------------
+   Reduced motion: everything above arrives in place, at once.
+--------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .app *,
+  .app *::before,
+  .app *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .app *::details-content {
+    transition: none !important;
+  }
+
+  .app :is(.video-card, .channel-card, .niche-idea-card, .sw-saved-card):hover,
+  .app .video-card:hover > a:first-child .thumb,
+  .app .shorts-strip .short-thumb:hover,
+  .app .shorts-strip .short-thumb:hover img {
+    transform: none;
+  }
+
+  .count-up:not([data-counted]) {
+    visibility: visible;
+  }
+
+  .not-found,
+  .not-found-links a {
+    animation: none;
+  }
+}
