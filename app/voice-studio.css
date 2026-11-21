@@ -204,6 +204,12 @@
   flex: none;
 }
 
+.app .vx-starter-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .app .vx-foot {
   display: flex;
   align-items: center;
@@ -896,14 +902,20 @@
 
 /* --- the player bar --- */
 
+/* Pinned to the bottom of the window while the studio is on screen, like ElevenLabs' player. */
 .app .vx-player {
   grid-area: player;
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
   display: flex;
   align-items: center;
   gap: 14px;
   min-height: 74px;
   padding: 12px 18px;
   border-top: 1px solid var(--border);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  background: var(--card);
 }
 
 .app .vx-player[data-state="ready"] {
@@ -1082,13 +1094,6 @@
     border-top: 1px solid var(--border);
   }
 
-  .app .vx-player {
-    position: sticky;
-    bottom: 0;
-    z-index: 5;
-    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
-    background: var(--card);
-  }
 }
 
 @media (max-width: 640px) {

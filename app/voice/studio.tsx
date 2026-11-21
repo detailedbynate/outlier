@@ -159,7 +159,7 @@ export function Studio({
               <div className="vx-starter-list">
                 {scripts.slice(0, 2).map((s, i) => (
                   <button key={s.id} type="button" className="vx-starter vx-starter-mine" onClick={() => fill(s.text)} style={{ "--i": i } as CSSProperties}>
-                    <PenIcon size={13} /> {s.label}
+                    <PenIcon size={13} /> <span className="vx-starter-text">{s.label}</span>
                   </button>
                 ))}
                 {STARTERS.map((s, i) => (
