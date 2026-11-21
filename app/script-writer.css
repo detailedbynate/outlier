@@ -29,6 +29,13 @@
   line-height: 24px;
 }
 
+/* Explanations wrap here; the dashboard's one-line ellipsis would cut them off. */
+.app .sw-studio .dash-row-sub {
+  overflow: visible;
+  white-space: normal;
+  text-overflow: clip;
+}
+
 .app .sw-studio :is(.sw-sec-head, .sw-stage-head) .dash-row-sub {
   margin: 0;
   font-size: 13px;
@@ -53,11 +60,7 @@
 }
 
 .app .sw-studio .dash-eyebrow .sw-step {
-  width: 20px;
-  height: 20px;
-  border-radius: 6px;
-  font-size: 11px;
-  margin-right: 2px;
+  letter-spacing: 0;
 }
 
 /* A small ring that turns while it writes. */
@@ -468,8 +471,16 @@
 
 /* --- the stage --- */
 
+/* The stage takes the composer's height, so the empty state fills its column. */
 .app .sw-studio .sw-stage {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
   min-width: 0;
+}
+
+.app .sw-studio .sw-stage > .sw-stage-empty {
+  flex: 1 1 auto;
 }
 
 .app .sw-studio .sw-stage > .sw-error {
@@ -632,10 +643,17 @@
   margin-bottom: 16px;
 }
 
+/* "Your script" reads as a section title, like steps 1 and 2. */
 .app .sw-studio .sw-read .dash-eyebrow {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  text-transform: none;
+  color: var(--text-primary);
 }
 
 .app .sw-studio .sw-head-actions {

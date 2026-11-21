@@ -363,7 +363,7 @@ function ScriptView({ result, charged, target }: { result: ScriptResult; charged
           <span className="sw-fit-text">
             {elapsed !== null ? (
               <>
-                <strong>{clock(elapsed)}</strong> of about {clock(spoken)}
+                <strong>{clock(elapsed)}</strong> of about {clock(Math.round(spoken))}
               </>
             ) : (
               <>
