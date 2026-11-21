@@ -186,14 +186,14 @@
    Cards answer the cursor: a gentle lift, a brighter hairline, and a faint
    light that follows the pointer (components/pointer-light.tsx sets --mx/--my).
 --------------------------------------------------------------------------- */
-.app :is(.video-card, .channel-card, .dash-panel, .card, .nf-row, .niche-idea-card, .sw-saved-card) {
+.app :is(.video-card, .channel-card, .dash-panel, .card, .nf-row, .niche-idea-card, .sw-idea) {
   transition:
     transform 420ms var(--ease-out-expo),
     border-color 260ms var(--ease-out-quart),
     background-color 260ms var(--ease-out-quart);
 }
 
-.app :is(.video-card, .channel-card, .niche-idea-card, .sw-saved-card):hover {
+.app :is(.video-card, .channel-card, .niche-idea-card, .sw-idea):hover {
   transform: translateY(-3px);
   border-color: rgba(255, 255, 255, 0.16);
 }
@@ -203,7 +203,7 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .app :is(.video-card, .channel-card, .dash-panel, .card, .niche-idea-card, .sw-saved-card)[data-lit]:not([class*="plan"]) {
+  .app :is(.video-card, .channel-card, .dash-panel, .card, .niche-idea-card, .sw-idea)[data-lit]:not([class*="plan"]) {
     background-image: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), rgba(255, 255, 255, 0.045), transparent 65%);
   }
 }
@@ -659,7 +659,7 @@ html {
     transition: none !important;
   }
 
-  .app :is(.video-card, .channel-card, .niche-idea-card, .sw-saved-card):hover,
+  .app :is(.video-card, .channel-card, .niche-idea-card, .sw-idea):hover,
   .app .video-card:hover > a:first-child .thumb,
   .app .shorts-strip .short-thumb:hover,
   .app .shorts-strip .short-thumb:hover img {

@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 
 /** Surfaces that catch the faint cursor light (styled in app/motion.css). */
-const LIT = ".video-card, .channel-card, .dash-panel, .card, .niche-idea-card, .sw-saved-card";
+const LIT = ".video-card, .channel-card, .dash-panel, .card, .niche-idea-card, .sw-idea";
 
 /**
  * One listener for the whole app: marks the card under the pointer with

@@ -1,12 +1,15 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useDeferredValue, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { MicIcon } from "@/components/icons";
 import { scriptText, WORDS_PER_SECOND } from "@/lib/scripts/schema";
 import type { SavedScriptRow } from "@/types/database";
 import { deleteSavedScript } from "./actions";
 import { Copyable } from "./script-form";
+
+/** Past this many, a filter box earns its place. */
+const FILTER_FROM = 6;
 
 /**
  * Every script written, newest first.
@@ -16,25 +19,50 @@ import { Copyable } from "./script-form";
  * state rather than a link, so reading an old script never costs a page load.
  */
 export function SavedScripts({ scripts }: { scripts: SavedScriptRow[] }) {
+  const [query, setQuery] = useState("");
+  const deferred = useDeferredValue(query.trim().toLowerCase());
+
   if (scripts.length === 0) {
     return (
       <section className="sw-saved">
         <h2 className="sw-saved-head">Your scripts</h2>
-        <p className="dash-row-sub">Scripts you write are kept here automatically.</p>
+        <div className="sw-saved-empty">
+          <p>Every script you write is kept here, with its titles, ready to copy or voice.</p>
+        </div>
       </section>
     );
   }
 
+  const shown = deferred
+    ? scripts.filter((row) => `${row.topic} ${row.idea} ${row.script} ${row.titles.join(" ")}`.toLowerCase().includes(deferred))
+    : scripts;
+
   return (
     <section className="sw-saved">
-      <h2 className="sw-saved-head">
-        Your scripts <span className="sw-count">{scripts.length}</span>
-      </h2>
-      <ul className="sw-saved-list">
-        {scripts.map((row, i) => (
-          <SavedScript key={row.id} row={row} index={i} />
-        ))}
-      </ul>
+      <div className="sw-saved-bar">
+        <h2 className="sw-saved-head">
+          Your scripts <span className="sw-count">{scripts.length}</span>
+        </h2>
+        {scripts.length >= FILTER_FROM ? (
+          <input
+            type="search"
+            className="sw-saved-filter"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Filter by niche, idea or words"
+            aria-label="Filter your scripts"
+          />
+        ) : null}
+      </div>
+      {shown.length > 0 ? (
+        <ul className="sw-saved-list">
+          {shown.map((row, i) => (
+            <SavedScript key={row.id} row={row} index={i} />
+          ))}
+        </ul>
+      ) : (
+        <p className="dash-row-sub sw-saved-none">No script mentions &ldquo;{query.trim()}&rdquo;.</p>
+      )}
     </section>
   );
 }
@@ -51,21 +79,23 @@ function SavedScript({ row, index }: { row: SavedScriptRow; index: number }) {
       <button type="button" className="sw-saved-top" onClick={() => setOpen(!open)} aria-expanded={open}>
         <span className="sw-saved-hook">{hook}</span>
         <span className="sw-saved-meta">
-          {row.topic} · {row.seconds}s · {new Date(row.created_at).toLocaleDateString()}
+          <span className="sw-saved-topic">{row.topic}</span> · {row.seconds}s · {row.tone} ·{" "}
+          {new Date(row.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
         </span>
         <span className="sw-chevron" aria-hidden="true">
           ›
         </span>
       </button>
 
-      {open ? (
+      {/* Always rendered so it can unfold smoothly; inert while folded so its buttons aren't tabbable. */}
+      <div className="sw-saved-fold" inert={!open}>
         <div className="sw-saved-body">
           <p className="sw-line">{text}</p>
           {row.titles.length > 0 ? (
             <ul className="sw-titles">
               {row.titles.map((title) => (
                 <li key={title}>
-                  {title} <Copyable text={title} label="Copy" />
+                  <span>{title}</span> <Copyable text={title} label="Copy" />
                 </li>
               ))}
             </ul>
@@ -82,11 +112,11 @@ function SavedScript({ row, index }: { row: SavedScriptRow; index: number }) {
               </button>
             </form>
             <span className="sw-footnote">
-              {row.words} words · about {seconds}s · {row.tone}
+              {row.words} words · about {seconds}s
             </span>
           </div>
         </div>
-      ) : null}
+      </div>
     </li>
   );
 }

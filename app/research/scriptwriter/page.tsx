@@ -38,16 +38,17 @@ export default async function ScriptwriterPage({ searchParams }: { searchParams:
     : [[], []];
 
   return (
-    <div className="dash sw">
-      <header className="dash-hero">
+    <div className="dash sw sw-studio">
+      <header className="dash-hero sw-hero">
         <div className="dash-hero-text">
           <span className="dash-eyebrow">
             <PenIcon size={13} /> Writing tool
           </span>
           <h1>Shorts Script Writer</h1>
           <p>
-            Give it your niche and an idea and it writes the words — hook, turn, payoff — ready to read out. Tell it what
-            you know that nobody else does and it builds the script around that instead of guessing.</p>
+            Give it your niche and an idea and it writes the words, ready to read out: hook, turn, body, payoff. Tell it
+            what you know that nobody else does and it builds the script around that instead of guessing.
+          </p>
         </div>
       </header>
 
@@ -55,8 +56,10 @@ export default async function ScriptwriterPage({ searchParams }: { searchParams:
         <>
           {showScriptTour(current.user.user_metadata, new Date()) ? <ScriptTour ideaCost={CREDIT_COSTS.find_ideas} scriptCost={cost} /> : null}
           <Writer cost={cost} ideaCost={CREDIT_COSTS.find_ideas} limitNote={writerTerms(plan?.plan.id, current.isOwner)?.limitNote ?? null} initialSeed={initialSeed} />
-          <StyleSamples samples={styles} />
-          <SavedScripts scripts={saved} />
+          <div className="sw-library">
+            <SavedScripts scripts={saved} />
+            <StyleSamples samples={styles} />
+          </div>
         </>
       ) : (
         <ComingSoonLock mode={onFreePlan ? "upgrade" : "soon"}>{<LockedPreview cost={cost} />}</ComingSoonLock>
@@ -71,21 +74,26 @@ export default async function ScriptwriterPage({ searchParams }: { searchParams:
  */
 function LockedPreview({ cost }: { cost: number }) {
   return (
-    <>
-      <div className="sw-form">
+    <div className="sw-work">
+      <div className="sw-form sw-composer">
+        <header className="sw-sec-head">
+          <span className="sw-step">2</span>
+          <div>
+            <h2 className="sw-saved-head">Shape it</h2>
+            <p className="dash-row-sub">What it&apos;s about, how long, and how it sounds.</p>
+          </div>
+        </header>
         <div className="sw-row">
           <label className="sw-field">
             <span>Niche</span>
             <input defaultValue="minecraft" readOnly tabIndex={-1} />
-            <small>Who it&apos;s for. The script is written for people already in this niche.</small>
           </label>
           <label className="sw-field">
             <span>Video idea or title</span>
             <input defaultValue="the redstone trick nobody uses" readOnly tabIndex={-1} />
-            <small>What this Short is about. A working title is enough.</small>
           </label>
         </div>
-        <div className="sw-row">
+        <div className="sw-controls">
           <label className="sw-field">
             <span>Length</span>
             <input defaultValue="30 seconds" readOnly tabIndex={-1} />
@@ -94,36 +102,42 @@ function LockedPreview({ cost }: { cost: number }) {
             <span>Tone</span>
             <input defaultValue="Energetic" readOnly tabIndex={-1} />
           </label>
-          <div className="sw-submit">
-            <span className="btn btn-primary">
-              <PenIcon size={15} /> Write the script
-            </span>
-            <small>{cost} credits</small>
-          </div>
+        </div>
+        <div className="sw-submit">
+          <span className="btn btn-primary sw-write">
+            <PenIcon size={15} /> Write the script
+          </span>
+          <small>{cost} credits</small>
         </div>
       </div>
 
-      <div className="sw-result">
-        <section className="sw-script">
-          <header className="sw-script-head">
-            <span className="dash-eyebrow">Your script</span>
-          </header>
-          <p className="sw-line">
-            Your redstone doesn&apos;t need a single repeater, and most builds are full of them. People stack them because
-            that&apos;s what every tutorial shows, not because the circuit needs one. Put a torch on the side of a block, then put
-            another block straight on top of the torch. That block is now powered, permanently, and it&apos;ll drive anything
-            touching it. Hide it inside a wall and your door opens with nothing visible anywhere. Same circuit, half the parts,
-            and nobody can see how it works.
-          </p>
-        </section>
-        <section className="sw-panel">
-          <h3>Titles</h3>
-          <ul className="sw-titles">
-            <li>The redstone trick nobody uses</li>
-            <li>Stop putting repeaters in everything</li>
-          </ul>
-        </section>
+      <div className="sw-stage">
+        <div className="sw-result">
+          <article className="sw-script sw-read">
+            <header className="sw-script-head">
+              <span className="dash-eyebrow">
+                <span className="sw-step">3</span> Your script
+              </span>
+            </header>
+            <div className="sw-lines">
+              <p className="sw-hook-line">Your redstone doesn&apos;t need a single repeater, and most builds are full of them.</p>
+              <p className="sw-line">
+                People stack them because that&apos;s what every tutorial shows, not because the circuit needs one. Put a torch
+                on the side of a block, then put another block straight on top of the torch. That block is now powered,
+                permanently, and it&apos;ll drive anything touching it. Hide it inside a wall and your door opens with nothing
+                visible anywhere. Same circuit, half the parts, and nobody can see how it works.
+              </p>
+            </div>
+          </article>
+          <section className="sw-panel sw-titles-panel">
+            <h3>Titles</h3>
+            <ul className="sw-titles">
+              <li>The redstone trick nobody uses</li>
+              <li>Stop putting repeaters in everything</li>
+            </ul>
+          </section>
+        </div>
       </div>
-    </>
+    </div>
   );
 }

@@ -87,9 +87,11 @@ function StyleSample({ row, index, used }: { row: StyleSampleRow; index: number;
       <button type="button" className="sw-style-top" onClick={() => setOpen(!open)} aria-expanded={open}>
         <span className="sw-style-name">{row.label?.trim() || preview}</span>
         {/* Only the three most recent reach the prompt; saying so beats a silent cut-off. */}
-        <span className="sw-style-tag">{used ? "in use" : "not used"}</span>
+        <span className="sw-style-tag" data-on={used ? "" : undefined}>
+          {used ? "in use" : "not used"}
+        </span>
       </button>
-      {open ? (
+      <div className="sw-saved-fold" inert={!open}>
         <div className="sw-style-body">
           <p className="sw-style-text">{row.body}</p>
           <form action={deleteStyleSample}>
@@ -99,7 +101,7 @@ function StyleSample({ row, index, used }: { row: StyleSampleRow; index: number;
             </button>
           </form>
         </div>
-      ) : null}
+      </div>
     </li>
   );
 }

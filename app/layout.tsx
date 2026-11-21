@@ -25,6 +25,7 @@ import { getServices } from "@/lib/services";
 import { signOut } from "./login/actions";
 import "./globals.css";
 import "./motion.css";
+import "./script-writer.css";
 import { PointerLight } from "@/components/pointer-light";
 import { writerOpenTo } from "@/lib/scripts/access";
 import { LANDING_HEADER } from "@/lib/landing-link";

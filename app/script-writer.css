@@ -1,0 +1,1157 @@
+/* ===========================================================================
+   Script Writer studio, loaded after globals.css and motion.css.
+
+   Idea finder across the top; then the composer (left) beside the stage where
+   the script appears (right); then saved scripts beside the writing style.
+   Same look as everywhere else: black, flat #0e0e0e surfaces, hairlines, one
+   violet. What's new is structure and motion: numbered steps, a stage that is
+   never blank, a script that inks in sentence by sentence, a practice read.
+   Everything is scoped to .sw-studio so the locked preview and the old rules
+   elsewhere are untouched.
+=========================================================================== */
+
+.app .sw-studio {
+  --sw-sticky-top: 76px;
+}
+
+/* --- section heads: a step number, a title, one line under it --- */
+
+.app .sw-studio .sw-sec-head,
+.app .sw-studio .sw-stage-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 0;
+}
+
+.app .sw-studio :is(.sw-sec-head, .sw-stage-head) .sw-saved-head {
+  margin: 0 0 3px;
+  line-height: 24px;
+}
+
+.app .sw-studio :is(.sw-sec-head, .sw-stage-head) .dash-row-sub {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  text-wrap: pretty;
+}
+
+.app .sw-studio .sw-step {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  border: 1px solid var(--border-strong);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.app .sw-studio .dash-eyebrow .sw-step {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  font-size: 11px;
+  margin-right: 2px;
+}
+
+/* A small ring that turns while it writes. */
+.app .sw-studio .sw-step-busy {
+  position: relative;
+  border-color: rgba(157, 107, 255, 0.4);
+}
+
+.app .sw-studio .sw-step-busy::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid rgba(157, 107, 255, 0.25);
+  border-top-color: var(--accent);
+  animation: sw-spin 0.8s linear infinite;
+}
+
+@keyframes sw-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* --- 1. idea finder --- */
+
+.app .main .sw-studio .sw-ideas {
+  margin: 0;
+  padding: 20px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--card);
+  animation: none;
+}
+
+.app .sw-studio .sw-ideas-top {
+  display: grid;
+  gap: 16px;
+}
+
+.app .sw-studio .sw-ideas-form {
+  margin: 0;
+  flex-wrap: nowrap;
+}
+
+.app .sw-studio .sw-ideas-form input {
+  min-width: 0;
+  height: 40px;
+  border-color: var(--border-strong);
+  transition:
+    border-color var(--motion-fast) var(--ease-out-quart),
+    background-color var(--motion-fast) var(--ease-out-quart);
+}
+
+.app .sw-studio .sw-ideas-form input:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.app .sw-studio .sw-ideas-form .btn {
+  flex: none;
+  height: 40px;
+}
+
+.app .sw-studio .sw-ideas-form small {
+  flex: none;
+  white-space: nowrap;
+}
+
+@media (min-width: 1100px) {
+  .app .sw-studio .sw-ideas-top {
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 460px);
+    align-items: center;
+    gap: 28px;
+  }
+}
+
+.app .sw-studio .sw-ideas > .sw-error {
+  margin-top: 14px;
+}
+
+.app .sw-studio .sw-idea-list {
+  margin-top: 18px;
+  gap: 12px;
+}
+
+@media (min-width: 1100px) {
+  .app .sw-studio .sw-idea-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.app .sw-studio .sw-idea {
+  position: relative;
+  gap: 10px;
+  padding: 16px 16px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background-color: rgba(255, 255, 255, 0.025);
+}
+
+.app .sw-studio .sw-idea:hover {
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.app .sw-studio .sw-idea[data-picked] {
+  border-color: rgba(157, 107, 255, 0.5);
+}
+
+.app .sw-studio .sw-idea-num {
+  color: var(--text-muted);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}
+
+.app .sw-studio .sw-idea[data-picked] .sw-idea-num {
+  color: var(--accent-text);
+}
+
+.app .sw-studio .sw-idea h3 {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.app .sw-studio .sw-idea-parts {
+  gap: 10px;
+  margin: 0;
+}
+
+.app .sw-studio .sw-idea-parts dt {
+  font-size: 11px;
+  font-weight: 550;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+}
+
+/* The first line as it would be said: set off by a violet rule, not italics. */
+.app .sw-studio .sw-idea-hook {
+  padding-left: 10px;
+  border-left: 2px solid rgba(157, 107, 255, 0.55);
+  font-style: normal;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.app .sw-studio .sw-idea-why {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.app .sw-studio .sw-idea-use {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  align-self: stretch;
+  margin-top: auto;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  transition:
+    border-color var(--motion-fast) var(--ease-out-quart),
+    background-color var(--motion-fast) var(--ease-out-quart),
+    color var(--motion-fast) var(--ease-out-quart);
+}
+
+.app .sw-studio .sw-idea-use span {
+  display: inline-block;
+  transition: transform var(--motion) var(--ease-spring);
+}
+
+.app .sw-studio .sw-idea-use:hover {
+  border-color: rgba(157, 107, 255, 0.55);
+  background: var(--accent-wash);
+  color: var(--text-primary);
+}
+
+.app .sw-studio .sw-idea-use:hover span {
+  transform: translateY(2px);
+}
+
+.app .sw-studio .sw-idea[data-picked] .sw-idea-use {
+  border-color: transparent;
+  background: var(--accent-wash);
+  color: var(--accent-text);
+}
+
+/* Placeholders while it thinks: three lines that breathe, card by card. */
+.app .sw-studio .sw-idea-ghost {
+  min-height: 168px;
+  gap: 12px;
+  border-style: solid;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.app .sw-studio .sw-idea-ghost:hover {
+  transform: none;
+  border-color: var(--border);
+}
+
+.app .sw-studio .sw-idea-ghost i {
+  display: block;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--surface-3);
+  animation: sw-breathe 1.6s var(--ease-in-out) infinite;
+  animation-delay: calc(var(--i, 0) * 120ms);
+}
+
+.app .sw-studio .sw-idea-ghost i:nth-child(1) {
+  width: 32%;
+  height: 8px;
+}
+
+.app .sw-studio .sw-idea-ghost i:nth-child(2) {
+  width: 88%;
+  height: 14px;
+}
+
+.app .sw-studio .sw-idea-ghost i:nth-child(3) {
+  width: 70%;
+  margin-top: 8px;
+}
+
+@keyframes sw-breathe {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* --- 2 + 3. the workspace: composer beside the stage --- */
+
+/* The composer stays in view beside a long script, but only on screens tall
+   enough to show all of it; a sticky panel taller than the window hides its
+   own button. */
+@media (min-width: 1100px) and (min-height: 860px) {
+  .app .sw-studio .sw-composer {
+    position: sticky;
+    top: var(--sw-sticky-top);
+  }
+}
+
+.app .sw-studio .sw-work-anchor {
+  scroll-margin-top: var(--sw-sticky-top);
+}
+
+.app .sw-studio .sw-work {
+  display: grid;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (min-width: 1100px) {
+  .app .sw-studio .sw-work {
+    grid-template-columns: minmax(340px, 400px) minmax(0, 1fr);
+  }
+
+  /* Narrow column: every field gets the full width. */
+  .app .sw-studio .sw-composer :is(.sw-row, .sw-controls) {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+}
+
+.app .main .sw-studio .sw-composer {
+  gap: 20px;
+  padding: 20px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--card);
+  animation: none;
+}
+
+/* Picking an idea above lands here: the border catches violet and lets go. */
+.app .main .sw-studio .sw-composer[data-seeded] {
+  animation: sw-seeded 1.4s var(--ease-out-quart);
+}
+
+.app .sw-studio .sw-composer[data-seeded] .sw-idea-input {
+  animation: sw-seeded-field 1.4s var(--ease-out-quart);
+}
+
+@keyframes sw-seeded {
+  0%,
+  30% {
+    border-color: rgba(157, 107, 255, 0.6);
+  }
+  100% {
+    border-color: var(--border);
+  }
+}
+
+@keyframes sw-seeded-field {
+  0%,
+  30% {
+    border-color: rgba(157, 107, 255, 0.6);
+    background-color: var(--accent-wash);
+  }
+}
+
+.app .sw-studio .sw-composer .sw-field > span {
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--text-secondary);
+}
+
+.app .sw-studio .sw-composer .sw-field small {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
+  text-wrap: pretty;
+}
+
+.app .sw-studio .sw-composer .sw-field small.sw-ask {
+  color: var(--accent-text);
+}
+
+.app .sw-studio :is(.sw-composer .sw-field, .sw-style-form .sw-field) :is(input:not([type="range"]), textarea),
+.app .sw-studio .sw-ideas-form input,
+.app .sw-studio .sw-saved-filter {
+  border-radius: 9px;
+  border: 1px solid var(--border-strong);
+  background: var(--control-bg);
+  transition:
+    border-color var(--motion-fast) var(--ease-out-quart),
+    background-color var(--motion-fast) var(--ease-out-quart);
+}
+
+.app .sw-studio :is(.sw-composer .sw-field, .sw-style-form .sw-field) :is(input:not([type="range"]), textarea):hover {
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.app .sw-studio :is(.sw-composer .sw-field, .sw-style-form .sw-field) :is(input:not([type="range"]), textarea):focus-visible,
+.app .sw-studio .sw-ideas-form input:focus-visible,
+.app .sw-studio .sw-saved-filter:focus-visible {
+  outline: 3px solid rgba(157, 107, 255, 0.22);
+  outline-offset: 0;
+  border-color: rgba(157, 107, 255, 0.7);
+}
+
+.app .sw-studio .sw-composer .sw-idea-input {
+  min-height: 4.4em;
+}
+
+/* Length: a solid violet fill up to the thumb, and the readout in the label. */
+.app .sw-studio .sw-composer .sw-slider::-webkit-slider-runnable-track {
+  height: 4px;
+  background: linear-gradient(90deg, var(--accent) 0 calc(var(--filled, 0) * 100%), var(--surface-3) 0);
+}
+
+.app .sw-studio .sw-composer .sw-slider::-moz-range-track {
+  height: 4px;
+}
+
+.app .sw-studio .sw-composer .sw-slider::-webkit-slider-thumb {
+  transition: transform var(--motion) var(--ease-spring);
+}
+
+.app .sw-studio .sw-composer .sw-slider:active::-webkit-slider-thumb {
+  transform: scale(1.15);
+}
+
+.app .sw-studio .sw-composer .sw-seconds {
+  transition: color var(--motion-fast) var(--ease-out-quart);
+}
+
+.app .sw-studio .sw-composer .sw-ticks {
+  margin-top: -2px;
+}
+
+.app .main .sw-studio .sw-composer .sw-tones {
+  width: 100%;
+}
+
+.app .main .sw-studio .sw-composer .sw-tones .sw-tone {
+  flex: 1 1 0;
+  text-align: center;
+}
+
+.app .sw-studio .sw-tone-note {
+  animation: m-fade 320ms var(--ease-out-quart) backwards;
+}
+
+.app .sw-studio .sw-composer .sw-submit {
+  align-self: stretch;
+  gap: 8px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.app .sw-studio .sw-composer .sw-write {
+  justify-content: center;
+  width: 100%;
+  height: 42px;
+  font-size: 14px;
+}
+
+/* --- the stage --- */
+
+.app .sw-studio .sw-stage {
+  min-width: 0;
+}
+
+.app .sw-studio .sw-stage > .sw-error {
+  margin: 0 0 14px;
+}
+
+.app .sw-studio .sw-stage-empty {
+  padding: 22px 24px 10px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--card);
+  animation: m-fade 420ms var(--ease-out-quart) backwards;
+}
+
+.app .sw-studio .sw-beats {
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.app .sw-studio .sw-beat {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: 16px;
+  row-gap: 10px;
+  padding: 16px 0;
+  border-top: 1px solid var(--border);
+  animation: m-item-in 560ms var(--ease-out-expo) backwards;
+  animation-delay: calc(120ms + var(--b, 0) * 70ms);
+}
+
+.app .sw-studio .sw-beat-name {
+  grid-row: 1 / span 2;
+  padding-top: 1px;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.app .sw-studio .sw-beat-note {
+  font-size: 13.5px;
+  color: var(--text-secondary);
+}
+
+.app .sw-studio .sw-beat-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.app .sw-studio .sw-beat-lines i {
+  display: block;
+  height: 8px;
+  width: 94%;
+  border-radius: 4px;
+  background: var(--surface-2);
+  transform-origin: left center;
+}
+
+.app .sw-studio .sw-beat-lines i + i {
+  width: 66%;
+}
+
+.app .sw-studio .sw-beat:nth-child(3) .sw-beat-lines i + i {
+  width: 81%;
+}
+
+/* Writing: each part lights in turn and its lines draw across, on a loop. */
+.app .sw-studio .sw-pending .sw-beat {
+  animation:
+    m-item-in 560ms var(--ease-out-expo) backwards,
+    sw-beat-on 6s var(--ease-in-out) infinite backwards;
+  animation-delay:
+    calc(120ms + var(--b, 0) * 70ms),
+    calc(var(--b, 0) * 1.5s);
+}
+
+.app .sw-studio .sw-pending .sw-beat-name {
+  animation: sw-beat-name 6s var(--ease-in-out) infinite backwards;
+  animation-delay: calc(var(--b, 0) * 1.5s);
+}
+
+.app .sw-studio .sw-pending .sw-beat-lines i {
+  background: var(--surface-3);
+  animation: sw-draw 6s var(--ease-out-quart) infinite backwards;
+  animation-delay: calc(var(--b, 0) * 1.5s);
+}
+
+.app .sw-studio .sw-pending .sw-beat-lines i + i {
+  animation-delay: calc(var(--b, 0) * 1.5s + 0.45s);
+}
+
+@keyframes sw-beat-on {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  6%,
+  24% {
+    opacity: 1;
+  }
+  34% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes sw-beat-name {
+  0%,
+  34%,
+  100% {
+    color: var(--text-muted);
+  }
+  6%,
+  24% {
+    color: var(--accent-text);
+  }
+}
+
+@keyframes sw-draw {
+  0% {
+    transform: scaleX(0.04);
+    opacity: 0;
+  }
+  3% {
+    opacity: 1;
+  }
+  20% {
+    transform: scaleX(1);
+  }
+  88% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scaleX(1);
+    opacity: 0;
+  }
+}
+
+/* --- the written script --- */
+
+.app .sw-studio .sw-result {
+  gap: 14px;
+  margin: 0;
+}
+
+.app .main .sw-studio .sw-read {
+  padding: 22px 26px 28px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--card);
+  animation: m-page-in 520ms var(--ease-out-expo) backwards;
+}
+
+.app .sw-studio .sw-read .sw-script-head {
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.app .sw-studio .sw-read .dash-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.app .sw-studio .sw-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.app .sw-studio .sw-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 11px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+  transition:
+    border-color var(--motion-fast) var(--ease-out-quart),
+    background-color var(--motion-fast) var(--ease-out-quart),
+    color var(--motion-fast) var(--ease-out-quart);
+}
+
+.app .sw-studio .sw-copy[data-copied] {
+  animation: m-pop 360ms var(--ease-spring);
+}
+
+.app .sw-studio .sw-practice[data-on] {
+  border-color: rgba(157, 107, 255, 0.5);
+  background: var(--accent-wash);
+  color: var(--accent-text);
+}
+
+/* How long it runs, against the length asked for. */
+.app .sw-studio .sw-fit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 22px;
+}
+
+.app .sw-studio .sw-fit-track {
+  position: relative;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+
+.app .sw-studio :is(.sw-fit-fill, .sw-fit-play) {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  transform: scaleX(var(--fit, 0));
+}
+
+.app .sw-studio .sw-fit-fill {
+  background: var(--accent);
+  animation: sw-fill 1100ms var(--ease-out-expo) 200ms backwards;
+}
+
+.app .sw-studio .sw-fit[data-fit="long"] .sw-fit-fill,
+.app .sw-studio .sw-fit[data-fit="short"] .sw-fit-fill {
+  background: var(--text-muted);
+}
+
+.app .sw-studio .sw-fit-play {
+  background: var(--text-primary);
+}
+
+@keyframes sw-fill {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+.app .sw-studio .sw-fit-text {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.app .sw-studio .sw-fit-text strong {
+  font-weight: 550;
+  color: var(--text-secondary);
+}
+
+.app .sw-studio .sw-fit[data-fit="fits"] .sw-fit-text strong {
+  color: var(--accent-text);
+}
+
+/* Sized to be read off a screen while filming, not skimmed. */
+.app .sw-studio .sw-lines {
+  max-width: 68ch;
+}
+
+.app .sw-studio .sw-hook-line {
+  margin: 0 0 14px;
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  text-wrap: balance;
+}
+
+.app .main .sw-studio .sw-read .sw-line {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.75;
+  color: var(--text-primary);
+  text-wrap: pretty;
+  animation: none;
+}
+
+/* Each sentence inks in after the one before it. */
+.app .sw-studio .sw-sentence {
+  border-radius: 4px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  animation: sw-ink 700ms var(--ease-out-quart) backwards;
+  animation-delay: calc(240ms + var(--n, 0) * 110ms);
+  transition:
+    color 220ms var(--ease-out-quart),
+    background-color 220ms var(--ease-out-quart);
+}
+
+@keyframes sw-ink {
+  from {
+    opacity: 0;
+    filter: blur(6px);
+  }
+}
+
+/* Practice read: what's coming is grey, where you are is lit, what's said fades back. */
+.app .sw-studio .sw-read[data-playing] .sw-sentence {
+  color: var(--text-secondary);
+}
+
+.app .sw-studio .sw-read[data-playing] .sw-sentence[data-at="now"] {
+  color: var(--text-primary);
+  background-color: var(--accent-wash);
+}
+
+.app .sw-studio .sw-read[data-playing] .sw-sentence[data-at="said"] {
+  color: rgba(255, 255, 255, 0.28);
+}
+
+.app .main .sw-studio .sw-titles-panel {
+  padding: 18px 20px 8px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--card);
+  animation: m-page-in 520ms var(--ease-out-expo) 260ms backwards;
+}
+
+.app .sw-studio .sw-titles {
+  gap: 0;
+  margin: 8px 0 0;
+}
+
+.app .sw-studio .sw-titles li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+  font-size: 14.5px;
+  color: var(--text-primary);
+}
+
+.app .sw-studio .sw-titles-panel .sw-titles li {
+  animation: m-item-in 560ms var(--ease-out-expo) backwards;
+  animation-delay: calc(380ms + var(--n, 0) * 60ms);
+}
+
+.app .sw-studio .sw-titles li .sw-copy {
+  opacity: 0.55;
+}
+
+.app .sw-studio .sw-titles li:hover .sw-copy,
+.app .sw-studio .sw-titles li .sw-copy:focus-visible,
+.app .sw-studio .sw-titles li .sw-copy[data-copied] {
+  opacity: 1;
+}
+
+.app .sw-studio .sw-result > .sw-footnote {
+  margin: 0 2px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* --- saved scripts beside the writing style --- */
+
+.app .sw-studio .sw-library {
+  display: grid;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (min-width: 1100px) {
+  .app .sw-studio .sw-library {
+    grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  }
+}
+
+.app .main .sw-studio :is(.sw-saved, .sw-styles) {
+  margin: 0;
+  padding: 20px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--card);
+}
+
+.app .sw-studio .sw-saved-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.app .sw-studio .sw-saved-bar .sw-saved-head {
+  margin: 0;
+}
+
+.app .sw-studio .sw-saved > .sw-saved-head,
+.app .sw-studio .sw-styles > .sw-saved-head {
+  margin-bottom: 6px;
+}
+
+.app .sw-studio .sw-saved-filter {
+  width: min(240px, 50%);
+  height: 32px;
+  padding: 0 11px;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+
+.app .sw-studio .sw-saved-empty {
+  margin-top: 10px;
+  padding: 18px;
+  border-radius: 10px;
+  border: 1px dashed var(--border-strong);
+  color: var(--text-muted);
+  font-size: 13.5px;
+}
+
+.app .sw-studio .sw-saved-empty p {
+  margin: 0;
+}
+
+.app .sw-studio .sw-saved-none {
+  margin: 4px 0 0;
+}
+
+.app .sw-studio .sw-saved-list {
+  gap: 8px;
+}
+
+.app .sw-studio .sw-saved-item {
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  transition:
+    border-color var(--motion) var(--ease-out-quart),
+    background-color var(--motion) var(--ease-out-quart);
+}
+
+.app .sw-studio .sw-saved-item:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+  background-color: rgba(255, 255, 255, 0.015);
+}
+
+.app .sw-studio .sw-saved-item[data-open] {
+  border-color: rgba(157, 107, 255, 0.4);
+  background-color: rgba(255, 255, 255, 0.015);
+}
+
+.app .sw-studio .sw-saved-top {
+  padding: 13px 14px;
+}
+
+.app .sw-studio .sw-saved-hook {
+  font-size: 14.5px;
+  font-weight: 550;
+  letter-spacing: -0.005em;
+}
+
+.app .sw-studio .sw-saved-item[data-open] .sw-saved-hook {
+  white-space: normal;
+}
+
+.app .sw-studio .sw-saved-meta {
+  font-size: 12px;
+}
+
+.app .sw-studio .sw-saved-topic {
+  color: var(--text-secondary);
+}
+
+.app .sw-studio .sw-chevron {
+  transition: transform var(--motion) var(--ease-spring), color var(--motion-fast) var(--ease-out-quart);
+}
+
+.app .sw-studio .sw-saved-item:hover .sw-chevron {
+  color: var(--text-secondary);
+}
+
+/* Unfolds to its own height. The grid row goes from 0fr to 1fr; padding
+   lives on spacers inside so a closed row really is zero tall. */
+.app .sw-studio .sw-saved-fold {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 360ms var(--ease-out-expo);
+}
+
+.app .sw-studio [data-open] > .sw-saved-fold {
+  grid-template-rows: 1fr;
+}
+
+.app .sw-studio .sw-saved-fold > * {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app .sw-studio .sw-saved-fold > .sw-saved-body,
+.app .sw-studio .sw-saved-fold > .sw-style-body {
+  padding-top: 0;
+  padding-bottom: 0;
+  border-top: 0;
+  animation: none;
+  opacity: 0;
+  transition: opacity 240ms var(--ease-out-quart);
+}
+
+.app .sw-studio [data-open] > .sw-saved-fold > * {
+  opacity: 1;
+  transition-delay: 80ms;
+}
+
+.app .sw-studio .sw-saved-body::before {
+  content: "";
+  display: block;
+  height: 1px;
+  margin-bottom: 14px;
+  background: var(--border);
+}
+
+.app .sw-studio :is(.sw-saved-body, .sw-style-body)::after {
+  content: "";
+  display: block;
+  height: 14px;
+}
+
+.app .main .sw-studio .sw-saved-body .sw-line {
+  margin: 0 0 12px;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--text-primary);
+}
+
+.app .sw-studio .sw-saved-body .sw-titles li {
+  font-size: 13.5px;
+}
+
+.app .sw-studio .sw-saved-actions {
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.app .sw-studio .sw-saved-actions .sw-footnote {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.app .sw-studio .sw-delete {
+  height: 30px;
+  padding: 0 11px;
+  font-size: 12.5px;
+  transition:
+    border-color var(--motion-fast) var(--ease-out-quart),
+    color var(--motion-fast) var(--ease-out-quart);
+}
+
+/* Writing style */
+
+.app .sw-studio .sw-styles .dash-row-sub {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.app .sw-studio .sw-style-list {
+  gap: 8px;
+}
+
+.app .sw-studio .sw-style-item {
+  border-radius: 10px;
+  background: transparent;
+  transition: border-color var(--motion) var(--ease-out-quart);
+}
+
+.app .sw-studio .sw-style-item:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.app .sw-studio .sw-style-item[data-open] {
+  border-color: rgba(157, 107, 255, 0.4);
+}
+
+.app .sw-studio .sw-style-name {
+  font-size: 13.5px;
+}
+
+.app .sw-studio .sw-style-tag[data-on] {
+  background: var(--accent-wash);
+  color: var(--accent-text);
+}
+
+.app .sw-studio .sw-style-text {
+  font-size: 13.5px;
+}
+
+.app .sw-studio .sw-add {
+  width: 100%;
+  height: 38px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.app .sw-studio .sw-style-form {
+  animation: m-fade 320ms var(--ease-out-quart) backwards;
+}
+
+/* --- small screens --- */
+
+@media (max-width: 720px) {
+  .app .sw-studio .sw-ideas-form {
+    flex-wrap: wrap;
+  }
+
+  .app .sw-studio .sw-ideas-form input {
+    flex: 1 1 100%;
+  }
+
+  .app .main .sw-studio :is(.sw-ideas, .sw-composer, .sw-saved, .sw-styles) {
+    padding: 16px;
+  }
+
+  .app .main .sw-studio .sw-read {
+    padding: 18px 18px 22px;
+  }
+
+  .app .sw-studio .sw-stage-empty {
+    padding: 18px 18px 6px;
+  }
+
+  .app .sw-studio .sw-beat {
+    grid-template-columns: 64px minmax(0, 1fr);
+    column-gap: 12px;
+  }
+
+  .app .sw-studio .sw-hook-line {
+    font-size: 19px;
+  }
+
+  .app .main .sw-studio .sw-read .sw-line {
+    font-size: 16px;
+  }
+
+  .app .sw-studio .sw-saved-bar {
+    flex-wrap: wrap;
+  }
+
+  .app .sw-studio .sw-saved-filter {
+    width: 100%;
+  }
+
+  .app .sw-studio .sw-titles li .sw-copy {
+    opacity: 1;
+  }
+}
+
+/* --- reduced motion: everything still works, nothing moves on its own --- */
+
+@media (prefers-reduced-motion: reduce) {
+  .app .sw-studio :is(
+      .sw-sentence,
+      .sw-beat,
+      .sw-beat-name,
+      .sw-beat-lines i,
+      .sw-fit-fill,
+      .sw-read,
+      .sw-titles-panel,
+      .sw-titles li,
+      .sw-stage-empty,
+      .sw-tone-note,
+      .sw-style-form,
+      .sw-idea-ghost i,
+      .sw-composer,
+      .sw-idea-input,
+      .sw-copy
+    ) {
+    animation: none !important;
+  }
+
+  .app .sw-studio .sw-step-busy::before {
+    animation: none;
+  }
+
+  .app .sw-studio :is(.sw-saved-fold, .sw-saved-fold > *) {
+    transition: none;
+  }
+}
