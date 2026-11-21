@@ -1,4 +1,4 @@
-import { deltaOverWindow } from "./metrics";
+import { deltaOverWindow, gainOverWindow } from "./metrics";
 
 /** Pure helpers for the dashboard: growth deltas, alerts, and activity labels. */
 
@@ -15,8 +15,8 @@ export function channelGrowth(snapshots: readonly { captured_at: string; subscri
   return {
     subs24h: deltaOverWindow(subs, 20),
     subs7d: deltaOverWindow(subs, 24 * 6.5),
-    views24h: deltaOverWindow(views, 20),
-    views7d: deltaOverWindow(views, 24 * 6.5),
+    views24h: gainOverWindow(views, 20),
+    views7d: gainOverWindow(views, 24 * 6.5),
   };
 }
 

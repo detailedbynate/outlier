@@ -75,6 +75,24 @@ export function deltaOverWindow(points: readonly SnapshotPoint[], windowHours: n
   return baseline ? latest.value - baseline.value : null;
 }
 
+/**
+ * What a running total gained over the trailing window: the rises between
+ * snapshots, added up, with any falls left out. A channel's total views only
+ * fall when a video is deleted, made private or audited, and that isn't
+ * negative viewing, so it shouldn't read as "-1.1M views this week". Same
+ * baseline rule as deltaOverWindow; null when history is too short.
+ */
+export function gainOverWindow(points: readonly SnapshotPoint[], windowHours: number): number | null {
+  if (points.length < 2) return null;
+  const sorted = points.toSorted((a, b) => toMs(a.capturedAt) - toMs(b.capturedAt));
+  const cutoff = toMs(sorted.at(-1)!.capturedAt) - windowHours * MS_PER_HOUR;
+  const start = sorted.findLastIndex((p) => toMs(p.capturedAt) <= cutoff);
+  if (start < 0) return null;
+  let gained = 0;
+  for (let i = start + 1; i < sorted.length; i++) gained += Math.max(0, sorted[i]!.value - sorted[i - 1]!.value);
+  return gained;
+}
+
 /** Percent growth between two values; null when the starting value is zero or unknown. */
 export function growthRate(from: number | null, to: number | null): number | null {
   if (from === null || to === null || from <= 0) return null;

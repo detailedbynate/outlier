@@ -3,6 +3,7 @@ import {
   isPromoted,
   computeVideoPerformance,
   deltaOverWindow,
+  gainOverWindow,
   engagementRate,
   growthRate,
   median,
@@ -49,6 +50,18 @@ describe("analytics metrics", () => {
     expect(deltaOverWindow(points, 24 * 7)).toBe(900);
     expect(deltaOverWindow(points, 24 * 30)).toBeNull();
     expect(deltaOverWindow(points.slice(0, 1), 24)).toBeNull();
+  });
+
+  it("gainOverWindow adds up rises and ignores a removed video's drop", () => {
+    const points = [
+      { capturedAt: "2026-09-05T00:00:00Z", value: 4_500_000 },
+      { capturedAt: "2026-09-10T00:00:00Z", value: 4_520_000 },
+      { capturedAt: "2026-09-11T00:00:00Z", value: 3_400_000 },
+      { capturedAt: "2026-09-13T00:00:00Z", value: 3_413_000 },
+    ];
+    expect(gainOverWindow(points, 24 * 7)).toBe(33_000);
+    expect(gainOverWindow(points, 24 * 30)).toBeNull();
+    expect(gainOverWindow(points.slice(0, 1), 24)).toBeNull();
   });
 
   it("growthRate", () => {

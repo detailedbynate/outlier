@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { LineChart } from "@/components/line-chart";
 import { StatTile } from "@/components/stat-tile";
 import { VideoCard } from "@/components/video-card";
+import { WatchGrid } from "@/components/watch-grid";
+import { watchItems } from "@/components/watch-items";
 import { daysAgo, formatCompact, formatNumber, timeAgo } from "@/lib/format";
 import { requireApprovedUser } from "@/lib/auth/session";
 import { Paywall } from "@/components/paywall";
@@ -92,11 +94,11 @@ export default async function ChannelPage({ params }: { params: Promise<{ id: st
         {topOutliers.length === 0 ? (
           <div className="card empty">No performance data yet.</div>
         ) : (
-          <div className="video-grid">
+          <WatchGrid items={watchItems(topOutliers)}>
             {topOutliers.map((video) => (
               <VideoCard key={video.video_id} video={video} showChannel={false} />
             ))}
-          </div>
+          </WatchGrid>
         )}
       </section>
 

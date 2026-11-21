@@ -11,6 +11,8 @@ import { getServices } from "@/lib/services";
 import { CREDIT_COSTS } from "@/lib/services/credits-service";
 import { looksLikeChannelReference } from "@/lib/services/research-service";
 import { VideoCard } from "@/components/video-card";
+import { WatchGrid } from "@/components/watch-grid";
+import { watchItems } from "@/components/watch-items";
 import { writerAccess } from "@/lib/scripts/access";
 import { AddChannel } from "./add-channel";
 import { PeerPlan } from "./peer-plan";
@@ -299,11 +301,11 @@ export default async function ShortsChannelsPage({ searchParams }: { searchParam
               <p className="stat-note">Shorts from the last 30 days beating their channel&apos;s usual views</p>
             </div>
           </div>
-          <div className="video-grid">
+          <WatchGrid items={watchItems(breakouts)}>
             {breakouts.map((video) => (
               <VideoCard key={video.video_id} video={video} />
             ))}
-          </div>
+          </WatchGrid>
           {breakouts.length >= 3 ? <PeerPlan channelId={target.id} cost={CREDIT_COSTS.peer_ideas} available={canPlan} /> : null}
         </section>
       ) : null}
