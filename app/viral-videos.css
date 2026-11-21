@@ -730,6 +730,29 @@ html:has(.vv-watch[open]) {
   font-size: 10.5px;
 }
 
+/* --- the line above the grid --- */
+
+.app .vv-meta {
+  margin: 0 0 -8px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.app .vv-meta strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.app .vv-meta-score {
+  color: var(--signal, #c4f542);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.app .vv-meta-hint {
+  margin-left: 4px;
+}
+
 /* --- smaller screens --- */
 
 @media (max-width: 960px) {

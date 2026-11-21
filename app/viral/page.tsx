@@ -12,7 +12,7 @@ import { PAID_FEATURES } from "@/lib/billing/features";
 import { ANGLES, HOOK_TYPES, VIDEO_STYLES, termDescription, termLabel } from "@/lib/breakdowns/taxonomy";
 import { getServices } from "@/lib/services";
 import type { VideoBreakdownRow, VideoFeedRow, VideoFormat } from "@/types/database";
-import { RANGES, SORTS, readState, viralHref, type TermParam, type ViralState } from "./options";
+import { RANGES, readState, viralHref, type TermParam, type ViralState } from "./options";
 
 export const dynamic = "force-dynamic";
 
@@ -32,21 +32,23 @@ export default async function ViralPage({ searchParams }: { searchParams: Search
   const filtering = Boolean(state.style || state.hook || state.angle);
 
   const { repositories } = getServices();
-  // No breakdowns table yet (migration not applied): show the plain feed rather than fail the page.
-  const matching = filtering
-    ? await repositories.breakdowns.videoIdsWhere({ style: state.style, hookType: state.hook, angle: state.angle }, 600).catch(() => null)
-    : null;
-  const videos = await repositories.videos.feed({
-    orderBy: state.sort,
-    limit: 60,
+  const window = {
     publishedAfter: state.range === "all" ? undefined : daysAgo(Number(state.range)),
     format: state.format === "all" ? undefined : (state.format as VideoFormat),
     discovery: true,
-    ...(matching ? { videoIds: matching } : {}),
-  });
-  const breakdowns: Map<string, VideoBreakdownRow> = await repositories.breakdowns.forVideos(videos.map((v) => v.video_id)).catch(() => new Map());
+  };
+  // Every explained video that fits the filters (all of them when none are set). It's what the
+  // patterns panel reads, and with a filter set it's the grid too. No breakdowns table yet
+  // (migration not applied): the plain feed, no patterns.
+  const explainedIds = await repositories.breakdowns.videoIdsWhere({ style: state.style, hookType: state.hook, angle: state.angle }, 600).catch(() => null);
+  const [videos, explained] = await Promise.all([
+    filtering && explainedIds ? Promise.resolve(null) : repositories.videos.feed({ ...window, orderBy: state.sort, limit: 60 }),
+    explainedIds ? repositories.videos.feed({ ...window, orderBy: state.sort, limit: 600, videoIds: explainedIds }) : Promise.resolve([]),
+  ]);
+  const shown = videos ?? explained.slice(0, 60);
+  const breakdowns: Map<string, VideoBreakdownRow> = await repositories.breakdowns.forVideos([...new Set([...shown, ...explained].map((v) => v.video_id))]).catch(() => new Map());
 
-  if (videos.length === 0) {
+  if (shown.length === 0) {
     return (
       <div className="card empty vv-empty">
         {filtering ? (
@@ -60,11 +62,24 @@ export default async function ViralPage({ searchParams }: { searchParams: Search
     );
   }
 
+  const scores = shown.map((v) => v.outlier_score).filter((x): x is number => x !== null);
+  const typical = median(scores);
+  const channels = new Set(shown.map((v) => v.youtube_channel_id)).size;
+
   return (
     <>
-      <WhatWorks videos={videos} breakdowns={breakdowns} state={state} />
-      <WatchGrid items={watchItems(videos)}>
-        {videos.map((video) => (
+      <WhatWorks explained={explained.filter((v) => breakdowns.has(v.video_id))} breakdowns={breakdowns} state={state} />
+      <p className="vv-meta">
+        <strong>{shown.length}</strong> video{shown.length === 1 ? "" : "s"} from {channels} channel{channels === 1 ? "" : "s"}
+        {typical !== null ? (
+          <>
+            , typically <span className="vv-meta-score">{formatMultiplier(typical)}</span> their channel&apos;s usual views
+          </>
+        ) : null}
+        . <span className="vv-meta-hint">Click a thumbnail to watch it here.</span>
+      </p>
+      <WatchGrid items={watchItems(shown)}>
+        {shown.map((video) => (
           <VideoCard key={video.video_id} video={video} breakdown={breakdowns.get(video.video_id)} />
         ))}
       </WatchGrid>
@@ -79,18 +94,13 @@ const COLUMNS: { param: TermParam; field: "hook_type" | "style" | "angle"; title
 ];
 
 /**
- * What the videos on screen have in common, from Claude's read of each: the
- * hooks, styles and angles that turn up most, how often, and how far those
- * videos beat their channels. Each one filters the page to it.
+ * What's working, from Claude's read of every explained video that fits the
+ * filters: the hooks, styles and angles that turn up most, how often, and how
+ * far those videos beat their channels. Each one filters the page to it.
  */
-function WhatWorks({ videos, breakdowns, state }: { videos: VideoFeedRow[]; breakdowns: Map<string, VideoBreakdownRow>; state: ViralState }) {
-  const explained = videos.filter((v) => breakdowns.has(v.video_id));
-  const scores = videos.map((v) => v.outlier_score).filter((s): s is number => s !== null);
-  const typical = median(scores);
-  const top = scores.length ? Math.max(...scores) : null;
-  const channels = new Set(videos.map((v) => v.youtube_channel_id)).size;
+function WhatWorks({ explained, breakdowns, state }: { explained: VideoFeedRow[]; breakdowns: Map<string, VideoBreakdownRow>; state: ViralState }) {
+  if (explained.length < 3) return null;
   const range = RANGES.find((r) => r.key === state.range)?.label.toLowerCase();
-  const sort = SORTS.find((s) => s.key === state.sort)?.label.toLowerCase();
 
   const columns = COLUMNS.map((column) => {
     const groups = new Map<string, number[]>();
@@ -102,7 +112,7 @@ function WhatWorks({ videos, breakdowns, state }: { videos: VideoFeedRow[]; brea
     const rows = [...groups.entries()]
       .map(([key, list]) => ({ key, count: list.length, median: median(list.filter((s) => s > 0)) }))
       .sort((a, b) => b.count - a.count || (b.median ?? 0) - (a.median ?? 0))
-      .slice(0, 4);
+      .slice(0, 5);
     return { ...column, rows };
   });
 
@@ -110,29 +120,14 @@ function WhatWorks({ videos, breakdowns, state }: { videos: VideoFeedRow[]; brea
     <section className="vv-works" aria-labelledby="vv-works-title">
       <div className="vv-works-head">
         <div>
-          <h2 id="vv-works-title">What these {videos.length} have in common</h2>
+          <h2 id="vv-works-title">What&apos;s working {state.range === "all" ? "overall" : `in the last ${range}`}</h2>
           <p>
-            {state.range === "all" ? "All time" : `Last ${range}`}, by {sort}, from {channels} channel{channels === 1 ? "" : "s"}.{" "}
-            {explained.length > 0 ? `Claude has explained ${explained.length} of them; click a pattern to see only those.` : "Claude hasn't explained any of these yet."}
+            Patterns across the {explained.length} viral videos Claude has explained that fit these filters. The bar is how many use it;
+            &ldquo;typical&rdquo; is how far those videos beat their channel&apos;s usual. Click one to see only those.
           </p>
         </div>
-        <dl className="vv-works-stats">
-          {typical !== null ? (
-            <div>
-              <dt>Typical</dt>
-              <dd>{formatMultiplier(typical)}</dd>
-            </div>
-          ) : null}
-          {top !== null ? (
-            <div>
-              <dt>Top</dt>
-              <dd>{formatMultiplier(top)}</dd>
-            </div>
-          ) : null}
-        </dl>
       </div>
-      {explained.length >= 3 ? (
-        <div className="vv-works-cols">
+      <div className="vv-works-cols">
           {columns.map((column, c) => (
             <div key={column.param} className="vv-works-col">
               <h3>{column.title}</h3>
@@ -147,7 +142,7 @@ function WhatWorks({ videos, breakdowns, state }: { videos: VideoFeedRow[]; brea
                         data-on={on ? "" : undefined}
                         title={termDescription(TERMS[column.param], row.key)}
                         scroll={false}
-                        style={{ "--share": row.count / explained.length, "--i": c * 4 + i } as CSSProperties}
+                        style={{ "--share": row.count / explained.length, "--i": c * 5 + i } as CSSProperties}
                       >
                         <span className="vv-work-label">{termLabel(TERMS[column.param], row.key)}</span>
                         <span className="vv-work-count">
@@ -162,8 +157,7 @@ function WhatWorks({ videos, breakdowns, state }: { videos: VideoFeedRow[]; brea
               </ol>
             </div>
           ))}
-        </div>
-      ) : null}
+      </div>
     </section>
   );
 }

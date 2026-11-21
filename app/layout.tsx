@@ -29,6 +29,7 @@ import "./script-writer.css";
 import "./voice-studio.css";
 import "./transcribe.css";
 import "./viral-videos.css";
+import "./tracked-channels.css";
 import { PointerLight } from "@/components/pointer-light";
 import { writerOpenTo } from "@/lib/scripts/access";
 import { LANDING_HEADER } from "@/lib/landing-link";

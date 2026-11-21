@@ -1,0 +1,463 @@
+/* ===========================================================================
+   Tracked Channels, loaded after globals.css and motion.css.
+
+   One row per channel: who it is, its subscribers over eight days as a line
+   that draws itself in, what it gained this week and how its newest upload is
+   doing. Black page, flat #0e0e0e surfaces, hairlines; violet for the lines,
+   lime only for outlier scores.
+=========================================================================== */
+
+@keyframes tc-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+
+.app .tc {
+  --tc-cols: minmax(220px, 1.4fr) 110px 130px 130px minmax(230px, 1.6fr) 84px;
+}
+
+/* --- add a channel --- */
+
+.app .tc-add {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  align-items: center;
+  gap: 14px 28px;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--card, #0e0e0e);
+}
+
+.app .tc-add h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.app .tc-add p {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.app .tc-add form {
+  margin: 0;
+}
+
+.app .tc-add .form {
+  flex-wrap: nowrap;
+}
+
+.app .tc-add .form input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* --- this week, in three numbers --- */
+
+.app .tc-sum {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.7fr;
+  gap: 12px;
+  margin: 0;
+}
+
+.app .tc-sum > div {
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--card, #0e0e0e);
+  animation: m-item-in 520ms var(--ease-out-expo) backwards;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+
+.app .tc-sum dt {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.app .tc-sum dd {
+  margin: 4px 0 2px;
+  font-size: 24px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.app .tc-sum small {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.app .tc-sum-best dd {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  margin: 8px 0 4px;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.app .tc-sum-best a {
+  overflow: hidden;
+  color: var(--text-primary);
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 180ms ease;
+}
+
+.app .tc-sum-best a:hover {
+  color: var(--accent-text);
+}
+
+.app .tc-score {
+  display: inline-block;
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--signal, #c4f542);
+  color: #0b0b0b;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- the list --- */
+
+.app .tc-list-card {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--card, #0e0e0e);
+}
+
+.app .tc-list-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.app .tc-list-head h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.app :is(.tc-cols, .tc-row) {
+  display: grid;
+  grid-template-columns: var(--tc-cols);
+  align-items: center;
+  gap: 18px;
+  padding-inline: 16px;
+}
+
+.app .tc-cols {
+  padding-block: 9px;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+.app .tc-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.app .tc-row {
+  padding-block: 12px;
+  border-top: 1px solid var(--border);
+  transition: background 200ms ease;
+  animation: m-item-in 480ms var(--ease-out-expo) backwards;
+  animation-delay: calc(120ms + var(--i, 0) * 40ms);
+}
+
+.app .tc-row:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.app .tc-who {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.app .tc-avatar {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #1a1a1a;
+  object-fit: cover;
+}
+
+.app .tc-who-text {
+  display: grid;
+  min-width: 0;
+}
+
+.app .tc-who-text :is(strong, small) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app .tc-who-text strong {
+  font-size: 14px;
+  font-weight: 600;
+  transition: color 180ms ease;
+}
+
+.app .tc-who-text small {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.app .tc-who:hover strong {
+  color: var(--accent-text);
+}
+
+.app .tc-spark {
+  display: block;
+  height: 34px;
+}
+
+.app .tc-spark svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.app .tc-spark path {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  animation: tc-draw 1.2s var(--ease-out-expo) backwards;
+  animation-delay: calc(280ms + var(--i, 0) * 40ms);
+}
+
+.app .tc-spark[data-flat] path {
+  stroke: var(--text-muted);
+  opacity: 0.5;
+}
+
+.app .tc-spark-empty {
+  height: auto;
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+
+.app .tc-num {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.app .tc-num strong {
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.app .tc-num small {
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.app .tc-num small[data-tone="up"] {
+  color: var(--good-text);
+}
+
+.app .tc-num small[data-tone="down"] {
+  color: var(--critical);
+}
+
+.app .tc-latest {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.app .tc-latest :is(img, .tc-latest-blank) {
+  flex: none;
+  width: 64px;
+  height: 36px;
+  border-radius: 6px;
+  background: #151515;
+  object-fit: cover;
+}
+
+.app .tc-latest-text {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.app .tc-latest-title {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 180ms ease;
+}
+
+.app .tc-latest small {
+  display: flex;
+  align-items: center;
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.app .tc-latest .tc-score {
+  margin-right: 7px;
+  padding: 0 6px;
+  font-size: 11px;
+  line-height: 17px;
+}
+
+.app .tc-latest:hover .tc-latest-title {
+  color: var(--accent-text);
+}
+
+.app .tc-latest-none {
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+
+.app .tc-remove {
+  justify-self: end;
+  margin: 0;
+}
+
+.app .tc-remove button {
+  color: var(--text-muted);
+}
+
+.app .tc-remove button:hover {
+  color: var(--text-primary);
+}
+
+.app .tc-empty {
+  display: grid;
+  gap: 6px;
+  padding: 36px 20px;
+  text-align: center;
+}
+
+.app .tc-empty strong {
+  font-size: 15px;
+}
+
+.app .tc-empty span {
+  max-width: 52ch;
+  margin: 0 auto;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* --- smaller screens --- */
+
+@media (max-width: 1100px) {
+  .app .tc-cols {
+    display: none;
+  }
+
+  .app .tc-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-areas:
+      "who who remove"
+      "spark subs views"
+      "latest latest latest";
+    gap: 12px 16px;
+  }
+
+  .app .tc-who {
+    grid-area: who;
+  }
+
+  .app .tc-spark {
+    grid-area: spark;
+  }
+
+  .app .tc-num[data-label="Subscribers"] {
+    grid-area: subs;
+  }
+
+  .app .tc-num[data-label="Views this week"] {
+    grid-area: views;
+  }
+
+  .app .tc-num::before {
+    content: attr(data-label);
+    color: var(--text-muted);
+    font-size: 11px;
+  }
+
+  .app .tc-latest {
+    grid-area: latest;
+  }
+
+  .app .tc-remove {
+    grid-area: remove;
+  }
+}
+
+@media (max-width: 860px) {
+  .app .tc-add {
+    grid-template-columns: 1fr;
+  }
+
+  .app .tc-sum {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .app .tc-sum-best {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 560px) {
+  .app .tc-add .form {
+    flex-wrap: wrap;
+  }
+
+  .app .tc-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas:
+      "who remove"
+      "subs views"
+      "spark spark"
+      "latest latest";
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app .tc-sum > div,
+  .app .tc-row,
+  .app .tc-spark path {
+    animation: none;
+  }
+}
