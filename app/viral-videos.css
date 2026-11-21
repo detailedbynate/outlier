@@ -520,8 +520,9 @@ html:has(.vv-watch[open]) {
   color: var(--text-primary, #f2f2f2);
 }
 
+/* A modal dialog is pinned to both sides, so `auto` would stretch it: fit it to the upright video instead. */
 .vv-watch:has(.vv-watch-body[data-short]) {
-  width: auto;
+  width: fit-content;
 }
 
 .vv-watch[open] {
