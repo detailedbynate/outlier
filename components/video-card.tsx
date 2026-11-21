@@ -5,36 +5,52 @@ import { formatCompact, formatMultiplier, timeAgo } from "@/lib/format";
 import type { VideoBreakdownRow, VideoFeedRow } from "@/types/database";
 
 export function VideoCard({ video, showChannel = true, breakdown }: { video: VideoFeedRow; showChannel?: boolean; breakdown?: VideoBreakdownRow | null }) {
+  const format = video.format === "short" ? "Short" : video.format === "long_form" ? "Video" : video.format;
+  const length = duration(video.duration_seconds);
   return (
     <article className="card video-card">
-      <a href={`https://www.youtube.com/watch?v=${video.youtube_video_id}`} target="_blank" rel="noreferrer">
+      <a className="video-thumb" href={`https://www.youtube.com/watch?v=${video.youtube_video_id}`} target="_blank" rel="noreferrer" aria-label={`Watch ${video.title} on YouTube`}>
         {video.thumbnail_url ? <img className="thumb" src={video.thumbnail_url} alt="" loading="lazy" /> : null}
+        {video.outlier_score !== null ? (
+          <span className="video-thumb-score" title="Views compared to the channel's typical video">
+            {formatMultiplier(video.outlier_score)}
+          </span>
+        ) : null}
+        <span className="video-thumb-chip">
+          {format}
+          {length ? <span> · {length}</span> : null}
+        </span>
       </a>
       <h3 className="video-title clamp" title={video.title}>
         {video.title}
       </h3>
       {showChannel ? (
-        <div className="row" style={{ marginBottom: 8 }}>
-          <Link href={`/channels/${video.youtube_channel_id}`} className="muted">
-            {video.channel_title}
-          </Link>
-          <span className="muted">· {formatCompact(video.subscriber_count)} subs</span>
+        <div className="video-channel">
+          <Link href={`/channels/${video.youtube_channel_id}`}>{video.channel_title}</Link>
+          <span>{formatCompact(video.subscriber_count)} subs</span>
         </div>
       ) : null}
-      <div className="metric-line">
-        <span className="outlier" title="Views compared to the channel's typical video">
-          {formatMultiplier(video.outlier_score)} outlier
+      <div className="video-stats">
+        <span title="Total views">
+          <strong>{formatCompact(video.view_count)}</strong> views
         </span>
-        <span>{formatCompact(video.view_count)} views</span>
-        <span>{formatCompact(video.views_per_day)}/day</span>
-      </div>
-      <div className="metric-line" style={{ marginTop: 4 }}>
-        <span className="badge">{video.format === "short" ? "Short" : video.format === "long_form" ? "Video" : video.format}</span>
-        <span>{timeAgo(video.published_at)}</span>
+        <span title="Average views per day since upload">
+          <strong>{formatCompact(video.views_per_day)}</strong>/day
+        </span>
+        <span className="video-stats-age">{timeAgo(video.published_at)}</span>
       </div>
       {breakdown ? <Breakdown breakdown={breakdown} /> : null}
     </article>
   );
+}
+
+/** "0:42" or "12:05" from seconds; nothing when unknown. */
+function duration(seconds: number | null): string | null {
+  if (!seconds || seconds <= 0) return null;
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = String(seconds % 60).padStart(2, "0");
+  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${s}` : `${m}:${s}`;
 }
 
 /** "Why it blew up": Claude's read, collapsed until opened. */

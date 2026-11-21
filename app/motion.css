@@ -210,6 +210,7 @@
 
 /* Thumbnails: a slow push-in inside their frame on hover. */
 .app .video-card > a:first-child {
+  position: relative;
   display: block;
   overflow: hidden;
   border-radius: 10px;
@@ -250,11 +251,125 @@
   transform: scale(1.07);
 }
 
-/* The outlier multiplier lands with a small pop once its card is in. */
-.app .video-card .outlier {
-  display: inline-block;
-  animation: m-pop 520ms var(--ease-spring) backwards;
-  animation-delay: calc(420ms + var(--n, 0) * 38ms);
+/* ---------------------------------------------------------------------------
+   Video cards: the thumbnail carries the score (lime, the outlier colour) and
+   the format and length, like a player would; the stats sit in one quiet row.
+--------------------------------------------------------------------------- */
+.app .video-card {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 10px 12px;
+}
+
+.app .video-card .video-thumb {
+  position: relative;
+}
+
+.video-thumb-score {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 1;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--signal, #c4f542);
+  color: #0b0b0b;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  animation: m-pop 560ms var(--ease-spring) backwards;
+  animation-delay: calc(380ms + var(--n, 0) * 38ms);
+}
+
+.video-thumb-chip {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 1;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.78);
+  color: #f2f2f2;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.video-thumb-chip > span {
+  color: #bdbdbd;
+  font-weight: 500;
+}
+
+.app .video-card .video-title {
+  margin: 0 2px 6px;
+  font-size: 14px;
+  line-height: 1.38;
+  letter-spacing: -0.01em;
+  /* Two lines held open, so a short title doesn't lift its card's stats out of line with its row. */
+  min-height: 2.76em;
+}
+
+/* Opening one card's breakdown grows that card, not its whole row. */
+.app .video-grid {
+  align-items: start;
+}
+
+.video-channel {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0 2px 10px;
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.video-channel a {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+  transition: color 200ms var(--ease-out-quart);
+}
+
+.video-channel a:hover {
+  color: var(--text-primary);
+}
+
+.video-channel span {
+  flex: none;
+}
+
+.video-channel span::before {
+  content: "·";
+  margin-right: 6px;
+}
+
+.video-stats {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin: 0 2px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.video-stats strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.video-stats-age {
+  margin-left: auto;
+}
+
+.app .video-card .breakdown {
+  margin: 10px 2px 0;
 }
 
 /* ---------------------------------------------------------------------------
@@ -559,4 +674,36 @@ html {
   .not-found-links a {
     animation: none;
   }
+}
+
+/* ---------------------------------------------------------------------------
+   Type: page titles get a little more presence, intros stay a readable
+   width, and links inside text draw their underline in on hover.
+--------------------------------------------------------------------------- */
+@media (min-width: 901px) {
+  .app .main :is(h1, .page-header h1, .dash-hero h1) {
+    font-size: 30px;
+    line-height: 1.15;
+    font-weight: 650;
+    letter-spacing: -0.035em;
+  }
+}
+
+.app .main :is(.subtitle, .page-header .subtitle, .page-header p) {
+  max-width: 72ch;
+  text-wrap: pretty;
+}
+
+.app .main :is(h1, h2, h3) {
+  text-wrap: balance;
+}
+
+.app .main :is(p, li, .subtitle, .notice) a:not([class]) {
+  color: var(--accent-text);
+  background: linear-gradient(currentColor, currentColor) 0 100% / 0 1px no-repeat;
+  transition: background-size 380ms var(--ease-out-expo);
+}
+
+.app .main :is(p, li, .subtitle, .notice) a:not([class]):hover {
+  background-size: 100% 1px;
 }
