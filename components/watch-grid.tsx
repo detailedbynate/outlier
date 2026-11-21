@@ -36,7 +36,7 @@ export function WatchGrid({ items, children, className = "video-grid" }: { items
 
   const onGridClick = (event: MouseEvent<HTMLDivElement>) => {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-    const link = (event.target as Element).closest<HTMLAnchorElement>("a.video-thumb");
+    const link = (event.target as Element).closest<HTMLAnchorElement>("a.video-thumb, a[data-watch]");
     if (!link) return;
     const id = new URL(link.href).searchParams.get("v");
     const index = items.findIndex((i) => i.id === id);

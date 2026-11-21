@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { PlugIcon } from "@/components/icons";
-import { PageHeader } from "@/components/page-header";
+import type { CSSProperties } from "react";
 import { Paywall } from "@/components/paywall";
 import { requireApprovedUser } from "@/lib/auth/session";
 import { paidFeaturesLocked } from "@/lib/billing/feature-gate";
@@ -16,11 +15,17 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Connect AI · Outlier" };
 
 const TOOLS = [
-  ["Search Shorts channels", "by niche, size, faceless or on camera"],
-  ["Find similar channels", "for any @handle or channel link, with a match %"],
-  ["What's working for similar channels", "Shorts beating their channel's usual views right now"],
-  ["Viral Shorts", "outliers across the library"],
-  ["Removed channels", "channels YouTube took down"],
+  { name: "Search Shorts channels", note: "By niche, size, faceless or on camera." },
+  { name: "Find similar channels", note: "For any @handle or channel link, with a match %." },
+  { name: "What's working for similar channels", note: "Shorts beating their channel's usual views right now." },
+  { name: "Viral Shorts", note: "Outliers across the whole library." },
+  { name: "Removed channels", note: "Channels YouTube took down, with what they had." },
+] as const;
+
+const PROMPTS = [
+  "Find faceless gaming Shorts channels under 50K subscribers that grew this month",
+  "Which channels are most like @MrBeast, and what are their best Shorts lately?",
+  "What hooks are the viral Shorts in cooking using this week?",
 ] as const;
 
 export default async function ConnectAiPage() {
@@ -33,41 +38,50 @@ export default async function ConnectAiPage() {
   const endpoint = `${origin}/api/mcp`;
 
   return (
-    <div className="research-page">
-      <PageHeader icon={PlugIcon} title="Connect AI" subtitle="Use Outlier from Claude and other AI assistants through the Outlier MCP server." />
+    <div className="stack ca">
+      <header className="dash-hero ca-hero">
+        <div className="dash-hero-text">
+          <h1>Connect AI</h1>
+          <p>Ask Claude, Cursor or any MCP assistant about channels and Shorts, and it answers from your Outlier library. It only reads, so it uses no credits; each token allows 300 calls an hour.</p>
+        </div>
+      </header>
 
-      <section className="card stack">
-        <h2>What your assistant can do</h2>
-        <ul className="mcp-tools">
-          {TOOLS.map(([name, note]) => (
-            <li key={name}>
-              <strong>{name}</strong> <span className="muted">· {note}</span>
+      <section aria-labelledby="ca-tools-title">
+        <h2 id="ca-tools-title" className="ca-title">
+          What your assistant can do
+        </h2>
+        <ul className="ca-tools">
+          {TOOLS.map((tool, i) => (
+            <li key={tool.name} style={{ "--i": i } as CSSProperties}>
+              <strong>{tool.name}</strong>
+              <span>{tool.note}</span>
             </li>
           ))}
         </ul>
-        <p className="stat-note">It reads your Outlier library only, so it uses no credits. Up to 300 calls an hour per token.</p>
       </section>
 
-      <section className="card stack">
-        <h2>Set it up</h2>
-        <p className="stat-note">
-          Server address: <code>{endpoint}</code>
-        </p>
-        <CreateToken endpoint={endpoint} />
+      <section className="ca-card" aria-labelledby="ca-setup-title">
+        <h2 id="ca-setup-title" className="ca-title">
+          Set it up
+        </h2>
+        <CreateToken endpoint={endpoint} prompts={PROMPTS} />
       </section>
 
-      <section className="card">
-        <h2>Your tokens</h2>
+      <section className="ca-card" aria-labelledby="ca-tokens-title">
+        <h2 id="ca-tokens-title" className="ca-title">
+          Your tokens
+        </h2>
         {tokens.length === 0 ? (
-          <div className="empty">No tokens yet.</div>
+          <p className="ca-empty">None yet. Make one above; it shows up here with when it was last used.</p>
         ) : (
-          <ul className="mcp-token-list">
+          <ul className="ca-tokens">
             {tokens.map((t) => (
               <li key={t.id}>
+                <span className="ca-token-dot" data-live={t.last_used_at ? "" : undefined} aria-hidden="true" />
                 <div>
                   <strong>{t.label}</strong>
-                  <span className="muted">
-                    {t.prefix}… · made {timeAgo(t.created_at)} · {t.last_used_at ? `last used ${timeAgo(t.last_used_at)}` : "not used yet"}
+                  <span>
+                    <code>{t.prefix}…</code> · made {timeAgo(t.created_at)} · {t.last_used_at ? `last used ${timeAgo(t.last_used_at)}` : "not used yet"}
                   </span>
                 </div>
                 <form action={revokeMcpToken}>

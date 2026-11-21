@@ -1,0 +1,592 @@
+/* ===========================================================================
+   One channel's page, loaded after globals.css and motion.css.
+
+   Who it is (with Claude's read of it), four numbers on how it's moving, its
+   subscriber line beside a bar for every recent upload, what tends to work
+   there, its biggest hits, and every upload with a meter against its usual.
+   Black page, flat #0e0e0e surfaces, hairlines, violet; lime only where a
+   video beat its channel.
+=========================================================================== */
+
+@keyframes ch-rise {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+/* --- who it is --- */
+
+.app .ch-hero {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 18px;
+}
+
+.app .ch-avatar {
+  display: block;
+  width: 72px;
+  height: 72px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: #1a1a1a;
+  object-fit: cover;
+  animation: m-pop 620ms var(--ease-spring) backwards;
+}
+
+.app .ch-hero-text {
+  min-width: 0;
+}
+
+.app .ch-hero h1 {
+  margin: 2px 0 0;
+  font-size: 28px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+.app .ch-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.app .ch-face {
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-size: 11.5px;
+}
+
+.app .ch-summary {
+  max-width: 72ch;
+  margin: 10px 0 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.app .ch-tags {
+  margin-top: 10px;
+}
+
+.app .ch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.app .ch-actions form {
+  margin: 0;
+}
+
+.app .ch-actions :is(button, a) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.app .ch-tracking::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--good-text);
+}
+
+/* --- four numbers --- */
+
+.app .ch-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.app .ch-stats > div {
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--card, #0e0e0e);
+  animation: m-item-in 520ms var(--ease-out-expo) backwards;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+
+.app .ch-stats dt {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.app .ch-stats dd {
+  margin: 4px 0 2px;
+  font-size: 26px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.app .ch-stats small {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.app .ch-stats small[data-tone="up"] {
+  color: var(--good-text);
+}
+
+.app .ch-stats small[data-tone="down"] {
+  color: var(--critical);
+}
+
+/* --- cards --- */
+
+.app .ch-card {
+  min-width: 0;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--card, #0e0e0e);
+}
+
+.app :is(.ch-card-head, .ch-section-head) h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.app :is(.ch-card-head, .ch-section-head) p {
+  margin: 3px 0 14px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+
+.app .ch-charts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+/* --- a bar per upload --- */
+
+.app .ch-bars {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 200px;
+  padding-top: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.app .ch-bars-typical {
+  position: absolute;
+  right: 0;
+  left: 0;
+  z-index: 1;
+  border-top: 1px dashed rgba(255, 255, 255, 0.32);
+  pointer-events: none;
+}
+
+.app .ch-bar {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-items: flex-end;
+  height: 100%;
+  min-width: 0;
+  text-decoration: none;
+}
+
+.app .ch-bar-fill {
+  position: relative;
+  width: 100%;
+  height: var(--h);
+  border-radius: 4px 4px 1px 1px;
+  background: rgba(157, 107, 255, 0.34);
+  transform-origin: bottom;
+  transition: background 160ms ease;
+  animation: ch-rise 900ms var(--ease-out-expo) backwards;
+  animation-delay: calc(200ms + var(--i, 0) * 22ms);
+}
+
+.app .ch-bar[data-above] .ch-bar-fill {
+  background: var(--accent);
+}
+
+.app .ch-bar[data-best] .ch-bar-fill {
+  background: var(--signal, #c4f542);
+}
+
+.app .ch-bar:hover .ch-bar-fill {
+  background: #c3a6ff;
+}
+
+.app .ch-bar-flag {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  color: var(--signal, #c4f542);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+.app .ch-bar-tip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  z-index: 5;
+  width: 230px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 9px;
+  background: #121212;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 4px);
+  transition:
+    opacity 150ms ease,
+    transform 200ms var(--ease-out-expo);
+}
+
+.app .ch-bar-tip strong {
+  display: -webkit-box;
+  margin-bottom: 3px;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 12.5px;
+  font-weight: 600;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.app .ch-bar[data-edge="start"] .ch-bar-tip {
+  left: 0;
+  transform: translate(0, 4px);
+}
+
+.app .ch-bar[data-edge="end"] .ch-bar-tip {
+  right: 0;
+  left: auto;
+  transform: translate(0, 4px);
+}
+
+.app .ch-bar:hover .ch-bar-tip {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.app .ch-bar[data-edge]:hover .ch-bar-tip {
+  transform: none;
+}
+
+/* --- what works --- */
+
+.app .ch-patterns ol {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.app .ch-patterns li {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  animation: m-item-in 520ms var(--ease-out-expo) backwards;
+  animation-delay: calc(120ms + var(--i, 0) * 60ms);
+}
+
+.app .ch-pattern-lift {
+  justify-self: start;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(52, 211, 153, 0.1);
+  color: var(--good-text);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.app .ch-patterns li[data-tone="down"] .ch-pattern-lift {
+  background: rgba(248, 113, 113, 0.1);
+  color: var(--critical);
+}
+
+.app .ch-patterns li strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.app .ch-patterns li > span:last-child {
+  color: var(--text-muted);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+/* --- every upload --- */
+
+.app .ch-upload {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr) 84px 84px 130px;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+  animation: m-item-in 460ms var(--ease-out-expo) backwards;
+  animation-delay: calc(min(var(--i, 0), 12) * 30ms);
+}
+
+.app .ch-upload-thumb {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #151515;
+}
+
+.app .ch-upload-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 420ms var(--ease-out-expo);
+}
+
+.app .ch-upload-thumb:hover img {
+  transform: scale(1.06);
+}
+
+.app .ch-upload-thumb span {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.78);
+  color: #f2f2f2;
+  font-size: 10.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.app .ch-upload-main {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.app .ch-upload-title {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-decoration: none;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  transition: color 160ms ease;
+}
+
+.app .ch-upload-title:hover {
+  color: var(--accent-text);
+}
+
+.app .ch-upload-main small {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.app .ch-upload-num {
+  display: grid;
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.app .ch-upload-num small {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.app .ch-upload-score {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 46px;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.app .ch-upload-meter {
+  position: relative;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.app .ch-upload-meter::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: calc(var(--s, 0) * 100%);
+  border-radius: inherit;
+  background: var(--accent);
+  transform-origin: left;
+  animation: vv-grow 900ms var(--ease-out-expo) backwards;
+  animation-delay: calc(240ms + min(var(--i, 0), 12) * 30ms);
+}
+
+.app .ch-upload-score[data-hot] {
+  color: var(--signal, #c4f542);
+}
+
+.app .ch-upload-score[data-hot] .ch-upload-meter::after {
+  background: var(--signal, #c4f542);
+}
+
+.app .ch-more summary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  list-style: none;
+  cursor: pointer;
+  transition: color 160ms ease;
+}
+
+.app .ch-more summary::-webkit-details-marker {
+  display: none;
+}
+
+.app .ch-more summary:hover {
+  color: var(--text-primary);
+}
+
+.app .ch-more-chevron {
+  width: 7px;
+  height: 7px;
+  margin-top: -3px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  rotate: 45deg;
+  transition:
+    rotate 300ms var(--ease-out-expo),
+    margin 300ms var(--ease-out-expo);
+}
+
+.app .ch-more[open] .ch-more-chevron {
+  margin-top: 3px;
+  rotate: 225deg;
+}
+
+/* --- smaller screens --- */
+
+@media (max-width: 1100px) {
+  .app .ch-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .app .ch-charts {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .app .ch-hero {
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+
+  .app .ch-avatar {
+    width: 56px;
+    height: 56px;
+  }
+
+  .app .ch-hero h1 {
+    font-size: 22px;
+  }
+
+  .app .ch-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+
+  .app .ch-upload {
+    grid-template-columns: 96px minmax(0, 1fr) 70px;
+    grid-template-areas:
+      "thumb main views"
+      "thumb main score";
+    gap: 4px 12px;
+  }
+
+  .app .ch-upload-thumb {
+    grid-area: thumb;
+  }
+
+  .app .ch-upload-main {
+    grid-area: main;
+  }
+
+  .app .ch-upload > span:nth-of-type(1) {
+    grid-area: views;
+  }
+
+  .app .ch-upload > span:nth-of-type(2) {
+    display: none;
+  }
+
+  .app .ch-upload-score {
+    grid-area: score;
+    grid-template-columns: 1fr;
+  }
+
+  .app .ch-upload-meter {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app .ch-avatar,
+  .app .ch-stats > div,
+  .app .ch-bar-fill,
+  .app .ch-patterns li,
+  .app .ch-upload,
+  .app .ch-upload-meter::after {
+    animation: none;
+  }
+}
