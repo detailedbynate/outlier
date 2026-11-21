@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
-import { CoinsIcon } from "@/components/icons";
-import { PageHeader } from "@/components/page-header";
+import type { CSSProperties } from "react";
 import { requireApprovedUser } from "@/lib/auth/session";
 import { logger } from "@/lib/core/logger";
 import { CREDIT_PACKS, formatPrice } from "@/lib/billing/packs";
@@ -66,11 +65,19 @@ export default async function BillingPage({ searchParams }: { searchParams: Sear
   const code = await activeCreatorCode();
   const creator = code && code.user_id !== current.user.id ? code : null;
   const discordLink = services.discord.enabled ? await services.discord.link(current.user.id) : null;
+  const unlimited = credits.limit >= 1_000_000;
+  const usedShare = credits.monthly > 0 ? Math.min(credits.used / credits.monthly, 1) : 0;
+  const resetsOn = new Date(credits.resetsAt).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
   const fmtEnd = (iso: string) => new Date(iso).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
 
   return (
     <div className="research-page billing-page">
-      <PageHeader icon={CoinsIcon} title="Credits" subtitle="Your monthly credits reset on the 1st. Bought credits never expire and are used once the monthly ones run out." />
+      <header className="dash-hero cr-hero">
+        <div className="dash-hero-text">
+          <h1>Credits</h1>
+          <p>Your monthly credits reset on the 1st. Bought credits never expire and are used once the monthly ones run out.</p>
+        </div>
+      </header>
 
       {status === "subscribed" ? (
         <div className="billing-notice" data-tone="good" role="status">
@@ -90,19 +97,34 @@ export default async function BillingPage({ searchParams }: { searchParams: Sear
         </div>
       ) : null}
 
-      <section className="card glass billing-balance">
-        <div>
-          <span className="stat-note">Credits left</span>
-          <strong>{credits.limit >= 1_000_000 ? "Unlimited" : credits.remaining.toLocaleString("en-US")}</strong>
-        </div>
-        <div>
-          <span className="stat-note">Monthly</span>
-          <strong>{Math.max(credits.monthly - credits.used, 0).toLocaleString("en-US")}</strong>
-        </div>
-        <div>
-          <span className="stat-note">Bought / extra</span>
-          <strong>{credits.extra.toLocaleString("en-US")}</strong>
-        </div>
+      <section className="cr-balance" aria-label="Your credits">
+        <dl className="cr-balance-row">
+          <div>
+            <dt>Credits left</dt>
+            <dd>{unlimited ? "Unlimited" : credits.remaining.toLocaleString("en-US")}</dd>
+          </div>
+          <div>
+            <dt>Monthly</dt>
+            <dd>{Math.max(credits.monthly - credits.used, 0).toLocaleString("en-US")}</dd>
+          </div>
+          <div>
+            <dt>Bought / extra</dt>
+            <dd>{credits.extra.toLocaleString("en-US")}</dd>
+          </div>
+        </dl>
+        {!unlimited && credits.monthly > 0 ? (
+          <div className="cr-meter" data-low={usedShare >= 0.85 ? "" : undefined}>
+            <div className="cr-meter-track" aria-hidden="true">
+              <span className="cr-meter-fill" style={{ "--used": usedShare } as CSSProperties} />
+            </div>
+            <p>
+              <span>
+                <strong>{Math.min(credits.used, credits.monthly).toLocaleString("en-US")}</strong> of {credits.monthly.toLocaleString("en-US")} monthly credits used
+              </span>
+              <span>Resets {resetsOn}</span>
+            </p>
+          </div>
+        ) : null}
       </section>
 
       {enabled && plans.length > 0 ? (
@@ -122,7 +144,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Sear
               : "More credits each month, so research doesn't stop halfway through the week."}
           </p>
           <div className="billing-plans">
-            {[FREE_PLAN, ...plans].map((plan) => {
+            {[FREE_PLAN, ...plans].map((plan, index) => {
               const isCurrent = subscription.plan.id === plan.id;
               // A trial isn't paid for yet: its card buys the plan rather than managing it.
               const manage = isCurrent && !trialLive;
@@ -136,6 +158,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Sear
                   key={plan.id}
                   action={manage && paid ? openBillingPortal : startSubscription}
                   className="billing-plan"
+                  style={{ "--i": index } as CSSProperties}
                   data-plan={plan.id}
                   data-current={isCurrent}
                   data-featured={Boolean(plan.badge)}
@@ -233,8 +256,8 @@ export default async function BillingPage({ searchParams }: { searchParams: Sear
           <h2 className="section-title">Top up</h2>
           <p className="billing-plans-lede">One-off credits on top of your plan. They never expire.</p>
           <div className="billing-packs">
-            {CREDIT_PACKS.map((pack) => (
-              <form key={pack.id} action={startCheckout} className="billing-pack" data-pack={pack.id}>
+            {CREDIT_PACKS.map((pack, index) => (
+              <form key={pack.id} action={startCheckout} className="billing-pack" data-pack={pack.id} style={{ "--i": index } as CSSProperties}>
                 <input type="hidden" name="packId" value={pack.id} />
                 <span className="billing-pack-label">{pack.label}</span>
                 <strong className="billing-pack-credits">{pack.credits.toLocaleString("en-US")} credits</strong>

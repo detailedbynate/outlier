@@ -1,0 +1,168 @@
+/* ===========================================================================
+   Credits, loaded after globals.css and motion.css.
+
+   Presentation only: the balance with a meter for this month's credits, and
+   the plans and packs settling in one after another, answering the cursor.
+   Prices, plans and their colours are untouched.
+=========================================================================== */
+
+/* --- the balance --- */
+
+.app .cr-balance {
+  padding: 16px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--card, #0e0e0e);
+  animation: m-item-in 520ms var(--ease-out-expo) backwards;
+}
+
+.app .cr-balance-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+}
+
+.app .cr-balance-row > div {
+  min-width: 0;
+  padding: 0 20px;
+}
+
+.app .cr-balance-row > div:first-child {
+  padding-left: 0;
+}
+
+.app .cr-balance-row > div + div {
+  border-left: 1px solid var(--border);
+}
+
+.app .cr-balance dt {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.app .cr-balance dd {
+  margin: 4px 0 0;
+  font-family: var(--font-numbers, inherit);
+  font-size: 26px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.app .cr-meter {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.app .cr-meter-track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.app .cr-meter-fill {
+  display: block;
+  width: calc(var(--used, 0) * 100%);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transform-origin: left;
+  animation: vv-grow 1.1s var(--ease-out-expo) 200ms backwards;
+}
+
+.app .cr-meter[data-low] .cr-meter-fill {
+  background: var(--warning, #f59e0b);
+}
+
+.app .cr-meter p {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 16px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+
+.app .cr-meter strong {
+  color: var(--text-primary);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- plans and packs arrive one after another --- */
+
+.app .billing-page :is(.billing-plan, .billing-pack) {
+  animation: m-item-in 600ms var(--ease-out-expo) backwards;
+  animation-delay: calc(120ms + var(--i, 0) * 90ms);
+  transition:
+    border-color 240ms ease,
+    translate 360ms var(--ease-out-expo);
+}
+
+.app .billing-page :is(.billing-plan, .billing-pack):hover {
+  translate: 0 -3px;
+}
+
+.app .billing-page .billing-plan-price strong {
+  display: inline-block;
+  animation: m-pop 620ms var(--ease-spring) backwards;
+  animation-delay: calc(380ms + var(--i, 0) * 90ms);
+}
+
+.app .billing-page .billing-plan-features li {
+  animation: m-fade 420ms ease backwards;
+  animation-delay: calc(460ms + var(--i, 0) * 90ms);
+}
+
+.app .billing-page .billing-plan-features li:nth-child(2) {
+  animation-delay: calc(500ms + var(--i, 0) * 90ms);
+}
+
+.app .billing-page .billing-plan-features li:nth-child(3) {
+  animation-delay: calc(540ms + var(--i, 0) * 90ms);
+}
+
+.app .billing-page .billing-plan-features li:nth-child(4) {
+  animation-delay: calc(580ms + var(--i, 0) * 90ms);
+}
+
+.app .billing-page .billing-plan-features li:nth-child(n + 5) {
+  animation-delay: calc(620ms + var(--i, 0) * 90ms);
+}
+
+@media (max-width: 600px) {
+  .app .cr-balance-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .app .cr-balance-row > div,
+  .app .cr-balance-row > div:first-child {
+    padding: 0;
+  }
+
+  .app .cr-balance-row > div + div {
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    border-left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app .cr-balance,
+  .app .cr-meter-fill,
+  .app .billing-page :is(.billing-plan, .billing-pack),
+  .app .billing-page .billing-plan-price strong,
+  .app .billing-page .billing-plan-features li {
+    animation: none;
+  }
+
+  .app .billing-page :is(.billing-plan, .billing-pack):hover {
+    translate: none;
+  }
+}
