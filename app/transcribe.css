@@ -1,0 +1,965 @@
+/* ===========================================================================
+   Transcribe, loaded after globals.css and motion.css.
+
+   The same one-surface studio as Voice Studio: the file and its captions on
+   the left, caption style and downloads on the right, the audio in a bar along
+   the bottom. Not scoped to .app, because the free SRT tool page renders the
+   same component outside the app shell; every token has a fallback for that.
+=========================================================================== */
+
+.tq {
+  --tq-card: var(--card, #0e0e0e);
+  --tq-border: var(--border, rgba(255, 255, 255, 0.07));
+  --tq-border-strong: var(--border-strong, rgba(255, 255, 255, 0.14));
+  --tq-text: var(--text-primary, #f2f2f2);
+  --tq-text-2: var(--text-secondary, #a6a6a6);
+  --tq-muted: var(--text-muted, #767676);
+  --tq-accent: var(--accent, #9d6bff);
+  --tq-accent-text: var(--accent-text, #c8b4ff);
+  --tq-wash: var(--accent-wash, rgba(157, 107, 255, 0.12));
+  --tq-control: var(--control-bg, #141414);
+  --tq-expo: var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  --tq-quart: var(--ease-out-quart, cubic-bezier(0.25, 1, 0.5, 1));
+  --tq-spring: var(--ease-spring, cubic-bezier(0.34, 1.4, 0.64, 1));
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "main side"
+    "player player";
+  min-height: clamp(520px, calc(100dvh - 240px), 760px);
+  border: 1px solid var(--tq-border);
+  border-radius: 14px;
+  background: var(--tq-card);
+  color: var(--tq-text);
+  color-scheme: dark;
+}
+
+@keyframes tq-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+@keyframes tq-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* --- main column --- */
+
+.tq-main {
+  grid-area: main;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.tq-file {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 18px 14px 22px;
+  animation: tq-fade 320ms var(--tq-quart) backwards;
+}
+
+.tq-file-name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tq-file-name strong {
+  overflow: hidden;
+  font-size: 14.5px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tq-file-name small {
+  color: var(--tq-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tq-pill {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--tq-border-strong);
+  background: transparent;
+  color: var(--tq-text-2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    border-color 160ms var(--tq-quart),
+    color 160ms var(--tq-quart);
+}
+
+.tq-pill:hover {
+  border-color: rgba(255, 255, 255, 0.26);
+  color: var(--tq-text);
+}
+
+.tq-tabs {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, 120px);
+  padding: 0 10px;
+  border-bottom: 1px solid var(--tq-border);
+}
+
+.tq-tabs button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 42px;
+  border: 0;
+  background: none;
+  color: var(--tq-muted);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 550;
+  cursor: pointer;
+  transition: color 160ms var(--tq-quart);
+}
+
+.tq-tabs button:hover,
+.tq-tabs button[aria-selected="true"] {
+  color: var(--tq-text);
+}
+
+.tq-tab-count {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--tq-wash);
+  color: var(--tq-accent-text);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.tq-tab-ink {
+  position: absolute;
+  bottom: -1px;
+  left: 10px;
+  width: 120px;
+  height: 2px;
+  background: var(--tq-text);
+  transition: transform 420ms var(--tq-expo);
+}
+
+.tq-tabs[data-tab="text"] .tq-tab-ink {
+  transform: translateX(100%);
+}
+
+/* Captions, as a timeline you can click into. */
+.tq-captions {
+  flex: 1 1 auto;
+  max-height: clamp(280px, calc(100dvh - 430px), 560px);
+  margin: 0;
+  padding: 8px 10px 12px;
+  overflow: auto;
+  list-style: none;
+  scrollbar-width: thin;
+}
+
+.tq-captions li {
+  animation: tq-in 460ms var(--tq-expo) backwards;
+  animation-delay: calc(var(--i, 0) * 18ms);
+}
+
+.tq-captions button {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 14px;
+  width: 100%;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--tq-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 160ms var(--tq-quart),
+    box-shadow 160ms var(--tq-quart);
+}
+
+.tq-captions button:hover {
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.tq-stamp {
+  color: var(--tq-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tq-line {
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.tq-dur {
+  color: var(--tq-muted);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0;
+  transition: opacity 160ms var(--tq-quart);
+}
+
+.tq-captions button:hover .tq-dur {
+  opacity: 1;
+}
+
+.tq-captions li[data-past] .tq-line {
+  color: var(--tq-text-2);
+}
+
+.tq-captions li[data-on] button {
+  background: var(--tq-wash);
+  box-shadow: inset 2px 0 0 var(--tq-accent);
+}
+
+.tq-captions li[data-on] .tq-stamp {
+  color: var(--tq-accent-text);
+}
+
+/* Full text: the word being said is lit, karaoke style. */
+.tq-text {
+  flex: 1 1 auto;
+  max-height: clamp(280px, calc(100dvh - 430px), 560px);
+  margin: 0;
+  padding: 18px 24px 22px;
+  overflow: auto;
+  font-size: 17px;
+  line-height: 1.85;
+  animation: tq-fade 280ms var(--tq-quart) backwards;
+}
+
+.tq-text span {
+  border-radius: 4px;
+  cursor: pointer;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  transition:
+    background-color 120ms linear,
+    color 120ms linear;
+}
+
+.tq-text span:hover {
+  color: var(--tq-accent-text);
+}
+
+.tq-text span[data-on] {
+  background: var(--tq-wash);
+  color: var(--tq-text);
+}
+
+/* Before a file: the drop zone. */
+.tq-drop {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 360px;
+  margin: 16px;
+  padding: 24px;
+  border: 1.5px dashed var(--tq-border-strong);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--tq-text-2);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  transition:
+    border-color 220ms var(--tq-quart),
+    background-color 220ms var(--tq-quart);
+}
+
+.tq-drop:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.012);
+}
+
+.tq-drop[data-dragging] {
+  border-color: var(--tq-accent);
+  background: var(--tq-wash);
+}
+
+.tq-drop[data-busy] {
+  border-style: solid;
+  border-color: var(--tq-border);
+  cursor: progress;
+}
+
+.tq-drop-icon {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  margin-bottom: 4px;
+  border-radius: 50%;
+  border: 1px solid var(--tq-border-strong);
+  color: var(--tq-text);
+  transition: transform 420ms var(--tq-spring);
+}
+
+.tq-drop:hover .tq-drop-icon {
+  transform: translateY(-3px);
+}
+
+.tq-drop[data-dragging] .tq-drop-icon {
+  transform: translateY(-5px) scale(1.08);
+  border-color: var(--tq-accent);
+}
+
+.tq-drop strong {
+  color: var(--tq-text);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.tq-drop small {
+  color: var(--tq-muted);
+  font-size: 12.5px;
+}
+
+.tq-gets {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.tq-gets span {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--tq-border);
+  color: var(--tq-muted);
+  font-size: 12px;
+}
+
+.tq-working {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  animation: tq-fade 240ms var(--tq-quart) backwards;
+}
+
+.tq-wave {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 40px;
+  margin-bottom: 6px;
+}
+
+.tq-wave i {
+  display: block;
+  width: 3px;
+  height: 100%;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.3);
+  transform: scaleY(0.15);
+  animation: tq-wave 1.15s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  animation-delay: calc(var(--i, 0) * 55ms);
+}
+
+@keyframes tq-wave {
+  50% {
+    transform: scaleY(0.9);
+    background: rgba(255, 255, 255, 0.7);
+  }
+}
+
+.tq-shimmer {
+  background: linear-gradient(90deg, var(--tq-muted) 0%, var(--tq-text) 45%, var(--tq-muted) 90%) 0 0 / 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent !important;
+  animation: tq-shimmer 1.5s linear infinite;
+}
+
+@keyframes tq-shimmer {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -120% 0;
+  }
+}
+
+.tq-steps {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.tq-steps span {
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--tq-border);
+  color: var(--tq-muted);
+  font-size: 12px;
+  transition:
+    color 300ms var(--tq-quart),
+    border-color 300ms var(--tq-quart);
+}
+
+.tq-steps span[data-on] {
+  border-color: var(--tq-border-strong);
+  color: var(--tq-text);
+}
+
+.tq-progress {
+  display: block;
+  width: 240px;
+  height: 3px;
+  margin-top: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.tq-progress span {
+  display: block;
+  height: 100%;
+  background: var(--tq-accent);
+  transform-origin: left center;
+  transition: transform 260ms linear;
+}
+
+.tq-error {
+  margin: 0 16px 16px;
+}
+
+/* --- side: language, caption style, downloads --- */
+
+.tq-side {
+  grid-area: side;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  min-width: 0;
+  padding: 18px;
+  border-left: 1px solid var(--tq-border);
+}
+
+.tq-field {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.tq-label {
+  color: var(--tq-text-2);
+  font-size: 12.5px;
+  font-weight: 550;
+}
+
+.tq-select {
+  width: 100%;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--tq-border-strong);
+  background: var(--tq-control);
+  color: var(--tq-text);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
+.tq-select:focus-visible {
+  outline: 3px solid rgba(157, 107, 255, 0.22);
+  border-color: rgba(157, 107, 255, 0.7);
+}
+
+/* Segmented control: the highlight slides to the picked style. */
+.tq-seg {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  padding: 3px;
+  border-radius: 10px;
+  border: 1px solid var(--tq-border);
+  background: #0a0a0a;
+}
+
+.tq-seg button {
+  position: relative;
+  z-index: 1;
+  height: 30px;
+  border: 0;
+  background: none;
+  color: var(--tq-muted);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 550;
+  cursor: pointer;
+  transition: color 200ms var(--tq-quart);
+}
+
+.tq-seg button:hover,
+.tq-seg button[data-on] {
+  color: var(--tq-text);
+}
+
+.tq-seg-ink {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc((100% - 6px) / 3);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateX(calc(var(--seg, 0) * 100%));
+  transition:
+    transform 380ms var(--tq-expo),
+    opacity 200ms var(--tq-quart);
+}
+
+.tq-seg[data-custom] .tq-seg-ink {
+  opacity: 0;
+}
+
+.tq-range {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--tq-muted);
+  font-size: 12.5px;
+}
+
+.tq-range strong {
+  color: var(--tq-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.tq .tq-slider {
+  height: 20px;
+}
+
+.tq .tq-slider::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--tq-accent) 0 calc(var(--filled, 0) * 100%), rgba(255, 255, 255, 0.08) 0);
+}
+
+.tq .tq-slider::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.tq .tq-slider::-moz-range-progress {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--tq-accent);
+}
+
+.tq .tq-slider::-webkit-slider-thumb {
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
+  border: 0;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.tq .tq-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: 0;
+  background: #fff;
+}
+
+/* How a caption will look on the video, at the current style. */
+.tq-preview {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 86px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--tq-border);
+  background: #050505;
+  overflow: hidden;
+}
+
+.tq-preview::before {
+  content: "Preview";
+  position: absolute;
+  top: 7px;
+  left: 9px;
+  color: var(--tq-muted);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+}
+
+.tq-preview-line {
+  max-width: 100%;
+  color: #fff;
+  font-size: 19px;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  text-align: center;
+  -webkit-text-stroke: 4px #000;
+  paint-order: stroke fill;
+  animation: tq-pop 260ms var(--tq-spring) backwards;
+}
+
+@keyframes tq-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+
+.tq-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--tq-text-2);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.tq-toggle:hover {
+  color: var(--tq-text);
+}
+
+.tq-switch {
+  position: relative;
+  width: 32px;
+  height: 18px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  transition: background-color 220ms var(--tq-quart);
+}
+
+.tq-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 300ms var(--tq-spring);
+}
+
+.tq-toggle[aria-checked="true"] .tq-switch {
+  background: var(--tq-accent);
+}
+
+.tq-toggle[aria-checked="true"] .tq-switch::after {
+  transform: translateX(14px);
+}
+
+.tq-toggle:focus-visible {
+  outline: 2px solid rgba(157, 107, 255, 0.6);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.tq-downloads {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 6px;
+}
+
+.tq-downloads .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px;
+}
+
+.tq-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 9px;
+  border: 1px solid var(--tq-border-strong);
+  background: none;
+  color: var(--tq-text-2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  cursor: pointer;
+  transition:
+    border-color 160ms var(--tq-quart),
+    color 160ms var(--tq-quart);
+}
+
+.tq-btn:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.26);
+  color: var(--tq-text);
+}
+
+.tq-btn:disabled,
+.tq-downloads .btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.tq-copy {
+  width: 100%;
+}
+
+.tq-copy[data-copied] {
+  border-color: rgba(52, 211, 153, 0.5);
+  color: #6ee7b7;
+}
+
+.tq-note {
+  margin: 0;
+  color: var(--tq-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.tq-allowance {
+  margin-top: auto;
+}
+
+.tq-allowance .vs-allowance-bar {
+  width: 100%;
+}
+
+/* --- the player bar --- */
+
+.tq-player {
+  grid-area: player;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 70px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--tq-border);
+  animation: tq-fade 320ms var(--tq-quart) backwards;
+}
+
+.tq-play {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--tq-text);
+  color: #000;
+  cursor: pointer;
+  transition: transform 260ms var(--tq-spring);
+}
+
+.tq-play:hover {
+  transform: scale(1.06);
+}
+
+.tq-play:active {
+  transform: scale(0.94);
+}
+
+.tq-bars {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 2px;
+  min-width: 120px;
+  height: 42px;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.tq-bars:focus-visible {
+  outline: 2px solid rgba(157, 107, 255, 0.6);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+
+.tq-bars > span:not(.tq-scrub) {
+  flex: 1 1 0;
+  min-width: 1px;
+  height: calc(var(--h, 0.1) * 100%);
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.16);
+  animation: tq-bar-in 640ms var(--tq-expo) backwards;
+  animation-delay: calc(var(--i, 0) * 3ms);
+  transition: background-color 120ms linear;
+}
+
+.tq-bars > span[data-on] {
+  background: var(--tq-text);
+}
+
+@keyframes tq-bar-in {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+/* A tick under the waveform where each caption starts. */
+.tq-cue {
+  position: absolute;
+  bottom: -7px;
+  left: calc(var(--x, 0) * 100%);
+  width: 1px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.22);
+  pointer-events: none;
+}
+
+.tq-scrub {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  left: calc(var(--x, 0) * 100%);
+  width: 1px;
+  background: rgba(255, 255, 255, 0.55);
+  pointer-events: none;
+}
+
+.tq-scrub em {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--tq-border-strong);
+  background: #161616;
+  color: var(--tq-text);
+  font-size: 11px;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+.tq-time {
+  flex: none;
+  min-width: 82px;
+  color: var(--tq-text-2);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.tq-time span {
+  color: var(--tq-muted);
+}
+
+/* --- smaller screens --- */
+
+@media (max-width: 1000px) {
+  .tq {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+    grid-template-areas:
+      "main"
+      "side"
+      "player";
+    min-height: 0;
+  }
+
+  .tq-side {
+    border-left: 0;
+    border-top: 1px solid var(--tq-border);
+  }
+
+  .tq-player {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    border-radius: 0 0 14px 14px;
+    background: var(--tq-card);
+  }
+
+  .tq-drop {
+    min-height: 260px;
+  }
+}
+
+@media (max-width: 640px) {
+  .tq-file {
+    flex-wrap: wrap;
+    padding: 14px 16px 12px;
+  }
+
+  .tq-captions button {
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .tq-dur {
+    display: none;
+  }
+
+  .tq-text {
+    padding: 14px 16px 18px;
+    font-size: 16px;
+  }
+
+  .tq-gets {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tq :is(.tq-file, .tq-captions li, .tq-text, .tq-working, .tq-wave i, .tq-shimmer, .tq-preview-line, .tq-bars > span, .tq-player) {
+    animation: none !important;
+  }
+
+  .tq .tq-shimmer {
+    background: none;
+    color: inherit !important;
+  }
+
+  .tq :is(.tq-seg-ink, .tq-tab-ink) {
+    transition: none;
+  }
+
+  .tq .tq-switch::after {
+    transition: none;
+  }
+}

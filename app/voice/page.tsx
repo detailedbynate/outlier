@@ -42,7 +42,7 @@ export default async function VoicePage({ searchParams }: { searchParams: Promis
   const initialText = (script && scripts.find((s) => s.id === script)?.text) || "";
 
   return (
-    <div className="dash vs-page">
+    <div className="dash vs-page vx-page">
       <header className="dash-hero">
         <div className="dash-hero-text">
           <span className="dash-eyebrow">
@@ -69,29 +69,49 @@ export default async function VoicePage({ searchParams }: { searchParams: Promis
 /** What Free sees behind the blur: the studio's shape with an example in it. Static, nothing to submit. */
 function LockedPreview() {
   return (
-    <div className="vs">
-      <section className="vs-editor">
-        <div className="vs-text vs-text-static">
-          What is the rarest monster in the game that nobody owns? You&apos;d think it&apos;s some legendary event monster, right? It&apos;s
-          actually one from way back that got vaulted before most players even started.
+    <div className="vx">
+      <section className="vx-editor">
+        <div className="vx-toolbar">
+          <span className="vx-pill">My scripts</span>
         </div>
-        <div className="vs-editor-bar">
-          <span className="vs-count">168 / 1,000</span>
-          <span className="btn btn-primary vs-go">Generate speech</span>
+        <div className="vx-canvas">
+          <div className="vx-text vx-text-static">
+            What is the rarest monster in the game that nobody owns? You&apos;d think it&apos;s some legendary event monster, right? It&apos;s
+            actually one from way back that got vaulted before most players even started.
+          </div>
         </div>
+        <footer className="vx-foot">
+          <span className="vx-count">
+            <span className="vx-count-num">168</span> / 1,000 <em>· about 11s</em>
+          </span>
+          <div className="vx-generate">
+            <span className="btn btn-primary vx-go">Generate speech</span>
+          </div>
+        </footer>
       </section>
-      <aside className="vs-side">
-        <div className="vs-panel">
-          <span className="vs-label">Voice</span>
-          <div className="vs-voice-current">
-            <span className="vs-orb" style={orbStyle("preview-roger")} />
-            <span className="vs-voice-text">
-              <strong>Roger</strong>
-              <small>american · male · classy</small>
-            </span>
+      <aside className="vx-side">
+        <div className="vx-tabs" data-tab="settings">
+          <span>Settings</span>
+          <span>History</span>
+          <span className="vx-tab-ink" aria-hidden="true" />
+        </div>
+        <div className="vx-panel">
+          <div className="vx-field">
+            <span className="vx-label">Voice</span>
+            <div className="vx-voice-current">
+              <span className="vx-orb" style={orbStyle("preview-roger")} />
+              <span className="vx-who-text">
+                <strong>Roger</strong>
+                <small>american · male · classy</small>
+              </span>
+            </div>
           </div>
         </div>
       </aside>
+      <div className="vx-player" data-state="empty">
+        <span className="vx-orb vx-orb-idle" aria-hidden="true" />
+        <span className="vx-player-hint">Your audio plays here.</span>
+      </div>
     </div>
   );
 }
