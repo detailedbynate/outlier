@@ -1,3 +1,5 @@
+import { AiBalanceEmptyError } from "@/lib/ai/balance";
+import { AiBudgetSpentError } from "@/lib/ai/budget";
 import type { TextProvider } from "@/lib/ai/types";
 import { isAppError } from "@/lib/core/errors";
 import { createLogger, type Logger } from "@/lib/core/logger";
@@ -35,8 +37,12 @@ export const REVIEWED_MODEL = "rules-v1-reviewed";
 
 /**
  * Labels channels that were never labeled. Rules label every channel for free;
- * when an AI provider is configured, only the channels the rules weren't sure
- * about are sent to it, in batches. If the AI call fails, the rule label stands.
+ * when an AI provider is configured, the channels the rules weren't sure about
+ * are sent to it, in batches. With Claude (`claude`), the ones the rules were
+ * sure about get its read too, since a confident rule can still be wrong about
+ * the game or miss the sub-niches; that never falls back to the free models,
+ * which label worse than the rules do on a clear channel. If the AI call
+ * fails, the rule label stands.
  */
 export class NicheLabelingService {
   private readonly log: Logger;
@@ -44,6 +50,8 @@ export class NicheLabelingService {
   constructor(
     private readonly deps: {
       text: TextProvider | null;
+      /** Claude on its own, for second opinions on channels the rules were already sure about. */
+      claude?: TextProvider | null;
       channels: Pick<ChannelRepository, "listUnlabeled" | "saveNicheLabel">;
       niches: Pick<NicheRepository, "upsertEntity" | "refreshChannelCounts">;
     },
@@ -57,7 +65,8 @@ export class NicheLabelingService {
     const result: LabelRunResult = { labeled: 0, byAi: 0, categoryOnly: 0, batches: 0, inputTokens: 0, outputTokens: 0 };
     const now = options.now ?? (() => new Date());
 
-    const pending = await this.deps.channels.listUnlabeled(options.maxChannels, { includeUnsureRuleLabels: this.deps.text !== null });
+    const claude = this.deps.claude ?? null;
+    const pending = await this.deps.channels.listUnlabeled(options.maxChannels, { includeUnsureRuleLabels: this.deps.text !== null, includeRuleLabels: claude !== null });
     const ruled = pending.map((channel) => ({
       channel,
       label: labelWithRules({
@@ -70,8 +79,11 @@ export class NicheLabelingService {
     }));
 
     const unsure = this.deps.text ? ruled.filter((r) => r.label.confidence < CONFIDENT) : [];
+    const sure = claude ? ruled.filter((r) => r.label.confidence >= CONFIDENT) : [];
     const reviewed = new Set<string>();
-    const aiLabels = unsure.length > 0 ? await this.labelWithAi(unsure.map((r) => r.channel), result, reviewed, options.signal) : new Map<string, { label: RuleLabel; model: string }>();
+    const aiLabels = new Map<string, { label: RuleLabel; model: string }>();
+    if (unsure.length > 0) await this.labelWithAi(this.deps.text!, unsure.map((r) => r.channel), aiLabels, result, reviewed, options.signal);
+    if (sure.length > 0) await this.labelWithAi(claude!, sure.map((r) => r.channel), aiLabels, result, reviewed, options.signal);
 
     // Most channels share a handful of games and categories: look each entity up once per run.
     const entityIds = new Map<string, Promise<string>>();
@@ -98,12 +110,13 @@ export class NicheLabelingService {
 
   /** Second opinion for unsure channels. Failures just leave the rule labels in place. */
   private async labelWithAi(
+    provider: TextProvider,
     channels: PendingChannel[],
+    labels: Map<string, { label: RuleLabel; model: string }>,
     result: LabelRunResult,
     reviewed: Set<string>,
     signal?: AbortSignal,
-  ): Promise<Map<string, { label: RuleLabel; model: string }>> {
-    const labels = new Map<string, { label: RuleLabel; model: string }>();
+  ): Promise<void> {
     for (let i = 0; i < channels.length && !signal?.aborted; i += this.config.batchSize) {
       const batch = channels.slice(i, i + this.config.batchSize);
       const inputs: ChannelLabelInput[] = batch.map((channel, index) => ({
@@ -118,7 +131,7 @@ export class NicheLabelingService {
       }));
       result.batches += 1;
       try {
-        const response = await this.deps.text!.generateObject({
+        const response = await provider.generateObject({
           system: LABEL_SYSTEM_PROMPT,
           messages: [{ role: "user", content: buildLabelPrompt(inputs) }],
           schema: labelBatchSchema,
@@ -140,11 +153,10 @@ export class NicheLabelingService {
         this.log.warn("AI niche labeling batch failed; keeping rule labels", { size: batch.length, error });
         // Only an unusable answer about these channels counts as a review. Outages, rate limits and
         // setup problems (retired model, bad key) stop the run so the channels are tried again later.
-        if (!isAppError(error) || error.code !== "UPSTREAM_ERROR") break;
+        if (!isAppError(error) || error.code !== "UPSTREAM_ERROR" || error instanceof AiBudgetSpentError || error instanceof AiBalanceEmptyError) break;
         for (const channel of batch) reviewed.add(channel.id);
       }
     }
-    return labels;
   }
 
   private async save(channelId: string, label: RuleLabel, model: string, at: Date, entityIds: Map<string, Promise<string>>): Promise<void> {

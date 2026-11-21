@@ -68,16 +68,21 @@ export type NicheCategory = (typeof NICHE_CATEGORIES)[number];
 export type ContentFormat = (typeof CONTENT_FORMATS)[number];
 export type QualityFlag = (typeof QUALITY_FLAGS)[number];
 
-/** What the model returns for one channel. Ranges are enforced after parsing. */
+/**
+ * What the model returns for one channel. Ranges are enforced after parsing.
+ * Enums reach Claude as a hint rather than a hard constraint, so an off-list
+ * value is caught or dropped here instead of failing the whole batch of eight:
+ * one stray format name was throwing away every label in it.
+ */
 export const channelLabelSchema = z.object({
   ref: z.string(),
-  category: z.enum(NICHE_CATEGORIES),
-  primary_kind: z.enum(["game", "topic"]),
+  category: z.enum(NICHE_CATEGORIES).catch("Other"),
+  primary_kind: z.enum(["game", "topic"]).catch("topic"),
   primary_name: z.string(),
   aliases: z.array(z.string()),
   sub_niches: z.array(z.string()),
-  formats: z.array(z.enum(CONTENT_FORMATS)),
-  flags: z.array(z.enum(QUALITY_FLAGS)),
+  formats: z.array(z.string().describe(`One of: ${CONTENT_FORMATS.join(", ")}`)),
+  flags: z.array(z.string().describe(`One of: ${QUALITY_FLAGS.join(", ")}`)),
   confidence: z.number(),
 });
 
@@ -164,6 +169,8 @@ export function nicheSlug(name: string): string {
 }
 
 const unique = <T>(values: T[]) => [...new Set(values)];
+const isContentFormat = (value: string): value is ContentFormat => (CONTENT_FORMATS as readonly string[]).includes(value);
+const isQualityFlag = (value: string): value is QualityFlag => (QUALITY_FLAGS as readonly string[]).includes(value);
 
 /** Validate ranges and tidy names. Returns null when the label is unusable. */
 export function normalizeLabel(raw: RawChannelLabel): ChannelLabel | null {
@@ -178,8 +185,8 @@ export function normalizeLabel(raw: RawChannelLabel): ChannelLabel | null {
     category: raw.category,
     primary: { kind: raw.primary_kind, name, slug, aliases },
     subNiches,
-    formats: unique(raw.formats).slice(0, 3),
-    flags: unique(raw.flags),
+    formats: unique(raw.formats.filter(isContentFormat)).slice(0, 3),
+    flags: unique(raw.flags.filter(isQualityFlag)),
     confidence: Math.round(Math.min(Math.max(Number.isFinite(raw.confidence) ? raw.confidence : 0, 0), 1) * 100) / 100,
   };
 }

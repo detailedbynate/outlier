@@ -1,5 +1,6 @@
 import type { DatabaseClient } from "@/lib/database/client";
 import { assertOk, unwrap } from "@/lib/database/errors";
+import type { ChannelProfile } from "@/lib/breakdowns/channel";
 import type { ChannelTraitRow } from "@/types/database";
 
 /** Hundreds of ids in one filter overflow the request URL limit. */
@@ -13,11 +14,27 @@ export class ChannelTraitRepository {
     return unwrap(await this.db.rpc("channels_for_faceless_check", { batch_size: limit, stale_before: staleBefore.toISOString() }), "traits.dueFaceless");
   }
 
-  async saveFaceless(rows: { channelId: string; faceless: boolean | null; model: string }[], at: Date): Promise<void> {
+  /** The faceless verdict, and the profile when Claude wrote one; a row without a profile keeps the last one. */
+  async saveFaceless(rows: { channelId: string; faceless: boolean | null; model: string; profile?: ChannelProfile }[], at: Date): Promise<void> {
     if (rows.length === 0) return;
     assertOk(
       await this.db.from("channel_traits").upsert(
-        rows.map((r) => ({ channel_id: r.channelId, faceless: r.faceless, model: r.model, faceless_checked_at: at.toISOString() })),
+        rows.map((r) => ({
+          channel_id: r.channelId,
+          faceless: r.faceless,
+          model: r.model,
+          faceless_checked_at: at.toISOString(),
+          ...(r.profile
+            ? {
+                summary: r.profile.summary,
+                main_style: r.profile.main_style,
+                presentation: r.profile.presentation,
+                tone: r.profile.tone,
+                audience: r.profile.audience,
+                content_pillars: r.profile.content_pillars,
+              }
+            : {}),
+        })),
         { onConflict: "channel_id" },
       ),
       "traits.saveFaceless",

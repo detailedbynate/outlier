@@ -193,7 +193,7 @@ const serverEnvSchema = z.object({
    * The part of the month background jobs (niche labeling, radar, sub-niche
    * names) may use, spread evenly over the days; the rest stays for scripts.
    */
-  ANTHROPIC_BACKGROUND_BUDGET_USD: z.coerce.number().min(0).default(20),
+  ANTHROPIC_BACKGROUND_BUDGET_USD: z.coerce.number().min(0).default(35),
   OPENAI_API_KEY: optionalString,
 
   /** ElevenLabs key: Voice Studio. Blank hides it. */
@@ -233,7 +233,9 @@ const serverEnvSchema = z.object({
   /** Channels embedded per hourly run for similar-channel search; 0 turns it off. Needs OPENROUTER_API_KEY. */
   EMBED_MAX_PER_RUN: z.coerce.number().int().min(0).max(2000).default(1000),
   /** Channels per hour Claude Haiku checks for faceless, from the background budget. 0 turns it off. */
-  FACELESS_MAX_PER_RUN: z.coerce.number().int().min(0).max(500).default(20),
+  FACELESS_MAX_PER_RUN: z.coerce.number().int().min(0).max(500).default(30),
+  /** Outlier videos Claude explains per hourly run (hook, style, angle, how to copy), about $0.0003 each. 0 turns it off. */
+  BREAKDOWN_MAX_PER_RUN: z.coerce.number().int().min(0).max(500).default(40),
   NICHE_LABEL_BATCH_SIZE: z.coerce.number().int().min(1).max(50).default(8),
   /** Channels labeled per hourly run. */
   NICHE_LABEL_MAX_PER_RUN: z.coerce.number().int().min(0).max(5_000).default(200),

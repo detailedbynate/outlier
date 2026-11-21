@@ -15,6 +15,7 @@ import {
   ZapIcon,
 } from "@/components/icons";
 import { matchPercent } from "@/lib/services/similar-channels-service";
+import { PRESENTATIONS, TONES, VIDEO_STYLES, termDescription, termLabel } from "@/lib/breakdowns/taxonomy";
 import { formatCompact, formatMultiplier, hoursSince, timeAgo } from "@/lib/format";
 import type { ShortsChannelWithPreviews } from "@/lib/services/research-service";
 import { setChannelTracked } from "./actions";
@@ -134,6 +135,45 @@ export function ChannelCard({
           </Dropdown>
         </div>
       </header>
+
+      {channel.profile ? (
+        <div className="channel-profile">
+          <p className="channel-summary">{channel.profile.summary}</p>
+          <div className="profile-tags">
+            {channel.profile.mainStyle && channel.profile.mainStyle !== "other" ? (
+              <span className="profile-tag" title={termDescription(VIDEO_STYLES, channel.profile.mainStyle)}>
+                <span className="profile-tag-key">Style</span>
+                {termLabel(VIDEO_STYLES, channel.profile.mainStyle)}
+              </span>
+            ) : null}
+            {channel.profile.presentation ? (
+              <span className="profile-tag" title={termDescription(PRESENTATIONS, channel.profile.presentation)}>
+                <span className="profile-tag-key">Format</span>
+                {termLabel(PRESENTATIONS, channel.profile.presentation)}
+              </span>
+            ) : null}
+            {channel.profile.tone ? (
+              <span className="profile-tag" title={termDescription(TONES, channel.profile.tone)}>
+                <span className="profile-tag-key">Tone</span>
+                {termLabel(TONES, channel.profile.tone)}
+              </span>
+            ) : null}
+            {channel.profile.audience ? (
+              <span className="profile-tag">
+                <span className="profile-tag-key">For</span>
+                {channel.profile.audience}
+              </span>
+            ) : null}
+          </div>
+          {channel.profile.pillars.length > 0 ? (
+            <div className="profile-pillars" title="Recurring series and themes">
+              {channel.profile.pillars.map((pillar) => (
+                <span key={pillar}>{pillar}</span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className={`growth-panel ${highlightGrowth ? "is-highlighted" : ""}`}>
         <div className="growth-panel-head">

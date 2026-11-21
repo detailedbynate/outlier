@@ -9,6 +9,7 @@ import type { LibraryGrowthService } from "@/lib/services/library-growth-service
 import { MONITOR_CHANNELS_JOB_TYPE, MONITOR_VIDEOS_JOB_TYPE, type MonitoringService } from "@/lib/services/monitoring-service";
 import type { NicheLabelingService } from "@/lib/services/niche-labeling-service";
 import type { ChannelTraitsService } from "@/lib/services/channel-traits-service";
+import type { VideoBreakdownService } from "@/lib/services/video-breakdown-service";
 import type { SimilarChannelsService } from "@/lib/services/similar-channels-service";
 import type { StorageBudgetService } from "@/lib/services/storage-budget-service";
 import { TRENDING_JOB_TYPE, TRENDING_REFRESH_JOB_TYPE, type TrendingService } from "@/lib/services/trending-service";
@@ -29,6 +30,7 @@ export interface JobDependencies {
   nicheLabeling: NicheLabelingService;
   similar: Pick<SimilarChannelsService, "embedPending">;
   traits: Pick<ChannelTraitsService, "classifyPending">;
+  breakdowns: Pick<VideoBreakdownService, "breakdownPending">;
   libraryGrowth: LibraryGrowthService;
   /** Housekeeping for the YouTube response cache and quota ledger. */
   youtubeHousekeeping: { pruneCache: () => Promise<void>; pruneQuotaHistory: () => Promise<void> };
@@ -48,12 +50,14 @@ export interface JobDependencies {
     nicheLabelMaxPerRun: number;
     embedMaxPerRun: number;
     facelessMaxPerRun: number;
+    breakdownMaxPerRun: number;
   };
 }
 
 export const NICHE_LABEL_JOB_TYPE = "niches.label_channels";
 export const EMBED_CHANNELS_JOB_TYPE = "channels.embed";
 export const FACELESS_JOB_TYPE = "channels.faceless";
+export const VIDEO_BREAKDOWN_JOB_TYPE = "videos.breakdown";
 export const LIBRARY_GROWTH_JOB_TYPE = "library.grow";
 export const LIBRARY_FEATURED_JOB_TYPE = "library.featured";
 export const DISCORD_SYNC_JOB_TYPE = "discord.sync_roles";
@@ -318,10 +322,19 @@ export function createJobRegistry(deps: JobDependencies): JobRegistry {
     .register(
       defineJob({
         type: FACELESS_JOB_TYPE,
-        description: "Scheduled: Claude Haiku looks at a few Shorts thumbnails per channel to tell faceless channels from on-camera ones (background budget).",
+        description: "Scheduled: Claude Haiku profiles channels from a few Shorts thumbnails and titles: faceless or on camera, a one-line summary, style, presentation, tone and audience (background budget).",
         payloadSchema: emptyPayload,
         maxAttempts: 1,
         handler: async (_payload, { signal }) => ({ ...(await deps.traits.classifyPending({ maxChannels: deps.config.facelessMaxPerRun, signal })) }),
+      }),
+    )
+    .register(
+      defineJob({
+        type: VIDEO_BREAKDOWN_JOB_TYPE,
+        description: "Scheduled: Claude Haiku explains why the top outlier videos took off (hook, style, angle, title pattern, how to copy it) for Viral Videos (background budget).",
+        payloadSchema: emptyPayload,
+        maxAttempts: 1,
+        handler: async (_payload, { signal }) => ({ ...(await deps.breakdowns.breakdownPending({ maxVideos: deps.config.breakdownMaxPerRun, signal })) }),
       }),
     )
     .register(

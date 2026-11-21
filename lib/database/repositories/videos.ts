@@ -224,6 +224,8 @@ export class VideoRepository {
     youtubeChannelId?: string;
     /** Restrict to these channel UUIDs. */
     channelIds?: string[];
+    /** Restrict to these video UUIDs (e.g. a breakdown filter); looked up 100 at a time. */
+    videoIds?: string[];
     /**
      * Finding videos across other channels (Viral Videos, peers): leaves out
      * paid ads and upcoming premieres, and ranks "outlier" by viral_score so a
@@ -232,8 +234,20 @@ export class VideoRepository {
      */
     discovery?: boolean;
   }): Promise<VideoFeedRow[]> {
-    if (options.channelIds?.length === 0) return [];
+    if (options.channelIds?.length === 0 || options.videoIds?.length === 0) return [];
+    if (options.videoIds && options.videoIds.length > 100) {
+      // Hundreds of ids in one filter overflow the request URL: query in chunks, then rank together.
+      const chunks: string[][] = [];
+      for (let i = 0; i < options.videoIds.length; i += 100) chunks.push(options.videoIds.slice(i, i + 100));
+      const parts = await Promise.all(chunks.map((videoIds) => this.feed({ ...options, videoIds })));
+      const key = options.discovery && options.orderBy === "outlier_score" ? "outlier_score" : options.orderBy;
+      return parts
+        .flat()
+        .sort((a, b) => sortValue(b[key]) - sortValue(a[key]))
+        .slice(0, options.limit);
+    }
     let query = this.db.from("video_feed").select("*");
+    if (options.videoIds) query = query.in("video_id", options.videoIds);
     if (options.discovery) {
       query = query.eq("promoted", false);
       if (!options.format) query = query.neq("format", "upcoming");
@@ -254,4 +268,11 @@ export class VideoRepository {
       "video_performance.upsert",
     );
   }
+}
+
+/** Feed columns can be numbers, numeric strings, dates or null; nulls sort last. */
+function sortValue(value: unknown): number {
+  if (value === null || value === undefined) return -Infinity;
+  if (typeof value === "string" && Number.isNaN(Number(value))) return Date.parse(value);
+  return Number(value);
 }

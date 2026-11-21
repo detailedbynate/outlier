@@ -7,6 +7,8 @@ import { requireApprovedUser } from "@/lib/auth/session";
 import { Paywall } from "@/components/paywall";
 import { paidFeaturesLocked } from "@/lib/billing/feature-gate";
 import { PAID_FEATURES } from "@/lib/billing/features";
+import { Dropdown } from "@/components/dropdown";
+import { ANGLES, HOOK_TYPES, VIDEO_STYLES, termLabel } from "@/lib/breakdowns/taxonomy";
 import { getServices } from "@/lib/services";
 import type { VideoFormat } from "@/types/database";
 
@@ -33,6 +35,13 @@ const SORTS = [
   { key: "view_count", label: "Total views" },
 ] as const;
 
+/** Filters on Claude's breakdowns: only videos it has explained can match. */
+const BREAKDOWN_FILTERS = [
+  { param: "style", label: "Style", terms: VIDEO_STYLES },
+  { param: "hook", label: "Hook", terms: HOOK_TYPES },
+  { param: "angle", label: "Angle", terms: ANGLES },
+] as const;
+
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 function pick<T extends readonly { key: string }[]>(options: T, value: unknown, fallback: T[number]["key"]): T[number]["key"] {
@@ -48,16 +57,31 @@ export default async function ViralPage({ searchParams }: { searchParams: Search
   const format = pick(FORMATS, params.format, "all");
   const sort = pick(SORTS, params.sort, "outlier_score");
 
-  const videos = await getServices().repositories.videos.feed({
+  const chosen = {
+    style: typeof params.style === "string" && params.style in VIDEO_STYLES ? params.style : "",
+    hook: typeof params.hook === "string" && params.hook in HOOK_TYPES ? params.hook : "",
+    angle: typeof params.angle === "string" && params.angle in ANGLES ? params.angle : "",
+  };
+  const filtering = Boolean(chosen.style || chosen.hook || chosen.angle);
+
+  const { repositories } = getServices();
+  // No breakdowns table yet (migration not applied): show the plain feed rather than fail the page.
+  const matching = filtering
+    ? await repositories.breakdowns.videoIdsWhere({ style: chosen.style, hookType: chosen.hook, angle: chosen.angle }, 600).catch(() => null)
+    : null;
+  const videos = await repositories.videos.feed({
     orderBy: sort,
     limit: 60,
     publishedAfter: range === "all" ? undefined : daysAgo(Number(range)),
     format: format === "all" ? undefined : (format as VideoFormat),
     discovery: true,
+    ...(matching ? { videoIds: matching } : {}),
   });
+  const breakdowns = await repositories.breakdowns.forVideos(videos.map((v) => v.video_id)).catch(() => new Map());
 
   const href = (overrides: Record<string, string>) => {
-    const next = new URLSearchParams({ range, format, sort, ...overrides });
+    const next = new URLSearchParams({ range, format, sort, ...chosen, ...overrides });
+    for (const [key, value] of [...next.entries()]) if (!value) next.delete(key);
     return `/viral?${next.toString()}`;
   };
 
@@ -89,14 +113,54 @@ export default async function ViralPage({ searchParams }: { searchParams: Search
         </div>
       </div>
 
+      <div className="row breakdown-filters" aria-label="Filter by what made them work">
+        <span className="muted">What worked</span>
+        {BREAKDOWN_FILTERS.map((filter) => {
+          const current = chosen[filter.param];
+          return (
+            <Dropdown
+              key={filter.param}
+              className={`filter-dropdown ${current ? "is-set" : ""}`}
+              label={
+                <span>
+                  {filter.label}: <strong>{termLabel(filter.terms, current) ?? "Any"}</strong>
+                </span>
+              }
+            >
+              <Link href={href({ [filter.param]: "" })} className="dropdown-item" aria-current={!current}>
+                Any
+              </Link>
+              {Object.entries(filter.terms)
+                .filter(([key]) => key !== "other")
+                .map(([key, term]) => (
+                  <Link key={key} href={href({ [filter.param]: key })} className="dropdown-item" title={term.description} aria-current={key === current}>
+                    {term.label}
+                  </Link>
+                ))}
+            </Dropdown>
+          );
+        })}
+        {filtering ? (
+          <Link href={href({ style: "", hook: "", angle: "" })} className="muted">
+            Clear
+          </Link>
+        ) : null}
+      </div>
+
       {videos.length === 0 ? (
         <div className="card empty">
-          No videos match. <Link href="/channels">Track more channels</Link> or widen the date range.
+          {filtering ? (
+            <>No explained videos match these filters yet. Breakdowns are added every hour, so try a wider date range or check back soon.</>
+          ) : (
+            <>
+              No videos match. <Link href="/channels">Track more channels</Link> or widen the date range.
+            </>
+          )}
         </div>
       ) : (
         <div className="video-grid">
           {videos.map((video) => (
-            <VideoCard key={video.video_id} video={video} />
+            <VideoCard key={video.video_id} video={video} breakdown={breakdowns.get(video.video_id)} />
           ))}
         </div>
       )}

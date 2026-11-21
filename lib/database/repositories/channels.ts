@@ -68,10 +68,10 @@ export class ChannelRepository {
     return rows[0] ?? null;
   }
 
-  async findByIds(ids: string[]): Promise<Pick<ChannelRow, "id" | "title" | "youtube_channel_id" | "thumbnail_url" | "subscriber_count">[]> {
+  async findByIds(ids: string[]): Promise<Pick<ChannelRow, "id" | "title" | "youtube_channel_id" | "thumbnail_url" | "subscriber_count" | "description">[]> {
     if (ids.length === 0) return [];
     return unwrap(
-      await this.db.from("channels").select("id, title, youtube_channel_id, thumbnail_url, subscriber_count").in("id", ids),
+      await this.db.from("channels").select("id, title, youtube_channel_id, thumbnail_url, subscriber_count, description").in("id", ids),
       "channels.findByIds",
     );
   }
@@ -317,7 +317,7 @@ export class ChannelRepository {
    * Channels waiting for niche labels, with their recent upload titles and tags.
    * Only channels with stored uploads: without them there is nothing to judge.
    */
-  async listUnlabeled(limit: number, options: { includeUnsureRuleLabels?: boolean } = {}): Promise<
+  async listUnlabeled(limit: number, options: { includeUnsureRuleLabels?: boolean; includeRuleLabels?: boolean } = {}): Promise<
     (Pick<ChannelRow, "id" | "title" | "description" | "keywords" | "topic_categories" | "subscriber_count" | "niche_labeled_at"> & {
       recentTitles: string[];
       recentTags: string[];
@@ -333,8 +333,15 @@ export class ChannelRepository {
         await this.db
           .from("channels")
           .select("id, title, description, keywords, topic_categories, subscriber_count, niche_labeled_at")
-          // With an AI provider, channels the free rules weren't sure about get another look.
-          .or(options.includeUnsureRuleLabels ? "niche_labeled_at.is.null,and(niche_label_model.eq.rules-v1,niche_confidence.lt.0.6)" : "niche_labeled_at.is.null")
+          // With an AI provider, channels the free rules weren't sure about get another look;
+          // with Claude, every channel the rules labeled does, sure or not.
+          .or(
+            options.includeRuleLabels
+              ? "niche_labeled_at.is.null,niche_label_model.eq.rules-v1"
+              : options.includeUnsureRuleLabels
+                ? "niche_labeled_at.is.null,and(niche_label_model.eq.rules-v1,niche_confidence.lt.0.6)"
+                : "niche_labeled_at.is.null",
+          )
           .order("niche_labeled_at", { ascending: true, nullsFirst: true })
           .order("created_at", { ascending: true })
           .range(page * pageSize, page * pageSize + pageSize - 1),

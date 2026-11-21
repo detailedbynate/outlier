@@ -409,6 +409,30 @@ export type ChannelTraitRow = {
   faceless: boolean | null;
   faceless_checked_at: string | null;
   model: string | null;
+  /** One line on what the channel makes (lib/breakdowns/channel.ts). */
+  summary: string | null;
+  /** Keys from lib/breakdowns/taxonomy.ts. */
+  main_style: string | null;
+  presentation: string | null;
+  tone: string | null;
+  audience: string | null;
+  content_pillars: string[];
+};
+
+/** Claude's read on why an outlier video took off (supabase/migrations/20261121000043_ai_breakdowns.sql). */
+export type VideoBreakdownRow = {
+  video_id: string;
+  hook_type: string;
+  style: string;
+  angle: string;
+  topic: string;
+  title_pattern: string;
+  thumbnail_style: string;
+  why_it_worked: string;
+  how_to_copy: string;
+  tags: string[];
+  model: string;
+  analyzed_at: string;
 };
 
 /** A personal MCP token; only its hash is stored. */
@@ -758,6 +782,7 @@ export type Database = {
       discord_links: TableDef<DiscordLinkRow, "user_id" | "discord_id" | "discord_username">;
       channel_embeddings: TableDef<ChannelEmbeddingRow, "channel_id" | "embedding" | "model" | "source_hash">;
       channel_traits: TableDef<ChannelTraitRow, "channel_id">;
+      video_breakdowns: TableDef<VideoBreakdownRow, "video_id" | "hook_type" | "style" | "angle" | "topic" | "title_pattern" | "thumbnail_style" | "why_it_worked" | "how_to_copy" | "model">;
       mcp_tokens: TableDef<McpTokenRow, "user_id" | "token_hash" | "prefix">;
       referral_rewards: TableDef<ReferralRewardRow, "code" | "referred_user_id">;
       credit_grants: TableDef<CreditGrantRow, "user_id" | "amount" | "reason">;

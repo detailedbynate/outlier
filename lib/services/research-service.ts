@@ -8,7 +8,7 @@ import { DEFAULT_QUALITY, rejectReason, underratedScore, type QualityConfig } fr
 import { keywordTokens, mentionsKeywords } from "@/lib/research/relevance";
 import { parseChannelIdentifier } from "@/lib/youtube/parse";
 import type { YouTubeService } from "@/lib/youtube/service";
-import type { ChannelRow, ShortsChannelRow, VideoFeedRow } from "@/types/database";
+import type { ChannelRow, ChannelTraitRow, ShortsChannelRow, VideoFeedRow } from "@/types/database";
 import type { ChannelTraitRepository } from "@/lib/database/repositories/traits";
 import { yppEligible } from "./channel-traits-service";
 import type { SimilarChannelsService } from "./similar-channels-service";
@@ -35,7 +35,24 @@ export type ShortsChannelWithPreviews = ShortsChannelRow & {
   ypp?: boolean;
   /** 0–1, in "similar to" mode. */
   similarity?: number;
+  /** Claude's profile of the channel, once it has written one. */
+  profile?: ChannelProfileSummary | null;
 };
+
+/** The parts of a channel profile shown on cards (keys from lib/breakdowns/taxonomy.ts). */
+export interface ChannelProfileSummary {
+  summary: string;
+  mainStyle: string | null;
+  presentation: string | null;
+  tone: string | null;
+  audience: string | null;
+  pillars: string[];
+}
+
+function profileOf(row: ChannelTraitRow | undefined): ChannelProfileSummary | null {
+  if (!row?.summary) return null;
+  return { summary: row.summary, mainStyle: row.main_style, presentation: row.presentation, tone: row.tone, audience: row.audience, pillars: row.content_pillars ?? [] };
+}
 
 /** Channels considered for a "similar to" list before the page's filters narrow it. */
 const SIMILAR_CANDIDATES = 300;
@@ -149,11 +166,11 @@ export class ResearchService {
   }
 
   /** Latest Shorts and badges (faceless, YPP eligible) for a page of channels. */
-  private async decorate<T extends ShortsChannelRow>(rows: T[], previewsPerChannel: number): Promise<(T & { recentShorts: VideoPreview[]; faceless: boolean | null; ypp: boolean })[]> {
+  private async decorate<T extends ShortsChannelRow>(rows: T[], previewsPerChannel: number): Promise<(T & { recentShorts: VideoPreview[]; faceless: boolean | null; ypp: boolean; profile: ChannelProfileSummary | null })[]> {
     const ids = rows.map((r) => r.channel_id);
     const [previews, traits, views] = await Promise.all([
       previewsPerChannel > 0 && this.deps.videos ? this.deps.videos.latestShortsByChannel(ids, previewsPerChannel) : new Map<string, VideoPreview[]>(),
-      this.deps.traits && ids.length > 0 ? this.deps.traits.forChannels(ids).catch(() => new Map()) : new Map(),
+      this.deps.traits && ids.length > 0 ? this.deps.traits.forChannels(ids).catch(() => new Map<string, ChannelTraitRow>()) : new Map<string, ChannelTraitRow>(),
       this.deps.traits && ids.length > 0 ? this.deps.traits.shortsViews90d(ids).catch(() => new Map<string, number>()) : new Map<string, number>(),
     ]);
     return rows.map((row) => ({
@@ -161,6 +178,7 @@ export class ResearchService {
       recentShorts: previews.get(row.channel_id) ?? [],
       faceless: traits.get(row.channel_id)?.faceless ?? null,
       ypp: yppEligible(row.subscriber_count, views.get(row.channel_id)),
+      profile: profileOf(traits.get(row.channel_id)),
     }));
   }
 

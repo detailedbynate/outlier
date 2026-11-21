@@ -29,7 +29,7 @@ function aiLabel(ref: string, name: string) {
   return { ref, category: "Gaming", primary_kind: "game", primary_name: name, aliases: [], sub_niches: [`${name.toLowerCase()} guides`], formats: ["gameplay"], flags: [], confidence: 0.9 };
 }
 
-function setup(options: { pending?: ReturnType<typeof channel>[]; respond?: (call: number) => unknown; ai?: boolean } = {}) {
+function setup(options: { pending?: ReturnType<typeof channel>[]; respond?: (call: number) => unknown; ai?: boolean; claude?: (call: number) => unknown } = {}) {
   const saved = new Map<string, Record<string, unknown>>();
   const upserts: { slug: string; kind: string; parentId: string | null }[] = [];
   let calls = 0;
@@ -40,11 +40,20 @@ function setup(options: { pending?: ReturnType<typeof channel>[]; respond?: (cal
     return { object: result, model: "claude-haiku-4-5", usage: { inputTokens: 1_000, outputTokens: 200 } };
   });
   const refreshChannelCounts = vi.fn(async () => {});
+  let claudeCalls = 0;
+  const claudeObject = vi.fn(async () => {
+    claudeCalls += 1;
+    const result = options.claude?.(claudeCalls);
+    if (result instanceof Error) throw result;
+    return { object: result, model: "claude-haiku-5-5", usage: { inputTokens: 500, outputTokens: 100 } };
+  });
+  const listUnlabeled = vi.fn(async (limit: number, _options?: unknown) => (options.pending ?? []).slice(0, limit));
   const service = new NicheLabelingService(
     {
       text: options.ai ? ({ name: "fake", generateText: vi.fn(), generateObject } as unknown as TextProvider) : null,
+      claude: options.claude ? ({ name: "anthropic", generateText: vi.fn(), generateObject: claudeObject } as unknown as TextProvider) : null,
       channels: {
-        listUnlabeled: async (limit: number) => (options.pending ?? []).slice(0, limit),
+        listUnlabeled,
         saveNicheLabel: async (id: string, value: Record<string, unknown>) => {
           saved.set(id, value);
         },
@@ -60,7 +69,7 @@ function setup(options: { pending?: ReturnType<typeof channel>[]; respond?: (cal
     { batchSize: 2 },
     createLogger(),
   );
-  return { service, saved, upserts, generateObject, refreshChannelCounts };
+  return { service, saved, upserts, generateObject, claudeObject, listUnlabeled, refreshChannelCounts };
 }
 
 describe("NicheLabelingService", () => {
@@ -105,6 +114,34 @@ describe("NicheLabelingService", () => {
     expect(saved.get("a")).toMatchObject({ model: RULES_MODEL, nicheId: "niche-clash-royale" });
     expect(saved.get("b")).toMatchObject({ model: "claude-haiku-4-5", nicheId: "niche-minecraft" });
     expect(saved.get("c")).toMatchObject({ nicheId: "niche-terraria" });
+  });
+
+  it("with Claude, also gets a second read on channels the rules were sure about, and asks for them", async () => {
+    const { service, saved, generateObject, claudeObject, listUnlabeled } = setup({
+      ai: true,
+      pending: [clashChannel("a"), vagueChannel("b")],
+      respond: () => ({ channels: [aiLabel("c1", "Minecraft")] }),
+      claude: () => ({ channels: [{ ...aiLabel("c1", "Clash Royale"), sub_niches: ["hog cycle decks"], formats: ["tutorial_guide", "not_a_format"] }] }),
+    });
+    const result = await service.labelPending({ maxChannels: 10, now: () => NOW });
+
+    expect(listUnlabeled.mock.calls[0]?.[1]).toEqual({ includeUnsureRuleLabels: true, includeRuleLabels: true });
+    expect(generateObject).toHaveBeenCalledTimes(1);
+    expect(claudeObject).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({ labeled: 2, byAi: 2 });
+    expect(saved.get("a")).toMatchObject({ model: "claude-haiku-5-5", nicheId: "niche-clash-royale", labels: ["hog cycle decks"], formats: ["tutorial_guide"] });
+    expect(saved.get("b")).toMatchObject({ nicheId: "niche-minecraft" });
+  });
+
+  it("leaves a sure rule label alone, and unreviewed, when Claude's budget is used up", async () => {
+    const { AiBudgetSpentError } = await import("@/lib/ai/budget");
+    const { service, saved } = setup({
+      pending: [channel("a", ["best deck #clashroyale", "clash royale ladder push", "hog cycle guide clash royale", "evo tier list #clashroyale"], "A", "2026-09-10T00:00:00Z")],
+      claude: () => new AiBudgetSpentError(),
+    });
+    const result = await service.labelPending({ maxChannels: 10, now: () => NOW });
+    expect(result.labeled).toBe(0);
+    expect(saved.has("a")).toBe(false);
   });
 
   it("keeps the AI's finished batches when the run runs out of time on a later one", async () => {

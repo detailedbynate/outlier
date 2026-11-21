@@ -23095,3 +23095,202 @@ body.app-body {
 @media (max-width: 640px) {
   .prose-card.seo-page { padding: 20px 16px; margin: 12px 0; }
 }
+
+/* ── "Why it blew up" on video cards, filters on Viral Videos, channel profiles ── */
+.breakdown {
+  margin-top: 10px;
+  border-top: 1px solid var(--grid);
+  padding-top: 8px;
+}
+
+.breakdown > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  list-style: none;
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--accent-text);
+  padding: 4px 2px;
+  border-radius: var(--radius-sm);
+}
+
+.breakdown > summary::-webkit-details-marker {
+  display: none;
+}
+
+.breakdown > summary:hover {
+  color: var(--text-primary);
+}
+
+.breakdown > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.breakdown-chevron {
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform 0.2s var(--ease);
+}
+
+.breakdown[open] .breakdown-chevron {
+  transform: rotate(-135deg) translateY(-1px);
+}
+
+.breakdown-body {
+  display: grid;
+  gap: 9px;
+  padding: 8px 2px 2px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.breakdown-terms {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+}
+
+.breakdown-terms > div {
+  min-width: 0;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.breakdown-terms dt {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.breakdown-terms dd {
+  margin: 1px 0 0;
+  color: var(--text-primary);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.breakdown-why {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.breakdown-row {
+  display: grid;
+  gap: 1px;
+}
+
+.breakdown-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.breakdown-pattern {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.breakdown-copy {
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-wash);
+  border: 1px solid var(--accent-track);
+}
+
+.breakdown-copy > span:last-child {
+  color: var(--text-primary);
+}
+
+.breakdown-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.breakdown-filters {
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  font-size: 13px;
+}
+
+.filter-dropdown.is-set > summary {
+  border-color: var(--accent-track);
+  color: var(--text-primary);
+}
+
+.filter-dropdown .dropdown-panel {
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.channel-profile {
+  display: grid;
+  gap: 8px;
+  padding: 2px 0 12px;
+}
+
+.channel-summary {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--text-primary);
+}
+
+.profile-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.profile-tag {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  max-width: 100%;
+}
+
+.profile-tag-key {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.profile-pillars {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.profile-pillars > span::before {
+  content: "#";
+  margin-right: 2px;
+  color: var(--accent-text);
+}

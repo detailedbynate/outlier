@@ -41,7 +41,9 @@ import {
   UsageRepository,
   VideoRepository,
 } from "@/lib/database";
-import { createJobRegistry, DISCORD_SYNC_JOB_TYPE, EMBED_CHANNELS_JOB_TYPE, FACELESS_JOB_TYPE, LIBRARY_FEATURED_JOB_TYPE, LIBRARY_GROWTH_JOB_TYPE, NICHE_LABEL_JOB_TYPE } from "@/lib/jobs/definitions";
+import { createJobRegistry, DISCORD_SYNC_JOB_TYPE, EMBED_CHANNELS_JOB_TYPE, FACELESS_JOB_TYPE, LIBRARY_FEATURED_JOB_TYPE, LIBRARY_GROWTH_JOB_TYPE, NICHE_LABEL_JOB_TYPE, VIDEO_BREAKDOWN_JOB_TYPE } from "@/lib/jobs/definitions";
+import { VideoBreakdownService } from "@/lib/services/video-breakdown-service";
+import { VideoBreakdownRepository } from "@/lib/database/repositories/breakdowns";
 import { JobQueue } from "@/lib/jobs/queue";
 import type { JobRegistry } from "@/lib/jobs/registry";
 import { JobScheduler } from "@/lib/jobs/scheduler";
@@ -159,6 +161,7 @@ export interface Services {
     youtubeCache: YouTubeCacheRepository;
     embeddings: EmbeddingRepository;
     traits: ChannelTraitRepository;
+    breakdowns: VideoBreakdownRepository;
     mcpTokens: McpTokenRepository;
   };
 }
@@ -237,6 +240,7 @@ export function getServices(): Services {
     youtubeCache: lazy(() => new YouTubeCacheRepository(lazyDb())),
     embeddings: lazy(() => new EmbeddingRepository(lazyDb())),
     traits: lazy(() => new ChannelTraitRepository(lazyDb())),
+    breakdowns: lazy(() => new VideoBreakdownRepository(lazyDb())),
     mcpTokens: lazy(() => new McpTokenRepository(lazyDb())),
   };
   const accounts = new AccountService(
@@ -307,12 +311,13 @@ export function getServices(): Services {
   const weeklyUsd = config.ANTHROPIC_WEEKLY_BUDGET_USD;
   const claudeBudget = new MonthlySpendBudget(repositories.usage, config.ANTHROPIC_MONTHLY_BUDGET_USD, { weeklyUsd });
   const backgroundBudget = new MonthlySpendBudget(repositories.usage, config.ANTHROPIC_MONTHLY_BUDGET_USD, { shareUsd: config.ANTHROPIC_BACKGROUND_BUDGET_USD, weeklyUsd });
-  const traits = new ChannelTraitsService({ vision: backgroundClaude(config, backgroundBudget), traits: repositories.traits, videos: repositories.videos });
+  const traits = new ChannelTraitsService({ vision: backgroundClaude(config, backgroundBudget), traits: repositories.traits, videos: repositories.videos, channels: repositories.channels });
+  const breakdowns = new VideoBreakdownService({ ai: backgroundClaude(config, backgroundBudget), videos: repositories.videos, breakdowns: repositories.breakdowns });
   // Niche labeling is rule-based and free; an AI provider only gives unsure channels a second opinion.
   const text = labelingProvider(config, backgroundBudget);
   if (text && !getAIProviders().has("text")) getAIProviders().register("text", text);
   const nicheLabeling = new NicheLabelingService(
-    { text, channels: repositories.channels, niches: repositories.niches },
+    { text, claude: backgroundClaude(config, backgroundBudget), channels: repositories.channels, niches: repositories.niches },
     { batchSize: config.NICHE_LABEL_BATCH_SIZE },
   );
   // The radar's scraping half (autocomplete, search) is wired up by the scraper, which owns the gate's pace;
@@ -372,6 +377,7 @@ export function getServices(): Services {
     discord,
     similar,
     traits,
+    breakdowns,
     monitoring,
     nicheLabeling,
     libraryGrowth,
@@ -399,6 +405,7 @@ export function getServices(): Services {
       nicheLabelMaxPerRun: config.NICHE_LABEL_MAX_PER_RUN,
       embedMaxPerRun: config.EMBED_MAX_PER_RUN,
       facelessMaxPerRun: config.FACELESS_MAX_PER_RUN,
+      breakdownMaxPerRun: config.BREAKDOWN_MAX_PER_RUN,
     },
   });
   const queue = new JobQueue(repositories.jobs, jobRegistry);
@@ -417,6 +424,7 @@ export function getServices(): Services {
     { type: NICHE_LABEL_JOB_TYPE, everyHours: 1 },
     ...(config.OPENROUTER_API_KEY && config.EMBED_MAX_PER_RUN > 0 ? [{ type: EMBED_CHANNELS_JOB_TYPE, everyHours: 1 }] : []),
     ...(config.ANTHROPIC_API_KEY && config.FACELESS_MAX_PER_RUN > 0 ? [{ type: FACELESS_JOB_TYPE, everyHours: 1 }] : []),
+    ...(config.ANTHROPIC_API_KEY && config.BREAKDOWN_MAX_PER_RUN > 0 ? [{ type: VIDEO_BREAKDOWN_JOB_TYPE, everyHours: 1 }] : []),
     ...(config.LIBRARY_GROWTH_SEARCHES_PER_RUN > 0 || config.LIBRARY_FEATURED_CHECKS_PER_RUN > 0 ? [{ type: LIBRARY_GROWTH_JOB_TYPE, everyHours: 1 }] : []),
     ...(config.LIBRARY_FEATURED_CHECKS_PER_RUN > 0 ? [{ type: LIBRARY_FEATURED_JOB_TYPE, everyHours: 1 }] : []),
   ]);
